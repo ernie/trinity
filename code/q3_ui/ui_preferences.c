@@ -42,6 +42,7 @@ GAME OPTIONS MENU
 #define ID_DAMAGEEFFECT			139
 #define ID_CROSSHAIRCOLOR		140
 #define ID_BLOODPARTICLES		141
+#define ID_DAMAGEPLUMS			142
 
 #define	NUM_CROSSHAIRS			10
 
@@ -64,8 +65,9 @@ typedef struct {
 	menuradiobutton_s	synceveryframe;
 	menuradiobutton_s	forcemodel;
 	menulist_s			drawteamoverlay;
-	menulist_s			damageeffect;
-	menulist_s			bloodparticles;
+	menuradiobutton_s	damageeffect;
+	menuradiobutton_s	bloodparticles;
+	menuradiobutton_s	damageplums;
 	menuradiobutton_s	allowdownload;
 	menubitmap_s		back;
 
@@ -85,25 +87,11 @@ static const char *teamoverlay_names[] =
 	NULL
 };
 
-static const char *damageeffect_names[] =
-{
-	"Classic",
-	"Modern",
-	NULL
-};
-
 // Maps cvar value (1-7) to UI slider position (0-6)
 // Cvar: 1=red,2=green,3=yellow,4=blue,5=cyan,6=magenta,7=white
 // UI order: red,yellow,green,teal,blue,cyan,white (color spectrum)
 static int gamecodetoui[] = {4,2,3,0,5,1,6};
 static int uitogamecode[] = {4,6,2,3,1,5,7};
-
-static const char *bloodparticles_names[] =
-{
-	"Classic",
-	"Particles",
-	NULL
-};
 
 static void Preferences_SetMenuItems( void ) {
 	int c;
@@ -125,8 +113,9 @@ static void Preferences_SetMenuItems( void ) {
 	s_preferences.synceveryframe.curvalue	= trap_Cvar_VariableValue( "r_swapinterval" ) != 0;
 	s_preferences.forcemodel.curvalue		= trap_Cvar_VariableValue( "cg_forcemodel" ) != 0;
 	s_preferences.drawteamoverlay.curvalue	= Com_Clamp( 0, 3, trap_Cvar_VariableValue( "cg_drawTeamOverlay" ) );
-	s_preferences.damageeffect.curvalue		= Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_damageEffect" ) );
-	s_preferences.bloodparticles.curvalue	= Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_bloodParticles" ) );
+	s_preferences.damageeffect.curvalue		= trap_Cvar_VariableValue( "cg_damageEffect" ) != 0;
+	s_preferences.bloodparticles.curvalue	= trap_Cvar_VariableValue( "cg_bloodParticles" ) != 0;
+	s_preferences.damageplums.curvalue		= trap_Cvar_VariableValue( "cg_damagePlums" ) != 0;
 	s_preferences.allowdownload.curvalue	= trap_Cvar_VariableValue( "cl_allowDownload" ) != 0;
 }
 
@@ -199,6 +188,10 @@ static void Preferences_Event( void* ptr, int notification ) {
 
 	case ID_BLOODPARTICLES:
 		trap_Cvar_SetValue( "cg_bloodParticles", s_preferences.bloodparticles.curvalue );
+		break;
+
+	case ID_DAMAGEPLUMS:
+		trap_Cvar_SetValue( "cg_damagePlums", s_preferences.damageplums.curvalue );
 		break;
 
 	case ID_BACK:
@@ -477,24 +470,31 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.drawteamoverlay.itemnames			= teamoverlay_names;
 
 	y += BIGCHAR_HEIGHT+2;
-	s_preferences.damageeffect.generic.type       = MTYPE_SPINCONTROL;
-	s_preferences.damageeffect.generic.name       = "Damage Effect:";
+	s_preferences.damageeffect.generic.type       = MTYPE_RADIOBUTTON;
+	s_preferences.damageeffect.generic.name       = "Modern Damage Effect:";
 	s_preferences.damageeffect.generic.flags      = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_preferences.damageeffect.generic.callback   = Preferences_Event;
 	s_preferences.damageeffect.generic.id         = ID_DAMAGEEFFECT;
 	s_preferences.damageeffect.generic.x          = PREFERENCES_X_POS;
 	s_preferences.damageeffect.generic.y          = y;
-	s_preferences.damageeffect.itemnames          = damageeffect_names;
 
 	y += BIGCHAR_HEIGHT+2;
-	s_preferences.bloodparticles.generic.type       = MTYPE_SPINCONTROL;
-	s_preferences.bloodparticles.generic.name       = "Blood Effect:";
+	s_preferences.bloodparticles.generic.type       = MTYPE_RADIOBUTTON;
+	s_preferences.bloodparticles.generic.name       = "Blood Particles:";
 	s_preferences.bloodparticles.generic.flags      = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_preferences.bloodparticles.generic.callback   = Preferences_Event;
 	s_preferences.bloodparticles.generic.id         = ID_BLOODPARTICLES;
 	s_preferences.bloodparticles.generic.x          = PREFERENCES_X_POS;
 	s_preferences.bloodparticles.generic.y          = y;
-	s_preferences.bloodparticles.itemnames          = bloodparticles_names;
+
+	y += BIGCHAR_HEIGHT+2;
+	s_preferences.damageplums.generic.type     = MTYPE_RADIOBUTTON;
+	s_preferences.damageplums.generic.name	   = "Damage Numbers:";
+	s_preferences.damageplums.generic.flags	   = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.damageplums.generic.callback = Preferences_Event;
+	s_preferences.damageplums.generic.id       = ID_DAMAGEPLUMS;
+	s_preferences.damageplums.generic.x	       = PREFERENCES_X_POS;
+	s_preferences.damageplums.generic.y	       = y;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_preferences.allowdownload.generic.type     = MTYPE_RADIOBUTTON;
@@ -534,6 +534,7 @@ static void Preferences_MenuInit( void ) {
 	Menu_AddItem( &s_preferences.menu, &s_preferences.drawteamoverlay );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageeffect );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.bloodparticles );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.damageplums );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.allowdownload );
 
 	Menu_AddItem( &s_preferences.menu, &s_preferences.back );

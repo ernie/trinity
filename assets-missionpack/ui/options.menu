@@ -34,13 +34,41 @@ itemDef {
 
 // LEFT COLUMN
 
+itemDef {
+      		name options
+		group grpOptions
+		text "Crosshair:"
+		rect 158 95 20 20
+		ownerdraw UI_CROSSHAIR
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 0
+      		textaligny 20
+		textscale .3
+      		forecolor 1 1 1 1
+      		visible 1
+    		}
+
+itemDef {
+		name options
+		group grpOptions
+		text "Crosshair Color:"
+		ownerdraw UI_CROSSHAIRCOLOR
+		rect 30 115 210 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+	}
+
 	itemDef {
       		name options
 		group grpOptions
       		type ITEM_TYPE_YESNO
 		text "Simple Items:"
 		cvar "cg_simpleItems"
-		rect 30 95 210 20
+		rect 30 135 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -55,7 +83,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Marks On Walls:"
 		cvar "cg_marks"
-		rect 30 115 210 20
+		rect 30 155 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -70,7 +98,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Show Floating Scores:"
 		cvar "cg_scorePlums"
-		rect 30 135 210 20
+		rect 30 175 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -86,7 +114,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "cg_brassTime"
 		cvarFloatList { "High" 2500 "Med" 1250 "Off" 0 }
-		rect 30 155 210 20
+		rect 30 195 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -101,7 +129,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Dynamic Lights:"
 		cvar "r_dynamiclight"
-		rect 30 175 210 20
+		rect 30 215 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -116,7 +144,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Identify Target:"
 		cvar "cg_drawCrosshairNames"
-		rect 30 195 210 20
+		rect 30 235 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -131,7 +159,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Draw Gun:"
 		cvar "cg_drawGun"
-		rect 30 215 210 20
+		rect 30 255 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -146,7 +174,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Force Player Models:"
 		cvar "cg_forceModel"
-		rect 30 235 210 20
+		rect 30 275 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -161,7 +189,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Draw Team Overlay:"
 		cvar "cg_drawTeamOverlay"
-		rect 30 255 210 20
+		rect 30 295 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -176,7 +204,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Show Time:"
 		cvar "cg_drawTimer"
-		rect 30 275 210 20
+		rect 30 315 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -184,22 +212,6 @@ itemDef {
       		forecolor 1 1 1 1
       		visible 1
     		}
-
-	itemDef {
-      		name options
-		group grpOptions
-      		type ITEM_TYPE_YESNO
-		text "Auto Download:"
-		cvar "cl_allowDownload"
-		rect 30 295 210 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
-		textscale .3
-      		forecolor 1 1 1 1
-      		visible 1
-    		}
-
 
 // RIGHT COLUMN
 
@@ -209,7 +221,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Voices Off:"
 		cvar "cg_NoVoiceChats"
-		rect 223 95 210 20
+		rect 245 95 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -223,7 +235,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Taunts Off:"
 		cvar "cg_noTaunt"
-		rect 223 115 210 20
+		rect 245 115 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -237,7 +249,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Voice Text Off:"
 		cvar "cg_noVoiceText"
-		rect 223 135 210 20
+		rect 245 135 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -251,7 +263,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Team Chats Only:"
 		cvar "cg_teamChatsOnly"
-		rect 223 155 210 20
+		rect 245 155 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -266,7 +278,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "In Game Video:"
 		cvar "r_inGameVideo"
-		rect 223 175 210 20
+		rect 245 175 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -281,8 +293,8 @@ itemDef {
       		type ITEM_TYPE_MULTI
 		text "Statusbar:"
 		cvar "cg_hudfiles"
-		cvarStrList { Normal "ui/hud.txt" }
-		rect 223 195 210 20
+		cvarStrList { Normal "ui/hud.txt" Small "ui/hud2.txt" }
+		rect 245 195 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -291,14 +303,15 @@ itemDef {
       		visible 1
 	}
 
-itemDef {
+	itemDef {
       		name options
 		group grpOptions
-		text "Crosshair:"
-		rect 351 215 20 20
-		ownerdraw UI_CROSSHAIR
+      		type ITEM_TYPE_YESNO
+		text "Auto Download:"
+		cvar "cl_allowDownload"
+		rect 245 215 210 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 0
+      		textalignx 128
       		textaligny 20
 		textscale .3
       		forecolor 1 1 1 1
@@ -308,25 +321,10 @@ itemDef {
 itemDef {
 		name options
 		group grpOptions
-		text "Crosshair Color:"
-		ownerdraw UI_CROSSHAIRCOLOR
-		rect 223 235 210 20
-		textalign ITEM_ALIGN_RIGHT
-		textalignx 128
-		textaligny 20
-		textscale .3
-		forecolor 1 1 1 1
-		visible 1
-	}
-
-itemDef {
-		name options
-		group grpOptions
-		text "Damage Effect:"
-		type ITEM_TYPE_MULTI
+		text "Modern Damage Effect:"
+		type ITEM_TYPE_YESNO
 		cvar "cg_damageEffect"
-		cvarFloatList { "Classic" 0 "Modern" 1 }
-		rect 223 255 210 20
+		rect 245 255 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -338,11 +336,25 @@ itemDef {
 itemDef {
 		name options
 		group grpOptions
-		text "Blood Effect:"
-		type ITEM_TYPE_MULTI
+		text "Blood Particles:"
+		type ITEM_TYPE_YESNO
 		cvar "cg_bloodParticles"
-		cvarFloatList { "Classic" 0 "Particles" 1 }
-		rect 223 275 210 20
+		rect 245 275 210 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+	}
+
+itemDef {
+		name options
+		group grpOptions
+		text "Damage Numbers:"
+		type ITEM_TYPE_YESNO
+		cvar "cg_damagePlums"
+		rect 245 295 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
