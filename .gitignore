@@ -1,0 +1,38 @@
+# Claude Code
+.claude/
+
+# Distribution output
+dist/
+
+# Tools build output
+tools/bin/
+
+# Build outputs
+*.pk3
+*.qvm
+*.jts
+
+# QVM build intermediates
+build/vm-*/
+build/staging-*/
+
+# MSVC build outputs
+build/win32-msvc/.vs/
+build/win32-msvc/Win32/
+build/win32-msvc/x64/
+*.suo
+*.user
+*.ncb
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Editor files
+*.swp
+*~
+*.bak

@@ -1,0 +1,6 @@
+[submodule "tools/q3lcc"]
+	path = tools/q3lcc
+	url = https://github.com/ernie/q3lcc.git
+[submodule "tools/q3asm"]
+	path = tools/q3asm
+	url = https://github.com/ernie/q3asm.git
