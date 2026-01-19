@@ -792,6 +792,7 @@ typedef struct {
 #endif
 
 	qhandle_t	numberShaders[11];
+	qhandle_t	damagePlumShaders[11];
 
 	qhandle_t	shadowMarkShader;
 

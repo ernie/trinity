@@ -789,7 +789,9 @@ static void CG_AddRefEntity( localEntity_t *le ) {
 CG_AddScorePlum
 ===================
 */
-#define NUMBER_SIZE		8
+#define NUMBER_SIZE				8
+#define DAMAGE_DIGIT_SPACING	1.7
+#define DAMAGE_NARROW_SPACING	1.2  // tighter spacing for '1'
 
 void CG_AddScorePlum( localEntity_t *le ) {
 	refEntity_t	*re;
@@ -948,6 +950,7 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 
 	VectorSubtract(cg.refdef.vieworg, origin, dir);
 	CrossProduct(dir, up, vec);
+	vec[2] = 0;  // Keep digits on same horizontal plane
 	VectorNormalize(vec);
 
 	negative = qfalse;
@@ -966,10 +969,38 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 		numdigits++;
 	}
 
-	for (i = 0; i < numdigits; i++) {
-		VectorMA(origin, (float) (((float) numdigits / 2) - i) * (re->radius * 2), vec, re->origin);
-		re->customShader = cgs.media.numberShaders[digits[numdigits-1-i]];
-		trap_R_AddRefEntityToScene( re );
+	{
+		float total_width = 0;
+		float pos;
+		int digit, next_digit;
+
+		// First pass: calculate total width
+		for (i = 0; i < numdigits; i++) {
+			digit = digits[numdigits - 1 - i];
+			next_digit = (i + 1 < numdigits) ? digits[numdigits - 2 - i] : -1;
+			if (digit == 1 || next_digit == 1) {
+				total_width += re->radius * DAMAGE_NARROW_SPACING;
+			} else {
+				total_width += re->radius * DAMAGE_DIGIT_SPACING;
+			}
+		}
+
+		// Second pass: render digits from left to right, centered
+		pos = total_width / 2;
+		for (i = 0; i < numdigits; i++) {
+			digit = digits[numdigits - 1 - i];
+			next_digit = (i + 1 < numdigits) ? digits[numdigits - 2 - i] : -1;
+
+			VectorMA(origin, pos, vec, re->origin);
+			re->customShader = cgs.media.damagePlumShaders[digit];
+			trap_R_AddRefEntityToScene(re);
+
+			if (digit == 1 || next_digit == 1) {
+				pos -= re->radius * DAMAGE_NARROW_SPACING;
+			} else {
+				pos -= re->radius * DAMAGE_DIGIT_SPACING;
+			}
+		}
 	}
 }
 

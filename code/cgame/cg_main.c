@@ -633,6 +633,19 @@ static void CG_RegisterGraphics( void ) {
 		"gfx/2d/numbers/nine_32b",
 		"gfx/2d/numbers/minus_32b",
 	};
+	static char		*damage_nums[11] = {
+		"gfx/2d/damage/zero_32b",
+		"gfx/2d/damage/one_32b",
+		"gfx/2d/damage/two_32b",
+		"gfx/2d/damage/three_32b",
+		"gfx/2d/damage/four_32b",
+		"gfx/2d/damage/five_32b",
+		"gfx/2d/damage/six_32b",
+		"gfx/2d/damage/seven_32b",
+		"gfx/2d/damage/eight_32b",
+		"gfx/2d/damage/nine_32b",
+		"gfx/2d/damage/minus_32b",
+	};
 
 	// clear any references to old media
 	memset( &cg.refdef, 0, sizeof( cg.refdef ) );
@@ -647,6 +660,10 @@ static void CG_RegisterGraphics( void ) {
 
 	for ( i = 0 ; i < ARRAY_LEN( sb_nums ) ; i++ ) {
 		cgs.media.numberShaders[i] = trap_R_RegisterShader( sb_nums[i] );
+	}
+
+	for ( i = 0 ; i < ARRAY_LEN( damage_nums ) ; i++ ) {
+		cgs.media.damagePlumShaders[i] = trap_R_RegisterShader( damage_nums[i] );
 	}
 
 	cgs.media.botSkillShaders[0] = trap_R_RegisterShader( "menu/art/skill1.tga" );
