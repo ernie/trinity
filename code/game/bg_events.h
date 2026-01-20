@@ -89,7 +89,7 @@ DECLARE_EVENT( EV_POWERUP_REGEN ),
 DECLARE_EVENT( EV_GIB_PLAYER ),				// gib a previously living player
 DECLARE_EVENT( EV_SCOREPLUM ),				// score plum
 
-#ifdef MISSIONPACK
+//#ifdef MISSIONPACK
 DECLARE_EVENT( EV_PROXIMITY_MINE_STICK ),
 DECLARE_EVENT( EV_PROXIMITY_MINE_TRIGGER ),
 DECLARE_EVENT( EV_KAMIKAZE ),				// kamikaze explodes
@@ -98,7 +98,7 @@ DECLARE_EVENT( EV_OBELISKPAIN ),			// obelisk is in pain
 DECLARE_EVENT( EV_INVUL_IMPACT ),			// invulnerability sphere impact
 DECLARE_EVENT( EV_JUICED ),					// invulnerability juiced effect
 DECLARE_EVENT( EV_LIGHTNINGBOLT ),			// lightning bolt bounced of invulnerability sphere
-#endif
+//#endif
 
 DECLARE_EVENT( EV_DEBUG_LINE ),
 DECLARE_EVENT( EV_STOPLOOPINGSOUND ),
