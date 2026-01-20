@@ -37,9 +37,14 @@ $(BD)/cgame.qvm: $(cg_asm)
 $(BD)/ui.qvm: $(ui_asm)
 	$(Q3ASM) -o $@ $(ui_asm)
 
-$(BD)/game/%.asm: $(QADIR)/%.c; $(qa_cc)
-$(BD)/cgame/%.asm: $(QADIR)/%.c; $(cg_cc)
-$(BD)/cgame/%.asm: $(CGDIR)/%.c; $(cg_cc)
-$(BD)/cgame/%.asm: $(UIDIR)/%.c; $(cg_cc)
-$(BD)/ui/%.asm: $(QADIR)/%.c; $(ui_cc)
-$(BD)/ui/%.asm: $(UIDIR)/%.c; $(ui_cc)
+# Header dependencies - force rebuild when core headers change
+GAME_HEADERS = $(QADIR)/g_local.h $(QADIR)/g_cvar.h $(QADIR)/bg_public.h $(QADIR)/q_shared.h
+CGAME_HEADERS = $(CGDIR)/cg_local.h $(CGDIR)/cg_cvar.h $(QADIR)/bg_public.h $(QADIR)/q_shared.h
+UI_HEADERS = $(UIDIR)/ui_local.h $(UIDIR)/ui_cvar.h $(QADIR)/q_shared.h
+
+$(BD)/game/%.asm: $(QADIR)/%.c $(GAME_HEADERS); $(qa_cc)
+$(BD)/cgame/%.asm: $(QADIR)/%.c $(CGAME_HEADERS); $(cg_cc)
+$(BD)/cgame/%.asm: $(CGDIR)/%.c $(CGAME_HEADERS); $(cg_cc)
+$(BD)/cgame/%.asm: $(UIDIR)/%.c $(CGAME_HEADERS); $(cg_cc)
+$(BD)/ui/%.asm: $(QADIR)/%.c $(UI_HEADERS); $(ui_cc)
+$(BD)/ui/%.asm: $(UIDIR)/%.c $(UI_HEADERS); $(ui_cc)
