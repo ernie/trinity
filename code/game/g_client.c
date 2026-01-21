@@ -1253,7 +1253,15 @@ void ClientDisconnect( int clientNum ) {
 
 	G_RevertVote( ent->client );
 
-	G_LogPrintf( "ClientDisconnect: %i\n", clientNum );
+	// Log disconnect with GUID for human players, without for bots
+	if ( ent->r.svFlags & SVF_BOT ) {
+		G_LogPrintf( "ClientDisconnect: %i\n", clientNum );
+	} else {
+		char userinfo[MAX_INFO_STRING];
+		trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
+		G_LogPrintf( "ClientDisconnect: %i %s\n", clientNum,
+			Info_ValueForKey( userinfo, "cl_guid" ) );
+	}
 
 	// if we are playing in tourney mode and losing, give a win to the other player
 	if ( (g_gametype.integer == GT_TOURNAMENT )

@@ -402,6 +402,10 @@ typedef enum {
 	// The game can issue trap_argc() / trap_argv() commands to get the command
 	// and parameters.  Return qfalse if the game doesn't recognize it as a command.
 
-	BOTAI_START_FRAME				// ( int time );
+	BOTAI_START_FRAME,				// ( int time );
+
+	// Server lifecycle events - game just logs, engine handles lifecycle
+	GAME_SERVER_STARTED,			// ( void ); Called after first GAME_INIT - logs ServerStartup
+	GAME_SERVER_STOPPING			// ( void ); Called before final shutdown - logs ServerShutdown
 } gameExport_t;
 

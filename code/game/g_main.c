@@ -90,6 +90,12 @@ DLLEXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2 ) {
 		return ConsoleCommand();
 	case BOTAI_START_FRAME:
 		return BotAIStartFrame( arg0 );
+	case GAME_SERVER_STARTED:
+		G_LogPrintf( "ServerStartup:\n" );
+		return 0;
+	case GAME_SERVER_STOPPING:
+		G_LogPrintf( "ServerShutdown:\n" );
+		return 0;
 	}
 
 	return -1;
@@ -488,6 +494,9 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	srand( randomSeed );
 
 	G_RegisterCvars();
+
+	// Signal to engine that this game supports server lifecycle events
+	trap_Cvar_Set( "g_serverEvents", "1" );
 
 	G_ProcessIPBans();
 
