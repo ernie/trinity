@@ -857,7 +857,7 @@ const char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	ent->inuse = qtrue;
 
 	// get and distribute relevant paramters
-	G_LogPrintf( "ClientConnect: %i\n", clientNum );
+	G_LogPrintf( "ClientConnect: %i %s\n", clientNum, Info_ValueForKey( userinfo, "ip" ) );
 
 	client->pers.connected = CON_CONNECTING;
 
