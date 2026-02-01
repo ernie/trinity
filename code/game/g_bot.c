@@ -358,14 +358,18 @@ G_AddRandomBot
 void G_AddRandomBot( team_t team ) {
 	int		n, num, selection;
 	float	skill;
-	char	*value, netname[36], *teamstr, *skillstr;
+	char	*value, *botname, netname[36], *teamstr, *skillstr;
 	int		available[MAX_BOTS];
 
 	// First pass: collect indices of bots not currently in use
 	num = 0;
 	for ( n = 0; n < g_numBots; n++ ) {
-		value = Info_ValueForKey( g_botInfos[n], "name" );
-		if ( !G_IsBotInUse( value ) ) {
+		// Use the display name (funname or name) since that's what becomes netname
+		botname = Info_ValueForKey( g_botInfos[n], "funname" );
+		if ( !botname[0] ) {
+			botname = Info_ValueForKey( g_botInfos[n], "name" );
+		}
+		if ( !G_IsBotInUse( botname ) ) {
 			available[num++] = n;
 		}
 	}
@@ -387,6 +391,10 @@ void G_AddRandomBot( team_t team ) {
 
 	// Get bot info and add it
 	value = Info_ValueForKey( g_botInfos[selection], "name" );
+	botname = Info_ValueForKey( g_botInfos[selection], "funname" );
+	if ( !botname[0] ) {
+		botname = value;
+	}
 	skillstr = Info_ValueForKey( g_botInfos[selection], "skill" );
 	if ( *skillstr ) {
 		skill = atof( skillstr );
@@ -407,7 +415,7 @@ void G_AddRandomBot( team_t team ) {
 
 	// Mark this bot as pending so subsequent calls to G_AddRandomBot
 	// in the same frame won't select the same bot
-	G_MarkBotPending( value );
+	G_MarkBotPending( botname );
 
 	trap_SendConsoleCommand( EXEC_INSERT, va( "addbot %s %1.2f %s 0\n", netname, skill, teamstr ) );
 }
@@ -814,12 +822,12 @@ static void G_AddBot( const char *name, float skill, const char *team, int delay
 	}
 
 	if ( delay == 0 ) {
-		G_ClearBotPending( name );
+		G_ClearBotPending( botname );
 		ClientBegin( clientNum );
 		return;
 	}
 
-	AddBotToSpawnQueue( clientNum, delay, name );
+	AddBotToSpawnQueue( clientNum, delay, botname );
 }
 
 
