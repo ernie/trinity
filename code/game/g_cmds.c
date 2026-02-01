@@ -933,6 +933,14 @@ static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chat
 		mode = SAY_ALL;
 	}
 
+	// Trinity commands: messages starting with ! are logged but not broadcast
+	// The collector server handles these commands and responds via RCON
+	if ( chatText[0] == '!' && !(ent->r.svFlags & SVF_BOT) ) {
+		G_LogPrintf( "Command: %d \"%s\": %s\n", (int)(ent - g_entities), ent->client->pers.netname, chatText + 1 );
+		trap_SendServerCommand( ent-g_entities, va( "print \"^6Command: ^7%s\n\"", chatText + 1 ) );
+		return;
+	}
+
 	switch ( mode ) {
 	default:
 	case SAY_ALL:
