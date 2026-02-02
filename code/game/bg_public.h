@@ -347,6 +347,8 @@ typedef enum {
 #undef EVENT_ENUMS
 } entity_event_t;
 
+// plum type flags for EV_SCOREPLUM eventParm
+#define PLUM_DAMAGE		0x01
 
 typedef enum {
 	GTS_RED_CAPTURE,

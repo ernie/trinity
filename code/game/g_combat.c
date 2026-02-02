@@ -34,7 +34,8 @@ void DamagePlum( gentity_t *attacker, vec3_t origin, int damage ) {
 		return;
 	}
 
-	plum = G_TempEntity( origin, EV_DAMAGEPLUM );
+	plum = G_TempEntity( origin, EV_SCOREPLUM );
+	plum->s.eventParm = PLUM_DAMAGE;
 	// only send this temp entity to the attacker
 	plum->r.svFlags |= SVF_SINGLECLIENT;
 	plum->r.singleClient = attacker->s.number;
