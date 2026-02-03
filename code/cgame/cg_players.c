@@ -1641,6 +1641,41 @@ static void CG_SwingAngles( float destination, float swingTolerance, float clamp
 	}
 }
 
+/*
+================
+AxisTranspose - Transpose a 3x3 rotation matrix (for orthonormal matrices, transpose = inverse)
+================
+*/
+static void AxisTranspose(vec3_t in[3], vec3_t out[3]) {
+	out[0][0] = in[0][0]; out[0][1] = in[1][0]; out[0][2] = in[2][0];
+	out[1][0] = in[0][1]; out[1][1] = in[1][1]; out[1][2] = in[2][1];
+	out[2][0] = in[0][2]; out[2][1] = in[1][2]; out[2][2] = in[2][2];
+}
+
+/*
+================
+AxisToAngles - Extract Euler angles from a rotation matrix (inverse of AnglesToAxis)
+================
+*/
+static void AxisToAngles(vec3_t axis[3], vec3_t angles) {
+	float sp = -axis[0][2];
+
+	if (sp >= 1.0f) {
+		angles[PITCH] = 90.0f;
+	} else if (sp <= -1.0f) {
+		angles[PITCH] = -90.0f;
+	} else {
+		angles[PITCH] = RAD2DEG(atan2(sp, sqrt(1.0 - sp * sp)));
+	}
+
+	if (fabs(sp) < 0.999f) {
+		angles[YAW] = RAD2DEG(atan2(axis[0][1], axis[0][0]));
+		angles[ROLL] = RAD2DEG(atan2(axis[1][2], axis[2][2]));
+	} else {
+		angles[YAW] = RAD2DEG(atan2(-axis[1][0], axis[1][1]));
+		angles[ROLL] = 0.0f;
+	}
+}
 
 /*
 =================
@@ -1689,7 +1724,8 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	int			dir, clientNum;
 	clientInfo_t	*ci;
 	vec3_t		absoluteTorsoAngles;
-	float		movementOffset;
+	vec3_t		headWorldAngles, headLocalAngles;
+	vec3_t		headWorldAxis[3], torsoWorldAxis[3], torsoInverseAxis[3], headLocalAxis[3];
 
 	VectorCopy( cent->lerpAngles, headAngles );
 	headAngles[YAW] = AngleMod( headAngles[YAW] );
@@ -1813,13 +1849,24 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	AnglesSubtract( headAngles, torsoAngles, headAngles );
 	AnglesSubtract( torsoAngles, legsAngles, torsoAngles );
 
-	// VR: override head angles to achieve world-space HMD orientation
-	// headAngles = hmd_world - torso_world (clamped for biological realism)
+	// VR: compute head orientation relative to torso using matrix math
 	if (cent->currentState.eFlags & EF_VR_PLAYER) {
-		headAngles[PITCH] = AngleSubtract(cent->pe.vrHeadPitch, absoluteTorsoAngles[PITCH]);
-		movementOffset = AngleSubtract(absoluteTorsoAngles[YAW], cent->lerpAngles[YAW]);
-		headAngles[YAW] = Com_Clamp(-80.0f, 80.0f, AngleSubtract(cent->pe.vrHeadYawOffset, movementOffset));
-		headAngles[ROLL] = Com_Clamp(-60.0f, 60.0f, AngleSubtract(cent->lerpAngles[ROLL], absoluteTorsoAngles[ROLL]));
+		headWorldAngles[PITCH] = cent->pe.vrHeadPitch;
+		headWorldAngles[YAW] = cent->lerpAngles[YAW] + cent->pe.vrHeadYawOffset;
+		headWorldAngles[ROLL] = cent->lerpAngles[ROLL];
+
+		AnglesToAxis(headWorldAngles, headWorldAxis);
+		AnglesToAxis(absoluteTorsoAngles, torsoWorldAxis);
+		AxisTranspose(torsoWorldAxis, torsoInverseAxis);
+
+		MatrixMultiply(headWorldAxis, torsoInverseAxis, headLocalAxis);
+
+		AxisToAngles(headLocalAxis, headLocalAngles);
+
+		// Apply biological limits
+		headAngles[PITCH] = Com_Clamp(-80.0f, 80.0f, headLocalAngles[PITCH]);
+		headAngles[YAW] = Com_Clamp(-80.0f, 80.0f, headLocalAngles[YAW]);
+		headAngles[ROLL] = Com_Clamp(-60.0f, 60.0f, headLocalAngles[ROLL]);
 	}
 
 	AnglesToAxis( legsAngles, legs );
