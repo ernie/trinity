@@ -1688,11 +1688,23 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	float		speed;
 	int			dir, clientNum;
 	clientInfo_t	*ci;
+	vec3_t		absoluteTorsoAngles;
+	float		movementOffset;
 
 	VectorCopy( cent->lerpAngles, headAngles );
 	headAngles[YAW] = AngleMod( headAngles[YAW] );
 	VectorClear( legsAngles );
 	VectorClear( torsoAngles );
+
+	// VR player - interpolate head pitch and yaw offset (applied after AnglesSubtract below)
+	if (cent->currentState.eFlags & EF_VR_PLAYER) {
+		qboolean vrSwinging = qtrue;
+		CG_SwingAngles(cent->currentState.angles2[PITCH], 15, 90, 0.3f,
+		               &cent->pe.vrHeadPitch, &vrSwinging);
+		vrSwinging = qtrue;
+		CG_SwingAngles(cent->currentState.angles2[ROLL], 25, 90, 0.3f,
+		               &cent->pe.vrHeadYawOffset, &vrSwinging);
+	}
 
 	// --------- yaw -------------
 
@@ -1719,8 +1731,13 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	legsAngles[YAW] = headAngles[YAW] + movementOffsets[ dir ];
 	torsoAngles[YAW] = headAngles[YAW] + 0.25 * movementOffsets[ dir ];
 
-	// torso
-	CG_SwingAngles( torsoAngles[YAW], 25, 90, cg_swingSpeed.value, &cent->pe.torso.yawAngle, &cent->pe.torso.yawing );
+	// VR: torso follows weapon aim directly; flatscreen uses swing tolerance
+	if (cent->currentState.eFlags & EF_VR_PLAYER) {
+		cent->pe.torso.yawAngle = torsoAngles[YAW];
+		cent->pe.torso.yawing = qfalse;
+	} else {
+		CG_SwingAngles( torsoAngles[YAW], 25, 90, cg_swingSpeed.value, &cent->pe.torso.yawAngle, &cent->pe.torso.yawing );
+	}
 	CG_SwingAngles( legsAngles[YAW], 40, 90, cg_swingSpeed.value, &cent->pe.legs.yawAngle, &cent->pe.legs.yawing );
 
 	torsoAngles[YAW] = cent->pe.torso.yawAngle;
@@ -1735,7 +1752,13 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	} else {
 		dest = headAngles[PITCH] * 0.75f;
 	}
-	CG_SwingAngles( dest, 15, 30, 0.1f, &cent->pe.torso.pitchAngle, &cent->pe.torso.pitching );
+	// VR: torso follows weapon pitch directly; flatscreen uses swing tolerance
+	if (cent->currentState.eFlags & EF_VR_PLAYER) {
+		cent->pe.torso.pitchAngle = dest;
+		cent->pe.torso.pitching = qfalse;
+	} else {
+		CG_SwingAngles( dest, 15, 30, 0.1f, &cent->pe.torso.pitchAngle, &cent->pe.torso.pitching );
+	}
 	torsoAngles[PITCH] = cent->pe.torso.pitchAngle;
 
 	//
@@ -1781,9 +1804,24 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	// pain twitch
 	CG_AddPainTwitch( cent, torsoAngles );
 
+	// Save absolute torso angles for VR head calculation
+	if (cent->currentState.eFlags & EF_VR_PLAYER) {
+		VectorCopy(torsoAngles, absoluteTorsoAngles);
+	}
+
 	// pull the angles back out of the hierarchial chain
 	AnglesSubtract( headAngles, torsoAngles, headAngles );
 	AnglesSubtract( torsoAngles, legsAngles, torsoAngles );
+
+	// VR: override head angles to achieve world-space HMD orientation
+	// headAngles = hmd_world - torso_world (clamped for biological realism)
+	if (cent->currentState.eFlags & EF_VR_PLAYER) {
+		headAngles[PITCH] = AngleSubtract(cent->pe.vrHeadPitch, absoluteTorsoAngles[PITCH]);
+		movementOffset = AngleSubtract(absoluteTorsoAngles[YAW], cent->lerpAngles[YAW]);
+		headAngles[YAW] = Com_Clamp(-80.0f, 80.0f, AngleSubtract(cent->pe.vrHeadYawOffset, movementOffset));
+		headAngles[ROLL] = Com_Clamp(-60.0f, 60.0f, AngleSubtract(cent->lerpAngles[ROLL], absoluteTorsoAngles[ROLL]));
+	}
+
 	AnglesToAxis( legsAngles, legs );
 	AnglesToAxis( torsoAngles, torso );
 	AnglesToAxis( headAngles, head );

@@ -162,6 +162,10 @@ typedef struct {
 	float			barrelAngle;
 	int				barrelTime;
 	qboolean		barrelSpinning;
+
+	// VR head orientation interpolation (roll uses standard angles networking)
+	float			vrHeadPitch;
+	float			vrHeadYawOffset;
 } playerEntity_t;
 
 //=================================================

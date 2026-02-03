@@ -358,6 +358,11 @@ struct gclient_s {
 		vec3_t	origin;
 	} damagePlums[MAX_CLIENTS];
 	int			damagePlumCount;
+
+	// VR head orientation (from usercmd)
+	// Roll is sent via standard cmd->angles[ROLL] mechanism
+	float		vrHeadPitch;
+	float		vrHeadYawOffset;
 };
 
 

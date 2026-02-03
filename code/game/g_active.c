@@ -970,6 +970,20 @@ void ClientThink_real( gentity_t *ent ) {
 	client->buttons = ucmd->buttons;
 	client->latched_buttons |= client->buttons & ~client->oldbuttons;
 
+	// Unpack VR head orientation from upper bits of buttons (bits 12-25)
+	// VR clients pack head pitch and yaw offset in these bits when connecting to VR-aware servers
+	// Roll is sent via standard cmd->angles[ROLL] mechanism (vr_sendRollToServer)
+	if (ucmd->buttons & 0x03FFF000) {
+		int pitchPacked = (ucmd->buttons >> 12) & 0x7F;
+		int yawPacked = (ucmd->buttons >> 19) & 0x7F;
+
+		client->vrHeadPitch = (pitchPacked * 180.0f / 127.0f) - 90.0f;
+		client->vrHeadYawOffset = (yawPacked * 180.0f / 127.0f) - 90.0f;
+		client->ps.eFlags |= EF_VR_PLAYER;
+	} else {
+		client->ps.eFlags &= ~EF_VR_PLAYER;
+	}
+
 	// check for respawning
 	if ( client->ps.stats[STAT_HEALTH] <= 0 ) {
 		// wait for the attack button to be pressed
@@ -1158,6 +1172,14 @@ void ClientEndFrame( gentity_t *ent ) {
 
 	// set the latest info
 	BG_PlayerStateToEntityState( &client->ps, &ent->s, qtrue );
+
+	// Copy VR head orientation data to entityState_t for network transmission
+	// angles2[PITCH] = head pitch, angles2[ROLL] = head yaw offset (repurposed)
+	// Roll is already in the player's viewangles via standard networking
+	if (client->ps.eFlags & EF_VR_PLAYER) {
+		ent->s.angles2[PITCH] = client->vrHeadPitch;
+		ent->s.angles2[ROLL] = client->vrHeadYawOffset;
+	}
 
 	SendPendingPredictableEvents( &client->ps );
 
