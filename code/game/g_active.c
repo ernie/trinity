@@ -1179,6 +1179,10 @@ void ClientEndFrame( gentity_t *ent ) {
 	if (client->ps.eFlags & EF_VR_PLAYER) {
 		ent->s.angles2[PITCH] = client->vrHeadPitch;
 		ent->s.angles2[ROLL] = client->vrHeadYawOffset;
+		// Also store packed angles in playerState stats for demo playback of local player
+		// Pack float angles into shorts: range [-180, 180] -> [-32768, 32767] (182.04 = 32767/180)
+		client->ps.stats[STAT_VR_HEAD_PITCH] = (short)(client->vrHeadPitch * 182.04f);
+		client->ps.stats[STAT_VR_HEAD_YAW_OFFSET] = (short)(client->vrHeadYawOffset * 182.04f);
 	}
 
 	SendPendingPredictableEvents( &client->ps );

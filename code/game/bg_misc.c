@@ -1380,6 +1380,11 @@ void BG_PlayerStateToEntityState( playerState_t *ps, entityState_t *s, qboolean 
 	}
 
 	s->angles2[YAW] = ps->movementDir;
+	// Unpack VR head angles from stats for demo playback of local player
+	if (ps->eFlags & EF_VR_PLAYER) {
+		s->angles2[PITCH] = (float)ps->stats[STAT_VR_HEAD_PITCH] / 182.04f;
+		s->angles2[ROLL] = (float)ps->stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f;
+	}
 	s->legsAnim = ps->legsAnim;
 	s->torsoAnim = ps->torsoAnim;
 	s->clientNum = ps->clientNum;		// ET_PLAYER looks here instead of at number
@@ -1460,6 +1465,11 @@ void BG_PlayerStateToEntityStateExtraPolate( playerState_t *ps, entityState_t *s
 	}
 
 	s->angles2[YAW] = ps->movementDir;
+	// Unpack VR head angles from stats for demo playback of local player
+	if (ps->eFlags & EF_VR_PLAYER) {
+		s->angles2[PITCH] = (float)ps->stats[STAT_VR_HEAD_PITCH] / 182.04f;
+		s->angles2[ROLL] = (float)ps->stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f;
+	}
 	s->legsAnim = ps->legsAnim;
 	s->torsoAnim = ps->torsoAnim;
 	s->clientNum = ps->clientNum;		// ET_PLAYER looks here instead of at number
