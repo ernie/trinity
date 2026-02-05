@@ -534,7 +534,7 @@ typedef struct voiceChatList_s
 
 typedef struct headModelVoiceChat_s
 {
-	char headmodel[64];
+	char headmodel[MAX_QPATH*2];
 	int voiceChatNum;
 } headModelVoiceChat_t;
 
@@ -737,7 +737,7 @@ CG_VoiceChatListForClient
 voiceChatList_t *CG_VoiceChatListForClient( int clientNum ) {
 	clientInfo_t *ci;
 	int voiceChatNum, i, j, k, gender;
-	char filename[MAX_QPATH], headModelName[MAX_QPATH];
+	char filename[MAX_QPATH*2], headModelName[MAX_QPATH*2];
 
 	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
 		clientNum = 0;

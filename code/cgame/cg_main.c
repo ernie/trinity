@@ -671,6 +671,7 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.botSkillShaders[2] = trap_R_RegisterShader( "menu/art/skill3.tga" );
 	cgs.media.botSkillShaders[3] = trap_R_RegisterShader( "menu/art/skill4.tga" );
 	cgs.media.botSkillShaders[4] = trap_R_RegisterShader( "menu/art/skill5.tga" );
+	cgs.media.vrPlayerShader = trap_R_RegisterShader( "menu/art/vr.tga" );
 
 	cgs.media.viewBloodShader = trap_R_RegisterShader( "viewBloodBlend" );
 	cgs.media.vignetteShader = trap_R_RegisterShader( "gfx/vignette" );
@@ -1455,6 +1456,8 @@ static const char *CG_FeederItemText(float feederID, int index, int column, qhan
 				} else {
 					if ( info->botSkill > 0 && info->botSkill <= 5 ) {
 						*handle = cgs.media.botSkillShaders[ info->botSkill - 1 ];
+					} else if ( info->vrPlayer ) {
+						*handle = cgs.media.vrPlayerShader;
 					} else if ( info->handicap < 100 ) {
 					return va("%i", info->handicap );
 					}

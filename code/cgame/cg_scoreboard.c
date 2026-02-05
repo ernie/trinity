@@ -111,6 +111,15 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 					CG_DrawPic( iconx, y, 16, 16, cgs.media.botSkillShaders[ ci->botSkill - 1 ] );
 				}
 			}
+		} else if ( ci->vrPlayer ) {
+			if ( cg_drawIcons.integer ) {
+				if( largeFormat ) {
+					CG_DrawPic( iconx, y - ( 32 - BIGCHAR_HEIGHT ) / 2, 32, 32, cgs.media.vrPlayerShader );
+				}
+				else {
+					CG_DrawPic( iconx, y, 16, 16, cgs.media.vrPlayerShader );
+				}
+			}
 		} else if ( ci->handicap < 100 ) {
 			BG_sprintf( string, "%i", ci->handicap );
 			if ( cgs.gametype == GT_TOURNAMENT )

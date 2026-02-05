@@ -722,9 +722,10 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 			client->pers.maxHealth, client->sess.wins, client->sess.losses,
 			Info_ValueForKey( userinfo, "skill" ), teamTask, teamLeader );
 	} else {
-		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d",
-			client->pers.netname, client->sess.sessionTeam, model, headModel, c1, c2, 
-			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader );
+		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d\\vr\\%s",
+			client->pers.netname, client->sess.sessionTeam, model, headModel, c1, c2,
+			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader,
+			Info_ValueForKey( userinfo, "vr" )[0] ? "1" : "0" );
 	}
 
 	trap_SetConfigstring( CS_PLAYERS+clientNum, s );
@@ -733,8 +734,9 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	if ( ent->r.svFlags & SVF_BOT ) {
 		G_LogPrintf( "ClientUserinfoChanged: %i %s\n", clientNum, s );
 	} else {
-		G_LogPrintf( "ClientUserinfoChanged: %i %s\\g\\%s\n", clientNum, s,
-			Info_ValueForKey( userinfo, "cl_guid" ) );
+		G_LogPrintf( "ClientUserinfoChanged: %i %s\\g\\%s\\vr\\%s\n", clientNum, s,
+			Info_ValueForKey( userinfo, "cl_guid" ),
+			Info_ValueForKey( userinfo, "vr" )[0] ? "1" : "0" );
 	}
 
 	return qtrue;

@@ -1130,7 +1130,7 @@ qboolean UI_RegisterClientModelname( playerInfo_t *pi, const char *modelSkinName
 	char		skinName[MAX_QPATH];
 	char		headModelName[MAX_QPATH];
 	char		headSkinName[MAX_QPATH];
-	char		filename[MAX_QPATH];
+	char		filename[MAX_QPATH * 2];
 	char		*slash;
 
 	pi->torsoModel = 0;

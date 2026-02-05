@@ -333,6 +333,7 @@ typedef struct {
 	team_t			team;
 
 	int				botSkill;		// 0 = not bot, 1-5 = bot
+	qboolean		vrPlayer;		// qtrue if VR client
 
 	vec3_t			color1;
 	vec3_t			color2;
@@ -801,6 +802,7 @@ typedef struct {
 	qhandle_t	shadowMarkShader;
 
 	qhandle_t	botSkillShaders[5];
+	qhandle_t	vrPlayerShader;
 
 	// wall mark shaders
 	qhandle_t	wakeMarkShader;

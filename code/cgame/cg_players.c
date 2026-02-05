@@ -480,7 +480,7 @@ CG_RegisterClientSkin
 ==========================
 */
 static qboolean	CG_RegisterClientSkin( clientInfo_t *ci, const char *teamName, const char *modelName, const char *skinName, const char *headModelName, const char *headSkinName ) {
-	char filename[MAX_QPATH];
+	char filename[MAX_QPATH * 2];
 
 	/*
 	Com_sprintf( filename, sizeof( filename ), "models/players/%s/%slower_%s.skin", modelName, teamName, skinName );
@@ -539,7 +539,7 @@ CG_RegisterClientModelname
 ==========================
 */
 static qboolean CG_RegisterClientModelname( clientInfo_t *ci, const char *modelName, const char *skinName, const char *headModelName, const char *headSkinName, const char *teamName ) {
-	char	filename[MAX_QPATH];
+	char	filename[MAX_QPATH * 2];
 	const char		*headName;
 	char newTeamName[MAX_QPATH];
 
@@ -1287,6 +1287,10 @@ void CG_NewClientInfo( int clientNum ) {
 	// bot skill
 	v = Info_ValueForKey( configstring, "skill" );
 	newInfo.botSkill = atoi( v );
+
+	// VR player
+	v = Info_ValueForKey( configstring, "vr" );
+	newInfo.vrPlayer = atoi( v ) ? qtrue : qfalse;
 
 	// handicap
 	v = Info_ValueForKey( configstring, "hc" );
