@@ -66,7 +66,7 @@ bind mwheeldown followzoomout
 **Server**
 
 - Support for clients with `cg_damagePlums`
-- `g_teamDMSpawnThreshold`: Set > 0 to include Team (CTF) spawns in maps with only one deathmatch spawn. Allows use of maps that are otherwise a telefrag-fest in Team DM.
+- `g_teamDMSpawnThreshold`: Set > 0 to include Team (CTF) spawns in maps with fewer deathmatch spawns than the value. Allows use of maps that are otherwise a telefrag-fest in Team DM.
 
 ## Prerequisites
 
