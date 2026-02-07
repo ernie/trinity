@@ -1084,6 +1084,21 @@ static float CG_DrawTeamOverlay( float y, qboolean right, qboolean upper ) {
 
 
 /*
+=================
+CG_DrawVRFollowIcon
+
+Shows VR icon in upper-right when following a VR player.
+=================
+*/
+static float CG_DrawVRFollowIcon( float y ) {
+	float	size = (BIGCHAR_HEIGHT + 4) * 2;
+
+	CG_DrawPic( cgs.screenXmax - size - 2, y, size, size, cgs.media.vrPlayerShader );
+
+	return y + size;
+}
+
+/*
 =====================
 CG_DrawUpperRight
 
@@ -1097,7 +1112,7 @@ static void CG_DrawUpperRight(stereoFrame_t stereoFrame)
 
 	if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 1 ) {
 		y = CG_DrawTeamOverlay( y, qtrue, qtrue );
-	} 
+	}
 	if ( cg_drawSnapshot.integer ) {
 		y = CG_DrawSnapshot( y );
 	}
@@ -1112,6 +1127,9 @@ static void CG_DrawUpperRight(stereoFrame_t stereoFrame)
 	}
 	if ( cg_drawAttacker.integer ) {
 		y = CG_DrawAttacker( y );
+	}
+	if ( CG_IsVRFollow() ) {
+		y = CG_DrawVRFollowIcon( y );
 	}
 }
 
@@ -2039,6 +2057,11 @@ static void CG_DrawCrosshair( void ) {
 	}
 
 	if ( cg.renderingThirdPerson ) {
+		return;
+	}
+
+	// VR follow uses a 3D crosshair at the weapon aim point instead
+	if ( CG_IsVRFollow() ) {
 		return;
 	}
 

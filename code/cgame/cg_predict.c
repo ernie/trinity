@@ -234,9 +234,17 @@ static void CG_InterpolatePlayerState( qboolean grabAngles ) {
 			out->viewangles[i] = LerpAngle( 
 				prev->ps.viewangles[i], next->ps.viewangles[i], f );
 		}
-		out->velocity[i] = prev->ps.velocity[i] + 
+		out->velocity[i] = prev->ps.velocity[i] +
 			f * (next->ps.velocity[i] - prev->ps.velocity[i] );
 	}
+
+	// Interpolate VR head angle stats (same treatment as viewangles)
+	out->stats[STAT_VR_HEAD_PITCH] = (int)( LerpAngle(
+		(float)prev->ps.stats[STAT_VR_HEAD_PITCH] / 182.04f,
+		(float)next->ps.stats[STAT_VR_HEAD_PITCH] / 182.04f, f ) * 182.04f );
+	out->stats[STAT_VR_HEAD_YAW_OFFSET] = (int)( LerpAngle(
+		(float)prev->ps.stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f,
+		(float)next->ps.stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f, f ) * 182.04f );
 
 }
 

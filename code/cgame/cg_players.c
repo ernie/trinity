@@ -1737,13 +1737,29 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	VectorClear( torsoAngles );
 
 	// VR player - interpolate head pitch and yaw offset (applied after AnglesSubtract below)
-	if (cent->currentState.eFlags & EF_VR_PLAYER) {
+	if ((cent->currentState.eFlags & EF_VR_PLAYER)
+			&& !(cent->currentState.eFlags & EF_DEAD)) {
+		float vrPitch, vrYaw;
 		qboolean vrSwinging = qtrue;
-		CG_SwingAngles(cent->currentState.angles2[PITCH], 15, 90, 0.3f,
-		               &cent->pe.vrHeadPitch, &vrSwinging);
+
+		// Interpolate angles2 between snapshots
+		if ( cg.nextSnap ) {
+			vrPitch = LerpAngle( cent->currentState.angles2[PITCH],
+			                     cent->nextState.angles2[PITCH],
+			                     cg.frameInterpolation );
+			vrYaw   = LerpAngle( cent->currentState.angles2[ROLL],
+			                     cent->nextState.angles2[ROLL],
+			                     cg.frameInterpolation );
+		} else {
+			vrPitch = cent->currentState.angles2[PITCH];
+			vrYaw   = cent->currentState.angles2[ROLL];
+		}
+
+		CG_SwingAngles( vrPitch, 15, 90, 0.3f,
+		                &cent->pe.vrHeadPitch, &vrSwinging );
 		vrSwinging = qtrue;
-		CG_SwingAngles(cent->currentState.angles2[ROLL], 25, 90, 0.3f,
-		               &cent->pe.vrHeadYawOffset, &vrSwinging);
+		CG_SwingAngles( vrYaw, 25, 90, 0.3f,
+		                &cent->pe.vrHeadYawOffset, &vrSwinging );
 	}
 
 	// --------- yaw -------------

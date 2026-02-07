@@ -934,7 +934,13 @@ static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 	float	fracsin;
 
 	VectorCopy( cg.refdef.vieworg, origin );
-	VectorCopy( cg.refdefViewAngles, angles );
+
+	// VR follow: weapon points along weapon aim, not head direction
+	if ( CG_IsVRFollow() ) {
+		VectorCopy( cg.predictedPlayerState.viewangles, angles );
+	} else {
+		VectorCopy( cg.refdefViewAngles, angles );
+	}
 
 	// on odd legs, invert some angles
 	if ( cg.bobcycle & 1 ) {
@@ -1494,9 +1500,18 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	// set up gun position
 	CG_CalculateWeaponPosition( hand.origin, angles );
 
-	VectorMA( hand.origin, (cg_gun_x.value+fovOffset[0]), cg.refdef.viewaxis[0], hand.origin );
-	VectorMA( hand.origin, cg_gun_y.value, cg.refdef.viewaxis[1], hand.origin );
-	VectorMA( hand.origin, (cg_gun_z.value+fovOffset[2]), cg.refdef.viewaxis[2], hand.origin );
+	// VR follow: offset weapon along weapon-aim axes, not head-view axes
+	if ( CG_IsVRFollow() ) {
+		vec3_t	weaponAxis[3];
+		AnglesToAxis( cg.predictedPlayerState.viewangles, weaponAxis );
+		VectorMA( hand.origin, (cg_gun_x.value+fovOffset[0]), weaponAxis[0], hand.origin );
+		VectorMA( hand.origin, cg_gun_y.value, weaponAxis[1], hand.origin );
+		VectorMA( hand.origin, (cg_gun_z.value+fovOffset[2]), weaponAxis[2], hand.origin );
+	} else {
+		VectorMA( hand.origin, (cg_gun_x.value+fovOffset[0]), cg.refdef.viewaxis[0], hand.origin );
+		VectorMA( hand.origin, cg_gun_y.value, cg.refdef.viewaxis[1], hand.origin );
+		VectorMA( hand.origin, (cg_gun_z.value+fovOffset[2]), cg.refdef.viewaxis[2], hand.origin );
+	}
 
 	AnglesToAxis( angles, hand.axis );
 

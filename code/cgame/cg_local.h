@@ -696,6 +696,11 @@ typedef struct {
 
 	qboolean		skipDFshaders;
 
+	// VR first-person head view smoothing
+	float			vrViewPitch;			// smoothed head pitch
+	float			vrViewYaw;				// smoothed head absolute yaw
+	qboolean		vrViewInitialized;		// set once first valid target is computed
+
 	// Follow camera orbit state
 	vec3_t			orbitAngles;			// yaw, pitch for orbit camera
 	float			orbitDistance;			// current distance from player
@@ -1231,6 +1236,7 @@ void CG_AddBufferedSound( sfxHandle_t sfx);
 
 void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demoPlayback );
 void CG_DamageBorderVignette( void );
+qboolean CG_IsVRFollow( void );
 void CG_FollowCam_f( void );
 void CG_FollowZoomIn_f( void );
 void CG_FollowZoomOut_f( void );

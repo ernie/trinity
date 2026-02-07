@@ -954,6 +954,99 @@ void CG_DamageBorderVignette( void ) {
 
 /*
 ===============
+CG_DrawCrosshair3D
+
+Renders the crosshair as a 3D sprite at the weapon's aim point.
+Used during VR first-person follow so the crosshair shows where
+the weapon is actually pointing (which may differ from view center).
+===============
+*/
+static void CG_DrawCrosshair3D( void ) {
+	float		w;
+	qhandle_t	hShader;
+	int			ca;
+	trace_t		trace;
+	vec3_t		endpos, forward;
+	refEntity_t	ent;
+	float		dist;
+
+	if ( !cg_drawCrosshair.integer ) {
+		return;
+	}
+
+	// fire a trace along weapon aim direction
+	AngleVectors( cg.predictedPlayerState.viewangles, forward, NULL, NULL );
+	VectorMA( cg.refdef.vieworg, 8192, forward, endpos );
+	CG_Trace( &trace, cg.refdef.vieworg, NULL, NULL, endpos,
+		cg.predictedPlayerState.clientNum, MASK_SOLID );
+
+	// pull back slightly from hit surface
+	VectorMA( trace.endpos, -1, forward, endpos );
+
+	// scale sprite so it appears roughly the same angular size regardless of distance
+	dist = Distance( cg.refdef.vieworg, endpos );
+	w = dist * cg_crosshairSize.value / 640.0f;
+	if ( w < 0.5f ) {
+		w = 0.5f;
+	}
+
+	ca = cg_drawCrosshair.integer;
+	if ( ca < 0 ) {
+		ca = 0;
+	}
+	hShader = cgs.media.crosshairShader[ ca % NUM_CROSSHAIRS ];
+
+	memset( &ent, 0, sizeof( ent ) );
+	ent.reType = RT_SPRITE;
+	ent.radius = w;
+	ent.rotation = 0;
+	ent.customShader = hShader;
+	ent.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON;
+	VectorCopy( endpos, ent.origin );
+
+	// crosshair color
+	if ( cg_crosshairHealth.integer ) {
+		vec4_t hcolor;
+		CG_ColorForHealth( hcolor );
+		ent.shaderRGBA.rgba[0] = (byte)( hcolor[0] * 255 );
+		ent.shaderRGBA.rgba[1] = (byte)( hcolor[1] * 255 );
+		ent.shaderRGBA.rgba[2] = (byte)( hcolor[2] * 255 );
+		ent.shaderRGBA.rgba[3] = 255;
+	} else if ( cg_crosshairColor.integer ) {
+		int val = cg_crosshairColor.integer;
+		ent.shaderRGBA.rgba[0] = (val & 1) ? 255 : 0;
+		ent.shaderRGBA.rgba[1] = (val & 2) ? 255 : 0;
+		ent.shaderRGBA.rgba[2] = (val & 4) ? 255 : 0;
+		ent.shaderRGBA.rgba[3] = 255;
+	} else {
+		ent.shaderRGBA.rgba[0] = 255;
+		ent.shaderRGBA.rgba[1] = 255;
+		ent.shaderRGBA.rgba[2] = 255;
+		ent.shaderRGBA.rgba[3] = 255;
+	}
+
+	trap_R_AddRefEntityToScene( &ent );
+}
+
+/*
+===============
+CG_IsVRFollow
+
+Returns qtrue when following a VR player (first or third person).
+===============
+*/
+qboolean CG_IsVRFollow( void ) {
+	if ( !cg.demoPlayback && !(cg.snap->ps.pm_flags & PMF_FOLLOW) ) {
+		return qfalse;
+	}
+	if ( !(cg.predictedPlayerState.eFlags & EF_VR_PLAYER) ) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
+/*
+===============
 CG_CalcViewValues
 
 Sets cg.refdef view values
@@ -1002,6 +1095,34 @@ static int CG_CalcViewValues( void ) {
 
 	VectorCopy( ps->origin, cg.refdef.vieworg );
 	VectorCopy( ps->viewangles, cg.refdefViewAngles );
+
+	// VR first-person follow: look through the player's head, not weapon.
+	// EMA smooths the ~1.4 degree steps from 7-bit usercmd packing.
+	if ( !cg.renderingThirdPerson
+			&& (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
+			&& (ps->eFlags & EF_VR_PLAYER) ) {
+		float	targetPitch, targetYaw, alpha;
+
+		targetPitch = (float)ps->stats[STAT_VR_HEAD_PITCH] / 182.04f;
+		targetYaw   = ps->viewangles[YAW]
+			+ (float)ps->stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f;
+
+		if ( !cg.vrViewInitialized || cg.nextFrameTeleport ) {
+			cg.vrViewPitch = targetPitch;
+			cg.vrViewYaw   = targetYaw;
+			cg.vrViewInitialized = qtrue;
+		} else {
+			// tau ~30ms: smooths quantization steps without perceptible lag
+			alpha = (float)cg.frametime / ( (float)cg.frametime + 30.0f );
+			cg.vrViewPitch += alpha * AngleSubtract( targetPitch, cg.vrViewPitch );
+			cg.vrViewYaw   += alpha * AngleSubtract( targetYaw,   cg.vrViewYaw );
+		}
+
+		cg.refdefViewAngles[PITCH] = cg.vrViewPitch;
+		cg.refdefViewAngles[YAW]   = cg.vrViewYaw;
+	} else {
+		cg.vrViewInitialized = qfalse;
+	}
 
 	if (cg_cameraOrbit.integer) {
 		if (cg.time > cg.nextOrbitTime) {
@@ -1228,6 +1349,11 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		CG_AddLocalEntities();
 	}
 	CG_AddViewWeapon( &cg.predictedPlayerState );
+
+	// VR follow: add 3D crosshair at weapon aim point (first-person only)
+	if ( !cg.renderingThirdPerson && CG_IsVRFollow() ) {
+		CG_DrawCrosshair3D();
+	}
 
 	// add buffered sounds
 	CG_PlayBufferedSounds();
