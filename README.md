@@ -47,6 +47,21 @@ All of these settings are available in the options menu.
 - `cg_damagePlums`: Quake Live style colored damage numbers on hit (requires server support for clients)
 - `cg_damageEffect`: Modern red-border damage indication, directionally-weighted
 - `cg_bloodParticles`: Updated visuals replacing 5-frame blood spurt animation. Entry/exit wound blood particles splat on walls/floors. Going more for a "Mortal Kombat" style feel than hyper-realism, which seems era-appropriate.
+- `cg_followMode`: Orbit camera for spectating and demo playback. Mouse orbits around the followed player, forward/back keys zoom in and out. When following, weapon next/prev and zoom keys adjust distance and toggle follow mode, respectively, toggling between first and third-person.
+
+You can also set your own bindings. The default ones behave like this, but only in follow mode, so they don't override normal gameplay:
+
+```
+bind mouse2 followcam
+bind mwheelup followzoomin
+bind mwheeldown followzoomout
+```
+
+**VR Support**
+
+- Independent head and torso tracking for VR clients, backwards-compatible with flatscreen players
+- VR player head movement captured in demos for playback
+- VR player icon displayed on the scoreboard
 
 **Server**
 

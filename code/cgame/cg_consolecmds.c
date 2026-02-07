@@ -518,7 +518,10 @@ static consoleCommand_t	commands[] = {
 #endif
 	{ "startOrbit", CG_StartOrbit_f },
 	//{ "camera", CG_Camera_f },
-	{ "loaddeferred", CG_LoadDeferredPlayers }	
+	{ "followcam", CG_FollowCam_f },
+	{ "followzoomin", CG_FollowZoomIn_f },
+	{ "followzoomout", CG_FollowZoomOut_f },
+	{ "loaddeferred", CG_LoadDeferredPlayers }
 };
 
 

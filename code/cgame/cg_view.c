@@ -194,6 +194,218 @@ static void CG_CalcVrect (void) {
 
 /*
 ===============
+CG_InitOrbitCamera
+
+Seeds orbit state when entering orbit mode or when the followed player changes.
+===============
+*/
+static void CG_InitOrbitCamera( void ) {
+	usercmd_t	cmd;
+	int			cmdNum;
+
+	cg.orbitDistance = 200;
+	cg.orbitDistanceTarget = 200;
+	cg.orbitAngles[YAW] = cg.predictedPlayerState.viewangles[YAW] + 180;
+	cg.orbitAngles[PITCH] = 15;
+	cg.orbitAngles[ROLL] = 0;
+
+	// capture current cmd.angles so the first frame doesn't produce a jump
+	cmdNum = trap_GetCurrentCmdNumber();
+	if ( trap_GetUserCmd( cmdNum, &cmd ) ) {
+		cg.orbitLastCmdAngles[0] = cmd.angles[0];
+		cg.orbitLastCmdAngles[1] = cmd.angles[1];
+		cg.orbitLastCmdAngles[2] = cmd.angles[2];
+	}
+
+	cg.orbitLastClientNum = cg.snap->ps.clientNum;
+	cg.orbitInitialized = qtrue;
+}
+
+
+/*
+===============
+CG_FollowCam_f
+
+Console command: cycle or set follow camera mode.
+  followcam     - cycle between modes
+  followcam N   - set mode directly
+===============
+*/
+void CG_FollowCam_f( void ) {
+	int mode;
+
+	if ( !cg.snap ) {
+		return;
+	}
+
+	// only meaningful during demo playback or spectator follow
+	if ( !cg.demoPlayback && !( cg.snap->ps.pm_flags & PMF_FOLLOW ) ) {
+		CG_Printf( "followcam: not in follow or demo mode\n" );
+		return;
+	}
+
+	if ( trap_Argc() > 1 ) {
+		mode = atoi( CG_Argv( 1 ) );
+		if ( mode < 0 || mode > 1 ) {
+			mode = 0;
+		}
+	} else {
+		// cycle: 0 -> 1 -> 0
+		mode = ( cg_followMode.integer == 1 ) ? 0 : 1;
+	}
+
+	trap_Cvar_Set( "cg_followMode", va( "%i", mode ) );
+
+	if ( mode == 1 ) {
+		CG_InitOrbitCamera();
+	} else {
+		cg.orbitInitialized = qfalse;
+	}
+}
+
+
+/*
+===============
+CG_FollowZoomIn_f / CG_FollowZoomOut_f
+===============
+*/
+void CG_FollowZoomIn_f( void ) {
+	if ( !cg.snap || cg_followMode.integer != 1 ) return;
+	if ( !cg.demoPlayback && !(cg.snap->ps.pm_flags & PMF_FOLLOW) ) return;
+	cg.orbitDistanceTarget -= 20;
+	if ( cg.orbitDistanceTarget < 40 ) cg.orbitDistanceTarget = 40;
+}
+
+void CG_FollowZoomOut_f( void ) {
+	if ( !cg.snap || cg_followMode.integer != 1 ) return;
+	if ( !cg.demoPlayback && !(cg.snap->ps.pm_flags & PMF_FOLLOW) ) return;
+	cg.orbitDistanceTarget += 20;
+	if ( cg.orbitDistanceTarget > 512 ) cg.orbitDistanceTarget = 512;
+}
+
+
+/*
+===============
+CG_UpdateOrbitInput
+
+Reads frame-to-frame mouse/stick deltas and adjusts orbit angles + distance.
+Called each frame from CG_CalcViewValues when in orbit follow mode.
+===============
+*/
+static void CG_UpdateOrbitInput( void ) {
+	usercmd_t	cmd;
+	int			cmdNum;
+	short		delta;
+	float		zoomSpeed;
+
+	cmdNum = trap_GetCurrentCmdNumber();
+	if ( !trap_GetUserCmd( cmdNum, &cmd ) ) {
+		return;
+	}
+
+	if ( !cg.orbitInitialized ) {
+		CG_InitOrbitCamera();
+		return;
+	}
+
+	// detect followed-player change
+	if ( cg.snap->ps.clientNum != cg.orbitLastClientNum ) {
+		CG_InitOrbitCamera();
+		return;
+	}
+
+	// compute yaw delta
+	delta = (short)( cmd.angles[YAW] - cg.orbitLastCmdAngles[YAW] );
+	cg.orbitAngles[YAW] += SHORT2ANGLE( delta );
+
+	// compute pitch delta
+	delta = (short)( cmd.angles[PITCH] - cg.orbitLastCmdAngles[PITCH] );
+	cg.orbitAngles[PITCH] += SHORT2ANGLE( delta );
+
+	// clamp pitch
+	if ( cg.orbitAngles[PITCH] < -60 ) {
+		cg.orbitAngles[PITCH] = -60;
+	}
+	if ( cg.orbitAngles[PITCH] > 80 ) {
+		cg.orbitAngles[PITCH] = 80;
+	}
+
+	// zoom via forward/back movement (adjusts target)
+	zoomSpeed = 0.5f * cg.frametime;
+	if ( cmd.forwardmove > 0 ) {
+		cg.orbitDistanceTarget -= zoomSpeed;
+	} else if ( cmd.forwardmove < 0 ) {
+		cg.orbitDistanceTarget += zoomSpeed;
+	}
+
+	// clamp target
+	if ( cg.orbitDistanceTarget < 40 ) {
+		cg.orbitDistanceTarget = 40;
+	}
+	if ( cg.orbitDistanceTarget > 512 ) {
+		cg.orbitDistanceTarget = 512;
+	}
+
+	// smoothly lerp actual distance toward target
+	{
+		float factor = 8.0f * cg.frametime / 1000.0f;
+		if ( factor > 1.0f ) factor = 1.0f;
+		cg.orbitDistance += ( cg.orbitDistanceTarget - cg.orbitDistance ) * factor;
+	}
+
+	// store for next frame
+	cg.orbitLastCmdAngles[0] = cmd.angles[0];
+	cg.orbitLastCmdAngles[1] = cmd.angles[1];
+	cg.orbitLastCmdAngles[2] = cmd.angles[2];
+}
+
+
+/*
+===============
+CG_OffsetOrbitView
+
+Positions the camera orbiting around the followed player.
+Replaces CG_OffsetThirdPersonView when in orbit follow mode.
+===============
+*/
+static void CG_OffsetOrbitView( void ) {
+	vec3_t		forward, right, up;
+	vec3_t		playerEye;
+	vec3_t		camPos;
+	vec3_t		dir;
+	trace_t		trace;
+	static vec3_t	mins = { -4, -4, -4 };
+	static vec3_t	maxs = { 4, 4, 4 };
+
+	// player eye position
+	VectorCopy( cg.refdef.vieworg, playerEye );
+	playerEye[2] += cg.predictedPlayerState.viewheight;
+
+	// compute camera direction from orbit angles
+	AngleVectors( cg.orbitAngles, forward, right, up );
+
+	// position camera behind/around the player
+	VectorMA( playerEye, -cg.orbitDistance, forward, camPos );
+
+	// trace for wall collision
+	CG_Trace( &trace, playerEye, mins, maxs, camPos,
+		cg.predictedPlayerState.clientNum, MASK_SOLID );
+
+	if ( trace.fraction != 1.0f ) {
+		VectorCopy( trace.endpos, camPos );
+	}
+
+	VectorCopy( camPos, cg.refdef.vieworg );
+
+	// look at the player
+	VectorSubtract( playerEye, camPos, dir );
+	vectoangles( dir, cg.refdefViewAngles );
+	cg.refdefViewAngles[ROLL] = 0;
+}
+
+
+/*
+===============
 CG_OffsetThirdPersonView
 
 ===============
@@ -423,7 +635,17 @@ static void CG_OffsetFirstPersonView( void ) {
 
 //======================================================================
 
-void CG_ZoomDown_f( void ) { 
+void CG_ZoomDown_f( void ) {
+	if ( cg.snap && (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)) ) {
+		int mode = ( cg_followMode.integer == 1 ) ? 0 : 1;
+		trap_Cvar_Set( "cg_followMode", va( "%i", mode ) );
+		if ( mode == 1 ) {
+			CG_InitOrbitCamera();
+		} else {
+			cg.orbitInitialized = qfalse;
+		}
+		return;
+	}
 	if ( cg.zoomed ) {
 		return;
 	}
@@ -431,7 +653,10 @@ void CG_ZoomDown_f( void ) {
 	cg.zoomTime = cg.time;
 }
 
-void CG_ZoomUp_f( void ) { 
+void CG_ZoomUp_f( void ) {
+	if ( cg.snap && (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)) ) {
+		return;
+	}
 	if ( !cg.zoomed ) {
 		return;
 	}
@@ -799,8 +1024,14 @@ static int CG_CalcViewValues( void ) {
 	}
 
 	if ( cg.renderingThirdPerson ) {
-		// back away from character
-		CG_OffsetThirdPersonView();
+		if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
+				&& cg_followMode.integer == 1 ) {
+			CG_UpdateOrbitInput();
+			CG_OffsetOrbitView();
+		} else {
+			// back away from character
+			CG_OffsetThirdPersonView();
+		}
 	} else {
 		// offset for local bobbing and kicks
 		CG_OffsetFirstPersonView();
@@ -963,6 +1194,12 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// decide on third person view
 	cg.renderingThirdPerson = cg_thirdPerson.integer || (cg.snap->ps.stats[STAT_HEALTH] <= 0);
+
+	// force third-person rendering in orbit follow mode
+	if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
+			&& cg_followMode.integer == 1 ) {
+		cg.renderingThirdPerson = qtrue;
+	}
 
 	CG_TrackClientTeamChange();
 

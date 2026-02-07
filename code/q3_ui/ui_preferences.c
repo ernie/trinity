@@ -43,6 +43,7 @@ GAME OPTIONS MENU
 #define ID_CROSSHAIRCOLOR		140
 #define ID_BLOODPARTICLES		141
 #define ID_DAMAGEPLUMS			142
+#define ID_FOLLOWMODE			143
 
 #define	NUM_CROSSHAIRS			10
 
@@ -68,6 +69,7 @@ typedef struct {
 	menuradiobutton_s	damageeffect;
 	menuradiobutton_s	bloodparticles;
 	menuradiobutton_s	damageplums;
+	menulist_s			followmode;
 	menuradiobutton_s	allowdownload;
 	menubitmap_s		back;
 
@@ -84,6 +86,13 @@ static const char *teamoverlay_names[] =
 	"upper right",
 	"lower right",
 	"lower left",
+	NULL
+};
+
+static const char *followmode_names[] =
+{
+	"First-person",
+	"Orbit",
 	NULL
 };
 
@@ -116,6 +125,7 @@ static void Preferences_SetMenuItems( void ) {
 	s_preferences.damageeffect.curvalue		= trap_Cvar_VariableValue( "cg_damageEffect" ) != 0;
 	s_preferences.bloodparticles.curvalue	= trap_Cvar_VariableValue( "cg_bloodParticles" ) != 0;
 	s_preferences.damageplums.curvalue		= trap_Cvar_VariableValue( "cg_damagePlums" ) != 0;
+	s_preferences.followmode.curvalue		= Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_followMode" ) );
 	s_preferences.allowdownload.curvalue	= trap_Cvar_VariableValue( "cl_allowDownload" ) != 0;
 }
 
@@ -192,6 +202,10 @@ static void Preferences_Event( void* ptr, int notification ) {
 
 	case ID_DAMAGEPLUMS:
 		trap_Cvar_SetValue( "cg_damagePlums", s_preferences.damageplums.curvalue );
+		break;
+
+	case ID_FOLLOWMODE:
+		trap_Cvar_SetValue( "cg_followMode", s_preferences.followmode.curvalue );
 		break;
 
 	case ID_BACK:
@@ -358,7 +372,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.framer.width  	   = 256;
 	s_preferences.framer.height  	   = 334;
 
-	y = 104;
+	y = 96;
 	s_preferences.crosshair.generic.type		= MTYPE_TEXT;
 	s_preferences.crosshair.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT|QMF_NODEFAULTINIT|QMF_OWNERDRAW;
 	s_preferences.crosshair.generic.x			= PREFERENCES_X_POS;
@@ -497,6 +511,16 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.damageplums.generic.y	       = y;
 
 	y += BIGCHAR_HEIGHT+2;
+	s_preferences.followmode.generic.type        = MTYPE_SPINCONTROL;
+	s_preferences.followmode.generic.name        = "Follow Camera:";
+	s_preferences.followmode.generic.flags       = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.followmode.generic.callback    = Preferences_Event;
+	s_preferences.followmode.generic.id          = ID_FOLLOWMODE;
+	s_preferences.followmode.generic.x           = PREFERENCES_X_POS;
+	s_preferences.followmode.generic.y           = y;
+	s_preferences.followmode.itemnames           = followmode_names;
+
+	y += BIGCHAR_HEIGHT+2;
 	s_preferences.allowdownload.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.allowdownload.generic.name	   = "Automatic Downloading:";
 	s_preferences.allowdownload.generic.flags	   = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -535,6 +559,7 @@ static void Preferences_MenuInit( void ) {
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageeffect );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.bloodparticles );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageplums );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.followmode );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.allowdownload );
 
 	Menu_AddItem( &s_preferences.menu, &s_preferences.back );

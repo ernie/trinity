@@ -695,6 +695,14 @@ typedef struct {
 	int				followClient;
 
 	qboolean		skipDFshaders;
+
+	// Follow camera orbit state
+	vec3_t			orbitAngles;			// yaw, pitch for orbit camera
+	float			orbitDistance;			// current distance from player
+	float			orbitDistanceTarget;	// target distance (smoothly lerped to)
+	int				orbitLastCmdAngles[3];	// previous frame's cmd.angles
+	qboolean		orbitInitialized;		// set once orbit state has been seeded
+	int				orbitLastClientNum;		// detect followed-player changes
 } cg_t;
 
 
@@ -1223,6 +1231,9 @@ void CG_AddBufferedSound( sfxHandle_t sfx);
 
 void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demoPlayback );
 void CG_DamageBorderVignette( void );
+void CG_FollowCam_f( void );
+void CG_FollowZoomIn_f( void );
+void CG_FollowZoomOut_f( void );
 
 
 //

@@ -133,5 +133,6 @@ CG_CVAR( cg_followKiller, "cg_followKiller", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_damageEffect, "cg_damageEffect", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_crosshairColor, "cg_crosshairColor", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_bloodParticles, "cg_bloodParticles", "0", CVAR_ARCHIVE )
+CG_CVAR( cg_followMode, "cg_followMode", "0", CVAR_ARCHIVE )
 
 #undef CG_CVAR

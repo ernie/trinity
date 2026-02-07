@@ -1666,6 +1666,7 @@ void CG_NextWeapon_f( void ) {
 	cg.weaponSelectTime = cg.time;
 
 	if ( cg.snap->ps.pm_flags & PMF_FOLLOW || cg.demoPlayback ) {
+		CG_FollowZoomIn_f();
 		return;
 	}
 
@@ -1705,6 +1706,7 @@ void CG_PrevWeapon_f( void ) {
 	cg.weaponSelectTime = cg.time;
 
 	if ( cg.snap->ps.pm_flags & PMF_FOLLOW || cg.demoPlayback ) {
+		CG_FollowZoomOut_f();
 		return;
 	}
 

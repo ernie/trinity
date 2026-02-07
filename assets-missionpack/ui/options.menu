@@ -213,6 +213,22 @@ itemDef {
       		visible 1
     		}
 
+	itemDef {
+		name options
+		group grpOptions
+		text "Follow Camera:"
+		type ITEM_TYPE_MULTI
+		cvar "cg_followMode"
+		cvarFloatList { "First-person" 0 "Orbit" 1 }
+		rect 30 335 210 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+	}
+
 // RIGHT COLUMN
 
 	itemDef {
@@ -362,7 +378,6 @@ itemDef {
 		forecolor 1 1 1 1
 		visible 1
 	}
-
 
 itemDef {
       	name fadebox

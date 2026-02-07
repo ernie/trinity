@@ -1920,7 +1920,7 @@ void CG_EventHandling( cgame_event_t type )
 void CG_KeyEvent( int key, qboolean down )
 {
 	// process scoreboard clicks etc.
-	if ( cgs.score_catched && down ) 
+	if ( cgs.score_catched && down )
 	{
 		if ( key == /*K_TAB*/ cgs.score_key )
 			return;
