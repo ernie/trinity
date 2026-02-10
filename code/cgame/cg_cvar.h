@@ -134,5 +134,9 @@ CG_CVAR( cg_damageEffect, "cg_damageEffect", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_crosshairColor, "cg_crosshairColor", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_bloodParticles, "cg_bloodParticles", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_followMode, "cg_followMode", "0", CVAR_ARCHIVE )
+CG_CVAR( cg_tvTimeline, "cg_tvTimeline", "1", CVAR_ARCHIVE )
+CG_CVAR( cg_tvTime, "cl_tvTime", "0", CVAR_ROM )
+CG_CVAR( cg_tvDuration, "cl_tvDuration", "0", CVAR_ROM )
+CG_CVAR( cg_tvSkip, "cg_tvSkip", "10", CVAR_ARCHIVE )
 
 #undef CG_CVAR

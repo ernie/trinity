@@ -48,6 +48,7 @@ All of these settings are available in the options menu.
 - `cg_damageEffect`: Modern red-border damage indication, directionally-weighted
 - `cg_bloodParticles`: Updated visuals replacing 5-frame blood spurt animation. Entry/exit wound blood particles splat on walls/floors. Going more for a "Mortal Kombat" style feel than hyper-realism, which seems era-appropriate.
 - `cg_followMode`: Orbit camera for spectating and demo playback. Mouse orbits around the followed player, forward/back keys zoom in and out. When following, weapon next/prev and zoom keys adjust distance and toggle follow mode, respectively, toggling between first and third-person.
+- Playback of TV demos (TrinityVision, of course :wink:). These `.tvd` files are server-side recorded, and work like other MVD systems. Requires the client engine support. Currently, [specific to trinity-engine](https://github.com/ernie/trinity-engine)
 
 You can also set your own bindings. The default ones behave like this, but only in follow mode, so they don't override normal gameplay:
 

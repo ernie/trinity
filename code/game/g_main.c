@@ -513,8 +513,9 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	level.snd_fry = G_SoundIndex("sound/player/fry.wav");	// FIXME standing in lava / slime
 
-	// Generate unique match identifier
+	// Generate unique match identifier and expose to engine
 	G_GenerateMatchUUID( level.matchUUID, sizeof( level.matchUUID ) );
+	trap_Cvar_Set( "g_matchUUID", level.matchUUID );
 
 	if ( g_gametype.integer != GT_SINGLE_PLAYER && g_log.string[0] ) {
 		if ( g_logSync.integer ) {

@@ -2286,11 +2286,11 @@ static void CG_DrawTeamVote(void) {
 static qboolean CG_DrawScoreboard( void ) {
 #ifdef MISSIONPACK
 	static qboolean firstTime = qtrue;
+	static qboolean scoreboardCursorActive = qfalse;
+	static int lastFollowedClient = -1;
 	float fade, *fadeColor;
+	qboolean spectator;
 
-	if (menuScoreboard) {
-		menuScoreboard->window.flags &= ~WINDOW_FORCED;
-	}
 	if (cg_paused.integer) {
 		cg.deferredPlayerLoading = 0;
 		firstTime = qtrue;
@@ -2319,11 +2319,17 @@ static qboolean CG_DrawScoreboard( void ) {
 			cg.deferredPlayerLoading = 0;
 			cg.killerName[0] = 0;
 			firstTime = qtrue;
+			if ( scoreboardCursorActive ) {
+				trap_Key_SetCatcher( trap_Key_GetCatcher() & ~KEYCATCH_CGAME );
+				scoreboardCursorActive = qfalse;
+				if (menuScoreboard) {
+					menuScoreboard->window.flags &= ~WINDOW_FORCED;
+				}
+			}
 			return qfalse;
 		}
 		fade = *fadeColor;
-	}																					  
-
+	}
 
 	if (menuScoreboard == NULL) {
 		if ( cgs.gametype >= GT_TEAM ) {
@@ -2333,12 +2339,47 @@ static qboolean CG_DrawScoreboard( void ) {
 		}
 	}
 
-	if (menuScoreboard) {
-		if (firstTime) {
+	if (menuScoreboard == NULL) {
+		return qfalse;
+	}
+
+	// Clear WINDOW_FORCED unless scoreboard cursor is active
+	if (!scoreboardCursorActive) {
+		menuScoreboard->window.flags &= ~WINDOW_FORCED;
+	}
+
+	if (firstTime) {
+		CG_SetScoreSelection(menuScoreboard);
+		firstTime = qfalse;
+	}
+
+	// Update selection when followed player changes
+	if ( cg.snap && (cg.snap->ps.pm_flags & PMF_FOLLOW) ) {
+		if ( cg.snap->ps.clientNum != lastFollowedClient ) {
 			CG_SetScoreSelection(menuScoreboard);
-			firstTime = qfalse;
+			lastFollowedClient = cg.snap->ps.clientNum;
 		}
-		Menu_Paint(menuScoreboard, qtrue);
+	}
+
+	Menu_Paint(menuScoreboard, qtrue);
+
+	// Scoreboard cursor for spectators (enables click-to-follow)
+	spectator = cg.snap && (cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ||
+	            ( cg.snap->ps.pm_flags & PMF_FOLLOW ) || cg.demoPlayback || cgs.tvPlayback);
+	if ( cg.showScores && spectator && !scoreboardCursorActive ) {
+		cgs.cursorX = 320;
+		cgs.cursorY = 240;
+		trap_Key_SetCatcher( trap_Key_GetCatcher() | KEYCATCH_CGAME );
+		menuScoreboard->window.flags |= WINDOW_FORCED;
+		scoreboardCursorActive = qtrue;
+	} else if ( !cg.showScores && scoreboardCursorActive ) {
+		trap_Key_SetCatcher( trap_Key_GetCatcher() & ~KEYCATCH_CGAME );
+		scoreboardCursorActive = qfalse;
+		menuScoreboard->window.flags &= ~WINDOW_FORCED;
+	}
+
+	if ( scoreboardCursorActive ) {
+		CG_DrawPic( cgs.cursorX - 12, cgs.cursorY - 12, 24, 24, cgDC.Assets.cursor );
 	}
 
 	// load any models that have been deferred
@@ -2385,7 +2426,8 @@ static qboolean CG_DrawFollow( void ) {
 
 	const char	*name;
 
-	if ( !(cg.snap->ps.pm_flags & PMF_FOLLOW) ) {
+	if ( !(cg.snap->ps.pm_flags & PMF_FOLLOW) &&
+		 !(cgs.tvPlayback && cg_followMode.integer != 2) ) {
 		return qfalse;
 	}
 
@@ -2614,6 +2656,50 @@ void CG_DrawTimedMenus( void ) {
 
 /*
 =================
+CG_DrawTVTimeline
+
+Draws a progress bar at the bottom of the screen during TV playback.
+=================
+*/
+static void CG_DrawTVTimeline( void ) {
+	int		time, duration;
+	float	frac;
+	int		timeSec, durationSec;
+	vec4_t	bgColor = { 0.0f, 0.0f, 0.0f, 0.5f };
+	vec4_t	fgColor = { 0.8f, 0.8f, 0.2f, 0.7f };
+
+	if ( !cgs.tvPlayback || !cg_tvTimeline.integer ) {
+		return;
+	}
+
+	time = cg_tvTime.integer;
+	duration = cg_tvDuration.integer;
+	if ( duration <= 0 ) {
+		return;
+	}
+
+	frac = (float)time / (float)duration;
+	if ( frac < 0.0f ) frac = 0.0f;
+	if ( frac > 1.0f ) frac = 1.0f;
+
+	// bar at screen bottom
+	CG_FillRect( 0, 474, 640, 6, bgColor );
+	CG_FillRect( 0, 474, 640 * frac, 6, fgColor );
+
+	// time text above the bar
+	timeSec = time / 1000;
+	durationSec = duration / 1000;
+	CG_DrawString( 636, 474 - SMALLCHAR_HEIGHT,
+		va( "%d:%02d / %d:%02d",
+			timeSec / 60, timeSec % 60,
+			durationSec / 60, durationSec % 60 ),
+		colorWhite, SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT, 0,
+		DS_SHADOW | DS_RIGHT );
+}
+
+
+/*
+=================
 CG_Draw2D
 =================
 */
@@ -2717,6 +2803,9 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 		CG_DrawCenterString();
 	}
 
+	CG_DrawTVTimeline();
+
+#ifndef MISSIONPACK
 	if ( cgs.score_catched ) {
 		float x, y, w, h;
 		trap_R_SetColor( NULL );
@@ -2727,6 +2816,7 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 		CG_AdjustFrom640( &x, &y, &w, &h );
 		trap_R_DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cgs.media.cursor );
 	}
+#endif
 }
 
 

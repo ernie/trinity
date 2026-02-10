@@ -142,6 +142,7 @@ void CG_ParseServerinfo( void ) {
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
 	Q_strncpyz( cgs.redTeam, Info_ValueForKey( info, "g_redTeam" ), sizeof(cgs.redTeam) );
 	Q_strncpyz( cgs.blueTeam, Info_ValueForKey( info, "g_blueTeam" ), sizeof(cgs.blueTeam) );
+	cgs.tvPlayback = atoi( Info_ValueForKey( info, "tv" ) ) ? qtrue : qfalse;
 }
 
 
@@ -1029,6 +1030,59 @@ static void CG_ServerCommand( void ) {
 
 	if ( !strcmp( cmd, "cs" ) ) {
 		CG_ConfigStringModified();
+		return;
+	}
+
+	if ( !strcmp( cmd, "tv_seek_sync" ) ) {
+		int i;
+		int newClientNum = atoi( CG_Argv(1) );
+		const char *str;
+		// Update clientNum from engine's viewpoint
+		if ( newClientNum >= 0 && newClientNum < MAX_CLIENTS ) {
+			cg.clientNum = newClientNum;
+		}
+		// Re-fetch entire gamestate after TV seek
+		trap_GetGameState( &cgs.gameState );
+		CG_ParseServerinfo();
+		CG_ParseSysteminfo();
+		CG_SetConfigValues();
+		// Re-register all models from configstrings
+		for ( i = 1; i < MAX_MODELS; i++ ) {
+			str = CG_ConfigString( CS_MODELS + i );
+			if ( !str[0] ) {
+				break;
+			}
+			cgs.gameModels[i] = trap_R_RegisterModel( str );
+		}
+		// Re-register all sounds from configstrings
+		for ( i = 1; i < MAX_SOUNDS; i++ ) {
+			str = CG_ConfigString( CS_SOUNDS + i );
+			if ( !str[0] ) {
+				break;
+			}
+			if ( str[0] != '*' ) {
+				cgs.gameSounds[i] = trap_S_RegisterSound( str, qfalse );
+			}
+		}
+		// Re-register all player info
+		for ( i = 0; i < MAX_CLIENTS; i++ ) {
+			str = CG_ConfigString( CS_PLAYERS + i );
+			if ( str[0] ) {
+				CG_NewClientInfo( i );
+			} else if ( cgs.clientinfo[i].infoValid ) {
+				memset( &cgs.clientinfo[i], 0, sizeof( cgs.clientinfo[i] ) );
+			}
+		}
+		// Re-register all items
+		for ( i = 1; i < bg_numItems; i++ ) {
+			CG_RegisterItemVisuals( i );
+		}
+		CG_InitLocalEntities();
+		CG_InitMarkPolys();
+		CG_ClearParticles();
+		trap_S_ClearLoopingSounds( qtrue );
+		CG_Printf( "tv_seek_sync: re-registered resources, clientNum=%i\n",
+			cg.clientNum );
 		return;
 	}
 

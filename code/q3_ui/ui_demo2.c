@@ -217,13 +217,13 @@ static void UI_DemosReadDir( void )
 	num_files = c;
 	len = sizeof(buffer) - (s - buffer) - 1;
 	if ( len > 2  && num_files < UI_MAX_DEMOS-1 ) {
-		// count regular files
+		// count regular demo files
 		m = trap_FS_GetFileList( dir, "dm_??", s, len ); // try to perform pattern match in first place
 		if ( !m ) {
 			Com_sprintf( extension, sizeof( extension ), "dm_%d", (int)trap_Cvar_VariableValue( "protocol" ) );
 			m = trap_FS_GetFileList( dir, extension, s, len );
 		}
-		if ( num_files + m > UI_MAX_DEMOS ) 
+		if ( num_files + m > UI_MAX_DEMOS )
 			m = UI_MAX_DEMOS - n;
 		for ( i = 0; i < m; i++, c++ ) {
 			len = strlen( s );
@@ -233,6 +233,22 @@ static void UI_DemosReadDir( void )
 			s += len + 1;
 		}
 		num_files += m;
+
+		// count TV demo files
+		len = sizeof(buffer) - (s - buffer) - 1;
+		if ( len > 2 && num_files < UI_MAX_DEMOS-1 ) {
+			m = trap_FS_GetFileList( dir, "tvd", s, len );
+			if ( num_files + m > UI_MAX_DEMOS )
+				m = UI_MAX_DEMOS - num_files;
+			for ( i = 0; i < m; i++, c++ ) {
+				len = strlen( s );
+				dentry[c].file_name = s;
+				dentry[c].file_nlen = len;
+				dentry[c].file_type = 0;
+				s += len + 1;
+			}
+			num_files += m;
+		}
 	}
 	s_demos.numDemos = num_files;
 }
@@ -540,9 +556,9 @@ static void UI_DemosFillList( void ) {
 			strcpy( matchname, dentry[i].file_name );
 
 			// strip extension
-			if ( !Q_stricmp( matchname + len - 6, ".dm_68" ) )
+			if ( len > 6 && !Q_stricmp( matchname + len - 6, ".dm_68" ) )
 				matchname[ len-6 ] = '\0';
-		
+
 			BG_StripColor( matchname );
 			if ( !Q_stristr( matchname, s_demos.namefilter ) ) {
 				continue;
@@ -561,17 +577,17 @@ static void UI_DemosFillList( void ) {
 		s_demos.list.itemnames[i] = show_names[i];
 
 		Q_strncpyz( show_names[i], d->file_name, sizeof( show_names[i] ) );
+		len = d->file_nlen;
 		if ( d->file_type > 0 ) {
 			Q_strcat( show_names[i], sizeof( show_names[0] ), "^7/" );
 		}
 
-		len = d->file_nlen;
 		// strip extension
-		if ( !Q_stricmp( show_names[i] +  len - 6,".dm_68" ) ) {
-			memset( show_names[i] +  len - 6, ' ', 6 );
+		if ( len > 6 && !Q_stricmp( show_names[i] + len - 6, ".dm_68" ) ) {
+			memset( show_names[i] + len - 6, ' ', 6 );
 			len -= 6;
 		}
-		
+
 		diff = UI_cstrdiff ( show_names[i] );
 
 		show_names[i][s_demos.list.width-1+diff] = '\0';

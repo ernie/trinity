@@ -1513,21 +1513,51 @@ static qhandle_t CG_FeederItemImage(float feederID, int index) {
 	return 0;
 }
 
-static void CG_FeederSelection(float feederID, int index) {
-	if ( cgs.gametype >= GT_TEAM ) {
-		int i, count;
-		int team = (feederID == FEEDER_REDTEAM_LIST) ? TEAM_RED : TEAM_BLUE;
-		count = 0;
+static int CG_ScoreIndexFromFeederIndex(float feederID, int index) {
+	int id = (int)feederID;
+
+	if (id == FEEDER_SCOREBOARD) {
+		if (index >= 0 && index < cg.numScores) {
+			return index;
+		}
+	} else if (id == FEEDER_REDTEAM_LIST || id == FEEDER_BLUETEAM_LIST) {
+		int i, count = 0;
+		int team = (id == FEEDER_REDTEAM_LIST) ? TEAM_RED : TEAM_BLUE;
 		for (i = 0; i < cg.numScores; i++) {
 			if (cg.scores[i].team == team) {
-				if (index == count) {
-					cg.selectedScore = i;
+				if (count == index) {
+					return i;
 				}
 				count++;
 			}
 		}
-	} else {
-		cg.selectedScore = index;
+	}
+	return -1;
+}
+
+static void CG_FeederSelection(float feederID, int index) {
+	int scoreIndex = CG_ScoreIndexFromFeederIndex(feederID, index);
+	int clientNum = -1;
+
+	if (scoreIndex >= 0) {
+		cg.selectedScore = scoreIndex;
+		clientNum = cg.scores[scoreIndex].client;
+	}
+
+	// Send follow/view command if spectating and a valid player was selected
+	if ( clientNum >= 0 && cg.snap ) {
+		qboolean spectator = cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ||
+		                     ( cg.snap->ps.pm_flags & PMF_FOLLOW ) ||
+		                     cg.demoPlayback || cgs.tvPlayback;
+		qboolean alreadyFollowing = (cg.snap->ps.pm_flags & PMF_FOLLOW) &&
+		                            (cg.snap->ps.clientNum == clientNum);
+		if ( spectator && !alreadyFollowing && cg.scores[cg.selectedScore].team != TEAM_SPECTATOR ) {
+			if ( cgs.tvPlayback ) {
+				trap_SendConsoleCommand( va( "tv_view %i\n", clientNum ) );
+			} else if ( !cg.demoPlayback ) {
+				trap_SendClientCommand( va( "follow %i", clientNum ) );
+			}
+		}
 	}
 }
 

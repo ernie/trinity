@@ -57,7 +57,7 @@ static void CG_TransitionEntity( centity_t *cent ) {
 CG_SetInitialSnapshot
 
 This will only happen on the very first snapshot, or
-on tourney restarts.  All other times will use 
+on tourney restarts.  All other times will use
 CG_TransitionSnapshot instead.
 
 FIXME: Also called by map_restart?
@@ -69,6 +69,11 @@ void CG_SetInitialSnapshot( snapshot_t *snap ) {
 	entityState_t	*state;
 
 	cg.snap = snap;
+
+	// TV: update clientNum when viewpoint changes
+	if ( cgs.tvPlayback && snap->ps.clientNum != cg.clientNum ) {
+		cg.clientNum = snap->ps.clientNum;
+	}
 
 	BG_PlayerStateToEntityState( &snap->ps, &cg_entities[ snap->ps.clientNum ].currentState, qfalse );
 
@@ -134,6 +139,11 @@ static void CG_TransitionSnapshot( void ) {
 	// move nextSnap to snap and do the transitions
 	oldFrame = cg.snap;
 	cg.snap = cg.nextSnap;
+
+	// TV: update clientNum when viewpoint changes
+	if ( cgs.tvPlayback && cg.snap->ps.clientNum != cg.clientNum ) {
+		cg.clientNum = cg.snap->ps.clientNum;
+	}
 
 	BG_PlayerStateToEntityState( &cg.snap->ps, &cg_entities[ cg.snap->ps.clientNum ].currentState, qfalse );
 	cg_entities[ cg.snap->ps.clientNum ].interpolate = qfalse;
@@ -248,7 +258,7 @@ static snapshot_t *CG_ReadNextSnapshot( void ) {
 	snapshot_t	*dest;
 
 	if ( cg.latestSnapshotNum > cgs.processedSnapshotNum + 1000 ) {
-		CG_Printf( "WARNING: CG_ReadNextSnapshot: way out of range, %i > %i\n", 
+		CG_Printf( "WARNING: CG_ReadNextSnapshot: way out of range, %i > %i\n",
 			cg.latestSnapshotNum, cgs.processedSnapshotNum );
 	}
 
@@ -362,6 +372,27 @@ void CG_ProcessSnapshots( void ) {
 
 			// if time went backwards, we have a level restart
 			if ( cg.nextSnap->serverTime < cg.snap->serverTime ) {
+				if ( cgs.tvPlayback ) {
+					// TV seek backward: zero ALL entity state so nothing
+					// from the old timeline leaks through
+					memset( cg_entities, 0, sizeof( cg_entities ) );
+					memset( &cg.predictedPlayerEntity, 0, sizeof( cg.predictedPlayerEntity ) );
+					cg.validPPS = qfalse;
+
+					// Reset time-dependent view offsets so
+					// CG_OffsetFirstPersonView doesn't compute
+					// huge deltas from the old timeline
+					CG_ResetViewOffsets();
+
+					// Set time BEFORE CG_SetInitialSnapshot so
+					// BG_EvaluateTrajectory uses the correct time
+					cg.time = cg.nextSnap->serverTime;
+					cg.oldTime = cg.nextSnap->serverTime;
+
+					CG_SetInitialSnapshot( cg.nextSnap );
+					cg.nextSnap = NULL;
+					continue;
+				}
 				CG_Error( "CG_ProcessSnapshots: Server time went backwards" );
 			}
 		}

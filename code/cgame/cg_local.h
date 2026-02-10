@@ -708,6 +708,12 @@ typedef struct {
 	int				orbitLastCmdAngles[3];	// previous frame's cmd.angles
 	qboolean		orbitInitialized;		// set once orbit state has been seeded
 	int				orbitLastClientNum;		// detect followed-player changes
+
+	// Free-fly camera state (TV / demo)
+	vec3_t			freeFlyOrigin;
+	vec3_t			freeFlyAngles;
+	int				freeFlyLastCmdAngles[3];
+	qboolean		freeFlyInitialized;
 } cg_t;
 
 
@@ -1175,6 +1181,8 @@ typedef struct {
 	float			cursorX;
 	float			cursorY;
 #endif
+
+	qboolean		tvPlayback;		// playing back a TV demo (\tv\1 in serverinfo)
 } cgs_t;
 
 //==============================================================================
@@ -1234,6 +1242,7 @@ void CG_ZoomDown_f( void );
 void CG_ZoomUp_f( void );
 void CG_AddBufferedSound( sfxHandle_t sfx);
 
+void CG_ResetViewOffsets( void );
 void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demoPlayback );
 void CG_DamageBorderVignette( void );
 qboolean CG_IsVRFollow( void );

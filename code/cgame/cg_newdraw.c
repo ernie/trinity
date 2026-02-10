@@ -1708,10 +1708,14 @@ void CG_MouseEvent(int x, int y) {
 		cgs.activeCursor = cgs.media.sizeCursor;
 	}
 
-  if (cgs.capturedItem) {
-	  Display_MouseMove(cgs.capturedItem, x, y);
-  } else {
-	  Display_MouseMove(NULL, cgs.cursorX, cgs.cursorY);
+  // Skip Display_MouseMove when scoreboard is shown - we handle mouse interaction
+  // in CG_KeyEvent on click only, to avoid focus sound when hovering between team lists
+  if ( !cg.showScores ) {
+    if (cgs.capturedItem) {
+      Display_MouseMove(cgs.capturedItem, x, y);
+    } else {
+      Display_MouseMove(NULL, cgs.cursorX, cgs.cursorY);
+    }
   }
 
 }
@@ -1763,26 +1767,44 @@ void CG_EventHandling(cgame_event_t type) {
 
 
 void CG_KeyEvent(int key, qboolean down) {
+	qboolean isFollowing;
 
 	if (!down) {
 		return;
 	}
 
-	if ( cg.predictedPlayerState.pm_type == PM_NORMAL || (cg.predictedPlayerState.pm_type == PM_SPECTATOR && cg.showScores == qfalse)) {
-		CG_EventHandling(CGAME_EVENT_NONE);
-    trap_Key_SetCatcher(0);
+	isFollowing = cg.snap && ( cg.snap->ps.pm_flags & PMF_FOLLOW );
+
+	// Handle scoreboard click-to-follow
+	if ( cg.showScores && (cg.predictedPlayerState.pm_type == PM_SPECTATOR || isFollowing || cg.demoPlayback || cgs.tvPlayback) ) {
+		extern menuDef_t *menuScoreboard;
+
+		// Only process mouse clicks for scoreboard click-to-follow.
+		if ( key != K_MOUSE1 && key != K_MOUSE2 ) {
+			return;
+		}
+
+		// Sync cgDC cursor from cgs cursor before handling key
+		cgDC.cursorx = cgs.cursorX;
+		cgDC.cursory = cgs.cursorY;
+		// Ensure WINDOW_FORCED is set so Menu_HandleMouseMove will process the scoreboard
+		// (scoreboard menu has visible 0, so it needs WINDOW_FORCED to be processed)
+		if (menuScoreboard) {
+			menuScoreboard->window.flags |= WINDOW_FORCED;
+		}
+
+		Menu_HandleMouseMove(menuScoreboard, cgs.cursorX, cgs.cursorY);
+		Menu_HandleKey(menuScoreboard, key, down);
 		return;
 	}
 
-  //if (key == trap_Key_GetKey("teamMenu") || !Display_CaptureItem(cgs.cursorX, cgs.cursorY)) {
-    // if we see this then we should always be visible
-  //  CG_EventHandling(CGAME_EVENT_NONE);
-  //  trap_Key_SetCatcher(0);
-  //}
+	if ( cg.predictedPlayerState.pm_type == PM_NORMAL || (cg.predictedPlayerState.pm_type == PM_SPECTATOR && cg.showScores == qfalse)) {
+		CG_EventHandling(CGAME_EVENT_NONE);
+		trap_Key_SetCatcher(0);
+		return;
+	}
 
-
-
-  Display_HandleKey(key, down, cgs.cursorX, cgs.cursorY);
+	Display_HandleKey(key, down, cgs.cursorX, cgs.cursorY);
 
 	if (cgs.capturedItem) {
 		cgs.capturedItem = NULL;

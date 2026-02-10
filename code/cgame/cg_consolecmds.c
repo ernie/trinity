@@ -463,6 +463,62 @@ static void CG_Camera_f( void ) {
 */
 
 
+static void CG_TVNext_f( void ) {
+	if ( !cgs.tvPlayback ) {
+		return;
+	}
+	trap_SendConsoleCommand( "tv_view_next\n" );
+}
+
+static void CG_TVPrev_f( void ) {
+	if ( !cgs.tvPlayback ) {
+		return;
+	}
+	trap_SendConsoleCommand( "tv_view_prev\n" );
+}
+
+static void CG_TVPlayer_f( void ) {
+	char arg[MAX_TOKEN_CHARS];
+
+	if ( !cgs.tvPlayback ) {
+		return;
+	}
+	if ( trap_Argc() < 2 ) {
+		CG_Printf( "usage: tv_player <clientnum>\n" );
+		return;
+	}
+	trap_Argv( 1, arg, sizeof( arg ) );
+	trap_SendConsoleCommand( va( "tv_view %s\n", arg ) );
+}
+
+static void CG_TVForward_f( void ) {
+	int	ms, target;
+
+	if ( !cgs.tvPlayback ) {
+		return;
+	}
+	ms = cg_tvTime.integer + cg_tvSkip.integer * 1000;
+	target = cg_tvDuration.integer;
+	if ( ms > target ) {
+		ms = target;
+	}
+	trap_SendConsoleCommand( va( "tv_seek %i\n", ms / 1000 ) );
+}
+
+static void CG_TVBackward_f( void ) {
+	int	ms;
+
+	if ( !cgs.tvPlayback ) {
+		return;
+	}
+	ms = cg_tvTime.integer - cg_tvSkip.integer * 1000;
+	if ( ms < 0 ) {
+		ms = 0;
+	}
+	trap_SendConsoleCommand( va( "tv_seek %i\n", ms / 1000 ) );
+}
+
+
 typedef struct {
 	const char *cmd;
 	void	(*function)(void);
@@ -521,6 +577,11 @@ static consoleCommand_t	commands[] = {
 	{ "followcam", CG_FollowCam_f },
 	{ "followzoomin", CG_FollowZoomIn_f },
 	{ "followzoomout", CG_FollowZoomOut_f },
+	{ "tv_next", CG_TVNext_f },
+	{ "tv_prev", CG_TVPrev_f },
+	{ "tv_player", CG_TVPlayer_f },
+	{ "tv_forward", CG_TVForward_f },
+	{ "tv_backward", CG_TVBackward_f },
 	{ "loaddeferred", CG_LoadDeferredPlayers }
 };
 

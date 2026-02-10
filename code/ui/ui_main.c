@@ -2962,11 +2962,26 @@ static void UI_LoadDemos() {
 	char	demolist[4096];
 	char demoExt[32];
 	char	*demoname;
-	int		i, len;
+	int		i, len, count, bufUsed;
 
 	Com_sprintf(demoExt, sizeof(demoExt), "dm_%d", (int)trap_Cvar_VariableValue("protocol"));
 
 	uiInfo.demoCount = trap_FS_GetFileList( "demos", demoExt, demolist, 4096 );
+
+	// append TV demos to the same list
+	bufUsed = 0;
+	demoname = demolist;
+	for ( i = 0; i < uiInfo.demoCount; i++ ) {
+		len = strlen( demoname ) + 1;
+		bufUsed += len;
+		demoname += len;
+	}
+	if ( bufUsed < 4096 ) {
+		count = trap_FS_GetFileList( "demos", "tvd", demolist + bufUsed, 4096 - bufUsed );
+		if ( uiInfo.demoCount + count > MAX_DEMOS )
+			count = MAX_DEMOS - uiInfo.demoCount;
+		uiInfo.demoCount += count;
+	}
 
 	Com_sprintf(demoExt, sizeof(demoExt), ".dm_%d", (int)trap_Cvar_VariableValue("protocol"));
 

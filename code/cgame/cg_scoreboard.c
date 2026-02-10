@@ -260,7 +260,9 @@ void CG_ScoreboardClick( void )
 			continue;
 		}
 
-		if ( !cg.demoPlayback ) {
+		if ( cgs.tvPlayback ) {
+			trap_SendConsoleCommand( va( "tv_view %i\n", score->client ) );
+		} else if ( !cg.demoPlayback ) {
 			trap_SendClientCommand( va( "follow %i", score->client ) );
 		}
 	}

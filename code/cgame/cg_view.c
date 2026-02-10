@@ -246,11 +246,18 @@ void CG_FollowCam_f( void ) {
 
 	if ( trap_Argc() > 1 ) {
 		mode = atoi( CG_Argv( 1 ) );
-		if ( mode < 0 || mode > 1 ) {
+		if ( mode < 0 || mode > 2 ) {
 			mode = 0;
 		}
+		// freefly only available in TV
+		if ( mode == 2 && !cgs.tvPlayback ) {
+			mode = 0;
+		}
+	} else if ( cgs.tvPlayback ) {
+		// cycle: first -> third -> freefly -> first
+		mode = ( cg_followMode.integer + 1 ) % 3;
 	} else {
-		// cycle: 0 -> 1 -> 0
+		// cycle: first -> third -> first
 		mode = ( cg_followMode.integer == 1 ) ? 0 : 1;
 	}
 
@@ -261,6 +268,7 @@ void CG_FollowCam_f( void ) {
 	} else {
 		cg.orbitInitialized = qfalse;
 	}
+	cg.freeFlyInitialized = qfalse;
 }
 
 
@@ -404,6 +412,117 @@ static void CG_OffsetOrbitView( void ) {
 }
 
 
+
+/*
+===============
+CG_UpdateFreeFlyInput
+
+Reads mouse/stick deltas and movement keys, updates free-fly origin/angles.
+===============
+*/
+static void CG_UpdateFreeFlyInput( void ) {
+	usercmd_t	cmd;
+	int			cmdNum;
+	short		delta;
+	vec3_t		forward, right, up;
+	float		speed;
+
+	cmdNum = trap_GetCurrentCmdNumber();
+	if ( !trap_GetUserCmd( cmdNum, &cmd ) ) {
+		return;
+	}
+
+	if ( !cg.freeFlyInitialized ) {
+		if ( cg.orbitInitialized ) {
+			// coming from orbit: seed position/angles from orbit camera
+			vec3_t		fwd, eye, camPos, dir;
+			trace_t		trace;
+			static vec3_t	mins = { -4, -4, -4 };
+			static vec3_t	maxs = { 4, 4, 4 };
+
+			VectorCopy( cg.refdef.vieworg, eye );
+			eye[2] += cg.predictedPlayerState.viewheight;
+			AngleVectors( cg.orbitAngles, fwd, NULL, NULL );
+			VectorMA( eye, -cg.orbitDistance, fwd, camPos );
+			CG_Trace( &trace, eye, mins, maxs, camPos,
+				cg.predictedPlayerState.clientNum, MASK_SOLID );
+			if ( trace.fraction != 1.0f ) {
+				VectorCopy( trace.endpos, camPos );
+			}
+			VectorCopy( camPos, cg.freeFlyOrigin );
+			VectorSubtract( eye, camPos, dir );
+			vectoangles( dir, cg.freeFlyAngles );
+			cg.freeFlyAngles[ROLL] = 0;
+		} else {
+			// coming from first person: use player view
+			VectorCopy( cg.refdef.vieworg, cg.freeFlyOrigin );
+			cg.freeFlyOrigin[2] += cg.predictedPlayerState.viewheight;
+			VectorCopy( cg.refdefViewAngles, cg.freeFlyAngles );
+		}
+		cg.freeFlyLastCmdAngles[0] = cmd.angles[0];
+		cg.freeFlyLastCmdAngles[1] = cmd.angles[1];
+		cg.freeFlyLastCmdAngles[2] = cmd.angles[2];
+		cg.freeFlyInitialized = qtrue;
+		return;
+	}
+
+	// yaw delta
+	delta = (short)( cmd.angles[YAW] - cg.freeFlyLastCmdAngles[YAW] );
+	cg.freeFlyAngles[YAW] += SHORT2ANGLE( delta );
+
+	// pitch delta
+	delta = (short)( cmd.angles[PITCH] - cg.freeFlyLastCmdAngles[PITCH] );
+	cg.freeFlyAngles[PITCH] += SHORT2ANGLE( delta );
+
+	// clamp pitch
+	if ( cg.freeFlyAngles[PITCH] < -89 ) {
+		cg.freeFlyAngles[PITCH] = -89;
+	}
+	if ( cg.freeFlyAngles[PITCH] > 89 ) {
+		cg.freeFlyAngles[PITCH] = 89;
+	}
+
+	// movement
+	AngleVectors( cg.freeFlyAngles, forward, right, up );
+	speed = ( cmd.buttons & BUTTON_WALKING ) ? 800.0f : 400.0f;
+	speed = speed * cg.frametime / 1000.0f;
+
+	if ( cmd.forwardmove > 0 ) {
+		VectorMA( cg.freeFlyOrigin, speed, forward, cg.freeFlyOrigin );
+	} else if ( cmd.forwardmove < 0 ) {
+		VectorMA( cg.freeFlyOrigin, -speed, forward, cg.freeFlyOrigin );
+	}
+	if ( cmd.rightmove > 0 ) {
+		VectorMA( cg.freeFlyOrigin, speed, right, cg.freeFlyOrigin );
+	} else if ( cmd.rightmove < 0 ) {
+		VectorMA( cg.freeFlyOrigin, -speed, right, cg.freeFlyOrigin );
+	}
+	if ( cmd.upmove > 0 ) {
+		VectorMA( cg.freeFlyOrigin, speed, up, cg.freeFlyOrigin );
+	} else if ( cmd.upmove < 0 ) {
+		VectorMA( cg.freeFlyOrigin, -speed, up, cg.freeFlyOrigin );
+	}
+
+	// store for next frame
+	cg.freeFlyLastCmdAngles[0] = cmd.angles[0];
+	cg.freeFlyLastCmdAngles[1] = cmd.angles[1];
+	cg.freeFlyLastCmdAngles[2] = cmd.angles[2];
+}
+
+
+/*
+===============
+CG_OffsetFreeFlyView
+
+Sets refdef to the free-fly camera position/angles.
+===============
+*/
+static void CG_OffsetFreeFlyView( void ) {
+	VectorCopy( cg.freeFlyOrigin, cg.refdef.vieworg );
+	VectorCopy( cg.freeFlyAngles, cg.refdefViewAngles );
+}
+
+
 /*
 ===============
 CG_OffsetThirdPersonView
@@ -480,6 +599,33 @@ static void CG_OffsetThirdPersonView( void ) {
 	}
 	cg.refdefViewAngles[PITCH] = -180 / M_PI * atan2( focusPoint[2], focusDist );
 	cg.refdefViewAngles[YAW] -= cg_thirdPersonAngle.value;
+}
+
+
+/*
+===============
+CG_ResetViewOffsets
+
+Clear all time-dependent first-person view offsets.
+Called on TV backward seek to prevent stale timestamps
+from the old timeline producing huge view displacements.
+
+Keep in sync with CG_OffsetFirstPersonView / CG_StepOffset.
+===============
+*/
+void CG_ResetViewOffsets( void ) {
+	cg.stepChange = 0;
+	cg.stepTime = 0;
+	cg.duckChange = 0;
+	cg.duckTime = 0;
+	cg.landChange = 0;
+	cg.landTime = 0;
+	cg.damageTime = 0;
+	cg.v_dmg_time = 0;
+	cg.v_dmg_pitch = 0;
+	cg.v_dmg_roll = 0;
+	VectorClear( cg.kick_angles );
+	VectorClear( cg.kick_origin );
 }
 
 
@@ -637,13 +783,20 @@ static void CG_OffsetFirstPersonView( void ) {
 
 void CG_ZoomDown_f( void ) {
 	if ( cg.snap && (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)) ) {
-		int mode = ( cg_followMode.integer == 1 ) ? 0 : 1;
+		int mode;
+		if ( cgs.tvPlayback ) {
+			// cycle: first -> third -> freefly -> first
+			mode = ( cg_followMode.integer + 1 ) % 3;
+		} else {
+			mode = ( cg_followMode.integer == 1 ) ? 0 : 1;
+		}
 		trap_Cvar_Set( "cg_followMode", va( "%i", mode ) );
 		if ( mode == 1 ) {
 			CG_InitOrbitCamera();
 		} else {
 			cg.orbitInitialized = qfalse;
 		}
+		cg.freeFlyInitialized = qfalse;
 		return;
 	}
 	if ( cg.zoomed ) {
@@ -1144,6 +1297,21 @@ static int CG_CalcViewValues( void ) {
 		}
 	}
 
+	// free-fly camera — only available in TV playback
+	if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
+			&& cg_followMode.integer == 2 ) {
+		if ( !cgs.tvPlayback ) {
+			// reset — freefly not available outside TV
+			trap_Cvar_Set( "cg_followMode", "0" );
+			cg.freeFlyInitialized = qfalse;
+		} else {
+			CG_UpdateFreeFlyInput();
+			CG_OffsetFreeFlyView();
+			AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+			return CG_CalcFov();
+		}
+	}
+
 	if ( cg.renderingThirdPerson ) {
 		if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
 				&& cg_followMode.integer == 1 ) {
@@ -1316,9 +1484,11 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// decide on third person view
 	cg.renderingThirdPerson = cg_thirdPerson.integer || (cg.snap->ps.stats[STAT_HEALTH] <= 0);
 
-	// force third-person rendering in orbit follow mode
+	// force third-person rendering in orbit / free-fly follow modes
+	// (orbit needs the third-person offset; free-fly early-returns from
+	//  CG_CalcViewValues but still needs this flag to suppress the weapon model)
 	if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
-			&& cg_followMode.integer == 1 ) {
+			&& cg_followMode.integer >= 1 ) {
 		cg.renderingThirdPerson = qtrue;
 	}
 
@@ -1329,6 +1499,21 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		cg.followTime = 0;
 		if ( !cg.demoPlayback ) {
 			trap_SendConsoleCommand( va( "follow %i\n", cg.followClient ) );
+		}
+	}
+
+	// TV: +attack cycles to next viewpoint (mirrors SpectatorThink in g_active.c)
+	if ( cgs.tvPlayback && !cg.showScores ) {
+		usercmd_t	cmd;
+		static int	tvLastButtons;
+		int			cmdNum;
+
+		cmdNum = trap_GetCurrentCmdNumber();
+		if ( trap_GetUserCmd( cmdNum, &cmd ) ) {
+			if ( ( cmd.buttons & BUTTON_ATTACK ) && !( tvLastButtons & BUTTON_ATTACK ) ) {
+				trap_SendConsoleCommand( "tv_view_next\n" );
+			}
+			tvLastButtons = cmd.buttons;
 		}
 	}
 
@@ -1374,7 +1559,8 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	CG_PowerupTimerSounds();
 
 	// update audio positions
-	trap_S_Respatialize( cg.snap->ps.clientNum, cg.refdef.vieworg, cg.refdef.viewaxis, inwater );
+	trap_S_Respatialize( (cg_followMode.integer == 2) ? ENTITYNUM_NONE : cg.snap->ps.clientNum,
+		cg.refdef.vieworg, cg.refdef.viewaxis, inwater );
 
 	// make sure the lagometerSample and frame timing isn't done twice when in stereo
 	if ( stereoView != STEREO_RIGHT ) {
