@@ -2435,7 +2435,7 @@ static qboolean CG_DrawFollow( void ) {
 
 	name = cgs.clientinfo[ cg.snap->ps.clientNum ].name;
 
-	CG_DrawString( 320, cgs.screenYmin + 40, name, colorWhite, GIANT_WIDTH, GIANT_HEIGHT, 0, DS_FORCE_COLOR | DS_SHADOW | DS_CENTER );
+	CG_DrawString( 320, cgs.screenYmin + 40, name, colorWhite, GIANT_WIDTH, GIANT_HEIGHT, 0, DS_SHADOW | DS_CENTER );
 
 	return qtrue;
 }

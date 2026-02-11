@@ -230,7 +230,6 @@ static void CG_Obituary( entityState_t *ent ) {
 		strcpy( attackerName, "noname" );
 	} else {
 		Q_strncpyz( attackerName, Info_ValueForKey( attackerInfo, "n" ), sizeof(attackerName) - 2);
-		Q_CleanStr( attackerName );
 		strcat( attackerName, S_COLOR_WHITE );
 		// check for kill messages about the current clientNum
 		if ( target == cg.snap->ps.clientNum ) {
