@@ -2431,11 +2431,11 @@ static qboolean CG_DrawFollow( void ) {
 		return qfalse;
 	}
 
-	CG_DrawString( 320, cgs.screenYmin + 24, "following", colorWhite, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_CENTER | DS_SHADOW );
+	CG_DrawString( 320, cgs.screenYmin + 24, "following", colorWhite, SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT, 0, DS_CENTER | DS_SHADOW );
 
 	name = cgs.clientinfo[ cg.snap->ps.clientNum ].name;
 
-	CG_DrawString( 320, cgs.screenYmin + 40, name, colorWhite, GIANT_WIDTH, GIANT_HEIGHT, 0, DS_SHADOW | DS_CENTER );
+	CG_DrawString( 320, cgs.screenYmin + 40, name, colorWhite, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW | DS_CENTER );
 
 	return qtrue;
 }
