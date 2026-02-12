@@ -715,6 +715,12 @@ typedef struct {
 	vec3_t			freeFlyAngles;
 	int				freeFlyLastCmdAngles[3];
 	qboolean		freeFlyInitialized;
+
+	// download progress
+	qboolean		downloadActive;			// download was active last frame
+	int				downloadFinishTime;		// cg.time when download ended (0 = no anim)
+	char			downloadFinishName[MAX_QPATH];	// filename that finished
+	qboolean		downloadFinishError;	// qtrue if download was interrupted
 } cg_t;
 
 

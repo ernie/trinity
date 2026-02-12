@@ -2704,6 +2704,123 @@ void CG_DrawTimedMenus( void ) {
 
 /*
 =================
+CG_DrawDownloadProgress
+
+Draws a download progress indicator in the upper-left during active downloads.
+Shows a completion animation (pulse + fade) when the download ends.
+=================
+*/
+static void CG_DrawDownloadProgress( void ) {
+	float	x, y;
+	int		size, count;
+	float	charW = 4, charH = 8;
+	float	barW = 160.0f, barH = 6.0f;
+	vec4_t	barBg = { 0.0f, 0.0f, 0.0f, 0.5f };
+	vec4_t	barFg = { 0.8f, 0.8f, 0.2f, 0.7f };
+	vec4_t	textColor;
+
+	x = cgs.screenXmin + 4;
+	y = 24;
+
+	// active download
+	if ( cg_downloadName.string[0] != '\0' ) {
+		float	pct;
+		const char *s;
+
+		cg.downloadActive = qtrue;
+		Q_strncpyz( cg.downloadFinishName, cg_downloadName.string, sizeof( cg.downloadFinishName ) );
+
+		size = cg_downloadSize.integer;
+		count = cg_downloadCount.integer;
+
+		Vector4Copy( colorWhite, textColor );
+
+		if ( size > 0 ) {
+			// overflow-safe percentage (matches ui_connect.c)
+			if ( size > 0x200000 ) {
+				pct = 100.0f * ( count >> 8 ) / ( size >> 8 );
+			} else {
+				pct = 100.0f * count / size;
+			}
+			if ( pct > 100.0f ) pct = 100.0f;
+			if ( pct < 0.0f ) pct = 0.0f;
+
+			s = va( "%s (%d%%)", cg_downloadName.string, (int)pct );
+			CG_DrawString( x, y, s, textColor, charW, charH, 0, DS_SHADOW );
+
+			// progress bar
+			CG_FillRect( x, y + charH + 1, barW, barH, barBg );
+			CG_FillRect( x, y + charH + 1, barW * pct / 100.0f, barH, barFg );
+		} else {
+			// unknown size — show bytes received
+			if ( count >= 1024 * 1024 ) {
+				s = va( "%s", cg_downloadName.string );
+				CG_DrawString( x, y, s, textColor, charW, charH, 0, DS_SHADOW );
+				s = va( "%d.%d MB received", count / (1024 * 1024), ( count % (1024 * 1024) ) * 10 / (1024 * 1024) );
+			} else {
+				s = va( "%s", cg_downloadName.string );
+				CG_DrawString( x, y, s, textColor, charW, charH, 0, DS_SHADOW );
+				s = va( "%d KB received", count / 1024 );
+			}
+			CG_DrawString( x, y + charH + 1, s, textColor, charW, charH, 0, DS_SHADOW );
+		}
+		return;
+	}
+
+	// transition: download just ended
+	if ( cg.downloadActive ) {
+		cg.downloadActive = qfalse;
+		size = cg_downloadSize.integer;
+		count = cg_downloadCount.integer;
+		cg.downloadFinishError = ( size > 0 && count < size ) ? qtrue : qfalse;
+		cg.downloadFinishTime = cg.time;
+	}
+
+	// completion animation
+	if ( cg.downloadFinishTime != 0 ) {
+		int		t;
+		float	alpha, pulseFrac;
+
+		t = cg.time - cg.downloadFinishTime;
+		if ( t >= 1500 ) {
+			cg.downloadFinishTime = 0;
+			return;
+		}
+
+		if ( t < 500 ) {
+			// pulse phase: 2 full oscillations over 500ms
+			pulseFrac = sin( t * M_PI / 125.0f );
+			alpha = 0.75f + 0.25f * pulseFrac;
+		} else {
+			// fade phase: linear fade from 1.0 to 0.0 over 1000ms
+			alpha = 1.0f - (float)( t - 500 ) / 1000.0f;
+			if ( alpha < 0.0f ) alpha = 0.0f;
+		}
+
+		if ( cg.downloadFinishError ) {
+			barFg[0] = 0.8f; barFg[1] = 0.2f; barFg[2] = 0.2f; barFg[3] = 0.7f * alpha;
+		} else {
+			barFg[0] = 0.8f; barFg[1] = 0.8f; barFg[2] = 0.2f; barFg[3] = 0.7f * alpha;
+		}
+		barBg[3] = 0.5f * alpha;
+		textColor[0] = 1.0f; textColor[1] = 1.0f; textColor[2] = 1.0f; textColor[3] = alpha;
+
+		if ( cg.downloadFinishError ) {
+			CG_DrawString( x, y, va( "%s (failed)", cg.downloadFinishName ), textColor,
+				charW, charH, 0, DS_SHADOW );
+		} else {
+			CG_DrawString( x, y, va( "%s (100%%)", cg.downloadFinishName ), textColor,
+				charW, charH, 0, DS_SHADOW );
+		}
+
+		CG_FillRect( x, y + charH + 1, barW, barH, barBg );
+		CG_FillRect( x, y + charH + 1, barW, barH, barFg );
+	}
+}
+
+
+/*
+=================
 CG_DrawTVTimeline
 
 Draws a progress bar at the bottom of the screen during TV playback.
@@ -2886,6 +3003,7 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 		CG_DrawCenterString();
 	}
 
+	CG_DrawDownloadProgress();
 	CG_DrawTVTimeline();
 
 #ifndef MISSIONPACK

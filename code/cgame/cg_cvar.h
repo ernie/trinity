@@ -138,5 +138,9 @@ CG_CVAR( cg_tvTimeline, "cg_tvTimeline", "1", CVAR_ARCHIVE )
 CG_CVAR( cg_tvTime, "cl_tvTime", "0", CVAR_ROM )
 CG_CVAR( cg_tvDuration, "cl_tvDuration", "0", CVAR_ROM )
 CG_CVAR( cg_tvSkip, "cg_tvSkip", "10", CVAR_ARCHIVE )
+CG_CVAR( cg_downloadName,  "cl_downloadName",  "", CVAR_ROM )
+CG_CVAR( cg_downloadSize,  "cl_downloadSize",  "0", CVAR_ROM )
+CG_CVAR( cg_downloadCount, "cl_downloadCount", "0", CVAR_ROM )
+CG_CVAR( cg_downloadTime,  "cl_downloadTime",  "0", CVAR_ROM )
 
 #undef CG_CVAR
