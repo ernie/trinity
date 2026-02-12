@@ -1081,8 +1081,6 @@ static void CG_ServerCommand( void ) {
 		CG_InitMarkPolys();
 		CG_ClearParticles();
 		trap_S_ClearLoopingSounds( qtrue );
-		CG_Printf( "tv_seek_sync: re-registered resources, clientNum=%i\n",
-			cg.clientNum );
 		return;
 	}
 

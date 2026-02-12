@@ -518,6 +518,72 @@ static void CG_TVBackward_f( void ) {
 	trap_SendConsoleCommand( va( "tv_seek %i\n", ms / 1000 ) );
 }
 
+static void CG_TVScrubDown_f( void ) {
+	int		currentCatcher, newCatcher;
+	int		old_state, new_state;
+	float	frac;
+
+	if ( !cgs.tvPlayback || cg_tvDuration.integer <= 0 ) {
+		return;
+	}
+
+	cgs.tvScrubActive = qtrue;
+
+	// initialize cursor at current playback position
+	frac = (float)cg_tvTime.integer / (float)cg_tvDuration.integer;
+	if ( frac < 0.0f ) frac = 0.0f;
+	if ( frac > 1.0f ) frac = 1.0f;
+	cgs.cursorX = 640.0f * frac;
+
+	// capture input
+	cgs.tvScrubKey = trap_Key_GetKey( "+tv_scrub" );
+	currentCatcher = trap_Key_GetCatcher();
+	newCatcher = currentCatcher | KEYCATCH_CGAME;
+	if ( newCatcher != currentCatcher ) {
+		if ( cgs.tvScrubKey ) {
+			old_state = trap_Key_IsDown( cgs.tvScrubKey );
+			trap_Key_SetCatcher( newCatcher );
+			new_state = trap_Key_IsDown( cgs.tvScrubKey );
+			if ( new_state != old_state ) {
+				cgs.tvScrubFilterKeyUp = qtrue;
+			}
+		} else {
+			trap_Key_SetCatcher( newCatcher );
+		}
+	}
+}
+
+static void CG_TVScrubUp_f( void ) {
+	int		currentCatcher;
+	float	frac;
+	int		ms;
+
+	if ( cgs.tvScrubFilterKeyUp ) {
+		cgs.tvScrubFilterKeyUp = qfalse;
+		return;
+	}
+
+	if ( !cgs.tvScrubActive ) {
+		return;
+	}
+
+	cgs.tvScrubActive = qfalse;
+
+	// calculate seek time from cursor position
+	frac = cgs.cursorX / 640.0f;
+	if ( frac < 0.0f ) frac = 0.0f;
+	if ( frac > 1.0f ) frac = 1.0f;
+	ms = (int)( frac * cg_tvDuration.integer );
+
+	// release input capture (preserve if scoreboard is also catching)
+	if ( !cgs.score_catched ) {
+		currentCatcher = trap_Key_GetCatcher();
+		trap_Key_SetCatcher( currentCatcher & ~KEYCATCH_CGAME );
+	}
+
+	trap_SendConsoleCommand( va( "tv_seek %i\n", ms / 1000 ) );
+}
+
 
 typedef struct {
 	const char *cmd;
@@ -582,6 +648,8 @@ static consoleCommand_t	commands[] = {
 	{ "tv_player", CG_TVPlayer_f },
 	{ "tv_forward", CG_TVForward_f },
 	{ "tv_backward", CG_TVBackward_f },
+	{ "+tv_scrub", CG_TVScrubDown_f },
+	{ "-tv_scrub", CG_TVScrubUp_f },
 	{ "loaddeferred", CG_LoadDeferredPlayers }
 };
 

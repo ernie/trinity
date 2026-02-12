@@ -1949,6 +1949,19 @@ void CG_EventHandling( cgame_event_t type )
 
 void CG_KeyEvent( int key, qboolean down )
 {
+	// cancel timeline scrub on ESC
+	if ( cgs.tvScrubActive ) {
+		if ( down && key == /*K_ESCAPE*/27 ) {
+			int currentCatcher;
+			cgs.tvScrubActive = qfalse;
+			if ( !cgs.score_catched ) {
+				currentCatcher = trap_Key_GetCatcher();
+				trap_Key_SetCatcher( currentCatcher & ~KEYCATCH_CGAME );
+			}
+		}
+		return;
+	}
+
 	// process scoreboard clicks etc.
 	if ( cgs.score_catched && down )
 	{

@@ -58,6 +58,21 @@ bind mwheelup followzoomin
 bind mwheeldown followzoomout
 ```
 
+TVD playback supports timeline scrubbing. Hold the bound key and move the mouse left/right to select a position on the timeline. A vertical indicator and time label show the target position. Release the key to seek there, or press ESC to cancel.
+
+```
+bind mouse3 +tv_scrub
+```
+
+Other TVD playback binds:
+
+```
+bind leftarrow tv_backward   # skip backward (cg_tvSkip seconds, default 10)
+bind rightarrow tv_forward   # skip forward
+bind uparrow tv_next         # next player
+bind downarrow tv_prev       # previous player
+```
+
 **VR Support**
 
 - Independent head and torso tracking for VR clients, backwards-compatible with flatscreen players

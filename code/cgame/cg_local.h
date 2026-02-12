@@ -1183,6 +1183,10 @@ typedef struct {
 #endif
 
 	qboolean		tvPlayback;		// playing back a TV demo (\tv\1 in serverinfo)
+
+	qboolean		tvScrubActive;		// currently scrubbing the timeline
+	int				tvScrubKey;			// keycode that activated scrub (for phantom key-up filtering)
+	qboolean		tvScrubFilterKeyUp;	// filter phantom -tv_scrub from catcher change
 } cgs_t;
 
 //==============================================================================
