@@ -475,6 +475,9 @@ typedef struct {
 	// match identification
 	char		matchUUID[37];			// unique match identifier (UUID format)
 
+	// overtime
+	qboolean	inOvertime;				// qtrue once overtime has been announced
+
 } level_locals_t;
 
 

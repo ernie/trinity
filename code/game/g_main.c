@@ -1476,21 +1476,40 @@ static void CheckExitRules( void ) {
 		return;
 	}
 
-	// check for sudden death
-	if ( ScoreIsTied() ) {
-		// always wait for sudden death
-		return;
-	}
-
 	if ( g_timelimit.integer && !level.warmupTime ) {
 		if ( level.time - level.startTime >= g_timelimit.integer*60000 ) {
-			G_BroadcastServerCommand( -1, "print \"Timelimit hit.\n\"");
+			if ( ScoreIsTied() ) {
+				// announce overtime once
+				if ( !level.inOvertime ) {
+					level.inOvertime = qtrue;
+					G_BroadcastServerCommand( -1, "print \"Overtime!\n\"" );
+					G_LogPrintf( "Overtime:\n" );
+					G_UpdateMatchStateCvars();
+				}
+				// check overtime limit
+				if ( g_overtimelimit.integer > 0 ) {
+					int overtimeElapsed = level.time - level.startTime
+										- g_timelimit.integer * 60000;
+					if ( overtimeElapsed >= g_overtimelimit.integer * 60000 ) {
+						G_BroadcastServerCommand( -1, "print \"Overtime limit reached.\n\"" );
+						LogExit( "Overtime timelimit hit." );
+						return;
+					}
+				}
+				return;
+			}
+			G_BroadcastServerCommand( -1, "print \"Timelimit hit.\n\"" );
 			LogExit( "Timelimit hit." );
 			return;
 		}
 	}
 
 	if ( level.numPlayingClients < 2 ) {
+		return;
+	}
+
+	// don't end on fraglimit/capturelimit while tied
+	if ( ScoreIsTied() ) {
 		return;
 	}
 
@@ -1572,6 +1591,9 @@ void G_UpdateMatchStateCvars( void ) {
 		trap_Cvar_Set( "g_warmupEndTime", va( "%d", level.warmupTime ) );
 	} else if ( level.intermissiontime ) {
 		trap_Cvar_Set( "g_matchState", "intermission" );
+		trap_Cvar_Set( "g_warmupEndTime", "0" );
+	} else if ( level.inOvertime ) {
+		trap_Cvar_Set( "g_matchState", "overtime" );
 		trap_Cvar_Set( "g_warmupEndTime", "0" );
 	} else {
 		trap_Cvar_Set( "g_matchState", "active" );

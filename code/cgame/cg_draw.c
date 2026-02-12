@@ -903,15 +903,63 @@ static float CG_DrawTimer( float y ) {
 	const char	*s;
 	int			mins, seconds;
 	int			msec;
+	vec4_t		color;
 
 	msec = cg.time - cgs.levelStartTime;
+	Vector4Copy( colorWhite, color );
 
-	seconds = msec / 1000;
-	mins = seconds / 60;
-	seconds -= mins * 60;
+	if ( cg.warmup > 0 ) {
+		// warmup: count down to match start
+		int remaining = cg.warmup - cg.time;
+		if ( remaining < 0 ) remaining = 0;
+		seconds = ( remaining + 999 ) / 1000;
+		mins = seconds / 60;
+		seconds -= mins * 60;
+		s = va( "%i:%02i", mins, seconds );
+	} else if ( cgs.timelimit > 0 && !cg.warmup ) {
+		int timelimitMsec = cgs.timelimit * 60 * 1000;
+		int overtimeElapsed = msec - timelimitMsec;
 
-	s = va( "%i:%02i", mins, seconds );
-	CG_DrawString( cgs.screenXmax - 4, y + 2, s, colorWhite, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW | DS_RIGHT | DS_PROPORTIONAL );
+		if ( overtimeElapsed > 0 ) {
+			if ( cgs.overtimelimit > 0 ) {
+				// overtime with limit: count down
+				int remaining = ( cgs.overtimelimit * 60 * 1000 ) - overtimeElapsed;
+				if ( remaining < 0 ) remaining = 0;
+				seconds = ( remaining + 999 ) / 1000;
+				mins = seconds / 60;
+				seconds -= mins * 60;
+				s = va( "OT %i:%02i", mins, seconds );
+				if ( remaining < 30000 ) {
+					Vector4Copy( ( cg.time / 500 ) & 1 ? colorRed : colorWhite, color );
+				} else {
+					Vector4Copy( colorYellow, color );
+				}
+			} else {
+				// unlimited overtime: count up from OT start
+				seconds = overtimeElapsed / 1000;
+				mins = seconds / 60;
+				seconds -= mins * 60;
+				s = va( "OT %i:%02i", mins, seconds );
+				Vector4Copy( colorYellow, color );
+			}
+		} else {
+			// regulation: count down to timelimit
+			int remaining = timelimitMsec - msec;
+			if ( remaining < 0 ) remaining = 0;
+			seconds = ( remaining + 999 ) / 1000;
+			mins = seconds / 60;
+			seconds -= mins * 60;
+			s = va( "%i:%02i", mins, seconds );
+		}
+	} else {
+		// no timelimit: count up
+		seconds = msec / 1000;
+		mins = seconds / 60;
+		seconds -= mins * 60;
+		s = va( "%i:%02i", mins, seconds );
+	}
+
+	CG_DrawString( cgs.screenXmax - 4, y + 2, s, color, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW | DS_RIGHT | DS_PROPORTIONAL );
 
 	return y + BIGCHAR_HEIGHT + 4;
 }

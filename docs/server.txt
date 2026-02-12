@@ -72,6 +72,24 @@ g_teamAutoJoin
     removed
 
 
+g_overtimelimit <minutes>
+========================
+
+    maximum overtime duration in minutes
+
+    when timelimit is reached and scores are tied, the match enters overtime
+    (sudden death). this cvar limits how long overtime can last.
+
+    = 0 - unlimited overtime, sudden death until tie is broken (default)
+    > 0 - overtime ends after this many minutes; match ends as a tie
+
+    players receive 5-minute and 1-minute audio warnings before overtime
+    expires. the HUD timer switches to an "OT" countdown during limited
+    overtime, or an "OT" count-up during unlimited overtime.
+
+    has no effect when timelimit is 0.
+
+
 g_warmup <seconds>
 ========================
 

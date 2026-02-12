@@ -511,6 +511,7 @@ typedef struct {
 
 	int			timelimitWarnings;	// 5 min, 1 min, overtime
 	int			fraglimitWarnings;
+	int			overtimeWarnings;	// 5 min, 1 min warnings during overtime
 
 	qboolean	mapRestart;			// set on a map restart to set back the weapon
 
@@ -1096,6 +1097,7 @@ typedef struct {
 	int				fraglimit;
 	int				capturelimit;
 	int				timelimit;
+	int				overtimelimit;
 	int				maxclients;
 	char			mapname[MAX_QPATH];
 	char			redTeam[MAX_QPATH];

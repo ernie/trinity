@@ -451,6 +451,22 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 		}
 	}
 
+	// overtime warnings
+	if ( cgs.timelimit > 0 && cgs.overtimelimit > 0 && !cg.warmup && cg.warmupFightSound < cg.time ) {
+		int overtimeElapsed = (cg.time - cgs.levelStartTime) - (cgs.timelimit * 60 * 1000);
+		if ( overtimeElapsed > 0 ) {
+			int overtimeRemaining = (cgs.overtimelimit * 60 * 1000) - overtimeElapsed;
+			if ( !( cg.overtimeWarnings & 2 ) && overtimeRemaining <= 60 * 1000 && overtimeRemaining > 0 ) {
+				cg.overtimeWarnings |= 1 | 2;
+				CG_AddBufferedSound( cgs.media.oneMinuteSound );
+			}
+			else if ( cgs.overtimelimit > 5 && !( cg.overtimeWarnings & 1 ) && overtimeRemaining <= 5 * 60 * 1000 && overtimeRemaining > 0 ) {
+				cg.overtimeWarnings |= 1;
+				CG_AddBufferedSound( cgs.media.fiveMinuteSound );
+			}
+		}
+	}
+
 	// fraglimit warnings
 	if ( cgs.fraglimit > 0 && cgs.gametype < GT_CTF) {
 		highScore = cgs.scores1;

@@ -137,6 +137,7 @@ void CG_ParseServerinfo( void ) {
 	cgs.fraglimit = atoi( Info_ValueForKey( info, "fraglimit" ) );
 	cgs.capturelimit = atoi( Info_ValueForKey( info, "capturelimit" ) );
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
+	cgs.overtimelimit = atoi( Info_ValueForKey( info, "g_overtimelimit" ) );
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
@@ -1081,6 +1082,13 @@ static void CG_ServerCommand( void ) {
 		CG_InitMarkPolys();
 		CG_ClearParticles();
 		trap_S_ClearLoopingSounds( qtrue );
+		// Clear transient UI state — scoreFadeTime from the old
+		// timeline would cause CG_FadeColor to never expire after
+		// a backward seek
+		cg.showScores = qfalse;
+		cg.scoreFadeTime = 0;
+		cg.scoreBoardShowing = qfalse;
+		CG_SetScoreCatcher( qfalse );
 		return;
 	}
 
