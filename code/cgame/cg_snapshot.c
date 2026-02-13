@@ -379,16 +379,12 @@ void CG_ProcessSnapshots( void ) {
 					memset( &cg.predictedPlayerEntity, 0, sizeof( cg.predictedPlayerEntity ) );
 					cg.validPPS = qfalse;
 
-					// Reset time-dependent view offsets so
-					// CG_OffsetFirstPersonView doesn't compute
-					// huge deltas from the old timeline
-					CG_ResetViewOffsets();
-
 					// Set time BEFORE CG_SetInitialSnapshot so
 					// BG_EvaluateTrajectory uses the correct time
 					cg.time = cg.nextSnap->serverTime;
 					cg.oldTime = cg.nextSnap->serverTime;
 
+					// The server command `tv_seek_sync` will get processed here and reset other state.
 					CG_SetInitialSnapshot( cg.nextSnap );
 					cg.nextSnap = NULL;
 					continue;

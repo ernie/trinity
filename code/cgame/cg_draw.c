@@ -3108,6 +3108,88 @@ static void CG_WarmupEvents( void ) {
 
 
 
+/*
+===============
+CG_ResetSeekState
+
+Clear all transient state that goes stale after a TVD seek.
+Most fields use (cg.time - startTime) comparisons in draw code;
+after a seek cg.time jumps discontinuously, so stale timestamps
+produce incorrect durations.  Other state (scoreboard flags,
+sound buffer, VR smoothing) is simply invalid in the new timeline.
+
+Called from the tv_seek_sync server command handler (all seeks)
+and the backward-seek detector in cg_snapshot.c.
+
+See also: CG_WarmupEvent (similar subset for warmup/client changes)
+          CG_ResetViewOffsets (view bob/damage, called internally)
+===============
+*/
+void CG_ResetSeekState( void ) {
+
+	// -- HUD display timers --
+
+	// Medal display — CG_DrawReward: CG_FadeColor(rewardTime, 3000)
+	cg.rewardStack = 0;
+	cg.rewardTime = 0;
+
+	// Center print — CG_DrawCenterString: CG_FadeColor(centerPrintTime, 1000*cg_centertime)
+	cg.centerPrintTime = 0;
+
+	// Item pickup notification — CG_DrawPickupItem: CG_FadeColorTime(itemPickupTime, 3000, 250)
+	cg.itemPickupTime = 0;
+	cg.itemPickupBlendTime = 0;
+
+	// Weapon select bar — CG_DrawWeaponSelect: CG_FadeColor(weaponSelectTime, 1400)
+	cg.weaponSelectTime = 0;
+
+	// Attacker head — CG_DrawAttacker: (cg.time - attackerTime) vs 10000
+	cg.attackerTime = 0;
+
+	// Killer name display
+	cg.killerTime = 0;
+
+	// Crosshair target name — CG_DrawCrosshairNames: CG_FadeColor(crosshairClientTime, 1000)
+	cg.crosshairClientTime = 0;
+
+	// Powerup icon pulse — CG_DrawStatusBar: (cg.time - powerupTime) vs PULSE_TIME
+	cg.powerupTime = 0;
+
+	// Voice chat menu — CG_DrawTimedMenus: (cg.time - voiceTime) vs 2500
+	cg.voiceTime = 0;
+
+	// Download finish animation — (cg.time - downloadFinishTime) vs 1500
+	cg.downloadFinishTime = 0;
+
+	// Auto-follow killer — CG_DrawActiveFrame: (followTime < cg.time)
+	// Shouldn't actually be used during TV playback, but technically stale.
+	cg.followTime = 0;
+
+	// Low ammo warning — not time-based but stale across seeks
+	cg.lowAmmoWarning = 0;
+
+	// Damage vignette — CG_DamageBlendBlob: (cg.time - damageTime) vs DAMAGE_TIME
+	cg.damageTime = 0;
+
+	// Scoreboard
+	cg.showScores = qfalse;
+	cg.scoreFadeTime = 0;
+	cg.scoreBoardShowing = qfalse;
+	CG_SetScoreCatcher( qfalse );
+
+	// -- Non-HUD time-dependent state --
+
+	// View bob, damage kick, weapon kick offsets
+	CG_ResetViewOffsets();
+
+	// Flush queued announcer sounds (e.g. stale "Excellent!")
+	CG_AddBufferedSound( -1 );
+
+	// Force VR head-tracking EMA to re-seed from the new timeline
+	cg.vrViewInitialized = qfalse;
+}
+
+
 // will be called on warmup end and when client changed
 void CG_WarmupEvent( void ) {
 

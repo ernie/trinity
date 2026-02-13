@@ -1082,13 +1082,7 @@ static void CG_ServerCommand( void ) {
 		CG_InitMarkPolys();
 		CG_ClearParticles();
 		trap_S_ClearLoopingSounds( qtrue );
-		// Clear transient UI state — scoreFadeTime from the old
-		// timeline would cause CG_FadeColor to never expire after
-		// a backward seek
-		cg.showScores = qfalse;
-		cg.scoreFadeTime = 0;
-		cg.scoreBoardShowing = qfalse;
-		CG_SetScoreCatcher( qfalse );
+		CG_ResetSeekState();
 		return;
 	}
 
