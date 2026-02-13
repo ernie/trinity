@@ -44,6 +44,7 @@ GAME OPTIONS MENU
 #define ID_BLOODPARTICLES		141
 #define ID_DAMAGEPLUMS			142
 #define ID_FOLLOWMODE			143
+#define ID_TVDOWNLOAD			144
 
 #define	NUM_CROSSHAIRS			10
 
@@ -71,7 +72,10 @@ typedef struct {
 	menuradiobutton_s	damageplums;
 	menulist_s			followmode;
 	menuradiobutton_s	allowdownload;
+	menuradiobutton_s	tvdownload;
 	menubitmap_s		back;
+
+	qboolean			hasTvDownload;
 
 	qhandle_t			crosshairShader[NUM_CROSSHAIRS];
 	qhandle_t			fxBasePic;
@@ -127,6 +131,13 @@ static void Preferences_SetMenuItems( void ) {
 	s_preferences.damageplums.curvalue		= trap_Cvar_VariableValue( "cg_damagePlums" ) != 0;
 	s_preferences.followmode.curvalue		= Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_followMode" ) );
 	s_preferences.allowdownload.curvalue	= trap_Cvar_VariableValue( "cl_allowDownload" ) != 0;
+
+	{
+		char buf[16];
+		trap_Cvar_VariableStringBuffer( "cl_tvDownload", buf, sizeof(buf) );
+		s_preferences.hasTvDownload = ( buf[0] != '\0' );
+		s_preferences.tvdownload.curvalue = atoi( buf ) != 0;
+	}
 }
 
 
@@ -186,6 +197,10 @@ static void Preferences_Event( void* ptr, int notification ) {
 	case ID_ALLOWDOWNLOAD:
 		trap_Cvar_SetValue( "cl_allowDownload", s_preferences.allowdownload.curvalue );
 		trap_Cvar_SetValue( "sv_allowDownload", s_preferences.allowdownload.curvalue );
+		break;
+
+	case ID_TVDOWNLOAD:
+		trap_Cvar_SetValue( "cl_tvDownload", s_preferences.tvdownload.curvalue );
 		break;
 
 	case ID_DAMAGEEFFECT:
@@ -386,7 +401,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.crosshair.generic.left		= PREFERENCES_X_POS - ( ( strlen(s_preferences.crosshair.generic.name) + 1 ) * SMALLCHAR_WIDTH );
 	s_preferences.crosshair.generic.right		= PREFERENCES_X_POS + 48;
 
-	y += BIGCHAR_HEIGHT+2+4;
+	y += BIGCHAR_HEIGHT+4;
 	s_preferences.crosshaircolor.generic.type		= MTYPE_SPINCONTROL;
 	s_preferences.crosshaircolor.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT|QMF_NODEFAULTINIT|QMF_OWNERDRAW;
 	s_preferences.crosshaircolor.generic.x			= PREFERENCES_X_POS;
@@ -401,7 +416,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.crosshaircolor.generic.right		= PREFERENCES_X_POS + SMALLCHAR_WIDTH + 128;
 	s_preferences.crosshaircolor.numitems			= 7;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.simpleitems.generic.type        = MTYPE_RADIOBUTTON;
 	s_preferences.simpleitems.generic.name	      = "Simple Items:";
 	s_preferences.simpleitems.generic.flags	      = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -419,7 +434,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.wallmarks.generic.x	          = PREFERENCES_X_POS;
 	s_preferences.wallmarks.generic.y	          = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.brass.generic.type              = MTYPE_RADIOBUTTON;
 	s_preferences.brass.generic.name	          = "Ejecting Brass:";
 	s_preferences.brass.generic.flags	          = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -428,7 +443,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.brass.generic.x	              = PREFERENCES_X_POS;
 	s_preferences.brass.generic.y	              = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.dynamiclights.generic.type      = MTYPE_RADIOBUTTON;
 	s_preferences.dynamiclights.generic.name	  = "Dynamic Lights:";
 	s_preferences.dynamiclights.generic.flags     = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -437,7 +452,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.dynamiclights.generic.x	      = PREFERENCES_X_POS;
 	s_preferences.dynamiclights.generic.y	      = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.identifytarget.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.identifytarget.generic.name	  = "Identify Target:";
 	s_preferences.identifytarget.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -446,7 +461,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.identifytarget.generic.x	      = PREFERENCES_X_POS;
 	s_preferences.identifytarget.generic.y	      = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.highqualitysky.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.highqualitysky.generic.name	  = "High Quality Sky:";
 	s_preferences.highqualitysky.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -455,7 +470,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.highqualitysky.generic.x	      = PREFERENCES_X_POS;
 	s_preferences.highqualitysky.generic.y	      = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.synceveryframe.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.synceveryframe.generic.name	  = "Sync Every Frame:";
 	s_preferences.synceveryframe.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -464,7 +479,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.synceveryframe.generic.x	      = PREFERENCES_X_POS;
 	s_preferences.synceveryframe.generic.y	      = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.forcemodel.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.forcemodel.generic.name	  = "Force Player Models:";
 	s_preferences.forcemodel.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -473,7 +488,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.forcemodel.generic.x	      = PREFERENCES_X_POS;
 	s_preferences.forcemodel.generic.y	      = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.drawteamoverlay.generic.type     = MTYPE_SPINCONTROL;
 	s_preferences.drawteamoverlay.generic.name	   = "Draw Team Overlay:";
 	s_preferences.drawteamoverlay.generic.flags	   = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -483,7 +498,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.drawteamoverlay.generic.y	       = y;
 	s_preferences.drawteamoverlay.itemnames			= teamoverlay_names;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.damageeffect.generic.type       = MTYPE_RADIOBUTTON;
 	s_preferences.damageeffect.generic.name       = "Modern Damage Effect:";
 	s_preferences.damageeffect.generic.flags      = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -492,7 +507,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.damageeffect.generic.x          = PREFERENCES_X_POS;
 	s_preferences.damageeffect.generic.y          = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.bloodparticles.generic.type       = MTYPE_RADIOBUTTON;
 	s_preferences.bloodparticles.generic.name       = "Blood Particles:";
 	s_preferences.bloodparticles.generic.flags      = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -501,7 +516,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.bloodparticles.generic.x          = PREFERENCES_X_POS;
 	s_preferences.bloodparticles.generic.y          = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.damageplums.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.damageplums.generic.name	   = "Damage Numbers:";
 	s_preferences.damageplums.generic.flags	   = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -510,7 +525,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.damageplums.generic.x	       = PREFERENCES_X_POS;
 	s_preferences.damageplums.generic.y	       = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.followmode.generic.type        = MTYPE_SPINCONTROL;
 	s_preferences.followmode.generic.name        = "Follow Camera:";
 	s_preferences.followmode.generic.flags       = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -520,7 +535,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.followmode.generic.y           = y;
 	s_preferences.followmode.itemnames           = followmode_names;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
 	s_preferences.allowdownload.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.allowdownload.generic.name	   = "Automatic Downloading:";
 	s_preferences.allowdownload.generic.flags	   = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -529,7 +544,16 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.allowdownload.generic.x	       = PREFERENCES_X_POS;
 	s_preferences.allowdownload.generic.y	       = y;
 
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT;
+	s_preferences.tvdownload.generic.type        = MTYPE_RADIOBUTTON;
+	s_preferences.tvdownload.generic.name        = "Auto Download TVD:";
+	s_preferences.tvdownload.generic.flags       = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.tvdownload.generic.callback    = Preferences_Event;
+	s_preferences.tvdownload.generic.id          = ID_TVDOWNLOAD;
+	s_preferences.tvdownload.generic.x           = PREFERENCES_X_POS;
+	s_preferences.tvdownload.generic.y           = y;
+
+	y += BIGCHAR_HEIGHT;
 	s_preferences.back.generic.type	    = MTYPE_BITMAP;
 	s_preferences.back.generic.name     = ART_BACK0;
 	s_preferences.back.generic.flags    = QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
@@ -562,9 +586,13 @@ static void Preferences_MenuInit( void ) {
 	Menu_AddItem( &s_preferences.menu, &s_preferences.followmode );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.allowdownload );
 
-	Menu_AddItem( &s_preferences.menu, &s_preferences.back );
-
 	Preferences_SetMenuItems();
+
+	if ( s_preferences.hasTvDownload ) {
+		Menu_AddItem( &s_preferences.menu, &s_preferences.tvdownload );
+	}
+
+	Menu_AddItem( &s_preferences.menu, &s_preferences.back );
 }
 
 

@@ -334,6 +334,23 @@ itemDef {
       		visible 1
     		}
 
+	itemDef {
+		name options
+		group grpOptions
+		type ITEM_TYPE_YESNO
+		text "Auto Download TVD:"
+		cvar "cl_tvDownload"
+		rect 245 235 210 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+		cvarTest "cl_tvDownload"
+		showCvar { "0" ; "1" }
+	}
+
 itemDef {
 		name options
 		group grpOptions
