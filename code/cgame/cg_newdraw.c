@@ -1683,6 +1683,21 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
 void CG_MouseEvent(int x, int y) {
 	int n;
 
+	// timeline scrub owns the cursor — just update position
+	if ( cgs.tvScrubActive ) {
+		cgs.cursorX += x * cgs.cursorScaleR;
+		if ( cgs.cursorX < cgs.screenXmin )
+			cgs.cursorX = cgs.screenXmin;
+		else if ( cgs.cursorX > cgs.screenXmax )
+			cgs.cursorX = cgs.screenXmax;
+		cgs.cursorY += y * cgs.cursorScaleR;
+		if ( cgs.cursorY < cgs.screenYmin )
+			cgs.cursorY = cgs.screenYmin;
+		else if ( cgs.cursorY > cgs.screenYmax )
+			cgs.cursorY = cgs.screenYmax;
+		return;
+	}
+
 	if ( (cg.predictedPlayerState.pm_type == PM_NORMAL || cg.predictedPlayerState.pm_type == PM_SPECTATOR) && cg.showScores == qfalse) {
     trap_Key_SetCatcher(0);
 		return;
@@ -1768,6 +1783,19 @@ void CG_EventHandling(cgame_event_t type) {
 
 void CG_KeyEvent(int key, qboolean down) {
 	qboolean isFollowing;
+
+	// handle timeline scrub: swallow all keys, ESC cancels
+	if ( cgs.tvScrubActive ) {
+		if ( down && key == /*K_ESCAPE*/27 ) {
+			int currentCatcher;
+			cgs.tvScrubActive = qfalse;
+			if ( !cgs.score_catched ) {
+				currentCatcher = trap_Key_GetCatcher();
+				trap_Key_SetCatcher( currentCatcher & ~KEYCATCH_CGAME );
+			}
+		}
+		return;
+	}
 
 	if (!down) {
 		return;
