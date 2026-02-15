@@ -708,7 +708,7 @@ typedef struct {
 	float			orbitDistanceTarget;	// target distance (smoothly lerped to)
 	int				orbitLastCmdAngles[3];	// previous frame's cmd.angles
 	qboolean		orbitInitialized;		// set once orbit state has been seeded
-	int				orbitLastClientNum;		// detect followed-player changes
+	int				followLastClientNum;	// detect followed-player changes
 
 	// Free-fly camera state (TV / demo)
 	vec3_t			freeFlyOrigin;
@@ -1261,6 +1261,7 @@ qboolean CG_IsVRFollow( void );
 void CG_FollowCam_f( void );
 void CG_FollowZoomIn_f( void );
 void CG_FollowZoomOut_f( void );
+void CG_FollowRecenter_f( void );
 
 
 //

@@ -205,7 +205,7 @@ static void CG_InitOrbitCamera( void ) {
 
 	cg.orbitDistance = 200;
 	cg.orbitDistanceTarget = 200;
-	cg.orbitAngles[YAW] = cg.predictedPlayerState.viewangles[YAW] + 180;
+	cg.orbitAngles[YAW] = cg.predictedPlayerState.viewangles[YAW];
 	cg.orbitAngles[PITCH] = 15;
 	cg.orbitAngles[ROLL] = 0;
 
@@ -217,7 +217,7 @@ static void CG_InitOrbitCamera( void ) {
 		cg.orbitLastCmdAngles[2] = cmd.angles[2];
 	}
 
-	cg.orbitLastClientNum = cg.snap->ps.clientNum;
+	cg.followLastClientNum = cg.snap->ps.clientNum;
 	cg.orbitInitialized = qtrue;
 }
 
@@ -292,6 +292,28 @@ void CG_FollowZoomOut_f( void ) {
 }
 
 
+static void CG_RecenterFreeFly( void );
+
+/*
+===============
+CG_FollowRecenter_f
+
+Console command: recenter the follow camera behind the player.
+Works in both orbit and free-fly modes.
+===============
+*/
+void CG_FollowRecenter_f( void ) {
+	if ( !cg.snap ) return;
+	if ( !cg.demoPlayback && !(cg.snap->ps.pm_flags & PMF_FOLLOW) ) return;
+
+	if ( cg_followMode.integer == 1 ) {
+		CG_InitOrbitCamera();
+	} else if ( cg_followMode.integer == 2 ) {
+		CG_RecenterFreeFly();
+	}
+}
+
+
 /*
 ===============
 CG_UpdateOrbitInput
@@ -317,7 +339,7 @@ static void CG_UpdateOrbitInput( void ) {
 	}
 
 	// detect followed-player change
-	if ( cg.snap->ps.clientNum != cg.orbitLastClientNum ) {
+	if ( cg.snap->ps.clientNum != cg.followLastClientNum ) {
 		CG_InitOrbitCamera();
 		return;
 	}
@@ -338,8 +360,22 @@ static void CG_UpdateOrbitInput( void ) {
 		cg.orbitAngles[PITCH] = 80;
 	}
 
+	// use real time when paused so orbit still works at timescale 0
+	{
+	int			ft;
+	static int	lastRealTime;
+	int			realTime = trap_Milliseconds();
+
+	if ( cg.frametime > 0 ) {
+		ft = cg.frametime;
+	} else {
+		ft = realTime - lastRealTime;
+		if ( ft < 0 || ft > 100 ) ft = 16;
+	}
+	lastRealTime = realTime;
+
 	// zoom via forward/back movement (adjusts target)
-	zoomSpeed = 0.5f * cg.frametime;
+	zoomSpeed = 0.5f * ft;
 	if ( cmd.forwardmove > 0 ) {
 		cg.orbitDistanceTarget -= zoomSpeed;
 	} else if ( cmd.forwardmove < 0 ) {
@@ -356,9 +392,10 @@ static void CG_UpdateOrbitInput( void ) {
 
 	// smoothly lerp actual distance toward target
 	{
-		float factor = 8.0f * cg.frametime / 1000.0f;
+		float factor = 8.0f * ft / 1000.0f;
 		if ( factor > 1.0f ) factor = 1.0f;
 		cg.orbitDistance += ( cg.orbitDistanceTarget - cg.orbitDistance ) * factor;
+	}
 	}
 
 	// store for next frame
@@ -462,7 +499,14 @@ static void CG_UpdateFreeFlyInput( void ) {
 		cg.freeFlyLastCmdAngles[0] = cmd.angles[0];
 		cg.freeFlyLastCmdAngles[1] = cmd.angles[1];
 		cg.freeFlyLastCmdAngles[2] = cmd.angles[2];
+		cg.followLastClientNum = cg.snap->ps.clientNum;
 		cg.freeFlyInitialized = qtrue;
+		return;
+	}
+
+	// detect followed-player change
+	if ( cg.snap->ps.clientNum != cg.followLastClientNum ) {
+		CG_RecenterFreeFly();
 		return;
 	}
 
@@ -482,10 +526,23 @@ static void CG_UpdateFreeFlyInput( void ) {
 		cg.freeFlyAngles[PITCH] = 89;
 	}
 
-	// movement
+	// movement — use real time when paused so free-fly still works at timescale 0
+	{
+	int			ft;
+	static int	lastRealTime;
+	int			realTime = trap_Milliseconds();
+
+	if ( cg.frametime > 0 ) {
+		ft = cg.frametime;
+	} else {
+		ft = realTime - lastRealTime;
+		if ( ft < 0 || ft > 100 ) ft = 16;
+	}
+	lastRealTime = realTime;
+
 	AngleVectors( cg.freeFlyAngles, forward, right, up );
 	speed = ( cmd.buttons & BUTTON_WALKING ) ? 800.0f : 400.0f;
-	speed = speed * cg.frametime / 1000.0f;
+	speed = speed * ft / 1000.0f;
 
 	if ( cmd.forwardmove > 0 ) {
 		VectorMA( cg.freeFlyOrigin, speed, forward, cg.freeFlyOrigin );
@@ -502,11 +559,60 @@ static void CG_UpdateFreeFlyInput( void ) {
 	} else if ( cmd.upmove < 0 ) {
 		VectorMA( cg.freeFlyOrigin, -speed, up, cg.freeFlyOrigin );
 	}
+	}
 
 	// store for next frame
 	cg.freeFlyLastCmdAngles[0] = cmd.angles[0];
 	cg.freeFlyLastCmdAngles[1] = cmd.angles[1];
 	cg.freeFlyLastCmdAngles[2] = cmd.angles[2];
+}
+
+
+/*
+===============
+CG_RecenterFreeFly
+
+Places the free-fly camera 200 units behind the followed player, facing them.
+===============
+*/
+static void CG_RecenterFreeFly( void ) {
+	usercmd_t	cmd;
+	int			cmdNum;
+	vec3_t		playerEye, angles, forward, dir;
+	trace_t		trace;
+	static vec3_t	mins = { -4, -4, -4 };
+	static vec3_t	maxs = { 4, 4, 4 };
+
+	VectorCopy( cg.snap->ps.origin, playerEye );
+	playerEye[2] += cg.snap->ps.viewheight;
+
+	// position 200 units behind the player
+	VectorSet( angles, 0, cg.snap->ps.viewangles[YAW], 0 );
+	AngleVectors( angles, forward, NULL, NULL );
+	VectorMA( playerEye, -200, forward, cg.freeFlyOrigin );
+
+	// wall collision
+	CG_Trace( &trace, playerEye, mins, maxs, cg.freeFlyOrigin,
+		cg.snap->ps.clientNum, MASK_SOLID );
+	if ( trace.fraction != 1.0f ) {
+		VectorCopy( trace.endpos, cg.freeFlyOrigin );
+	}
+
+	// look at the player
+	VectorSubtract( playerEye, cg.freeFlyOrigin, dir );
+	vectoangles( dir, cg.freeFlyAngles );
+	cg.freeFlyAngles[ROLL] = 0;
+
+	// capture cmd.angles to avoid jump on next frame
+	cmdNum = trap_GetCurrentCmdNumber();
+	if ( trap_GetUserCmd( cmdNum, &cmd ) ) {
+		cg.freeFlyLastCmdAngles[0] = cmd.angles[0];
+		cg.freeFlyLastCmdAngles[1] = cmd.angles[1];
+		cg.freeFlyLastCmdAngles[2] = cmd.angles[2];
+	}
+
+	cg.followLastClientNum = cg.snap->ps.clientNum;
+	cg.freeFlyInitialized = qtrue;
 }
 
 

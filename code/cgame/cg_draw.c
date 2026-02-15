@@ -1806,6 +1806,11 @@ static void CG_DrawDisconnect( void ) {
 	usercmd_t	cmd;
 	const char	*s;
 
+	// don't show during paused demo/TV playback
+	if ( ( cg.demoPlayback || cgs.tvPlayback ) && cg_timescale.value == 0.0f ) {
+		return;
+	}
+
 	// draw the phone jack if we are completely past our buffers
 	cmdNum = trap_GetCurrentCmdNumber() - CMD_BACKUP + 1;
 	trap_GetUserCmd( cmdNum, &cmd );
