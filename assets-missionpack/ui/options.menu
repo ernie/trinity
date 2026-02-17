@@ -337,9 +337,10 @@ itemDef {
 	itemDef {
 		name options
 		group grpOptions
-		type ITEM_TYPE_YESNO
-		text "Auto Download TVD:"
+		type ITEM_TYPE_MULTI
+		text "TVD Download:"
 		cvar "cl_tvDownload"
+		cvarFloatList { "Off" 0 "Decline" 1 "Accept" 2 }
 		rect 245 235 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
@@ -348,7 +349,7 @@ itemDef {
 		forecolor 1 1 1 1
 		visible 1
 		cvarTest "cl_tvDownload"
-		showCvar { "0" ; "1" }
+		showCvar { "0" ; "1" ; "2" }
 	}
 
 itemDef {

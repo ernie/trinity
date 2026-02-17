@@ -721,6 +721,10 @@ typedef struct {
 	int				downloadFinishTime;		// cg.time when download ended (0 = no anim)
 	char			downloadFinishName[MAX_QPATH];	// filename that finished
 	qboolean		downloadFinishError;	// qtrue if download was interrupted
+
+	// TVD download offer prompt (tvdOfferName[0] != '\0' means active)
+	char			tvdOfferName[MAX_QPATH];
+	int				tvdOfferTime;		// cg.time when offer started (for 10s countdown)
 } cg_t;
 
 

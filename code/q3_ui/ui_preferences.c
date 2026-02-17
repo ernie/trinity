@@ -72,7 +72,7 @@ typedef struct {
 	menuradiobutton_s	damageplums;
 	menulist_s			followmode;
 	menuradiobutton_s	allowdownload;
-	menuradiobutton_s	tvdownload;
+	menulist_s			tvdownload;
 	menubitmap_s		back;
 
 	qboolean			hasTvDownload;
@@ -97,6 +97,14 @@ static const char *followmode_names[] =
 {
 	"First-person",
 	"Orbit",
+	NULL
+};
+
+static const char *tvdownload_names[] =
+{
+	"Off",
+	"Decline",
+	"Accept",
 	NULL
 };
 
@@ -136,7 +144,7 @@ static void Preferences_SetMenuItems( void ) {
 		char buf[16];
 		trap_Cvar_VariableStringBuffer( "cl_tvDownload", buf, sizeof(buf) );
 		s_preferences.hasTvDownload = ( buf[0] != '\0' );
-		s_preferences.tvdownload.curvalue = atoi( buf ) != 0;
+		s_preferences.tvdownload.curvalue = Com_Clamp( 0, 2, atoi( buf ) );
 	}
 }
 
@@ -545,13 +553,14 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.allowdownload.generic.y	       = y;
 
 	y += BIGCHAR_HEIGHT;
-	s_preferences.tvdownload.generic.type        = MTYPE_RADIOBUTTON;
-	s_preferences.tvdownload.generic.name        = "Auto Download TVD:";
+	s_preferences.tvdownload.generic.type        = MTYPE_SPINCONTROL;
+	s_preferences.tvdownload.generic.name        = "TVD Download:";
 	s_preferences.tvdownload.generic.flags       = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_preferences.tvdownload.generic.callback    = Preferences_Event;
 	s_preferences.tvdownload.generic.id          = ID_TVDOWNLOAD;
 	s_preferences.tvdownload.generic.x           = PREFERENCES_X_POS;
 	s_preferences.tvdownload.generic.y           = y;
+	s_preferences.tvdownload.itemnames           = tvdownload_names;
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.back.generic.type	    = MTYPE_BITMAP;

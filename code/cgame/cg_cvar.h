@@ -142,5 +142,9 @@ CG_CVAR( cg_downloadName,  "cl_downloadName",  "", CVAR_ROM )
 CG_CVAR( cg_downloadSize,  "cl_downloadSize",  "0", CVAR_ROM )
 CG_CVAR( cg_downloadCount, "cl_downloadCount", "0", CVAR_ROM )
 CG_CVAR( cg_downloadTime,  "cl_downloadTime",  "0", CVAR_ROM )
+CG_CVAR( cg_tvdTimeout,    "cg_tvdTimeout",    "10", CVAR_ARCHIVE )
+CG_CVAR( cg_tvdOffer,      "cl_tvdOffer",      "", CVAR_ROM )
+CG_CVAR( cg_voteYesKey,    "cl_voteYesKey",    "", CVAR_ROM )
+CG_CVAR( cg_voteNoKey,     "cl_voteNoKey",     "", CVAR_ROM )
 
 #undef CG_CVAR

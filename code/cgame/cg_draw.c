@@ -2269,12 +2269,15 @@ static void CG_DrawSpectator( void ) {
 CG_DrawVote
 =================
 */
-static void CG_DrawVote( void ) {
-	char	*s;
-	int		sec;
+static float CG_DrawVote( float y ) {
+	const char	*keyYes, *keyNo;
+	char		title[MAX_STRING_TOKENS + 16], tally[64], keys[128];
+	float		frac;
+	int			elapsed;
+	vec4_t		barFg;
 
 	if ( !cgs.voteTime ) {
-		return;
+		return y;
 	}
 
 	// play a talk beep whenever it is modified
@@ -2283,19 +2286,28 @@ static void CG_DrawVote( void ) {
 		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
 	}
 
-	sec = ( VOTE_TIME - ( cg.time - cgs.voteTime ) ) / 1000;
-	if ( sec < 0 ) {
-		sec = 0;
+	elapsed = cg.time - cgs.voteTime;
+	if ( elapsed >= VOTE_TIME ) {
+		return y;
 	}
-#ifdef MISSIONPACK
-	s = va("VOTE(%i):%s yes:%i no:%i", sec, cgs.voteString, cgs.voteYes, cgs.voteNo);
-	CG_DrawString( cgs.screenXmin - 0, 58, s, colorWhite, SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT, 0, DS_PROPORTIONAL );
-	s = "or press ESC then click Vote";
-	CG_DrawString( cgs.screenXmin - 0, 58 + SMALLCHAR_HEIGHT + 2, s, colorWhite, SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT, 0, DS_PROPORTIONAL );
-#else
-	s = va( "VOTE(%i):%s yes:%i no:%i", sec, cgs.voteString, cgs.voteYes, cgs.voteNo );
-	CG_DrawString( cgs.screenXmin - 0, 58, s, colorWhite, SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT, 0, DS_PROPORTIONAL ); // DS_SHADOW?
-#endif
+
+	frac = 1.0f - (float)elapsed / VOTE_TIME;
+	if ( frac < 0.0f ) frac = 0.0f;
+
+	Com_sprintf( title, sizeof( title ), "Vote: %s", cgs.voteString );
+	Com_sprintf( tally, sizeof( tally ), "yes:%i    no:%i",
+		cgs.voteYes, cgs.voteNo );
+
+	keyYes = cg_voteYesKey.string;
+	keyNo = cg_voteNoKey.string;
+	if ( keyYes[0] && keyNo[0] ) {
+		Com_sprintf( keys, sizeof( keys ), "%s: yes    %s: no",
+			keyYes, keyNo );
+	}
+
+	barFg[0] = 0.2f; barFg[1] = 0.6f; barFg[2] = 0.8f; barFg[3] = 0.7f;
+	return CG_DrawDialogBox( y, title, tally,
+		( keyYes[0] && keyNo[0] ) ? keys : NULL, frac, barFg, 1.0f );
 }
 
 
@@ -2304,19 +2316,22 @@ static void CG_DrawVote( void ) {
 CG_DrawTeamVote
 =================
 */
-static void CG_DrawTeamVote(void) {
-	char	*s;
-	int		sec, cs_offset;
+static float CG_DrawTeamVote( float y ) {
+	const char	*keyYes, *keyNo;
+	char		title[MAX_STRING_TOKENS + 16], tally[64], keys[128];
+	float		frac;
+	int			elapsed, cs_offset;
+	vec4_t		barFg;
 
 	if ( cgs.clientinfo[ cg.clientNum ].team == TEAM_RED )
 		cs_offset = 0;
 	else if ( cgs.clientinfo[ cg.clientNum ].team == TEAM_BLUE )
 		cs_offset = 1;
 	else
-		return;
+		return y;
 
 	if ( !cgs.teamVoteTime[cs_offset] ) {
-		return;
+		return y;
 	}
 
 	// play a talk beep whenever it is modified
@@ -2325,14 +2340,29 @@ static void CG_DrawTeamVote(void) {
 		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
 	}
 
-	sec = ( VOTE_TIME - ( cg.time - cgs.teamVoteTime[cs_offset] ) ) / 1000;
-	if ( sec < 0 ) {
-		sec = 0;
+	elapsed = cg.time - cgs.teamVoteTime[cs_offset];
+	if ( elapsed >= VOTE_TIME ) {
+		return y;
 	}
-	s = va("TEAMVOTE(%i):%s yes:%i no:%i", sec, cgs.teamVoteString[cs_offset],
-							cgs.teamVoteYes[cs_offset], cgs.teamVoteNo[cs_offset] );
 
-	CG_DrawString( cgs.screenXmin - 0, 90, s, colorWhite, SMALLCHAR_WIDTH, SMALLCHAR_HEIGHT, 0, DS_PROPORTIONAL ); // DF_SHADOW?
+	frac = 1.0f - (float)elapsed / VOTE_TIME;
+	if ( frac < 0.0f ) frac = 0.0f;
+
+	Com_sprintf( title, sizeof( title ), "Team: %s",
+		cgs.teamVoteString[cs_offset] );
+	Com_sprintf( tally, sizeof( tally ), "yes:%i    no:%i",
+		cgs.teamVoteYes[cs_offset], cgs.teamVoteNo[cs_offset] );
+
+	keyYes = cg_voteYesKey.string;
+	keyNo = cg_voteNoKey.string;
+	if ( keyYes[0] && keyNo[0] ) {
+		Com_sprintf( keys, sizeof( keys ), "%s: yes    %s: no",
+			keyYes, keyNo );
+	}
+
+	barFg[0] = 0.2f; barFg[1] = 0.6f; barFg[2] = 0.8f; barFg[3] = 0.7f;
+	return CG_DrawDialogBox( y, title, tally,
+		( keyYes[0] && keyNo[0] ) ? keys : NULL, frac, barFg, 1.0f );
 }
 
 
@@ -2707,75 +2737,134 @@ void CG_DrawTimedMenus( void ) {
 #endif
 
 
+// ---- shared layout for TVD offer / download box ----
+#define DIALOG_CHARW		4.0f
+#define DIALOG_CHARH		8.0f
+#define DIALOG_PAD_X		8.0f
+#define DIALOG_PAD_TOP		4.0f
+#define DIALOG_BAR_H		5.0f
+#define DIALOG_LINE_GAP	2.0f
+#define DIALOG_Y			95.0f
+#define DIALOG_MIN_W		160.0f
+// base box height (2 lines): pad + line + gap + line + gap + bar
+#define DIALOG_H2	( DIALOG_PAD_TOP + DIALOG_CHARH + DIALOG_LINE_GAP \
+					+ DIALOG_CHARH + DIALOG_LINE_GAP + DIALOG_BAR_H )
+// 3-line box height: adds another line + gap
+#define DIALOG_H3	( DIALOG_H2 + DIALOG_CHARH + DIALOG_LINE_GAP )
+
+
+/*
+=================
+CG_DrawDialogBox
+
+Shared helper: draws a centered dimmed box with text lines
+and a progress bar glued to the bottom.
+line3 is optional (NULL to omit).
+Returns the Y position below the box (for stacking).
+=================
+*/
+static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
+						   const char *line3,
+						   float barFrac, vec4_t barColor, float alpha ) {
+	int		len1, len2, len3, maxLen;
+	float	boxW, boxH, boxX, centerX;
+	float	lineY, barY;
+	vec4_t	bgColor, barBg, textColor;
+
+	len1 = CG_DrawStrlen( line1 );
+	len2 = CG_DrawStrlen( line2 );
+	maxLen = ( len1 > len2 ) ? len1 : len2;
+	if ( line3 ) {
+		len3 = CG_DrawStrlen( line3 );
+		if ( len3 > maxLen )
+			maxLen = len3;
+	}
+	boxW = maxLen * DIALOG_CHARW + 2 * DIALOG_PAD_X;
+	if ( boxW < DIALOG_MIN_W )
+		boxW = DIALOG_MIN_W;
+	boxH = line3 ? DIALOG_H3 : DIALOG_H2;
+
+	boxX = ( 640.0f - boxW ) / 2.0f;
+	centerX = 320.0f;
+
+	bgColor[0] = 0.0f; bgColor[1] = 0.0f; bgColor[2] = 0.0f; bgColor[3] = 0.5f * alpha;
+	barBg[0] = 0.2f; barBg[1] = 0.2f; barBg[2] = 0.2f; barBg[3] = 0.3f * alpha;
+	textColor[0] = 1.0f; textColor[1] = 1.0f; textColor[2] = 1.0f; textColor[3] = alpha;
+	barColor[3] *= alpha;
+
+	CG_FillRect( boxX, boxY, boxW, boxH, bgColor );
+
+	lineY = boxY + DIALOG_PAD_TOP;
+	CG_DrawString( centerX, lineY, line1, textColor,
+		DIALOG_CHARW, DIALOG_CHARH, 0, DS_CENTER | DS_SHADOW );
+	lineY += DIALOG_CHARH + DIALOG_LINE_GAP;
+	CG_DrawString( centerX, lineY, line2, textColor,
+		DIALOG_CHARW, DIALOG_CHARH, 0, DS_CENTER | DS_SHADOW );
+	if ( line3 ) {
+		lineY += DIALOG_CHARH + DIALOG_LINE_GAP;
+		CG_DrawString( centerX, lineY, line3, textColor,
+			DIALOG_CHARW, DIALOG_CHARH, 0, DS_CENTER | DS_SHADOW );
+	}
+
+	barY = boxY + boxH - DIALOG_BAR_H;
+	CG_FillRect( boxX, barY, boxW, DIALOG_BAR_H, barBg );
+	if ( barFrac > 0.0f )
+		CG_FillRect( boxX, barY, boxW * barFrac, DIALOG_BAR_H, barColor );
+
+	return boxY + boxH + DIALOG_LINE_GAP;
+}
+
+
 /*
 =================
 CG_DrawDownloadProgress
 
-Draws a download progress indicator in the upper-left during active downloads.
+Draws a download progress indicator in a centered box.
 Shows a completion animation (pulse + fade) when the download ends.
 =================
 */
-static void CG_DrawDownloadProgress( void ) {
-	float	x, y;
-	int		size, count;
-	float	charW = 4, charH = 8;
-	float	barW = 160.0f, barH = 6.0f;
-	vec4_t	barBg = { 0.0f, 0.0f, 0.0f, 0.5f };
-	vec4_t	barFg = { 0.8f, 0.8f, 0.2f, 0.7f };
-	vec4_t	textColor;
-
-	x = cgs.screenXmin + 4;
-	y = 24;
+static float CG_DrawDownloadProgress( float y ) {
+	const char	*line1, *line2;
+	float		frac, alpha;
+	vec4_t		barFg;
+	int			size, count;
 
 	// active download
 	if ( cg_downloadName.string[0] != '\0' ) {
-		float	pct;
-		const char *s;
-
 		cg.downloadActive = qtrue;
-		Q_strncpyz( cg.downloadFinishName, cg_downloadName.string, sizeof( cg.downloadFinishName ) );
+		Q_strncpyz( cg.downloadFinishName, cg_downloadName.string,
+			sizeof( cg.downloadFinishName ) );
 
-		size = cg_downloadSize.integer;
+		size  = cg_downloadSize.integer;
 		count = cg_downloadCount.integer;
-
-		Vector4Copy( colorWhite, textColor );
+		line1 = cg_downloadName.string;
 
 		if ( size > 0 ) {
-			// overflow-safe percentage (matches ui_connect.c)
-			if ( size > 0x200000 ) {
-				pct = 100.0f * ( count >> 8 ) / ( size >> 8 );
-			} else {
-				pct = 100.0f * count / size;
-			}
-			if ( pct > 100.0f ) pct = 100.0f;
-			if ( pct < 0.0f ) pct = 0.0f;
-
-			s = va( "%s (%d%%)", cg_downloadName.string, (int)pct );
-			CG_DrawString( x, y, s, textColor, charW, charH, 0, DS_SHADOW );
-
-			// progress bar
-			CG_FillRect( x, y + charH + 1, barW, barH, barBg );
-			CG_FillRect( x, y + charH + 1, barW * pct / 100.0f, barH, barFg );
+			if ( size > 0x200000 )
+				frac = (float)( count >> 8 ) / (float)( size >> 8 );
+			else
+				frac = (float)count / (float)size;
+			if ( frac > 1.0f ) frac = 1.0f;
+			if ( frac < 0.0f ) frac = 0.0f;
+			line2 = va( "%d%%", (int)( frac * 100.0f ) );
 		} else {
-			// unknown size — show bytes received
-			if ( count >= 1024 * 1024 ) {
-				s = va( "%s", cg_downloadName.string );
-				CG_DrawString( x, y, s, textColor, charW, charH, 0, DS_SHADOW );
-				s = va( "%d.%d MB received", count / (1024 * 1024), ( count % (1024 * 1024) ) * 10 / (1024 * 1024) );
-			} else {
-				s = va( "%s", cg_downloadName.string );
-				CG_DrawString( x, y, s, textColor, charW, charH, 0, DS_SHADOW );
-				s = va( "%d KB received", count / 1024 );
-			}
-			CG_DrawString( x, y + charH + 1, s, textColor, charW, charH, 0, DS_SHADOW );
+			frac = 0.0f;
+			if ( count >= 1024 * 1024 )
+				line2 = va( "%d.%d MB received",
+					count / ( 1024 * 1024 ),
+					( count % ( 1024 * 1024 ) ) * 10 / ( 1024 * 1024 ) );
+			else
+				line2 = va( "%d KB received", count / 1024 );
 		}
-		return;
+
+		barFg[0] = 0.8f; barFg[1] = 0.8f; barFg[2] = 0.2f; barFg[3] = 0.7f;
+		return CG_DrawDialogBox( y, line1, line2, NULL, frac, barFg, 1.0f );
 	}
 
 	// transition: download just ended
 	if ( cg.downloadActive ) {
 		cg.downloadActive = qfalse;
-		size = cg_downloadSize.integer;
+		size  = cg_downloadSize.integer;
 		count = cg_downloadCount.integer;
 		cg.downloadFinishError = ( size > 0 && count < size ) ? qtrue : qfalse;
 		cg.downloadFinishTime = cg.time;
@@ -2784,43 +2873,113 @@ static void CG_DrawDownloadProgress( void ) {
 	// completion animation
 	if ( cg.downloadFinishTime != 0 ) {
 		int		t;
-		float	alpha, pulseFrac;
+		float	pulseFrac;
 
 		t = cg.time - cg.downloadFinishTime;
 		if ( t >= 1500 ) {
 			cg.downloadFinishTime = 0;
-			return;
+			return y;
 		}
 
 		if ( t < 500 ) {
-			// pulse phase: 2 full oscillations over 500ms
 			pulseFrac = sin( t * M_PI / 125.0f );
 			alpha = 0.75f + 0.25f * pulseFrac;
 		} else {
-			// fade phase: linear fade from 1.0 to 0.0 over 1000ms
 			alpha = 1.0f - (float)( t - 500 ) / 1000.0f;
 			if ( alpha < 0.0f ) alpha = 0.0f;
 		}
 
-		if ( cg.downloadFinishError ) {
-			barFg[0] = 0.8f; barFg[1] = 0.2f; barFg[2] = 0.2f; barFg[3] = 0.7f * alpha;
-		} else {
-			barFg[0] = 0.8f; barFg[1] = 0.8f; barFg[2] = 0.2f; barFg[3] = 0.7f * alpha;
-		}
-		barBg[3] = 0.5f * alpha;
-		textColor[0] = 1.0f; textColor[1] = 1.0f; textColor[2] = 1.0f; textColor[3] = alpha;
+		line1 = cg.downloadFinishName;
+		line2 = cg.downloadFinishError ? "download failed" : "complete";
+		frac  = 1.0f;
 
 		if ( cg.downloadFinishError ) {
-			CG_DrawString( x, y, va( "%s (failed)", cg.downloadFinishName ), textColor,
-				charW, charH, 0, DS_SHADOW );
+			barFg[0] = 0.8f; barFg[1] = 0.2f; barFg[2] = 0.2f; barFg[3] = 0.7f;
 		} else {
-			CG_DrawString( x, y, va( "%s (100%%)", cg.downloadFinishName ), textColor,
-				charW, charH, 0, DS_SHADOW );
+			barFg[0] = 0.8f; barFg[1] = 0.8f; barFg[2] = 0.2f; barFg[3] = 0.7f;
 		}
 
-		CG_FillRect( x, y + charH + 1, barW, barH, barBg );
-		CG_FillRect( x, y + charH + 1, barW, barH, barFg );
+		return CG_DrawDialogBox( y, line1, line2, NULL, frac, barFg, alpha );
 	}
+
+	return y;
+}
+
+
+/*
+=================
+CG_DrawTVOffer
+
+Draws a download offer prompt when the server offers a TV demo.
+Polls cl_tvdOffer cvar each frame; countdown shown as a progress bar.
+=================
+*/
+static float CG_DrawTVOffer( float y ) {
+	const char	*offer;
+	const char	*keyYes, *keyNo;
+	char		keys[128];
+	float		frac;
+	int			mode;
+	char		buf[16];
+	vec4_t		barFg;
+
+	offer = cg_tvdOffer.string;
+
+	// offer cleared by engine — release state
+	if ( offer[0] == '\0' ) {
+		if ( cg.tvdOfferName[0] ) {
+			cg.tvdOfferName[0] = '\0';
+			cg.tvdOfferTime = 0;
+		}
+		return y;
+	}
+
+	// new or changed offer
+	if ( Q_stricmp( offer, cg.tvdOfferName ) != 0 ) {
+		Q_strncpyz( cg.tvdOfferName, offer, sizeof( cg.tvdOfferName ) );
+		cg.tvdOfferTime = cg.time;
+		trap_S_StartLocalSound( cgs.media.talkSound, CHAN_LOCAL_SOUND );
+	}
+
+	trap_Cvar_VariableStringBuffer( "cl_tvDownload", buf, sizeof( buf ) );
+	mode = atoi( buf );
+
+	{
+		int timeout = (int)( cg_tvdTimeout.value * 1000.0f );
+		if ( timeout < 0 )
+			timeout = 0;
+
+		// timeout expired (0 = instant)
+		if ( cg.time - cg.tvdOfferTime >= timeout ) {
+			if ( mode <= 1 )
+				trap_SendConsoleCommand( "tvdno\n" );
+			else
+				trap_SendConsoleCommand( "tvdyes\n" );
+			return y;
+		}
+
+		// countdown bar: full → empty over timeout
+		frac = 1.0f - (float)( cg.time - cg.tvdOfferTime ) / timeout;
+		if ( frac < 0.0f ) frac = 0.0f;
+	}
+
+	// use resolved key names if the engine provided them, else command names
+	keyYes = cg_voteYesKey.string;
+	keyNo = cg_voteNoKey.string;
+	if ( keyYes[0] && keyNo[0] ) {
+		Com_sprintf( keys, sizeof( keys ),
+			mode <= 1 ? "^7%s: yes    ^3%s: no"
+			          : "^3%s: yes    ^7%s: no",
+			keyYes, keyNo );
+	} else {
+		Com_sprintf( keys, sizeof( keys ),
+			mode <= 1 ? "^7vote yes    ^3vote no"
+			          : "^3vote yes    ^7vote no" );
+	}
+
+	barFg[0] = 0.8f; barFg[1] = 0.8f; barFg[2] = 0.2f; barFg[3] = 0.7f;
+	return CG_DrawDialogBox( y, "Download last match?", cg.tvdOfferName,
+		keys, frac, barFg, 1.0f );
 }
 
 
@@ -2905,6 +3064,24 @@ static void CG_DrawTVTimeline( void ) {
 
 /*
 =================
+CG_DrawTVOverlay
+
+Consolidates all TV/download HUD draws.
+=================
+*/
+static void CG_DrawTVOverlay( void ) {
+	float y = DIALOG_Y;
+
+	y = CG_DrawDownloadProgress( y );
+	y = CG_DrawTVOffer( y );
+	y = CG_DrawVote( y );
+	y = CG_DrawTeamVote( y );
+	CG_DrawTVTimeline();
+}
+
+
+/*
+=================
 CG_Draw2D
 =================
 */
@@ -2980,8 +3157,6 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 		}
 	}
 
-	CG_DrawVote();
-	CG_DrawTeamVote();
 
 	CG_DrawLagometer();
 
@@ -3008,8 +3183,7 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 		CG_DrawCenterString();
 	}
 
-	CG_DrawDownloadProgress();
-	CG_DrawTVTimeline();
+	CG_DrawTVOverlay();
 
 #ifndef MISSIONPACK
 	if ( cgs.score_catched ) {
