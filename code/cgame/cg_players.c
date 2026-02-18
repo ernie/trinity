@@ -1731,6 +1731,10 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	vec3_t		headWorldAngles, headLocalAngles;
 	vec3_t		headWorldAxis[3], torsoWorldAxis[3], torsoInverseAxis[3], headLocalAxis[3];
 
+	// NOTE: headAngles is a misnomer inherited from vanilla Q3, where the
+	// head/torso/legs shared a single aim direction (viewangles). In VR,
+	// headAngles actually represents weapon aim — the real head orientation
+	// comes from angles2 and is applied separately below.
 	VectorCopy( cent->lerpAngles, headAngles );
 	headAngles[YAW] = AngleMod( headAngles[YAW] );
 	VectorClear( legsAngles );
@@ -1777,13 +1781,14 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 		}
 	}
 	legsAngles[YAW] = headAngles[YAW] + movementOffsets[ dir ];
-	torsoAngles[YAW] = headAngles[YAW] + 0.25 * movementOffsets[ dir ];
-
-	// VR: torso follows weapon aim directly; flatscreen uses swing tolerance
+	// VR: torso follows weapon aim 1:1 (no movement offset);
+	// flatscreen: torso turns 25% toward movement direction
 	if (cent->currentState.eFlags & EF_VR_PLAYER) {
+		torsoAngles[YAW] = headAngles[YAW];
 		cent->pe.torso.yawAngle = torsoAngles[YAW];
 		cent->pe.torso.yawing = qfalse;
 	} else {
+		torsoAngles[YAW] = headAngles[YAW] + 0.25 * movementOffsets[ dir ];
 		CG_SwingAngles( torsoAngles[YAW], 25, 90, cg_swingSpeed.value, &cent->pe.torso.yawAngle, &cent->pe.torso.yawing );
 	}
 	CG_SwingAngles( legsAngles[YAW], 40, 90, cg_swingSpeed.value, &cent->pe.legs.yawAngle, &cent->pe.legs.yawing );
