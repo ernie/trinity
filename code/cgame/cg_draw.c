@@ -2264,14 +2264,19 @@ static void CG_DrawSpectator( void ) {
 }
 
 
+static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
+						   const char *line3, const char *line4,
+						   float barFrac, vec4_t barColor, float alpha,
+						   qboolean highlighted );
+
 /*
 =================
 CG_DrawVote
 =================
 */
-static float CG_DrawVote( float y ) {
+static float CG_DrawVote( float y, qboolean highlighted ) {
 	const char	*keyYes, *keyNo;
-	char		title[MAX_STRING_TOKENS + 16], tally[64], keys[128];
+	char		caller[64], desc[MAX_STRING_TOKENS + 32], tally[64], keys[128];
 	float		frac;
 	int			elapsed;
 	vec4_t		barFg;
@@ -2294,20 +2299,49 @@ static float CG_DrawVote( float y ) {
 	frac = 1.0f - (float)elapsed / VOTE_TIME;
 	if ( frac < 0.0f ) frac = 0.0f;
 
-	Com_sprintf( title, sizeof( title ), "Vote: %s", cgs.voteString );
-	Com_sprintf( tally, sizeof( tally ), "yes:%i    no:%i",
-		cgs.voteYes, cgs.voteNo );
+	// line 1: caller name with clientnum (or fallback)
+	if ( cgs.voteCaller >= 0 && cgs.voteCaller < MAX_CLIENTS
+			&& cgs.clientinfo[cgs.voteCaller].infoValid ) {
+		Com_sprintf( caller, sizeof( caller ), "Vote: %s^7 (%i)",
+			cgs.clientinfo[cgs.voteCaller].name, cgs.voteCaller );
+	} else {
+		Q_strncpyz( caller, "Vote:", sizeof( caller ) );
+	}
 
+	// line 2: vote description — resolve clientkick <N> to player name
+	if ( !Q_strncmp( cgs.voteString, "clientkick ", 11 ) ) {
+		int cn = atoi( cgs.voteString + 11 );
+		if ( cn >= 0 && cn < MAX_CLIENTS && cgs.clientinfo[cn].infoValid )
+			Com_sprintf( desc, sizeof( desc ), "kick %s^7 (%i)", cgs.clientinfo[cn].name, cn );
+		else
+			Q_strncpyz( desc, cgs.voteString, sizeof( desc ) );
+	} else {
+		Q_strncpyz( desc, cgs.voteString, sizeof( desc ) );
+	}
+
+	// line 3: tally with highlight on player's choice
+	if ( cg.myVote == 1 )
+		Com_sprintf( tally, sizeof( tally ), "^3yes^7:%i    no:%i",
+			cgs.voteYes, cgs.voteNo );
+	else if ( cg.myVote == -1 )
+		Com_sprintf( tally, sizeof( tally ), "yes:%i    ^3no^7:%i",
+			cgs.voteYes, cgs.voteNo );
+	else
+		Com_sprintf( tally, sizeof( tally ), "yes:%i    no:%i",
+			cgs.voteYes, cgs.voteNo );
+
+	// line 4: key hints (only on active dialog, before voting)
 	keyYes = cg_voteYesKey.string;
 	keyNo = cg_voteNoKey.string;
-	if ( keyYes[0] && keyNo[0] ) {
+	if ( highlighted && keyYes[0] && keyNo[0] && !cg.myVote ) {
 		Com_sprintf( keys, sizeof( keys ), "%s: yes    %s: no",
 			keyYes, keyNo );
 	}
 
 	barFg[0] = 0.2f; barFg[1] = 0.6f; barFg[2] = 0.8f; barFg[3] = 0.7f;
-	return CG_DrawDialogBox( y, title, tally,
-		( keyYes[0] && keyNo[0] ) ? keys : NULL, frac, barFg, 1.0f );
+	return CG_DrawDialogBox( y, caller, desc, tally,
+		( highlighted && keyYes[0] && keyNo[0] && !cg.myVote ) ? keys : NULL,
+		frac, barFg, 1.0f, highlighted );
 }
 
 
@@ -2316,9 +2350,9 @@ static float CG_DrawVote( float y ) {
 CG_DrawTeamVote
 =================
 */
-static float CG_DrawTeamVote( float y ) {
+static float CG_DrawTeamVote( float y, qboolean highlighted ) {
 	const char	*keyYes, *keyNo;
-	char		title[MAX_STRING_TOKENS + 16], tally[64], keys[128];
+	char		caller[64], desc[MAX_STRING_TOKENS + 32], tally[64], keys[128];
 	float		frac;
 	int			elapsed, cs_offset;
 	vec4_t		barFg;
@@ -2348,21 +2382,51 @@ static float CG_DrawTeamVote( float y ) {
 	frac = 1.0f - (float)elapsed / VOTE_TIME;
 	if ( frac < 0.0f ) frac = 0.0f;
 
-	Com_sprintf( title, sizeof( title ), "Team: %s",
-		cgs.teamVoteString[cs_offset] );
-	Com_sprintf( tally, sizeof( tally ), "yes:%i    no:%i",
-		cgs.teamVoteYes[cs_offset], cgs.teamVoteNo[cs_offset] );
+	// line 1: caller name with clientnum (or fallback)
+	if ( cgs.teamVoteCaller[cs_offset] >= 0
+			&& cgs.teamVoteCaller[cs_offset] < MAX_CLIENTS
+			&& cgs.clientinfo[cgs.teamVoteCaller[cs_offset]].infoValid ) {
+		Com_sprintf( caller, sizeof( caller ), "Team Vote: %s^7 (%i)",
+			cgs.clientinfo[cgs.teamVoteCaller[cs_offset]].name,
+			cgs.teamVoteCaller[cs_offset] );
+	} else {
+		Q_strncpyz( caller, "Team Vote:", sizeof( caller ) );
+	}
 
+	// line 2: vote description — resolve leader <N> to player name
+	if ( !Q_strncmp( cgs.teamVoteString[cs_offset], "leader ", 7 ) ) {
+		int cn = atoi( cgs.teamVoteString[cs_offset] + 7 );
+		if ( cn >= 0 && cn < MAX_CLIENTS && cgs.clientinfo[cn].infoValid )
+			Com_sprintf( desc, sizeof( desc ), "leader %s^7 (%i)", cgs.clientinfo[cn].name, cn );
+		else
+			Q_strncpyz( desc, cgs.teamVoteString[cs_offset], sizeof( desc ) );
+	} else {
+		Q_strncpyz( desc, cgs.teamVoteString[cs_offset], sizeof( desc ) );
+	}
+
+	// line 3: tally with highlight on player's choice
+	if ( cg.myTeamVote == 1 )
+		Com_sprintf( tally, sizeof( tally ), "^3yes^7:%i    no:%i",
+			cgs.teamVoteYes[cs_offset], cgs.teamVoteNo[cs_offset] );
+	else if ( cg.myTeamVote == -1 )
+		Com_sprintf( tally, sizeof( tally ), "yes:%i    ^3no^7:%i",
+			cgs.teamVoteYes[cs_offset], cgs.teamVoteNo[cs_offset] );
+	else
+		Com_sprintf( tally, sizeof( tally ), "yes:%i    no:%i",
+			cgs.teamVoteYes[cs_offset], cgs.teamVoteNo[cs_offset] );
+
+	// line 4: key hints (only on active dialog, before voting)
 	keyYes = cg_voteYesKey.string;
 	keyNo = cg_voteNoKey.string;
-	if ( keyYes[0] && keyNo[0] ) {
+	if ( highlighted && keyYes[0] && keyNo[0] && !cg.myTeamVote ) {
 		Com_sprintf( keys, sizeof( keys ), "%s: yes    %s: no",
 			keyYes, keyNo );
 	}
 
 	barFg[0] = 0.2f; barFg[1] = 0.6f; barFg[2] = 0.8f; barFg[3] = 0.7f;
-	return CG_DrawDialogBox( y, title, tally,
-		( keyYes[0] && keyNo[0] ) ? keys : NULL, frac, barFg, 1.0f );
+	return CG_DrawDialogBox( y, caller, desc, tally,
+		( highlighted && keyYes[0] && keyNo[0] && !cg.myTeamVote ) ? keys : NULL,
+		frac, barFg, 1.0f, highlighted );
 }
 
 
@@ -2751,23 +2815,27 @@ void CG_DrawTimedMenus( void ) {
 					+ DIALOG_CHARH + DIALOG_LINE_GAP + DIALOG_BAR_H )
 // 3-line box height: adds another line + gap
 #define DIALOG_H3	( DIALOG_H2 + DIALOG_CHARH + DIALOG_LINE_GAP )
+// 4-line box height: adds yet another line + gap
+#define DIALOG_H4	( DIALOG_H3 + DIALOG_CHARH + DIALOG_LINE_GAP )
 
 
 /*
 =================
 CG_DrawDialogBox
 
-Shared helper: draws a centered dimmed box with text lines
+Shared helper: draws a left-aligned dimmed box with text lines
 and a progress bar glued to the bottom.
-line3 is optional (NULL to omit).
+line3 and line4 are optional (NULL to omit).
+When highlighted, draws a soft blue glow behind the box.
 Returns the Y position below the box (for stacking).
 =================
 */
 static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
-						   const char *line3,
-						   float barFrac, vec4_t barColor, float alpha ) {
-	int		len1, len2, len3, maxLen;
-	float	boxW, boxH, boxX, centerX;
+						   const char *line3, const char *line4,
+						   float barFrac, vec4_t barColor, float alpha,
+						   qboolean highlighted ) {
+	int		len1, len2, len3, len4, maxLen;
+	float	boxW, boxH, boxX, textX;
 	float	lineY, barY;
 	vec4_t	bgColor, barBg, textColor;
 
@@ -2779,13 +2847,36 @@ static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
 		if ( len3 > maxLen )
 			maxLen = len3;
 	}
+	if ( line4 ) {
+		len4 = CG_DrawStrlen( line4 );
+		if ( len4 > maxLen )
+			maxLen = len4;
+	}
 	boxW = maxLen * DIALOG_CHARW + 2 * DIALOG_PAD_X;
 	if ( boxW < DIALOG_MIN_W )
 		boxW = DIALOG_MIN_W;
-	boxH = line3 ? DIALOG_H3 : DIALOG_H2;
+	if ( line3 && line4 )
+		boxH = DIALOG_H4;
+	else if ( line3 || line4 )
+		boxH = DIALOG_H3;
+	else
+		boxH = DIALOG_H2;
 
-	boxX = ( 640.0f - boxW ) / 2.0f;
-	centerX = 320.0f;
+	// left-align against safe area
+	boxX = cgs.screenXmin + DIALOG_PAD_X;
+	textX = boxX + DIALOG_PAD_X;
+
+	// highlight glow (layered rectangles behind box)
+	if ( highlighted ) {
+		vec4_t glow;
+		glow[0] = 0.3f; glow[1] = 0.6f; glow[2] = 1.0f;
+		glow[3] = 0.15f * alpha;
+		CG_FillRect( boxX - 3, boxY - 3, boxW + 6, boxH + 6, glow );
+		glow[3] = 0.2f * alpha;
+		CG_FillRect( boxX - 2, boxY - 2, boxW + 4, boxH + 4, glow );
+		glow[3] = 0.25f * alpha;
+		CG_FillRect( boxX - 1, boxY - 1, boxW + 2, boxH + 2, glow );
+	}
 
 	bgColor[0] = 0.0f; bgColor[1] = 0.0f; bgColor[2] = 0.0f; bgColor[3] = 0.5f * alpha;
 	barBg[0] = 0.2f; barBg[1] = 0.2f; barBg[2] = 0.2f; barBg[3] = 0.3f * alpha;
@@ -2795,15 +2886,27 @@ static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
 	CG_FillRect( boxX, boxY, boxW, boxH, bgColor );
 
 	lineY = boxY + DIALOG_PAD_TOP;
-	CG_DrawString( centerX, lineY, line1, textColor,
-		DIALOG_CHARW, DIALOG_CHARH, 0, DS_CENTER | DS_SHADOW );
+	CG_DrawString( textX, lineY, line1, textColor,
+		DIALOG_CHARW, DIALOG_CHARH, 0, DS_SHADOW );
 	lineY += DIALOG_CHARH + DIALOG_LINE_GAP;
-	CG_DrawString( centerX, lineY, line2, textColor,
-		DIALOG_CHARW, DIALOG_CHARH, 0, DS_CENTER | DS_SHADOW );
+	CG_DrawString( textX, lineY, line2, textColor,
+		DIALOG_CHARW, DIALOG_CHARH, 0, DS_SHADOW );
 	if ( line3 ) {
 		lineY += DIALOG_CHARH + DIALOG_LINE_GAP;
-		CG_DrawString( centerX, lineY, line3, textColor,
-			DIALOG_CHARW, DIALOG_CHARH, 0, DS_CENTER | DS_SHADOW );
+		CG_DrawString( textX, lineY, line3, textColor,
+			DIALOG_CHARW, DIALOG_CHARH, 0, DS_SHADOW );
+	}
+	if ( line4 ) {
+		vec4_t pulseColor;
+		// pulse blue channel between 0 (yellow) and 0.7 (warm white)
+		float t = 0.35f + 0.35f * sin( cg.time * 0.005f );
+		pulseColor[0] = 1.0f;
+		pulseColor[1] = 1.0f;
+		pulseColor[2] = t;	// 0 = yellow, 1 = white
+		pulseColor[3] = alpha;
+		lineY += DIALOG_CHARH + DIALOG_LINE_GAP;
+		CG_DrawString( textX, lineY, line4, pulseColor,
+			DIALOG_CHARW, DIALOG_CHARH, 0, DS_SHADOW );
 	}
 
 	barY = boxY + boxH - DIALOG_BAR_H;
@@ -2858,7 +2961,7 @@ static float CG_DrawDownloadProgress( float y ) {
 		}
 
 		barFg[0] = 0.8f; barFg[1] = 0.8f; barFg[2] = 0.2f; barFg[3] = 0.7f;
-		return CG_DrawDialogBox( y, line1, line2, NULL, frac, barFg, 1.0f );
+		return CG_DrawDialogBox( y, line1, line2, NULL, NULL, frac, barFg, 1.0f, qfalse );
 	}
 
 	// transition: download just ended
@@ -2899,7 +3002,7 @@ static float CG_DrawDownloadProgress( float y ) {
 			barFg[0] = 0.8f; barFg[1] = 0.8f; barFg[2] = 0.2f; barFg[3] = 0.7f;
 		}
 
-		return CG_DrawDialogBox( y, line1, line2, NULL, frac, barFg, alpha );
+		return CG_DrawDialogBox( y, line1, line2, NULL, NULL, frac, barFg, alpha, qfalse );
 	}
 
 	return y;
@@ -2979,7 +3082,7 @@ static float CG_DrawTVOffer( float y ) {
 
 	barFg[0] = 0.8f; barFg[1] = 0.8f; barFg[2] = 0.2f; barFg[3] = 0.7f;
 	return CG_DrawDialogBox( y, "Download last match?", cg.tvdOfferName,
-		keys, frac, barFg, 1.0f );
+		NULL, keys, frac, barFg, 1.0f, qfalse );
 }
 
 
@@ -3071,11 +3174,30 @@ Consolidates all TV/download HUD draws.
 */
 static void CG_DrawTVOverlay( void ) {
 	float y = DIALOG_Y;
+	int target = CG_ActiveVoteTarget();
+	int voteRemain, teamRemain, cs_offset;
 
 	y = CG_DrawDownloadProgress( y );
 	y = CG_DrawTVOffer( y );
-	y = CG_DrawVote( y );
-	y = CG_DrawTeamVote( y );
+
+	// sort vote + teamvote by remaining time (soonest expiration first)
+	voteRemain = CG_VoteActive() ? VOTE_TIME - ( cg.time - cgs.voteTime ) : 0;
+	cs_offset = -1;
+	if ( cgs.clientinfo[ cg.clientNum ].team == TEAM_RED )
+		cs_offset = 0;
+	else if ( cgs.clientinfo[ cg.clientNum ].team == TEAM_BLUE )
+		cs_offset = 1;
+	teamRemain = ( cs_offset >= 0 && CG_TeamVoteActive() )
+		? VOTE_TIME - ( cg.time - cgs.teamVoteTime[cs_offset] ) : 0;
+
+	if ( teamRemain > 0 && ( voteRemain <= 0 || teamRemain < voteRemain ) ) {
+		y = CG_DrawTeamVote( y, target == 2 );
+		y = CG_DrawVote( y, target == 1 );
+	} else {
+		y = CG_DrawVote( y, target == 1 );
+		y = CG_DrawTeamVote( y, target == 2 );
+	}
+
 	CG_DrawTVTimeline();
 }
 

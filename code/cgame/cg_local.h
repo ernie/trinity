@@ -725,6 +725,10 @@ typedef struct {
 	// TVD download offer prompt (tvdOfferName[0] != '\0' means active)
 	char			tvdOfferName[MAX_QPATH];
 	int				tvdOfferTime;		// cg.time when offer started (for 10s countdown)
+
+	// local vote tracking (0=not voted, 1=yes, -1=no)
+	int				myVote;
+	int				myTeamVote;
 } cg_t;
 
 
@@ -1118,12 +1122,14 @@ typedef struct {
 	int				voteNo;
 	qboolean		voteModified;			// beep whenever changed
 	char			voteString[MAX_STRING_TOKENS];
+	int				voteCaller;				// clientnum, -1 if unknown
 
 	int				teamVoteTime[2];
 	int				teamVoteYes[2];
 	int				teamVoteNo[2];
 	qboolean		teamVoteModified[2];	// beep whenever changed
 	char			teamVoteString[2][MAX_STRING_TOKENS];
+	int				teamVoteCaller[2];		// per-team, -1 if unknown
 
 	int				levelStartTime;
 
@@ -1502,6 +1508,10 @@ void CG_ScoreboardClick( void );
 //
 qboolean CG_ConsoleCommand( void );
 void CG_InitConsoleCommands( void );
+qboolean CG_VoteActive( void );
+qboolean CG_TeamVoteActive( void );
+qboolean CG_TVDOfferActive( void );
+int CG_ActiveVoteTarget( void );	// 0=none, 1=vote, 2=teamvote
 #ifdef MISSIONPACK
 void Menu_Reset( void );
 #endif

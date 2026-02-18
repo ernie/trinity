@@ -601,6 +601,114 @@ static void CG_TVScrubUp_f( void ) {
 }
 
 
+/*
+==================
+CG_CallVote_f / CG_Vote_f / CG_CallTeamVote_f / CG_TeamVote_f
+
+Track local vote direction for UI highlighting, then forward
+the command to the server via trap_SendClientCommand.
+==================
+*/
+static void CG_CallVote_f( void ) {
+	char args[MAX_STRING_CHARS];
+	cg.myVote = 1;		// caller automatically votes yes
+	trap_Args( args, sizeof( args ) );
+	trap_SendClientCommand( va( "callvote %s", args ) );
+}
+
+static void CG_CallTeamVote_f( void ) {
+	char args[MAX_STRING_CHARS];
+	cg.myTeamVote = 1;
+	trap_Args( args, sizeof( args ) );
+	trap_SendClientCommand( va( "callteamvote %s", args ) );
+}
+
+qboolean CG_VoteActive( void ) {
+	return cgs.voteTime && ( cg.time - cgs.voteTime < VOTE_TIME );
+}
+
+qboolean CG_TeamVoteActive( void ) {
+	int cs_offset = -1;
+	if ( cgs.clientinfo[ cg.clientNum ].team == TEAM_RED )
+		cs_offset = 0;
+	else if ( cgs.clientinfo[ cg.clientNum ].team == TEAM_BLUE )
+		cs_offset = 1;
+	return cs_offset >= 0
+		&& cgs.teamVoteTime[cs_offset]
+		&& ( cg.time - cgs.teamVoteTime[cs_offset] < VOTE_TIME );
+}
+
+qboolean CG_TVDOfferActive( void ) {
+	return cg_tvdOffer.string[0] && cg.tvdOfferName[0];
+}
+
+/*
+=================
+CG_ActiveVoteTarget
+
+Returns which dialog should receive the next vote input:
+  0 = none active / all voted on
+  1 = regular vote
+  2 = team vote
+TVD offer is handled separately (always takes priority).
+Among vote and teamvote, picks the one expiring soonest
+that the player hasn't voted on yet.
+=================
+*/
+int CG_ActiveVoteTarget( void ) {
+	int voteRemain = 0, teamRemain = 0;
+
+	if ( CG_VoteActive() && cg.myVote == 0 )
+		voteRemain = VOTE_TIME - ( cg.time - cgs.voteTime );
+	if ( CG_TeamVoteActive() && cg.myTeamVote == 0 ) {
+		int cs_offset = ( cgs.clientinfo[ cg.clientNum ].team == TEAM_RED ) ? 0 : 1;
+		teamRemain = VOTE_TIME - ( cg.time - cgs.teamVoteTime[cs_offset] );
+	}
+
+	if ( voteRemain <= 0 && teamRemain <= 0 )
+		return 0;
+	if ( teamRemain > 0 && ( voteRemain <= 0 || teamRemain < voteRemain ) )
+		return 2;
+	return 1;
+}
+
+static void CG_Vote_f( void ) {
+	const char *arg = CG_Argv( 1 );
+	qboolean yes = ( arg[0] == 'y' || arg[0] == 'Y' || arg[0] == '1' );
+	int target;
+
+	// TVD offer always takes priority
+	if ( CG_TVDOfferActive() ) {
+		trap_SendConsoleCommand( yes ? "tvdyes\n" : "tvdno\n" );
+		return;
+	}
+
+	// route to the active unvoted dialog expiring soonest
+	target = CG_ActiveVoteTarget();
+	if ( target == 1 ) {
+		cg.myVote = yes ? 1 : -1;
+		trap_SendClientCommand( va( "vote %s", arg ) );
+	} else if ( target == 2 ) {
+		cg.myTeamVote = yes ? 1 : -1;
+		trap_SendClientCommand( va( "teamvote %s", arg ) );
+	} else {
+		// no unvoted dialog — fall through to server
+		trap_SendClientCommand( va( "vote %s", arg ) );
+	}
+}
+
+static void CG_TeamVote_f( void ) {
+	if ( cg.myTeamVote == 0 ) {
+		const char *arg = CG_Argv( 1 );
+		if ( arg[0] == 'y' || arg[0] == 'Y' || arg[0] == '1' )
+			cg.myTeamVote = 1;
+		else
+			cg.myTeamVote = -1;
+	}
+	trap_SendClientCommand( va( "teamvote %s", CG_Argv( 1 ) ) );
+}
+
+
 typedef struct {
 	const char *cmd;
 	void	(*function)(void);
@@ -668,7 +776,11 @@ static consoleCommand_t	commands[] = {
 	{ "tv_backward", CG_TVBackward_f },
 	{ "+tv_scrub", CG_TVScrubDown_f },
 	{ "-tv_scrub", CG_TVScrubUp_f },
-	{ "loaddeferred", CG_LoadDeferredPlayers }
+	{ "loaddeferred", CG_LoadDeferredPlayers },
+	{ "callvote", CG_CallVote_f },
+	{ "vote", CG_Vote_f },
+	{ "callteamvote", CG_CallTeamVote_f },
+	{ "teamvote", CG_TeamVote_f }
 };
 
 
@@ -737,10 +849,6 @@ void CG_InitConsoleCommands( void ) {
 	trap_AddCommand ("levelshot");
 	trap_AddCommand ("addbot");
 	trap_AddCommand ("setviewpos");
-	trap_AddCommand ("callvote");
-	trap_AddCommand ("vote");
-	trap_AddCommand ("callteamvote");
-	trap_AddCommand ("teamvote");
 	trap_AddCommand ("stats");
 	trap_AddCommand ("teamtask");
 	trap_AddCommand ("loaddefered");	// spelled wrong, but not changing for demo

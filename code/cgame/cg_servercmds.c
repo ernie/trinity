@@ -321,6 +321,12 @@ static void CG_ConfigStringModified( void ) {
 	} else if ( num == CS_VOTE_TIME ) {
 		cgs.voteTime = atoi( str );
 		cgs.voteModified = qtrue;
+		if ( !cgs.voteTime ) {
+			cg.myVote = 0;
+			cgs.voteCaller = -1;
+		}
+	} else if ( num == CS_VOTE_CALLER ) {
+		cgs.voteCaller = str[0] ? atoi( str ) : -1;
 	} else if ( num == CS_VOTE_YES ) {
 		cgs.voteYes = atoi( str );
 		cgs.voteModified = qtrue;
@@ -333,8 +339,15 @@ static void CG_ConfigStringModified( void ) {
 		trap_S_StartLocalSound( cgs.media.voteNow, CHAN_ANNOUNCER );
 #endif //MISSIONPACK
 	} else if ( num >= CS_TEAMVOTE_TIME && num <= CS_TEAMVOTE_TIME + 1) {
-		cgs.teamVoteTime[num-CS_TEAMVOTE_TIME] = atoi( str );
-		cgs.teamVoteModified[num-CS_TEAMVOTE_TIME] = qtrue;
+		int idx = num - CS_TEAMVOTE_TIME;
+		cgs.teamVoteTime[idx] = atoi( str );
+		cgs.teamVoteModified[idx] = qtrue;
+		if ( !cgs.teamVoteTime[idx] ) {
+			cg.myTeamVote = 0;
+			cgs.teamVoteCaller[idx] = -1;
+		}
+	} else if ( num >= CS_TEAMVOTE_CALLER && num <= CS_TEAMVOTE_CALLER + 1) {
+		cgs.teamVoteCaller[num - CS_TEAMVOTE_CALLER] = str[0] ? atoi( str ) : -1;
 	} else if ( num >= CS_TEAMVOTE_YES && num <= CS_TEAMVOTE_YES + 1) {
 		cgs.teamVoteYes[num-CS_TEAMVOTE_YES] = atoi( str );
 		cgs.teamVoteModified[num-CS_TEAMVOTE_YES] = qtrue;
@@ -478,7 +491,11 @@ static void CG_MapRestart( void ) {
 	cg.intermissionStarted = qfalse;
 	cg.levelShot = qfalse;
 
-	cgs.voteTime = 0;
+	// Note: don't zero vote state here. On a soft restart (warmup -> game),
+	// the server keeps votes active and EF_VOTED/EF_TEAMVOTED persist
+	// through ClientSpawn. The engine's configstring copy is still valid,
+	// so cgs vote fields are already correct. If the server did clear the
+	// vote, it will send updated configstrings which zero them properly.
 
 	cg.mapRestart = qtrue;
 
