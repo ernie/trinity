@@ -43,13 +43,19 @@ typedef struct {
 	menubitmap_s		item_null;
 
 	qhandle_t			fxBasePic;
-	qhandle_t			fxPic;
+	qhandle_t			fxPic[7];
 	playerInfo_t		playerinfo;
 	int					current_fx;
 	char				playerModel[MAX_QPATH];
 } playersettings_t;
 
 static playersettings_t	s_playersettings;
+
+// Maps cvar value (1-7) to UI slider position (0-6)
+// Cvar: 1=red,2=green,3=yellow,4=blue,5=cyan,6=magenta,7=white
+// UI order: red,yellow,green,teal,blue,cyan,white (color spectrum)
+static int gamecodetoui[] = {4,2,3,0,5,1,6};
+static int uitogamecode[] = {4,6,2,3,1,5,7};
 
 static const char *handicap_items[] = {
 	"None",
@@ -184,8 +190,6 @@ static void PlayerSettings_DrawEffects( void *self ) {
 	qboolean		focus;
 	int				style;
 	float			*color;
-	vec4_t			colors;
-	int				c;
 
 	item = (menulist_s *)self;
 	focus = (item->generic.parent->cursor == item->generic.menuPosition);
@@ -199,15 +203,12 @@ static void PlayerSettings_DrawEffects( void *self ) {
 
 	UI_DrawProportionalString( item->generic.x, item->generic.y, "Effects", style, color );
 
-	UI_DrawHandlePic( item->generic.x + 64, item->generic.y + PROP_HEIGHT + 8, 128, 8, s_playersettings.fxBasePic );
-	c = item->curvalue + 1;
-	colors[0] = (c >> 0) & 1;
-	colors[1] = (c >> 1) & 1;
-	colors[2] = (c >> 2) & 1;
-	colors[3] = 1.0;
-	UI_SetColor( colors );
-	UI_DrawHandlePic( item->generic.x + 64 + item->curvalue * 16 + 8, item->generic.y + PROP_HEIGHT + 6, 16, 12, s_playersettings.fxPic );
-	UI_SetColor( NULL );
+	{
+		int markerX = item->generic.x + 64 + (item->curvalue * 112 / 6);
+
+		UI_DrawHandlePic( item->generic.x + 64, item->generic.y + PROP_HEIGHT + 8, 128, 8, s_playersettings.fxBasePic );
+		UI_DrawHandlePic( markerX, item->generic.y + PROP_HEIGHT + 6, 16, 12, s_playersettings.fxPic[item->curvalue] );
+	}
 }
 
 
@@ -250,7 +251,7 @@ static void PlayerSettings_SaveChanges( void ) {
 	trap_Cvar_SetValue( "handicap", 100 - s_playersettings.handicap.curvalue * 5 );
 
 	// effects color
-	trap_Cvar_SetValue( "color1", s_playersettings.effects.curvalue + 1 );
+	trap_Cvar_SetValue( "color1", uitogamecode[s_playersettings.effects.curvalue] );
 }
 
 
@@ -285,7 +286,7 @@ static void PlayerSettings_SetMenuItems( void ) {
 	if ( c < 0 || c > 6 ) {
 		c = 6;
 	}
-	s_playersettings.effects.curvalue = c;
+	s_playersettings.effects.curvalue = gamecodetoui[c];
 
 	// model/skin
 	memset( &s_playersettings.playerinfo, 0, sizeof(playerInfo_t) );
@@ -478,7 +479,13 @@ void PlayerSettings_Cache( void ) {
 	trap_R_RegisterShaderNoMip( ART_BACK1 );
 
 	s_playersettings.fxBasePic = trap_R_RegisterShaderNoMip( ART_FX_BASE );
-	s_playersettings.fxPic = trap_R_RegisterShaderNoMip( ART_FX_WHITE );
+	s_playersettings.fxPic[0] = trap_R_RegisterShaderNoMip( ART_FX_RED );
+	s_playersettings.fxPic[1] = trap_R_RegisterShaderNoMip( ART_FX_YELLOW );
+	s_playersettings.fxPic[2] = trap_R_RegisterShaderNoMip( ART_FX_GREEN );
+	s_playersettings.fxPic[3] = trap_R_RegisterShaderNoMip( ART_FX_TEAL );
+	s_playersettings.fxPic[4] = trap_R_RegisterShaderNoMip( ART_FX_BLUE );
+	s_playersettings.fxPic[5] = trap_R_RegisterShaderNoMip( ART_FX_CYAN );
+	s_playersettings.fxPic[6] = trap_R_RegisterShaderNoMip( ART_FX_WHITE );
 }
 
 
