@@ -289,12 +289,13 @@ networking (lerpAngles[ROLL]).
 
 For VR players (`EF_VR_PLAYER` set), the cgame:
 
-1. **Interpolates** VR head pitch and yaw from `angles2` using
-   `CG_SwingAngles()` as a low-pass filter
-2. **Skips torso swing** — torso follows weapon aim 1:1 instead of using the
-   standard swing tolerance. This is necessary because the head yaw offset is
-   relative to weapon aim, so the torso must track weapon aim exactly for the
-   head to appear correct.
+1. **Interpolates** VR head pitch and yaw from `angles2` between snapshots
+   using `LerpAngle()`, guarded by `cent->interpolate`
+2. **Skips torso movement offset and swing** — torso follows weapon aim 1:1
+   (`torsoAngles[YAW] = headAngles[YAW]`) instead of adding 25%
+   `movementOffset` and running `CG_SwingAngles`. This is necessary because
+   the head yaw offset is relative to weapon aim, so the torso must track
+   weapon aim exactly for the head to appear correct.
 3. **Computes head angles** relative to torso using matrix math (inverse torso
    rotation applied to world-space head orientation)
 4. **Applies biological limits**: pitch ±80°, yaw ±80°, roll ±60°
@@ -422,8 +423,9 @@ Screen
 6. In `ClientUserinfoChanged`: include `vr` flag in `CS_PLAYERS` configstring
 
 **Client-side game:**
-1. In `CG_PlayerAngles`: check `EF_VR_PLAYER` → interpolate head, skip torso swing,
-   compute head-relative-to-torso, apply biological limits
+1. In `CG_PlayerAngles`: check `EF_VR_PLAYER` → LerpAngle-interpolate head
+   between snapshots, skip torso movement offset and swing, compute
+   head-relative-to-torso, apply biological limits
 2. In `CG_CalcViewValues`: EMA smooth VR stats for 1st-person follow/demo
 3. In `CG_InterpolatePlayerState`: LerpAngle on VR stats between snapshots
 4. Parse `vr` from configstring for scoreboard icon
