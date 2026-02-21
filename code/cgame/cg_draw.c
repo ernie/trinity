@@ -960,6 +960,7 @@ static float CG_DrawTimer( float y ) {
 	}
 
 	CG_DrawString( cgs.screenXmax - 4, y + 2, s, color, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW | DS_RIGHT | DS_PROPORTIONAL );
+	trap_R_SetColor( NULL );
 
 	return y + BIGCHAR_HEIGHT + 4;
 }
