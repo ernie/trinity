@@ -987,7 +987,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 	case EV_RAILTRAIL:
 		cent->currentState.weapon = WP_RAILGUN;
 
-		if ( cent->currentState.clientNum == cg.snap->ps.clientNum && !cg_thirdPerson.integer ) 
+		if ( cent->currentState.clientNum == cg.snap->ps.clientNum && !cg.renderingThirdPerson )
 		{
 			VectorCopy( cg.refdef.vieworg, vec );
 			fovOffset = -0.2f * ( cgs.fov - 90.0f );
