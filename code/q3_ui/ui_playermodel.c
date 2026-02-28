@@ -603,7 +603,7 @@ static void PlayerModel_MenuInit( void )
 	s_playermodel.player.generic.type      = MTYPE_BITMAP;
 	s_playermodel.player.generic.flags     = QMF_INACTIVE;
 	s_playermodel.player.generic.ownerdraw = PlayerModel_DrawPlayer;
-	s_playermodel.player.generic.x	       = 400;
+	s_playermodel.player.generic.x	       = 337;
 	s_playermodel.player.generic.y	       = -40;
 	s_playermodel.player.width	           = 32*10;
 	s_playermodel.player.height            = 56*10;

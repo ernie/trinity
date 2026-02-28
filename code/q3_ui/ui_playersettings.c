@@ -424,7 +424,7 @@ static void PlayerSettings_MenuInit( void ) {
 	s_playersettings.player.generic.type		= MTYPE_BITMAP;
 	s_playersettings.player.generic.flags		= QMF_INACTIVE;
 	s_playersettings.player.generic.ownerdraw	= PlayerSettings_DrawPlayer;
-	s_playersettings.player.generic.x			= 400;
+	s_playersettings.player.generic.x			= 416;
 	s_playersettings.player.generic.y			= -40;
 	s_playersettings.player.width				= 32*10;
 	s_playersettings.player.height				= 56*10;
