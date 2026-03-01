@@ -581,6 +581,35 @@ void UI_DrawCenteredPic(qhandle_t image, int w, int h) {
 int frameCount = 0;
 int startTime;
 
+static char      trinityVersion[64];
+static qboolean  trinityVersionLoaded = qfalse;
+static qhandle_t trinityIconShader;
+
+static void UI_LoadTrinityVersion( void ) {
+	fileHandle_t f;
+	int len;
+
+	trinityVersionLoaded = qtrue;
+	trinityVersion[0] = '\0';
+
+	len = trap_FS_FOpenFile( "trinity-version.txt", &f, FS_READ );
+	if ( f == FS_INVALID_HANDLE ) {
+		return;
+	}
+	if ( len >= (int)sizeof( trinityVersion ) ) {
+		len = sizeof( trinityVersion ) - 1;
+	}
+	trap_FS_Read( trinityVersion, len, f );
+	trinityVersion[len] = '\0';
+	trap_FS_FCloseFile( f );
+
+	while ( len > 0 && ( trinityVersion[len-1] == '\n' || trinityVersion[len-1] == '\r' || trinityVersion[len-1] == ' ' ) ) {
+		trinityVersion[--len] = '\0';
+	}
+
+	trinityIconShader = trap_R_RegisterShaderNoMip( "menu/art/trinity" );
+}
+
 #define	UI_FPS_FRAMES	4
 void _UI_Refresh( int realtime )
 {
@@ -622,8 +651,28 @@ void _UI_Refresh( int realtime )
 		UI_BuildServerStatus(qfalse);
 		// refresh find player list
 		UI_BuildFindPlayerList(qfalse);
-	} 
-	
+	}
+
+	// Trinity version badge on main menu
+	if ( !trinityVersionLoaded ) {
+		UI_LoadTrinityVersion();
+	}
+	if ( trinityVersion[0] ) {
+		menuDef_t *focused = Menu_GetFocused();
+		if ( focused && focused->window.name && Q_stricmp( focused->window.name, "main" ) == 0 ) {
+			float scale = 0.2f;
+			int textWidth = Text_Width( trinityVersion, scale, 0 );
+			int iconSize = 16;
+			int rightMargin = 4;
+			float vx = 640 - rightMargin - textWidth;
+			float vy = 464;
+			vec4_t versionColor = { 1.0f, 1.0f, 1.0f, 0.8f };
+
+			UI_DrawHandlePic( vx - iconSize, vy, iconSize, iconSize, trinityIconShader );
+			Text_Paint( vx, vy + 12, scale, versionColor, trinityVersion, 0, 0, ITEM_TEXTSTYLE_NORMAL );
+		}
+	}
+
 	// draw cursor
 	UI_SetColor( NULL );
 	if (Menu_Count() > 0) {

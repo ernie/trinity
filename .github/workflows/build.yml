@@ -39,3 +39,7 @@ jobs:
         with:
           files: dist/*.pk3
           generate_release_notes: true
+          body: |
+            To update, ensure your Quake 3 client isn't running, and copy:
+            - `pak8t.pk3` → `baseq3`
+            - `pak3t.pk3` → `missionpack`
