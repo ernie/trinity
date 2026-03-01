@@ -20,7 +20,8 @@ dirs:
 ASSET_FILES = $(wildcard ../assets/*) $(wildcard ../assets/**/*) $(wildcard $(EXTRA_ASSETS)) $(wildcard $(EXTRA_ASSETS)/**/*)
 
 $(DISTDIR)/$(PK3): $(STAGING)/vm/qagame.qvm $(STAGING)/vm/cgame.qvm $(STAGING)/vm/ui.qvm $(ASSET_FILES)
-	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm ../../assets/* ../$(EXTRA_ASSETS)
+	git describe --tags --always > $(STAGING)/trinity-version.txt
+	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm trinity-version.txt ../../assets/* ../$(EXTRA_ASSETS)
 
 $(STAGING)/vm/%.qvm: $(BD)/%.qvm
 	cp $< $@
