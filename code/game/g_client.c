@@ -587,6 +587,7 @@ returns qfalse in case of invalid userinfo
 qboolean ClientUserinfoChanged( int clientNum ) {
 	gentity_t *ent;
 	int		teamTask, teamLeader, health;
+	int		isTrinityEngine;
 	char	*s;
 	char	model[MAX_QPATH];
 	char	headModel[MAX_QPATH];
@@ -714,6 +715,10 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	Q_strncpyz( c1, Info_ValueForKey( userinfo, "color1" ), sizeof( c1 ) );
 	Q_strncpyz( c2, Info_ValueForKey( userinfo, "color2" ), sizeof( c2 ) );
 
+	// Detect trinity engine: presence of "vr" key in userinfo (even if "0")
+	// Stock ioquake3 clients don't send this key at all
+	isTrinityEngine = Info_ValueForKey( userinfo, "vr" )[0] != '\0' ? 1 : 0;
+
 	// send over a subset of the userinfo keys so other clients can
 	// print scoreboards, display models, and play custom sounds
 	if ( ent->r.svFlags & SVF_BOT ) {
@@ -725,7 +730,7 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d\\vr\\%s",
 			client->pers.netname, client->sess.sessionTeam, model, headModel, c1, c2,
 			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader,
-			Info_ValueForKey( userinfo, "vr" )[0] ? "1" : "0" );
+			atoi(Info_ValueForKey( userinfo, "vr" )) ? "1" : "0" );
 	}
 
 	trap_SetConfigstring( CS_PLAYERS+clientNum, s );
@@ -734,9 +739,9 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	if ( ent->r.svFlags & SVF_BOT ) {
 		G_LogPrintf( "ClientUserinfoChanged: %i %s\n", clientNum, s );
 	} else {
-		G_LogPrintf( "ClientUserinfoChanged: %i %s\\g\\%s\\vr\\%s\n", clientNum, s,
+		G_LogPrintf( "ClientUserinfoChanged: %i %s\\g\\%s\\te\\%d\n", clientNum, s,
 			Info_ValueForKey( userinfo, "cl_guid" ),
-			Info_ValueForKey( userinfo, "vr" )[0] ? "1" : "0" );
+			isTrinityEngine );
 	}
 
 	return qtrue;
