@@ -148,6 +148,21 @@ static void CG_TransitionSnapshot( void ) {
 	BG_PlayerStateToEntityState( &cg.snap->ps, &cg_entities[ cg.snap->ps.clientNum ].currentState, qfalse );
 	cg_entities[ cg.snap->ps.clientNum ].interpolate = qfalse;
 
+	// TVD viewpoint switch: same frame, different POV.  Just swap entity
+	// data — no resets, no events, no player-state transition effects.
+	if ( cgs.tvPlayback && oldFrame
+			&& oldFrame->serverTime == cg.snap->serverTime ) {
+		for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {
+			cent = &cg_entities[ cg.snap->entities[ i ].number ];
+			cent->currentState = cent->nextState;
+			cent->currentValid = qtrue;
+			cent->interpolate = qfalse;
+			cent->snapShotTime = cg.snap->serverTime;
+		}
+		cg.nextSnap = NULL;
+		return;
+	}
+
 	for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {
 		cent = &cg_entities[ cg.snap->entities[ i ].number ];
 		CG_TransitionEntity( cent );

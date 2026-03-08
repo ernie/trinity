@@ -1606,7 +1606,15 @@ static void CG_SwingAngles( float destination, float swingTolerance, float clamp
 	if ( !*swinging ) {
 		return;
 	}
-	
+
+	// When time is frozen (e.g. paused TVD playback), snap directly
+	// to the destination — frametime is 0 so swing can't converge.
+	if ( cg.frametime == 0 ) {
+		*angle = destination;
+		*swinging = qfalse;
+		return;
+	}
+
 	// modify the speed depending on the delta
 	// so it doesn't seem so linear
 	swing = AngleSubtract( destination, *angle );
