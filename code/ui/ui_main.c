@@ -48,7 +48,7 @@ static const serverFilter_t serverFilters[] = {
 	{"Team Arena", "missionpack" },
 	{"Rocket Arena", "arena" },
 	{"Alliance", "alliance20" },
-	{"Weapons Factory Arena", "wfa" },
+	{"WFA", "wfa" },
 	{"OSP", "osp" },
 };
 
@@ -96,8 +96,7 @@ static const int numSortKeys = sizeof(sortKeys) / sizeof(const char*);
 static char* netnames[] = {
 	"???",
 	"UDP",
-	"IPX",
-	NULL
+	"UDP6"
 };
 
 #ifndef MISSIONPACK // bk001206
@@ -138,6 +137,7 @@ vmCvar_t  ui_new;
 vmCvar_t  ui_debug;
 vmCvar_t  ui_initialized;
 vmCvar_t  ui_teamArenaFirstRun;
+vmCvar_t  ui_serverFilterType;
 
 void _UI_Init( qboolean );
 void _UI_Shutdown( void );
@@ -1377,10 +1377,10 @@ static void UI_DrawNetMapCinematic(rectDef_t *rect, float scale, vec4_t color) {
 
 
 static void UI_DrawNetFilter(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	/*if (ui_serverFilterType.integer < 0 || ui_serverFilterType.integer > numServerFilters) {
+	if (ui_serverFilterType.integer < 0 || ui_serverFilterType.integer >= numServerFilters) {
 		ui_serverFilterType.integer = 0;
-	}*/
-  Text_Paint(rect->x, rect->y, scale, color, va("Filter: %s", serverFilters[0].description), 0, 0, textStyle);
+	}
+	Text_Paint(rect->x, rect->y, scale, color, va("Filter: %s", serverFilters[ui_serverFilterType.integer].description), 0, 0, textStyle);
 }
 
 
@@ -1743,10 +1743,10 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 			s = va("Source: %s", netSources[ui_netSource.integer]);
 			break;
 		case UI_NETFILTER:
-			/*if (ui_serverFilterType.integer < 0 || ui_serverFilterType.integer > numServerFilters) {
+			if (ui_serverFilterType.integer < 0 || ui_serverFilterType.integer >= numServerFilters) {
 				ui_serverFilterType.integer = 0;
-			}*/
-			s = va("Filter: %s", serverFilters[0].description );
+			}
+			s = va("Filter: %s", serverFilters[ui_serverFilterType.integer].description );
 			break;
 		case UI_TIER:
 			break;
@@ -2596,16 +2596,16 @@ static qboolean UI_NetFilter_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
 
 		if (key == K_MOUSE2) {
-			//ui_serverFilterType.integer--;
+			ui_serverFilterType.integer--;
 		} else {
-			//ui_serverFilterType.integer++;
+			ui_serverFilterType.integer++;
 		}
 
-    /*if (ui_serverFilterType.integer >= numServerFilters) {
-      ui_serverFilterType.integer = 0;
-    } else if (ui_serverFilterType.integer < 0) {
-      ui_serverFilterType.integer = numServerFilters - 1;
-		}*/
+		if (ui_serverFilterType.integer >= numServerFilters) {
+			ui_serverFilterType.integer = 0;
+		} else if (ui_serverFilterType.integer < 0) {
+			ui_serverFilterType.integer = numServerFilters - 1;
+		}
 		UI_BuildServerDisplayList(qtrue);
     return qtrue;
   }
@@ -3911,11 +3911,12 @@ static void UI_BuildServerDisplayList(qboolean force) {
 			trap_LAN_GetServerInfo(ui_netSource.integer, i, info, MAX_STRING_CHARS);
 
 			clients = atoi(Info_ValueForKey(info, "clients"));
-			uiInfo.serverStatus.numPlayersOnServers += clients;
 
 			if (ui_browserShowEmpty.integer == 0) {
 				if (clients == 0) {
-					trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
+					if (ping > 0) {
+						trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
+					}
 					continue;
 				}
 			}
@@ -3923,7 +3924,9 @@ static void UI_BuildServerDisplayList(qboolean force) {
 			if (ui_browserShowFull.integer == 0) {
 				maxClients = atoi(Info_ValueForKey(info, "sv_maxclients"));
 				if (clients == maxClients) {
-					trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
+					if (ping > 0) {
+						trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
+					}
 					continue;
 				}
 			}
@@ -3931,17 +3934,21 @@ static void UI_BuildServerDisplayList(qboolean force) {
 			if (uiInfo.joinGameTypes[ui_joinGameType.integer].gtEnum != -1) {
 				game = atoi(Info_ValueForKey(info, "gametype"));
 				if (game != uiInfo.joinGameTypes[ui_joinGameType.integer].gtEnum) {
-					trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
+					if (ping > 0) {
+						trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
+					}
 					continue;
 				}
 			}
-				
-			/*if (ui_serverFilterType.integer > 0) {
+
+			if (ui_serverFilterType.integer > 0) {
 				if (Q_stricmp(Info_ValueForKey(info, "game"), serverFilters[ui_serverFilterType.integer].basedir) != 0) {
-					trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
+					if (ping > 0) {
+						trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
+					}
 					continue;
 				}
-			}*/
+			}
 			// make sure we never add a favorite server twice
 			if (ui_netSource.integer == AS_FAVORITES) {
 				UI_RemoveServerFromDisplayList(i);
@@ -3952,6 +3959,7 @@ static void UI_BuildServerDisplayList(qboolean force) {
 			if (ping > 0) {
 				trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
 				numinvisible++;
+				uiInfo.serverStatus.numPlayersOnServers += clients;
 			}
 		}
 	}
@@ -4435,9 +4443,15 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 						return Info_ValueForKey(info, "addr");
 					} else {
 						if ( ui_netSource.integer == AS_LOCAL ) {
+							int nettype = atoi(Info_ValueForKey(info, "nettype"));
+
+							if (nettype < 0 || nettype >= ARRAY_LEN(netnames)) {
+								nettype = 0;
+							}
+
 							Com_sprintf( hostname, sizeof(hostname), "%s [%s]",
 											Info_ValueForKey(info, "hostname"),
-											netnames[atoi(Info_ValueForKey(info, "nettype"))] );
+											netnames[nettype] );
 							return hostname;
 						}
 						else {
@@ -5924,7 +5938,7 @@ static void UI_StartServerRefresh(qboolean full)
 	//
 	if( ui_netSource.integer == AS_LOCAL ) {
 		trap_Cmd_ExecuteText( EXEC_NOW, "localservers\n" );
-		uiInfo.serverStatus.refreshtime = uiInfo.uiDC.realTime + 1000;
+		uiInfo.serverStatus.refreshtime = uiInfo.uiDC.realTime + 5000;
 		return;
 	}
 
