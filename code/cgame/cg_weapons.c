@@ -1846,6 +1846,16 @@ void CG_FireWeapon( centity_t *cent ) {
 		if ( cent->pe.lightningFiring ) {
 			return;
 		}
+		// In TVD playback, the followed player's entity may appear in both the
+		// entity list and the playerstate, causing duplicate CG_FireWeapon
+		// calls on different centities.  lightningFiring is only maintained
+		// on predictedPlayerEntity, so without this check we hear nonstop
+		// initial firing sounds.
+		if ( cent != &cg.predictedPlayerEntity
+				&& ent->number == cg.snap->ps.clientNum
+				&& cg.predictedPlayerEntity.pe.lightningFiring ) {
+			return;
+		}
 	}
 
 	// play quad sound if needed
