@@ -115,6 +115,14 @@ static char* netnames[] = {
 	NULL
 };
 
+static const char *gametype_names[] = {
+	"FFA",		// GT_FFA
+	"1v1",		// GT_TOURNAMENT
+	"SP",		// GT_SINGLE_PLAYER
+	"TDM",		// GT_TEAM
+	"CTF"		// GT_CTF
+};
+
 static char quake3worldMessage[] = "Visit www.quake3world.com - News, Community, Events, Files";
 
 const char* punkbuster_items[] = {
@@ -885,6 +893,8 @@ static void ArenaServers_Insert( const char *adrstr, const char *info, int pingt
 	s = Info_ValueForKey( info, "game" );
 	if ( *s )
 		Q_strncpyz( servernodeptr->gamename, s, sizeof( servernodeptr->gamename ) );
+	else if ( servernodeptr->gametype >= 0 && servernodeptr->gametype < ARRAY_LEN( gametype_names ) )
+		Q_strncpyz( servernodeptr->gamename, gametype_names[servernodeptr->gametype], sizeof( servernodeptr->gamename ) );
 	else
 		Q_strncpyz( servernodeptr->gamename, "unknown", sizeof( servernodeptr->gamename ) );
 }
