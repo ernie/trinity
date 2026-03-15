@@ -3372,7 +3372,7 @@ static void CG_WarmupEvents( void ) {
 		count = ( cg.warmup - cg.time + 999 ) / 1000;
 	}
 
-	if ( cg.warmupCount == -2 && cg.demoPlayback ) {
+	if ( cg.warmupCount == -2 ) {
 		cg.warmupCount = 0;
 	}
 

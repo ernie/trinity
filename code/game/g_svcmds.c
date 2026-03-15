@@ -510,6 +510,59 @@ qboolean	ConsoleCommand( void ) {
 		return qtrue;
 	}
 
+	if (Q_stricmp (cmd, "sv_cmd") == 0) {
+		char	svcmd[MAX_TOKEN_CHARS];
+		char	clientStr[MAX_TOKEN_CHARS];
+		int		clientNum;
+
+		if ( trap_Argc() < 3 ) {
+			G_Printf( "Usage: sv_cmd <command> <clientnum> [args...]\n" );
+			return qtrue;
+		}
+
+		trap_Argv( 1, svcmd, sizeof( svcmd ) );
+		trap_Argv( 2, clientStr, sizeof( clientStr ) );
+		clientNum = atoi( clientStr );
+
+		if ( clientNum < -1 || clientNum >= level.maxclients ) {
+			G_Printf( "sv_cmd: invalid client number %d\n", clientNum );
+			return qtrue;
+		}
+
+		if ( clientNum >= 0 && level.clients[clientNum].pers.connected != CON_CONNECTED ) {
+			G_Printf( "sv_cmd: client %d is not connected\n", clientNum );
+			return qtrue;
+		}
+
+		if ( trap_Argc() > 3 ) {
+			char	msg[MAX_STRING_CHARS];
+			char	*p;
+
+			Q_strncpyz( msg, ConcatArgs( 3 ), sizeof( msg ) );
+
+			// Process escape sequences and strip characters that would
+			// break the quoted server command string:
+			// - \n → real newline (tokenizer eats real newlines, so we
+			//   need this escape to get line breaks into centerprint etc.)
+			// - " → stripped (Q3 tokenizer doesn't support \" escaping)
+			for ( p = msg; *p; p++ ) {
+				if ( p[0] == '\\' && p[1] == 'n' ) {
+					p[0] = '\n';
+					memmove( p + 1, p + 2, strlen( p + 2 ) + 1 );
+				} else if ( p[0] == '"' ) {
+					memmove( p, p + 1, strlen( p + 1 ) + 1 );
+					p--;
+				}
+			}
+
+			trap_SendServerCommand( clientNum, va( "%s \"%s\"", svcmd, msg ) );
+		} else {
+			trap_SendServerCommand( clientNum, svcmd );
+		}
+
+		return qtrue;
+	}
+
 	if (g_dedicated.integer) {
 		if (Q_stricmp (cmd, "say") == 0) {
 			char *msg = ConcatArgs(1);
