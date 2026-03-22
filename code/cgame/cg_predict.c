@@ -972,15 +972,17 @@ void CG_PredictPlayerState( void ) {
 
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
+	cg_pmove.pmove_physics = cgs.pmove_physics;
 
 	// clean event stack
 	eventStack = 0;
-	
+
 	// run cmds
 	moved = qfalse;
 
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
+	cg_pmove.pmove_physics = cgs.pmove_physics;
 
 	// Like the comments described above, a player's state is entirely
 	// re-predicted from the last valid snapshot every client frame, which

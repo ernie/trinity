@@ -160,6 +160,11 @@ void CG_ParseSysteminfo( void ) {
 		cgs.pmove_msec = 33;
 	}
 
+	cgs.pmove_physics = atoi( Info_ValueForKey( info, "g_physics" ) );
+	if ( cgs.pmove_physics < PM_PHYSICS_VQ3 || cgs.pmove_physics > PM_PHYSICS_QLT ) {
+		cgs.pmove_physics = PM_PHYSICS_VQ3;
+	}
+
 	cgs.synchronousClients = ( atoi( Info_ValueForKey( info, "g_synchronousClients" ) ) ) ? qtrue : qfalse;
 }
 

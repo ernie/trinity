@@ -186,9 +186,10 @@ itemDef {
 itemDef {
 	name options
 	group grpOptions
-	type ITEM_TYPE_YESNO
-	text "Simple Items:"
-	cvar "cg_simpleItems"
+	text "Physics:"
+	type ITEM_TYPE_MULTI
+	cvar "ui_physics"
+	cvarFloatList { "Vanilla Quake 3" 0 "CPMA" 1 "Quake Live" 2 "Quake Live Turbo" 3 }
 	rect 3 20 200 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146

@@ -642,6 +642,12 @@ void _UI_Refresh( int realtime )
 
 	UI_UpdateCvars();
 
+	// sync ui_physics to g_physics for local games
+	if ( ui_physics.modificationCount != uiInfo.lastPhysicsModCount ) {
+		uiInfo.lastPhysicsModCount = ui_physics.modificationCount;
+		trap_Cvar_SetValue( "g_physics", ui_physics.integer );
+	}
+
 	if (Menu_Count() > 0) {
 		// paint all the menus
 		Menu_PaintAll();

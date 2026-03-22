@@ -26,7 +26,14 @@ float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
 
+// CPM/PQL air control constants
+static float	cpm_pm_airstopaccelerate = 2.5f;
+static float	cpm_pm_aircontrol = 150.0f;
+static float	cpm_pm_strafeaccelerate = 70.0f;
+static float	cpm_pm_wishspeed = 30.0f;
+
 int		c_pmove = 0;
+
 
 #define NO_RESPAWN_OVERBOUNCE 250
 
@@ -361,10 +368,35 @@ static qboolean PM_CheckJump( void ) {
 
 	pml.groundPlane = qfalse;		// jumping away
 	pml.walking = qfalse;
-	pm->ps->pm_flags |= PMF_JUMP_HELD;
+
+	// QL/PQL: auto-hop (skip PMF_JUMP_HELD so holding jump re-jumps on landing)
+	if ( pm->pmove_physics != PM_PHYSICS_QL && pm->pmove_physics != PM_PHYSICS_QLT ) {
+		pm->ps->pm_flags |= PMF_JUMP_HELD;
+	}
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
-	pm->ps->velocity[2] = JUMP_VELOCITY;
+
+	if ( pm->pmove_physics == PM_PHYSICS_CPM ) {
+		// ramp jump: additive when moving up, hard set otherwise
+		if ( pm->ps->velocity[2] > 0 ) {
+			pm->ps->velocity[2] += JUMP_VELOCITY;
+		} else {
+			pm->ps->velocity[2] = JUMP_VELOCITY;
+		}
+		// double-jump: +100 bonus if jumping within 400ms of last jump
+		if ( pm->ps->stats[STAT_JUMPTIME] > 0 ) {
+			pm->ps->velocity[2] += 100;
+		}
+		pm->ps->stats[STAT_JUMPTIME] = 400;
+	} else if ( pm->pmove_physics == PM_PHYSICS_QL || pm->pmove_physics == PM_PHYSICS_QLT ) {
+		if ( pm->pmove_physics == PM_PHYSICS_QLT && pm->ps->velocity[2] > 0 ) {
+			pm->ps->velocity[2] += 275;	// PQL ramp jump: additive when moving up
+		} else {
+			pm->ps->velocity[2] = 275;		// QL/PQL jump velocity
+		}
+	} else {
+		pm->ps->velocity[2] = JUMP_VELOCITY;
+	}
 	PM_AddEvent( EV_JUMP );
 
 	if ( pm->cmd.forwardmove >= 0 ) {
@@ -579,6 +611,52 @@ static void PM_FlyMove( void ) {
 
 
 /*
+==============
+PM_AirControl
+
+CPMA-style air control. Rotates velocity toward view direction
+when moving mostly forward/backward, without changing speed.
+==============
+*/
+static void PM_AirControl( vec3_t wishdir, float wishspeed ) {
+	float	zspeed, speed, dot, k;
+	float	forwardScale;
+	int		i;
+
+	if ( wishspeed == 0.0f )
+		return;
+
+	// no air control if cross-axis input exceeds ~25 degrees off forward
+	if ( abs( pm->cmd.rightmove ) > 54 )
+		return;
+
+	// scale air control strength by forward deflection (analog ramp-up)
+	// This isn't strictly CPMA behavior, but that isn't analog-friendly
+	forwardScale = ( abs( pm->cmd.forwardmove ) - 10 ) / ( 120.0f - 10 );
+	forwardScale = Com_Clamp( 0.0f, 1.0f, forwardScale );
+	if ( forwardScale == 0.0f )
+		return;
+
+	zspeed = pm->ps->velocity[2];
+	pm->ps->velocity[2] = 0;
+	speed = VectorNormalize( pm->ps->velocity );
+
+	dot = DotProduct( pm->ps->velocity, wishdir );
+	k = 32 * forwardScale;
+	k *= cpm_pm_aircontrol * dot * dot * pml.frametime;
+
+	if ( dot > 0 ) {
+		for ( i = 0; i < 2; i++ )
+			pm->ps->velocity[i] = pm->ps->velocity[i] * speed + wishdir[i] * k;
+		VectorNormalize( pm->ps->velocity );
+	}
+
+	for ( i = 0; i < 2; i++ )
+		pm->ps->velocity[i] *= speed;
+	pm->ps->velocity[2] = zspeed;
+}
+
+/*
 ===================
 PM_AirMove
 
@@ -620,7 +698,34 @@ static void PM_AirMove( void ) {
 	wishspeed *= scale;
 
 	// not on ground, so little effect on velocity
-	PM_Accelerate (wishdir, wishspeed, pm_airaccelerate);
+	if ( pm->pmove_physics == PM_PHYSICS_CPM || pm->pmove_physics == PM_PHYSICS_QLT ) {
+		float wishspeed2 = wishspeed;
+		float accel;
+
+		// air stop: moving against current velocity
+		if ( DotProduct( pm->ps->velocity, wishdir ) < 0 )
+			accel = cpm_pm_airstopaccelerate;
+		else
+			accel = pm_airaccelerate;
+
+		// strafe-dominant: input is mostly sideways
+		// scale strafe accel by sideways deflection (analog ramp-up)
+		// This isn't strictly CPMA behavior, but that isn't analog-friendly
+		if ( abs( pm->cmd.rightmove ) >= 10
+			&& abs( pm->cmd.forwardmove ) <= 54 ) {
+			float strafeScale = ( abs( pm->cmd.rightmove ) - 10 ) / ( 120.0f - 10 );
+			strafeScale = Com_Clamp( 0.0f, 1.0f, strafeScale );
+			if ( wishspeed > cpm_pm_wishspeed ) {
+				wishspeed = wishspeed + ( cpm_pm_wishspeed - wishspeed ) * strafeScale;
+			}
+			accel = accel + ( cpm_pm_strafeaccelerate - accel ) * strafeScale;
+		}
+
+		PM_Accelerate( wishdir, wishspeed, accel );
+		PM_AirControl( wishdir, wishspeed2 );
+	} else {
+		PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
+	}
 
 	// we may have a ground plane that is very steep, even
 	// though we don't have a groundentity
@@ -1781,6 +1886,14 @@ static void PM_DropTimers( void ) {
 			pm->ps->torsoTimer = 0;
 		}
 	}
+
+	// CPM double-jump timer
+	if ( pm->ps->stats[STAT_JUMPTIME] > 0 ) {
+		pm->ps->stats[STAT_JUMPTIME] -= pml.msec;
+		if ( pm->ps->stats[STAT_JUMPTIME] < 0 ) {
+			pm->ps->stats[STAT_JUMPTIME] = 0;
+		}
+	}
 }
 
 /*
@@ -1832,6 +1945,20 @@ void trap_SnapVector( float *v );
 
 void PmoveSingle (pmove_t *pmove) {
 	pm = pmove;
+
+	// set physics parameters based on mode
+	switch ( pm->pmove_physics ) {
+	case PM_PHYSICS_CPM:
+		pm_accelerate = 15.0f;
+		pm_friction = 8.0f;
+		break;
+	case PM_PHYSICS_QL:
+	case PM_PHYSICS_QLT:
+	default:	// PM_PHYSICS_VQ3
+		pm_accelerate = 10.0f;
+		pm_friction = 6.0f;
+		break;
+	}
 
 	// this counter lets us debug movement problems with a journal
 	// by setting a conditional breakpoint fot the previous frame

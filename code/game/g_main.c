@@ -495,6 +495,15 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	G_RegisterCvars();
 
+	// apply client's preferred physics mode for local games
+	if ( g_physics.integer == 0 ) {
+		trap_Cvar_VariableStringBuffer( "ui_physics", value, sizeof( value ) );
+		if ( value[0] && atoi( value ) != 0 ) {
+			trap_Cvar_Set( "g_physics", value );
+			trap_Cvar_Update( &g_physics );
+		}
+	}
+
 	// Signal to engine that this game supports server lifecycle events
 	trap_Cvar_Set( "g_serverEvents", "1" );
 

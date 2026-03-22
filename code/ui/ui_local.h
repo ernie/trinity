@@ -726,6 +726,8 @@ typedef struct {
 
 	qboolean inGameLoad;
 
+	int lastPhysicsModCount;
+
 }	uiInfo_t;
 
 extern uiInfo_t uiInfo;

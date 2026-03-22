@@ -45,6 +45,7 @@ GAME OPTIONS MENU
 #define ID_DAMAGEPLUMS			142
 #define ID_FOLLOWMODE			143
 #define ID_TVDOWNLOAD			144
+#define ID_PHYSICS				145
 
 #define	NUM_CROSSHAIRS			10
 
@@ -73,6 +74,7 @@ typedef struct {
 	menulist_s			followmode;
 	menuradiobutton_s	allowdownload;
 	menulist_s			tvdownload;
+	menulist_s			physics;
 	menubitmap_s		back;
 
 	qboolean			hasTvDownload;
@@ -105,6 +107,15 @@ static const char *tvdownload_names[] =
 	"Off",
 	"Decline",
 	"Accept",
+	NULL
+};
+
+static const char *physics_names[] =
+{
+	"Vanilla Quake 3",
+	"CPMA",
+	"Quake Live",
+	"Quake Live Turbo",
 	NULL
 };
 
@@ -146,6 +157,8 @@ static void Preferences_SetMenuItems( void ) {
 		s_preferences.hasTvDownload = ( buf[0] != '\0' );
 		s_preferences.tvdownload.curvalue = Com_Clamp( 0, 2, atoi( buf ) );
 	}
+
+	s_preferences.physics.curvalue = Com_Clamp( 0, 3, trap_Cvar_VariableValue( "ui_physics" ) );
 }
 
 
@@ -229,6 +242,11 @@ static void Preferences_Event( void* ptr, int notification ) {
 
 	case ID_FOLLOWMODE:
 		trap_Cvar_SetValue( "cg_followMode", s_preferences.followmode.curvalue );
+		break;
+
+	case ID_PHYSICS:
+		trap_Cvar_SetValue( "ui_physics", s_preferences.physics.curvalue );
+		trap_Cvar_SetValue( "g_physics", s_preferences.physics.curvalue );
 		break;
 
 	case ID_BACK:
@@ -425,6 +443,16 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.crosshaircolor.numitems			= 7;
 
 	y += BIGCHAR_HEIGHT;
+	s_preferences.physics.generic.type          = MTYPE_SPINCONTROL;
+	s_preferences.physics.generic.name          = "Physics:";
+	s_preferences.physics.generic.flags         = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.physics.generic.callback      = Preferences_Event;
+	s_preferences.physics.generic.id            = ID_PHYSICS;
+	s_preferences.physics.generic.x             = PREFERENCES_X_POS;
+	s_preferences.physics.generic.y             = y;
+	s_preferences.physics.itemnames             = physics_names;
+
+	y += BIGCHAR_HEIGHT;
 	s_preferences.simpleitems.generic.type        = MTYPE_RADIOBUTTON;
 	s_preferences.simpleitems.generic.name	      = "Simple Items:";
 	s_preferences.simpleitems.generic.flags	      = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -580,6 +608,7 @@ static void Preferences_MenuInit( void ) {
 
 	Menu_AddItem( &s_preferences.menu, &s_preferences.crosshair );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.crosshaircolor );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.physics );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.simpleitems );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.wallmarks );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.brass );

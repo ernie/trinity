@@ -146,6 +146,14 @@ typedef enum {
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
+// physics modes (synced via g_physics CVAR_SYSTEMINFO)
+typedef enum {
+	PM_PHYSICS_VQ3,		// 0 - vanilla Quake 3
+	PM_PHYSICS_CPM,		// 1 - CPMA/promode
+	PM_PHYSICS_QL,		// 2 - vanilla Quake Live
+	PM_PHYSICS_QLT		// 3 - Quake Live Turbo
+} pmPhysics_t;
+
 #define	MAXTOUCH	32
 typedef struct {
 	// state (in / out)
@@ -174,6 +182,8 @@ typedef struct {
 	int			pmove_fixed;
 	int			pmove_msec;
 
+	int			pmove_physics;		// pmPhysics_t
+
 	// callbacks to test the world
 	// these will be different functions during game and cgame
 	void		(*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );
@@ -183,6 +193,7 @@ typedef struct {
 // if a full pmove isn't done on the client, you can just update the angles
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd );
 void Pmove (pmove_t *pmove);
+
 
 //===================================================================================
 
@@ -201,7 +212,8 @@ typedef enum {
 	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
 	STAT_MAX_HEALTH,				// health / armor limit, changable by handicap
 	STAT_VR_HEAD_PITCH,				// VR head pitch angle (packed as short for demo playback)
-	STAT_VR_HEAD_YAW_OFFSET			// VR head yaw offset from weapon direction (packed as short)
+	STAT_VR_HEAD_YAW_OFFSET,		// VR head yaw offset from weapon direction (packed as short)
+	STAT_JUMPTIME					// CPM double-jump timer (counts down from 400ms)
 } statIndex_t;
 
 
