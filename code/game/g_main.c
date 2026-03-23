@@ -280,8 +280,9 @@ static void G_UpdateCvars( void ) {
 				cv->modificationCount = cv->vmCvar->modificationCount;
 
 				if ( cv->trackChange ) {
-					G_BroadcastServerCommand( -1, va("print \"Server: %s changed to %s\n\"", 
+					G_BroadcastServerCommand( -1, va("print \"Server: %s changed to %s\n\"",
 						cv->cvarName, cv->vmCvar->string ) );
+					G_LogPrintf( "CvarChange: %s\\%s\n", cv->cvarName, cv->vmCvar->string );
 				}
 
 				if (cv->teamShader) {
