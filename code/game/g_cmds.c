@@ -1312,7 +1312,8 @@ static const char *voteCommands[] = {
 	"g_gametype",
 	"g_unlagged",
 	"g_warmup",
-	"g_physics",
+	"g_movement",
+	"g_gameplay",
 	"timelimit",
 	"fraglimit",
 	"capturelimit"
@@ -1359,7 +1360,8 @@ static qboolean ValidVoteCommand( int clientNum, char *command )
 	if ( i == ARRAY_LEN( voteCommands ) ) {
 		trap_SendServerCommand( clientNum, "print \"Invalid vote command.\nVote commands are: \n"
 			" g_gametype <n|ffa|duel|tdm|ctf>\n"
-			" g_physics <n|vq3|cpm|ql|qlt>\n"
+			" g_movement <n|vq3|cpm|ql|qlt>\n"
+			" g_gameplay <n|vq3|cpm|ql>\n"
 			" map_restart, map <mapname>, rotate [round], nextmap\n"
 			" kick <player>, clientkick <clientnum>\n"
 			" g_unlagged <0|1>, g_warmup <-1|0|seconds>\n"
@@ -1389,19 +1391,34 @@ static qboolean ValidVoteCommand( int clientNum, char *command )
 		return qtrue;
 	}
 
-	if ( Q_stricmp( buf, "g_physics" ) == 0 ) {
-		if ( !Q_stricmp( command, "vq3" ) ) i = PM_PHYSICS_VQ3;
-		else if ( !Q_stricmp( command, "cpm" ) ) i = PM_PHYSICS_CPM;
-		else if ( !Q_stricmp( command, "ql" ) ) i = PM_PHYSICS_QL;
-		else if ( !Q_stricmp( command, "qlt" ) ) i = PM_PHYSICS_QLT;
+	if ( Q_stricmp( buf, "g_movement" ) == 0 ) {
+		if ( !Q_stricmp( command, "vq3" ) || !Q_stricmp( command, "q3" ) ) i = PM_MOVEMENT_VQ3;
+		else if ( !Q_stricmp( command, "cpm" ) || !Q_stricmp( command, "cpma" ) ) i = PM_MOVEMENT_CPM;
+		else if ( !Q_stricmp( command, "ql" ) ) i = PM_MOVEMENT_QL;
+		else if ( !Q_stricmp( command, "qlt" ) ) i = PM_MOVEMENT_QLT;
 		else {
 			i = atoi( command );
-			if ( i < PM_PHYSICS_VQ3 || i > PM_PHYSICS_QLT ) {
-				trap_SendServerCommand( clientNum, va( "print \"Invalid physics mode: %s.\n\"", command ) );
+			if ( i < PM_MOVEMENT_VQ3 || i > PM_MOVEMENT_QLT ) {
+				trap_SendServerCommand( clientNum, va( "print \"Invalid movement mode: %s.\n\"", command ) );
 				return qfalse;
 			}
 		}
-		BG_sprintf( base, "g_physics %i", i );
+		BG_sprintf( base, "g_movement %i", i );
+		return qtrue;
+	}
+
+	if ( Q_stricmp( buf, "g_gameplay" ) == 0 ) {
+		if ( !Q_stricmp( command, "vq3" ) || !Q_stricmp( command, "q3" ) ) i = GP_VQ3;
+		else if ( !Q_stricmp( command, "cpm" ) || !Q_stricmp( command, "cpma" ) ) i = GP_CPM;
+		else if ( !Q_stricmp( command, "ql" ) ) i = GP_QL;
+		else {
+			i = atoi( command );
+			if ( i < GP_VQ3 || i > GP_QL ) {
+				trap_SendServerCommand( clientNum, va( "print \"Invalid combat balance: %s.\n\"", command ) );
+				return qfalse;
+			}
+		}
+		BG_sprintf( base, "g_gameplay %i", i );
 		return qtrue;
 	}
 

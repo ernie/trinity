@@ -18,12 +18,7 @@
 
 #define	RANK_TIED_FLAG		0x4000
 
-#define DEFAULT_SHOTGUN_SPREAD	700
-#define DEFAULT_SHOTGUN_COUNT	11
-
 #define	ITEM_RADIUS			15		// item sizes are needed for client side pickup detection
-
-#define	LIGHTNING_RANGE		768
 
 #define	SCORE_NOT_PRESENT	-9999	// for the CS_SCORES[12] when only one player is present
 
@@ -146,13 +141,20 @@ typedef enum {
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
-// physics modes (synced via g_physics CVAR_SYSTEMINFO)
+// movement modes (synced via g_movement CVAR_SYSTEMINFO)
 typedef enum {
-	PM_PHYSICS_VQ3,		// 0 - vanilla Quake 3
-	PM_PHYSICS_CPM,		// 1 - CPMA/promode
-	PM_PHYSICS_QL,		// 2 - vanilla Quake Live
-	PM_PHYSICS_QLT		// 3 - Quake Live Turbo
-} pmPhysics_t;
+	PM_MOVEMENT_VQ3,	// 0 - vanilla Quake 3
+	PM_MOVEMENT_CPM,	// 1 - CPMA
+	PM_MOVEMENT_QL,		// 2 - vanilla Quake Live
+	PM_MOVEMENT_QLT		// 3 - Quake Live Turbo
+} pmMovement_t;
+
+// gameplay modes (synced via g_gameplay CVAR_SYSTEMINFO)
+typedef enum {
+	GP_VQ3,			// 0 - vanilla Quake 3
+	GP_CPM,			// 1 - CPMA
+	GP_QL			// 2 - Quake Live
+} gameplay_t;
 
 #define	MAXTOUCH	32
 typedef struct {
@@ -182,7 +184,8 @@ typedef struct {
 	int			pmove_fixed;
 	int			pmove_msec;
 
-	int			pmove_physics;		// pmPhysics_t
+	int			pmove_movement;		// pmMovement_t
+	int			pmove_gameplay;	// gameplay_t
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame
@@ -213,7 +216,8 @@ typedef enum {
 	STAT_MAX_HEALTH,				// health / armor limit, changable by handicap
 	STAT_VR_HEAD_PITCH,				// VR head pitch angle (packed as short for demo playback)
 	STAT_VR_HEAD_YAW_OFFSET,		// VR head yaw offset from weapon direction (packed as short)
-	STAT_JUMPTIME					// CPM double-jump timer (counts down from 400ms)
+	STAT_JUMPTIME,					// CPM double-jump timer (counts down from 400ms)
+	STAT_ARMORTYPE					// CPM tiered armor: 0=none, 1=GA, 2=YA, 3=RA
 } statIndex_t;
 
 
@@ -541,7 +545,7 @@ gitem_t	*BG_FindItemForPowerup( powerup_t pw );
 gitem_t	*BG_FindItemForHoldable( holdable_t pw );
 #define	ITEM_INDEX(x) ((x)-bg_itemlist)
 
-qboolean	BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const playerState_t *ps );
+qboolean	BG_CanItemBeGrabbed( int gametype, int gameplay, const entityState_t *ent, const playerState_t *ps );
 
 
 // g_dmflags->integer flags

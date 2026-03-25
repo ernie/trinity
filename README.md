@@ -82,12 +82,18 @@ bind downarrow tv_prev       # previous player
 **Server**
 
 - Support for clients with `cg_damagePlums`
-- `g_physics`: Selectable physics mode, synchronized to clients for prediction. Voteable (can use `vq3` / `cpm` / `ql` / `qlt` there). Accepts numeric or string values:
+- `g_movement`: Selectable movement mode, synchronized to clients for prediction. Voteable (can use `vq3` / `cpm` / `ql` / `qlt` there). Accepts numeric or string values:
   - `0` — Vanilla Quake 3 (default)
   - `1` — CPMA/promode (higher ground accel/friction, strafe air control, double-jump)
-  - `2` — Vanilla Quake Live (auto-hop, jump velocity 275)
+  - `2` — Quake Live (auto-hop, jump velocity 275)
   - `3` — Quake Live Turbo (QL + strafe air control + ramp jump)
+- `g_gameplay`: Selectable gameplay mode, synchronized to clients for prediction. Voteable (can use `vq3` / `cpm` / `ql` there). Accepts numeric or string values:
+  - `0` — Vanilla Quake 3 (default)
+  - `1` — CPMA (3-tiered armor, instant weapon switch, damage adjustments, etc)
+  - `2` — Quake Live (damage adjustments, cg_trueShotgun, etc)
 - `g_teamDMSpawnThreshold`: Set > 0 to include Team (CTF) spawns in maps with fewer deathmatch spawns than the value. Allows use of maps that are otherwise a telefrag-fest in Team DM.
+
+In both `g_movement` and `g_gameplay` cases, values were determined by dumping cvars where possible, followed by community resources, then trial and error until things felt right. Bug reports of differences in behavior from the _default_ settings for CPMA/Quake Live are greatly appreciated.
 
 ## Prerequisites
 

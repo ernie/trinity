@@ -3,6 +3,7 @@
 // g_combat.c
 
 #include "g_local.h"
+#include "bg_gameplay.h"
 
 
 /*
@@ -695,7 +696,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 CheckArmor
 ================
 */
-int CheckArmor (gentity_t *ent, int damage, int dflags)
+int CheckArmor (gentity_t *ent, int damage, int dflags, qboolean selfDamage)
 {
 	gclient_t	*client;
 	int			save;
@@ -714,7 +715,20 @@ int CheckArmor (gentity_t *ent, int damage, int dflags)
 
 	// armor
 	count = client->ps.stats[STAT_ARMOR];
-	save = ceil( damage * ARMOR_PROTECTION );
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		float protection;
+		if ( cb->armorTiered ) {
+			if ( selfDamage ) {
+				protection = cb->armorSelfProtection;
+			} else {
+				protection = GP_ArmorProtection( cb, client->ps.stats[STAT_ARMORTYPE] );
+			}
+		} else {
+			protection = cb->armorProtection;
+		}
+		save = ceil( damage * protection );
+	}
 	if (save >= count)
 		save = count;
 
@@ -722,6 +736,11 @@ int CheckArmor (gentity_t *ent, int damage, int dflags)
 		return 0;
 
 	client->ps.stats[STAT_ARMOR] -= save;
+
+	// reset armor type when armor is fully depleted
+	if ( client->ps.stats[STAT_ARMOR] <= 0 ) {
+		client->ps.stats[STAT_ARMORTYPE] = ARMORTYPE_NONE;
+	}
 
 	return save;
 }
@@ -927,8 +946,31 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	}
 
 	knockback = damage;
-	if ( knockback > 200 ) {
-		knockback = 200;
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		float kbMul = 1.0f;
+		qboolean isSelf = ( targ == attacker );
+
+		// per-weapon knockback multiplier
+		switch ( mod ) {
+		case MOD_GAUNTLET:       kbMul = cb->gauntletKnockback; break;
+		case MOD_SHOTGUN:        kbMul = cb->sgKnockback; break;
+		case MOD_GRENADE:
+		case MOD_GRENADE_SPLASH: kbMul = cb->glKnockback; break;
+		case MOD_ROCKET:         kbMul = isSelf ? cb->rlSelfKnockback : cb->rlKnockback; break;
+		case MOD_ROCKET_SPLASH:  kbMul = isSelf ? cb->rlSelfKnockback : cb->rlKnockback; break;
+		case MOD_LIGHTNING:      kbMul = cb->lgKnockback; break;
+		case MOD_RAILGUN:        kbMul = cb->rgKnockback; break;
+		case MOD_PLASMA:
+		case MOD_PLASMA_SPLASH:  kbMul = isSelf ? cb->pgSelfKnockback : cb->pgKnockback; break;
+		case MOD_GRAPPLE:        kbMul = cb->ghKnockback; break;
+		default: break;
+		}
+		knockback = (int)( knockback * kbMul );
+
+		if ( knockback > cb->maxKnockback ) {
+			knockback = cb->maxKnockback;
+		}
 	}
 	if ( targ->flags & FL_NO_KNOCKBACK ) {
 		knockback = 0;
@@ -996,13 +1038,13 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	}
 
 	// battlesuit protects from all radius damage (but takes knockback)
-	// and protects 50% against all damage
+	// and protects against all damage (VQ3: 50%, CPM: 75%)
 	if ( client && client->ps.powerups[PW_BATTLESUIT] ) {
 		G_AddEvent( targ, EV_POWERUP_BATTLESUIT, 0 );
 		if ( ( dflags & DAMAGE_RADIUS ) || ( mod == MOD_FALLING ) ) {
 			return;
 		}
-		damage *= 0.5;
+		damage *= GP_GetConfig( g_gameplay.integer )->battleSuitProtection;
 	}
 
 	// always give half damage if hurting self
@@ -1017,7 +1059,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	take = damage;
 
 	// save some from armor
-	asave = CheckArmor( targ, take, dflags );
+	asave = CheckArmor( targ, take, dflags, targ == attacker );
 
 	take -= asave;
 
@@ -1280,7 +1322,10 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 			VectorSubtract (ent->r.currentOrigin, origin, dir);
 			// push the center of mass higher than the origin so players
 			// get knocked into the air more
-			dir[2] += 24;
+			{
+				const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+				dir[2] += ( ent == attacker ) ? cb->splashZKnockbackSelf : cb->splashZKnockback;
+			}
 			G_Damage (ent, NULL, attacker, dir, origin, (int)points, DAMAGE_RADIUS, mod);
 		}
 	}

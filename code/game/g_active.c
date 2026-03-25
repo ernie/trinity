@@ -434,8 +434,9 @@ void ClientTimerActions( gentity_t *ent, int msec ) {
 			}
 		}
 
-		// count down armor when over max
-		if ( client->ps.stats[STAT_ARMOR] > client->ps.stats[STAT_MAX_HEALTH] ) {
+		// count down armor when over max (CPM: armor never decays)
+		if ( g_gameplay.integer != GP_CPM
+			&& client->ps.stats[STAT_ARMOR] > client->ps.stats[STAT_MAX_HEALTH] ) {
 			client->ps.stats[STAT_ARMOR]--;
 		}
 	}
@@ -899,7 +900,8 @@ void ClientThink_real( gentity_t *ent ) {
 
 	pm.pmove_fixed = pmove_fixed.integer;
 	pm.pmove_msec = pmove_msec.integer;
-	pm.pmove_physics = g_physics.integer;
+	pm.pmove_movement = g_movement.integer;
+	pm.pmove_gameplay = g_gameplay.integer;
 
 	VectorCopy( client->ps.origin, client->oldOrigin );
 

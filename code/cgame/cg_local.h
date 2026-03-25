@@ -780,6 +780,12 @@ typedef struct {
 	qhandle_t	armorModel;
 	qhandle_t	armorIcon;
 
+	// per-tier armor media for CPM tiered armor HUD
+	qhandle_t	armorModelGA;
+	qhandle_t	armorModelRA;
+	qhandle_t	armorIconGA;
+	qhandle_t	armorIconRA;
+
 	qhandle_t	teamStatusBar;
 
 	qhandle_t	deferShader;
@@ -900,6 +906,9 @@ typedef struct {
 	qhandle_t	scoreboardPing;
 	qhandle_t	scoreboardScore;
 	qhandle_t	scoreboardTime;
+
+	// mode icons for movement/gameplay display (indexed by pmMovement_t / gameplay_t)
+	qhandle_t	modeIcons[4];
 
 	// medals shown during gameplay
 	qhandle_t	medalImpressive;
@@ -1185,7 +1194,8 @@ typedef struct {
 
 	qboolean		pmove_fixed;
 	int				pmove_msec;
-	int				pmove_physics;
+	int				pmove_movement;
+	int				gameplay;
 
 	qboolean		synchronousClients;
 
@@ -1330,6 +1340,8 @@ extern  char teamChat2[256];
 void CG_AddLagometerFrameInfo( void );
 void CG_AddLagometerSnapshotInfo( snapshot_t *snap );
 void CG_CenterPrint( const char *str, int y, int charWidth );
+qhandle_t CG_GetArmorIcon( void );
+qhandle_t CG_GetArmorModel( void );
 void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles );
 void CG_DrawActive( stereoFrame_t stereoView );
 void CG_DrawFlagModel( float x, float y, float w, float h, int team, qboolean force2D );

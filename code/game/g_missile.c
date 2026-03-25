@@ -1,6 +1,7 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "g_local.h"
+#include "bg_gameplay.h"
 
 #define	MISSILE_PRESTEP_TIME	50
 
@@ -514,9 +515,12 @@ gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.weapon = WP_PLASMAGUN;
 	bolt->r.ownerNum = self->s.number;
 	bolt->parent = self;
-	bolt->damage = 20;
-	bolt->splashDamage = 15;
-	bolt->splashRadius = 20;
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		bolt->damage = cb->pgDamage;
+		bolt->splashDamage = cb->pgSplashDamage;
+		bolt->splashRadius = cb->pgSplashRadius;
+	}
 	bolt->methodOfDeath = MOD_PLASMA;
 	bolt->splashMethodOfDeath = MOD_PLASMA_SPLASH;
 	bolt->clipmask = MASK_SHOT;
@@ -531,7 +535,7 @@ gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
 	SnapVector( bolt->s.pos.trBase );			// save net bandwidth
-	VectorScale( dir, 2000, bolt->s.pos.trDelta );
+	VectorScale( dir, GP_GetConfig( g_gameplay.integer )->pgSpeed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 
 	VectorCopy (start, bolt->r.currentOrigin);
@@ -562,9 +566,12 @@ gentity_t *fire_grenade (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.eFlags = EF_BOUNCE_HALF;
 	bolt->r.ownerNum = self->s.number;
 	bolt->parent = self;
-	bolt->damage = 100;
-	bolt->splashDamage = 100;
-	bolt->splashRadius = 150;
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		bolt->damage = cb->glDamage;
+		bolt->splashDamage = cb->glSplashDamage;
+		bolt->splashRadius = cb->glSplashRadius;
+	}
 	bolt->methodOfDeath = MOD_GRENADE;
 	bolt->splashMethodOfDeath = MOD_GRENADE_SPLASH;
 	bolt->clipmask = MASK_SHOT;
@@ -581,7 +588,7 @@ gentity_t *fire_grenade (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.pos.trType = TR_GRAVITY;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
-	VectorScale( dir, 700, bolt->s.pos.trDelta );
+	VectorScale( dir, GP_GetConfig( g_gameplay.integer )->glSpeed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 
 	VectorCopy (start, bolt->r.currentOrigin);
@@ -611,9 +618,12 @@ gentity_t *fire_bfg (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.weapon = WP_BFG;
 	bolt->r.ownerNum = self->s.number;
 	bolt->parent = self;
-	bolt->damage = 100;
-	bolt->splashDamage = 100;
-	bolt->splashRadius = 120;
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		bolt->damage = cb->bfgDamage;
+		bolt->splashDamage = cb->bfgSplashDamage;
+		bolt->splashRadius = cb->bfgSplashRadius;
+	}
 	bolt->methodOfDeath = MOD_BFG;
 	bolt->splashMethodOfDeath = MOD_BFG_SPLASH;
 	bolt->clipmask = MASK_SHOT;
@@ -631,7 +641,7 @@ gentity_t *fire_bfg (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
 	SnapVector( bolt->s.pos.trBase );			// save net bandwidth
-	VectorScale( dir, 2000, bolt->s.pos.trDelta );
+	VectorScale( dir, GP_GetConfig( g_gameplay.integer )->bfgSpeed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
 
@@ -660,9 +670,12 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.weapon = WP_ROCKET_LAUNCHER;
 	bolt->r.ownerNum = self->s.number;
 	bolt->parent = self;
-	bolt->damage = 100;
-	bolt->splashDamage = 100;
-	bolt->splashRadius = 120;
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		bolt->damage = cb->rlDamage;
+		bolt->splashDamage = cb->rlSplashDamage;
+		bolt->splashRadius = cb->rlSplashRadius;
+	}
 	bolt->methodOfDeath = MOD_ROCKET;
 	bolt->splashMethodOfDeath = MOD_ROCKET_SPLASH;
 	bolt->clipmask = MASK_SHOT;
@@ -680,7 +693,7 @@ gentity_t *fire_rocket (gentity_t *self, vec3_t start, vec3_t dir) {
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
 	SnapVector( bolt->s.pos.trBase );			// save net bandwidth
-	VectorScale( dir, 900, bolt->s.pos.trDelta );
+	VectorScale( dir, GP_GetConfig( g_gameplay.integer )->rlSpeed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, bolt->r.currentOrigin);
 
@@ -708,6 +721,7 @@ gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir) {
 	hook->r.svFlags = SVF_USE_CURRENT_ORIGIN;
 	hook->s.weapon = WP_GRAPPLING_HOOK;
 	hook->r.ownerNum = self->s.number;
+	hook->damage = GP_GetConfig( g_gameplay.integer )->ghDamage;
 	hook->methodOfDeath = MOD_GRAPPLE;
 	hook->clipmask = MASK_SHOT;
 	hook->parent = self;
@@ -744,8 +758,6 @@ gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir) {
 fire_nail
 =================
 */
-#define NAILGUN_SPREAD	500
-
 gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t right, vec3_t up ) {
 	gentity_t	*bolt;
 	vec3_t		dir;
@@ -761,7 +773,7 @@ gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t righ
 	bolt->s.weapon = WP_NAILGUN;
 	bolt->r.ownerNum = self->s.number;
 	bolt->parent = self;
-	bolt->damage = 20;
+	bolt->damage = GP_GetConfig( g_gameplay.integer )->ngDamage;
 	bolt->methodOfDeath = MOD_NAIL;
 	bolt->clipmask = MASK_SHOT;
 	bolt->target_ent = NULL;
@@ -770,17 +782,23 @@ gentity_t *fire_nail( gentity_t *self, vec3_t start, vec3_t forward, vec3_t righ
 	bolt->s.pos.trTime = level.time;
 	VectorCopy( start, bolt->s.pos.trBase );
 
-	r = random() * M_PI * 2.0f;
-	u = sin(r) * crandom() * NAILGUN_SPREAD * 16;
-	r = cos(r) * crandom() * NAILGUN_SPREAD * 16;
-	VectorMA( start, 8192 * 16, forward, end);
-	VectorMA (end, r, right, end);
-	VectorMA (end, u, up, end);
-	VectorSubtract( end, start, dir );
-	VectorNormalize( dir );
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		int spread = cb->ngSpread;
 
-	scale = 555 + random() * 1800;
-	VectorScale( dir, scale, bolt->s.pos.trDelta );
+		r = random() * M_PI * 2.0f;
+		u = sin(r) * crandom() * spread * 16;
+		r = cos(r) * crandom() * spread * 16;
+		VectorMA( start, 8192 * 16, forward, end);
+		VectorMA (end, r, right, end);
+		VectorMA (end, u, up, end);
+		VectorSubtract( end, start, dir );
+		VectorNormalize( dir );
+
+		// ngSpeed 0 = VQ3 random speed, >0 = fixed speed (QL)
+		scale = cb->ngSpeed > 0 ? cb->ngSpeed : 555 + random() * 1800;
+		VectorScale( dir, scale, bolt->s.pos.trDelta );
+	}
 	SnapVector( bolt->s.pos.trDelta );
 
 	VectorCopy( start, bolt->r.currentOrigin );
@@ -810,8 +828,8 @@ gentity_t *fire_prox( gentity_t *self, vec3_t start, vec3_t dir ) {
 	bolt->r.ownerNum = self->s.number;
 	bolt->parent = self;
 	bolt->damage = 0;
-	bolt->splashDamage = 100;
-	bolt->splashRadius = 150;
+	bolt->splashDamage = GP_GetConfig( g_gameplay.integer )->proxSplashDamage;
+	bolt->splashRadius = GP_GetConfig( g_gameplay.integer )->proxSplashRadius;
 	bolt->methodOfDeath = MOD_PROXIMITY_MINE;
 	bolt->splashMethodOfDeath = MOD_PROXIMITY_MINE;
 	bolt->clipmask = MASK_SHOT;
@@ -826,7 +844,7 @@ gentity_t *fire_prox( gentity_t *self, vec3_t start, vec3_t dir ) {
 	bolt->s.pos.trType = TR_GRAVITY;
 	bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, bolt->s.pos.trBase );
-	VectorScale( dir, 700, bolt->s.pos.trDelta );
+	VectorScale( dir, GP_GetConfig( g_gameplay.integer )->glSpeed, bolt->s.pos.trDelta );
 	SnapVector( bolt->s.pos.trDelta );			// save net bandwidth
 
 	VectorCopy (start, bolt->r.currentOrigin);

@@ -160,9 +160,14 @@ void CG_ParseSysteminfo( void ) {
 		cgs.pmove_msec = 33;
 	}
 
-	cgs.pmove_physics = atoi( Info_ValueForKey( info, "g_physics" ) );
-	if ( cgs.pmove_physics < PM_PHYSICS_VQ3 || cgs.pmove_physics > PM_PHYSICS_QLT ) {
-		cgs.pmove_physics = PM_PHYSICS_VQ3;
+	cgs.pmove_movement = atoi( Info_ValueForKey( info, "g_movement" ) );
+	if ( cgs.pmove_movement < PM_MOVEMENT_VQ3 || cgs.pmove_movement > PM_MOVEMENT_QLT ) {
+		cgs.pmove_movement = PM_MOVEMENT_VQ3;
+	}
+
+	cgs.gameplay = atoi( Info_ValueForKey( info, "g_gameplay" ) );
+	if ( cgs.gameplay < GP_VQ3 || cgs.gameplay > GP_QL ) {
+		cgs.gameplay = GP_VQ3;
 	}
 
 	cgs.synchronousClients = ( atoi( Info_ValueForKey( info, "g_synchronousClients" ) ) ) ? qtrue : qfalse;

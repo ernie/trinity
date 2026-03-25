@@ -37,10 +37,26 @@ itemDef {
 	itemDef {
 		name options
 		group grpOptions
-		text "Physics:"
+		text "Movement:"
 		type ITEM_TYPE_MULTI
-		cvar "ui_physics"
+		cvar "ui_movement"
 		cvarFloatList { "Vanilla Quake 3" 0 "CPMA" 1 "Quake Live" 2 "Quake Live Turbo" 3 }
+		rect 30 55 210 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+	}
+
+	itemDef {
+		name options
+		group grpOptions
+		text "Gameplay:"
+		type ITEM_TYPE_MULTI
+		cvar "ui_gameplay"
+		cvarFloatList { "Vanilla Quake 3" 0 "CPMA" 1 "Quake Live" 2 }
 		rect 30 75 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
@@ -173,24 +189,9 @@ itemDef {
       		name options
 		group grpOptions
       		type ITEM_TYPE_YESNO
-		text "Draw Gun:"
-		cvar "cg_drawGun"
-		rect 30 255 210 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
-		textscale .3
-      		forecolor 1 1 1 1
-      		visible 1
-    		}
-
-	itemDef {
-      		name options
-		group grpOptions
-      		type ITEM_TYPE_YESNO
 		text "Force Player Models:"
 		cvar "cg_forceModel"
-		rect 30 275 210 20
+		rect 30 255 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -205,7 +206,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Draw Team Overlay:"
 		cvar "cg_drawTeamOverlay"
-		rect 30 295 210 20
+		rect 30 275 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -220,7 +221,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Show Time:"
 		cvar "cg_drawTimer"
-		rect 30 315 210 20
+		rect 30 295 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -236,7 +237,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "cg_followMode"
 		cvarFloatList { "First-person" 0 "Orbit" 1 }
-		rect 30 335 210 20
+		rect 30 315 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20

@@ -4,6 +4,7 @@
 // active (after loading) gameplay
 
 #include "cg_local.h"
+#include "../game/bg_gameplay.h"
 
 #ifdef MISSIONPACK
 #include "../ui/ui_shared.h"
@@ -552,6 +553,36 @@ void CG_DrawTeamBackground( int x, int y, int w, int h, float alpha, int team )
 
 /*
 ================
+CG_GetArmorIcon / CG_GetArmorModel
+Returns the appropriate armor icon/model for the current armor type in CPM mode.
+================
+*/
+qhandle_t CG_GetArmorIcon( void ) {
+	if ( cgs.gameplay == GP_CPM ) {
+		switch ( cg.snap->ps.stats[STAT_ARMORTYPE] ) {
+		case ARMORTYPE_RA: return cgs.media.armorIconRA;
+		case ARMORTYPE_YA: return cgs.media.armorIcon;
+		case ARMORTYPE_GA: return cgs.media.armorIconGA;
+		default:           return cgs.media.armorIconGA;
+		}
+	}
+	return cgs.media.armorIcon;
+}
+
+qhandle_t CG_GetArmorModel( void ) {
+	if ( cgs.gameplay == GP_CPM ) {
+		switch ( cg.snap->ps.stats[STAT_ARMORTYPE] ) {
+		case ARMORTYPE_RA: return cgs.media.armorModelRA;
+		case ARMORTYPE_YA: return cgs.media.armorModel;
+		case ARMORTYPE_GA: return cgs.media.armorModelGA;
+		default:           return cgs.media.armorModelGA;
+		}
+	}
+	return cgs.media.armorModel;
+}
+
+/*
+================
 CG_DrawStatusBar
 ================
 */
@@ -618,7 +649,7 @@ static void CG_DrawStatusBar( void ) {
 		origin[2] = -10;
 		angles[YAW] = ( cg.time & 2047 ) * 360 / 2048.0;
 		CG_Draw3DModel( 370 + CHAR_WIDTH*3 + TEXT_ICON_SPACE, y, ICON_SIZE, ICON_SIZE,
-					   cgs.media.armorModel, 0, origin, angles );
+					   CG_GetArmorModel(), 0, origin, angles );
 	}
 #ifdef MISSIONPACK
 	if( cgs.gametype == GT_HARVESTER ) {
@@ -716,7 +747,7 @@ static void CG_DrawStatusBar( void ) {
 		trap_R_SetColor( NULL );
 		// if we didn't draw a 3D icon, draw a 2D icon for armor
 		if ( !cg_draw3dIcons.integer && cg_drawIcons.integer ) {
-			CG_DrawPic( 370 + CHAR_WIDTH*3 + TEXT_ICON_SPACE, y, ICON_SIZE, ICON_SIZE, cgs.media.armorIcon );
+			CG_DrawPic( 370 + CHAR_WIDTH*3 + TEXT_ICON_SPACE, y, ICON_SIZE, ICON_SIZE, CG_GetArmorIcon() );
 		}
 	}
 
@@ -1148,6 +1179,49 @@ static float CG_DrawVRFollowIcon( float y ) {
 }
 
 /*
+=================
+CG_DrawModeIndicators
+
+Shows movement and gameplay mode icons in the upper-right when the scoreboard is visible.
+=================
+*/
+static float CG_DrawModeIndicators( float y ) {
+	int		iconSize = 20;
+	int		pad = 4;
+	int		x;
+	vec4_t	color = { 1, 1, 1, 1 };
+
+	if ( !cg.showScores ) {
+		return y;
+	}
+
+	x = cgs.screenXmax - pad;
+
+	// gameplay: G [icon]  (rightmost)
+	x -= iconSize;
+	if ( cgs.gameplay >= GP_VQ3 && cgs.gameplay <= GP_QL ) {
+		CG_DrawPic( x, y, iconSize, iconSize, cgs.media.modeIcons[cgs.gameplay] );
+	}
+	x -= pad;
+	x -= BIGCHAR_WIDTH;
+	CG_DrawString( x, y + 2, "G", color, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW );
+
+	x -= pad * 2;
+
+	// movement: M [icon]
+	x -= iconSize;
+	if ( cgs.pmove_movement >= PM_MOVEMENT_VQ3 && cgs.pmove_movement <= PM_MOVEMENT_QLT ) {
+		CG_DrawPic( x, y, iconSize, iconSize, cgs.media.modeIcons[cgs.pmove_movement] );
+	}
+	x -= pad;
+	x -= BIGCHAR_WIDTH;
+	CG_DrawString( x, y + 2, "M", color, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW );
+
+	return y + iconSize + 4;
+}
+
+
+/*
 =====================
 CG_DrawUpperRight
 
@@ -1180,6 +1254,7 @@ static void CG_DrawUpperRight(stereoFrame_t stereoFrame)
 	if ( CG_IsVRFollow() ) {
 		y = CG_DrawVRFollowIcon( y );
 	}
+	y = CG_DrawModeIndicators( y );
 }
 
 

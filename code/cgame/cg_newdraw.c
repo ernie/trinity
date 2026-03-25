@@ -139,8 +139,6 @@ void CG_SelectPrevPlayer( void ) {
 
 
 static void CG_DrawPlayerArmorIcon( rectDef_t *rect, qboolean draw2D ) {
-	centity_t	*cent;
-	playerState_t	*ps;
 	vec3_t		angles;
 	vec3_t		origin;
 
@@ -148,21 +146,16 @@ static void CG_DrawPlayerArmorIcon( rectDef_t *rect, qboolean draw2D ) {
 		return;
 	}
 
-	cent = &cg_entities[cg.snap->ps.clientNum];
-	ps = &cg.snap->ps;
-
-	if ( draw2D || ( !cg_draw3dIcons.integer && cg_drawIcons.integer) ) { // bk001206 - parentheses
-		CG_DrawPic( rect->x, rect->y + rect->h/2 + 1, rect->w, rect->h, cgs.media.armorIcon );
-  } else if (cg_draw3dIcons.integer) {
-	  VectorClear( angles );
-    origin[0] = 90;
-  	origin[1] = 0;
-  	origin[2] = -10;
-  	angles[YAW] = ( cg.time & 2047 ) * 360 / 2048.0;
-  
-    CG_Draw3DModel( rect->x, rect->y, rect->w, rect->h, cgs.media.armorModel, 0, origin, angles );
-  }
-
+	if ( draw2D || ( !cg_draw3dIcons.integer && cg_drawIcons.integer) ) {
+		CG_DrawPic( rect->x, rect->y + rect->h/2 + 1, rect->w, rect->h, CG_GetArmorIcon() );
+	} else if (cg_draw3dIcons.integer) {
+		VectorClear( angles );
+		origin[0] = 90;
+		origin[1] = 0;
+		origin[2] = -10;
+		angles[YAW] = ( cg.time & 2047 ) * 360 / 2048.0;
+		CG_Draw3DModel( rect->x, rect->y + rect->h/2 + 1, rect->w, rect->h, CG_GetArmorModel(), 0, origin, angles );
+	}
 }
 
 static void CG_DrawPlayerArmorValue(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle) {

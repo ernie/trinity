@@ -6,6 +6,7 @@
 #include "q_shared.h"
 #include "bg_public.h"
 #include "bg_local.h"
+#include "bg_gameplay.h"
 
 pmove_t		*pm;
 pml_t		pml;
@@ -370,13 +371,13 @@ static qboolean PM_CheckJump( void ) {
 	pml.walking = qfalse;
 
 	// QL/PQL: auto-hop (skip PMF_JUMP_HELD so holding jump re-jumps on landing)
-	if ( pm->pmove_physics != PM_PHYSICS_QL && pm->pmove_physics != PM_PHYSICS_QLT ) {
+	if ( pm->pmove_movement != PM_MOVEMENT_QL && pm->pmove_movement != PM_MOVEMENT_QLT ) {
 		pm->ps->pm_flags |= PMF_JUMP_HELD;
 	}
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
 
-	if ( pm->pmove_physics == PM_PHYSICS_CPM ) {
+	if ( pm->pmove_movement == PM_MOVEMENT_CPM ) {
 		// ramp jump: additive when moving up, hard set otherwise
 		if ( pm->ps->velocity[2] > 0 ) {
 			pm->ps->velocity[2] += JUMP_VELOCITY;
@@ -388,8 +389,8 @@ static qboolean PM_CheckJump( void ) {
 			pm->ps->velocity[2] += 100;
 		}
 		pm->ps->stats[STAT_JUMPTIME] = 400;
-	} else if ( pm->pmove_physics == PM_PHYSICS_QL || pm->pmove_physics == PM_PHYSICS_QLT ) {
-		if ( pm->pmove_physics == PM_PHYSICS_QLT && pm->ps->velocity[2] > 0 ) {
+	} else if ( pm->pmove_movement == PM_MOVEMENT_QL || pm->pmove_movement == PM_MOVEMENT_QLT ) {
+		if ( pm->pmove_movement == PM_MOVEMENT_QLT && pm->ps->velocity[2] > 0 ) {
 			pm->ps->velocity[2] += 275;	// PQL ramp jump: additive when moving up
 		} else {
 			pm->ps->velocity[2] = 275;		// QL/PQL jump velocity
@@ -698,7 +699,7 @@ static void PM_AirMove( void ) {
 	wishspeed *= scale;
 
 	// not on ground, so little effect on velocity
-	if ( pm->pmove_physics == PM_PHYSICS_CPM || pm->pmove_physics == PM_PHYSICS_QLT ) {
+	if ( pm->pmove_movement == PM_MOVEMENT_CPM || pm->pmove_movement == PM_MOVEMENT_QLT ) {
 		float wishspeed2 = wishspeed;
 		float accel;
 
@@ -1582,7 +1583,7 @@ static void PM_BeginWeaponChange( int weapon ) {
 
 	PM_AddEvent( EV_CHANGE_WEAPON );
 	pm->ps->weaponstate = WEAPON_DROPPING;
-	pm->ps->weaponTime += 200;
+	pm->ps->weaponTime += GP_GetConfig( pm->pmove_gameplay )->weaponDropTime;
 	PM_StartTorsoAnim( TORSO_DROP );
 }
 
@@ -1607,7 +1608,7 @@ static void PM_FinishWeaponChange( void ) {
 	pm->ps->weapon = weapon;
 	pm->ps->weaponstate = WEAPON_RAISING;
 	pm->ps->eFlags &= ~EF_FIRING;
-	pm->ps->weaponTime += 250;
+	pm->ps->weaponTime += GP_GetConfig( pm->pmove_gameplay )->weaponRaiseTime;
 	PM_StartTorsoAnim( TORSO_RAISE );
 }
 
@@ -1733,7 +1734,7 @@ static void PM_Weapon( void ) {
 	// check for out of ammo
 	if ( ! pm->ps->ammo[ pm->ps->weapon ] ) {
 		PM_AddEvent( EV_NOAMMO );
-		pm->ps->weaponTime += 500;
+		pm->ps->weaponTime += GP_GetConfig( pm->pmove_gameplay )->noAmmoTime;
 		return;
 	}
 
@@ -1745,49 +1746,26 @@ static void PM_Weapon( void ) {
 	// fire weapon
 	PM_AddEvent( EV_FIRE_WEAPON );
 
-	switch( pm->ps->weapon ) {
-	default:
-	case WP_GAUNTLET:
-		addTime = 400;
-		break;
-	case WP_LIGHTNING:
-		addTime = 50;
-		break;
-	case WP_SHOTGUN:
-		addTime = 1000;
-		break;
-	case WP_MACHINEGUN:
-		addTime = 100;
-		break;
-	case WP_GRENADE_LAUNCHER:
-		addTime = 800;
-		break;
-	case WP_ROCKET_LAUNCHER:
-		addTime = 800;
-		break;
-	case WP_PLASMAGUN:
-		addTime = 100;
-		break;
-	case WP_RAILGUN:
-		addTime = 1500;
-		break;
-	case WP_BFG:
-		addTime = 200;
-		break;
-	case WP_GRAPPLING_HOOK:
-		addTime = 400;
-		break;
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( pm->pmove_gameplay );
+		switch( pm->ps->weapon ) {
+		default:
+		case WP_GAUNTLET:			addTime = cb->gauntletFireTime; break;
+		case WP_LIGHTNING:			addTime = cb->lgFireTime; break;
+		case WP_SHOTGUN:			addTime = cb->sgFireTime; break;
+		case WP_MACHINEGUN:			addTime = cb->mgFireTime; break;
+		case WP_GRENADE_LAUNCHER:	addTime = cb->glFireTime; break;
+		case WP_ROCKET_LAUNCHER:	addTime = cb->rlFireTime; break;
+		case WP_PLASMAGUN:			addTime = cb->pgFireTime; break;
+		case WP_RAILGUN:			addTime = cb->rgFireTime; break;
+		case WP_BFG:				addTime = cb->bfgFireTime; break;
+		case WP_GRAPPLING_HOOK:		addTime = 400; break;
 #ifdef MISSIONPACK
-	case WP_NAILGUN:
-		addTime = 1000;
-		break;
-	case WP_PROX_LAUNCHER:
-		addTime = 800;
-		break;
-	case WP_CHAINGUN:
-		addTime = 30;
-		break;
+		case WP_NAILGUN:			addTime = cb->ngFireTime; break;
+		case WP_PROX_LAUNCHER:		addTime = cb->proxFireTime; break;
+		case WP_CHAINGUN:			addTime = cb->cgFireTime; break;
 #endif
+		}
 	}
 
 #ifdef MISSIONPACK
@@ -1947,14 +1925,14 @@ void PmoveSingle (pmove_t *pmove) {
 	pm = pmove;
 
 	// set physics parameters based on mode
-	switch ( pm->pmove_physics ) {
-	case PM_PHYSICS_CPM:
+	switch ( pm->pmove_movement ) {
+	case PM_MOVEMENT_CPM:
 		pm_accelerate = 15.0f;
 		pm_friction = 8.0f;
 		break;
-	case PM_PHYSICS_QL:
-	case PM_PHYSICS_QLT:
-	default:	// PM_PHYSICS_VQ3
+	case PM_MOVEMENT_QL:
+	case PM_MOVEMENT_QLT:
+	default:	// PM_MOVEMENT_VQ3
 		pm_accelerate = 10.0f;
 		pm_friction = 6.0f;
 		break;

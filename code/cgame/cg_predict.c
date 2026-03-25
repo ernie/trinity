@@ -6,6 +6,7 @@
 // It also handles local physics interaction, like fragments bouncing off walls
 
 #include "cg_local.h"
+#include "../game/bg_gameplay.h"
 
 static	pmove_t		cg_pmove;
 
@@ -320,11 +321,51 @@ void CG_PlayDroppedEvents( playerState_t *ps, playerState_t *ops ) {
 
 
 static void CG_AddArmor( const gitem_t *item, int quantity ) {
+	const gameplayConfig_t *cb = GP_GetConfig( cgs.gameplay );
+	playerState_t *ps = &cg.predictedPlayerState;
 
-	cg.predictedPlayerState.stats[STAT_ARMOR] += quantity;
+	if ( cb->armorTiered ) {
+		int curType = ps->stats[STAT_ARMORTYPE];
+		int curArmor = ps->stats[STAT_ARMOR];
+		int newType, pickupValue, maxArmor, converted;
 
-		if ( cg.predictedPlayerState.stats[STAT_ARMOR] > cg.predictedPlayerState.stats[STAT_MAX_HEALTH]*2 )
-			cg.predictedPlayerState.stats[STAT_ARMOR] = cg.predictedPlayerState.stats[STAT_MAX_HEALTH]*2;
+		if ( item->quantity == 100 ) {
+			newType = ARMORTYPE_RA;
+			pickupValue = cb->armorRAPickupValue;
+			maxArmor = cb->armorRAMax;
+		} else if ( item->quantity == 50 ) {
+			newType = ARMORTYPE_YA;
+			pickupValue = cb->armorYAPickupValue;
+			maxArmor = cb->armorYAMax;
+		} else if ( item->quantity == 25 ) {
+			newType = ARMORTYPE_GA;
+			pickupValue = cb->armorGAPickupValue;
+			maxArmor = cb->armorGAMax;
+		} else {
+			// shard
+			if ( curArmor <= 0 ) {
+				ps->stats[STAT_ARMORTYPE] = ARMORTYPE_GA;
+			}
+			ps->stats[STAT_ARMOR] = curArmor + cb->armorShardValue;
+			maxArmor = GP_ArmorMax( cb, ps->stats[STAT_ARMORTYPE] );
+			if ( ps->stats[STAT_ARMOR] > maxArmor ) {
+				ps->stats[STAT_ARMOR] = maxArmor;
+			}
+			return;
+		}
+
+		converted = GP_ConvertArmor( cb, curArmor, curType, newType );
+		converted += pickupValue;
+		if ( converted > maxArmor ) {
+			converted = maxArmor;
+		}
+		ps->stats[STAT_ARMOR] = converted;
+		ps->stats[STAT_ARMORTYPE] = newType;
+	} else {
+		ps->stats[STAT_ARMOR] += item->quantity;
+		if ( ps->stats[STAT_ARMOR] > ps->stats[STAT_MAX_HEALTH]*2 )
+			ps->stats[STAT_ARMOR] = ps->stats[STAT_MAX_HEALTH]*2;
+	}
 }
 
 
@@ -335,8 +376,9 @@ static void CG_AddAmmo( int weapon, int count )
 	} else {
 		cg.predictedPlayerState.ammo[weapon] += count;
 		if ( weapon >= WP_MACHINEGUN && weapon <= WP_BFG ) {
-			if ( cg.predictedPlayerState.ammo[weapon] > AMMO_HARD_LIMIT ) {
-				cg.predictedPlayerState.ammo[weapon] = AMMO_HARD_LIMIT;
+			int max = GP_GetAmmoMax( GP_GetConfig( cgs.gameplay ), weapon );
+			if ( cg.predictedPlayerState.ammo[weapon] > max ) {
+				cg.predictedPlayerState.ammo[weapon] = max;
 			}
 		}
 	}
@@ -496,7 +538,7 @@ static void CG_TouchItem( centity_t *cent ) {
 		return;
 	}
 
-	if ( !BG_CanItemBeGrabbed( cgs.gametype, &cent->currentState, &cg.predictedPlayerState ) ) {
+	if ( !BG_CanItemBeGrabbed( cgs.gametype, cgs.gameplay, &cent->currentState, &cg.predictedPlayerState ) ) {
 		return;	// can't hold it
 	}
 
@@ -649,7 +691,9 @@ static void CG_CheckTimers( void ) {
 				cg.predictedPlayerState.stats[ STAT_HEALTH ]--;
 			}
 		}
-		if ( cg.predictedPlayerState.stats[ STAT_ARMOR ] > cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ] ) {
+		// count down armor when over max (CPM: armor never decays)
+		if ( cgs.gameplay != GP_CPM
+			&& cg.predictedPlayerState.stats[ STAT_ARMOR ] > cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ] ) {
 			cg.predictedPlayerState.stats[ STAT_ARMOR ]--;
 		}
 	}
@@ -798,8 +842,10 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 		}
 
 	}
-	// armor countdown?
-	if ( pps->stats[ STAT_ARMOR ] == ps->stats[ STAT_ARMOR ] - 1 && ps->stats[ STAT_ARMOR ] >= ps->stats[ STAT_MAX_HEALTH ] ) {
+	// armor countdown? (CPM: armor never decays)
+	if ( cgs.gameplay != GP_CPM
+		&& pps->stats[ STAT_ARMOR ] == ps->stats[ STAT_ARMOR ] - 1
+		&& ps->stats[ STAT_ARMOR ] >= ps->stats[ STAT_MAX_HEALTH ] ) {
 		// we may need few frames to sync with client->timeResidual on server side
 		cg.timeResidual = ps->commandTime + 1000;
 		for ( n = 0 ; n < NUM_SAVED_STATES; n++ ) {
@@ -972,7 +1018,8 @@ void CG_PredictPlayerState( void ) {
 
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
-	cg_pmove.pmove_physics = cgs.pmove_physics;
+	cg_pmove.pmove_movement = cgs.pmove_movement;
+	cg_pmove.pmove_gameplay = cgs.gameplay;
 
 	// clean event stack
 	eventStack = 0;
@@ -982,7 +1029,8 @@ void CG_PredictPlayerState( void ) {
 
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
-	cg_pmove.pmove_physics = cgs.pmove_physics;
+	cg_pmove.pmove_movement = cgs.pmove_movement;
+	cg_pmove.pmove_gameplay = cgs.gameplay;
 
 	// Like the comments described above, a player's state is entirely
 	// re-predicted from the last valid snapshot every client frame, which

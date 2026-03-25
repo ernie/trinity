@@ -2,6 +2,7 @@
 //
 // cg_weapons.c -- events and effects dealing with weapons
 #include "cg_local.h"
+#include "../game/bg_gameplay.h"
 
 /*
 ==========================
@@ -1055,10 +1056,10 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 	VectorMA( muzzlePoint, 14, forward, muzzlePoint );
 
 	// project forward by the lightning range
-	VectorMA( muzzlePoint, LIGHTNING_RANGE, forward, endPoint );
+	VectorMA( muzzlePoint, GP_GetConfig( cgs.gameplay )->lgRange, forward, endPoint );
 
 	// see if it hit a wall
-	CG_Trace( &trace, muzzlePoint, vec3_origin, vec3_origin, endPoint, 
+	CG_Trace( &trace, muzzlePoint, vec3_origin, vec3_origin, endPoint,
 		cent->currentState.number, MASK_SHOT );
 
 	// this is the endpoint
@@ -2211,15 +2212,52 @@ static void CG_ShotgunPattern( vec3_t origin, vec3_t origin2, int seed, int othe
 	PerpendicularVector( right, forward );
 	CrossProduct( forward, right, up );
 
-	// generate the "random" spread pattern
-	for ( i = 0 ; i < DEFAULT_SHOTGUN_COUNT ; i++ ) {
-		r = Q_crandom( &seed ) * DEFAULT_SHOTGUN_SPREAD * 16;
-		u = Q_crandom( &seed ) * DEFAULT_SHOTGUN_SPREAD * 16;
-		VectorMA( origin, 8192 * 16, forward, end);
-		VectorMA (end, r, right, end);
-		VectorMA (end, u, up, end);
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( cgs.gameplay );
+		float angle, radius;
+		int ring, ringIndex;
+		int trueSG = cg_trueShotgun.integer;
 
-		CG_ShotgunPellet( origin, end, otherEntNum );
+		// generate spread pattern
+		for ( i = 0 ; i < cb->sgCount ; i++ ) {
+			if ( cb->sgPatternType == 2 ) {
+				// CPM dual-ring pattern: 8 inner + 8 outer, offset 22.5°
+				ring = ( i < 8 ) ? 0 : 1;
+				ringIndex = ( i < 8 ) ? i : i - 8;
+				radius = ring ? (float)cb->sgSpread * 16.0f : (float)cb->sgSpread * 16.0f * 0.40f;
+				angle = 2.0f * M_PI * ringIndex / 8.0f + ( M_PI / 8.0f );
+				r = cos( angle ) * radius;
+				u = sin( angle ) * radius;
+			} else if ( cb->sgPatternType == 1 && trueSG > 0 ) {
+				// QL ring pattern: 3 concentric rings (inner 6, middle 6, outer 8)
+				if ( i < 6 ) {
+					ring = 0; ringIndex = i;
+				} else if ( i < 12 ) {
+					ring = 1; ringIndex = i - 6;
+				} else {
+					ring = 2; ringIndex = i - 12;
+				}
+				radius = (float)cb->sgSpread * 16.0f * ( ring + 1 ) / 3.0f;
+				if ( ring == 0 ) {
+					angle = 2.0f * M_PI * ringIndex / 6.0f;
+				} else if ( ring == 1 ) {
+					angle = 2.0f * M_PI * ringIndex / 6.0f - ( 25.0f * M_PI / 180.0f );
+				} else {
+					angle = 2.0f * M_PI * ringIndex / 8.0f;
+				}
+				r = cos( angle ) * radius;
+				u = sin( angle ) * radius;
+			} else {
+				// VQ3 random spread, or QL with cg_trueShotgun 0 (cosmetic random)
+				r = Q_crandom( &seed ) * cb->sgSpread * 16;
+				u = Q_crandom( &seed ) * cb->sgSpread * 16;
+			}
+			VectorMA( origin, 8192 * 16, forward, end);
+			VectorMA (end, r, right, end);
+			VectorMA (end, u, up, end);
+
+			CG_ShotgunPellet( origin, end, otherEntNum );
+		}
 	}
 }
 

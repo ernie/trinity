@@ -1,6 +1,7 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "g_local.h"
+#include "bg_gameplay.h"
 
 // g_client.c -- client functions that don't happen every frame
 
@@ -1122,10 +1123,13 @@ void ClientSpawn(gentity_t *ent) {
 	client->ps.clientNum = index;
 
 	client->ps.stats[STAT_WEAPONS] = ( 1 << WP_MACHINEGUN );
-	if ( g_gametype.integer == GT_TEAM ) {
-		client->ps.ammo[WP_MACHINEGUN] = 50;
-	} else {
-		client->ps.ammo[WP_MACHINEGUN] = 100;
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		if ( g_gametype.integer == GT_TEAM ) {
+			client->ps.ammo[WP_MACHINEGUN] = cb->mgStartAmmoTeam;
+		} else {
+			client->ps.ammo[WP_MACHINEGUN] = cb->mgStartAmmo;
+		}
 	}
 
 	client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_GAUNTLET );
@@ -1133,7 +1137,10 @@ void ClientSpawn(gentity_t *ent) {
 	client->ps.ammo[WP_GRAPPLING_HOOK] = -1;
 
 	// health will count down towards max_health
-	ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
+	{
+		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + cb->spawnHealthBonus;
+	}
 
 	G_SetOrigin( ent, spawn_origin );
 	VectorCopy( spawn_origin, client->ps.origin );

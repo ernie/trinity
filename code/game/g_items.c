@@ -1,6 +1,7 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "g_local.h"
+#include "bg_gameplay.h"
 
 /*
 
@@ -37,10 +38,14 @@
 
 //======================================================================
 
-int SpawnTime( gentity_t *ent, qboolean firstSpawn ) 
+int SpawnTime( gentity_t *ent, qboolean firstSpawn )
 {
+	const gameplayConfig_t *cb;
+
 	if ( !ent->item )
 		return 0;
+
+	cb = GP_GetConfig( g_gameplay.integer );
 
 	switch( ent->item->giType ) {
 	case IT_WEAPON:
@@ -52,19 +57,27 @@ int SpawnTime( gentity_t *ent, qboolean firstSpawn )
 			return g_weaponRespawn.value * 1000 ;
 
 	case IT_AMMO:
-		return firstSpawn ? SPAWN_AMMO : RESPAWN_AMMO;
+		return firstSpawn ? SPAWN_AMMO : cb->respawnAmmo * 1000;
 
 	case IT_ARMOR:
-		return firstSpawn ? SPAWN_ARMOR : RESPAWN_ARMOR;
+		return firstSpawn ? SPAWN_ARMOR : cb->respawnArmor * 1000;
 
 	case IT_HEALTH:
 		if ( ent->item->quantity == 100 ) // mega health respawns slow
-			return firstSpawn ? SPAWN_MEGAHEALTH : RESPAWN_MEGAHEALTH;
+			return firstSpawn ? SPAWN_MEGAHEALTH : cb->respawnMegahealth * 1000;
 		else
-			return firstSpawn ? SPAWN_HEALTH : RESPAWN_HEALTH;
+			return firstSpawn ? SPAWN_HEALTH : cb->respawnHealth * 1000;
 
 	case IT_POWERUP:
-		return firstSpawn ? SPAWN_POWERUP : RESPAWN_POWERUP;
+		{
+			if ( firstSpawn ) {
+				// CPM: powerups available immediately at map start
+				return cb->startPowerups ? 0 : SPAWN_POWERUP;
+			}
+			if ( ent->item->giTag == PW_BATTLESUIT )
+				return cb->respawnBattleSuit * 1000;
+			return cb->respawnPowerup * 1000;
+		}
 
 #ifdef MISSIONPACK
 	case IT_PERSISTANT_POWERUP:
@@ -247,8 +260,11 @@ int Pickup_Holdable( gentity_t *ent, gentity_t *other ) {
 static void Add_Ammo( gentity_t *ent, int weapon, int count )
 {
 	ent->client->ps.ammo[weapon] += count;
-	if ( ent->client->ps.ammo[weapon] > AMMO_HARD_LIMIT ) {
-		ent->client->ps.ammo[weapon] = AMMO_HARD_LIMIT;
+	{
+		int max = GP_GetAmmoMax( GP_GetConfig( g_gameplay.integer ), weapon );
+		if ( ent->client->ps.ammo[weapon] > max ) {
+			ent->client->ps.ammo[weapon] = max;
+		}
 	}
 }
 
@@ -260,7 +276,8 @@ static int Pickup_Ammo( gentity_t *ent, gentity_t *other )
 	if ( ent->count ) {
 		quantity = ent->count;
 	} else {
-		quantity = ent->item->quantity;
+		int boxQty = GP_GetAmmoBoxQuantity( GP_GetConfig( g_gameplay.integer ), ent->item->giTag );
+		quantity = boxQty ? boxQty : ent->item->quantity;
 	}
 
 	Add_Ammo( other, ent->item->giTag, quantity );
@@ -315,6 +332,21 @@ static int Pickup_Weapon( gentity_t *ent, gentity_t *other ) {
 
 //======================================================================
 
+#define CPM_MEGARESPAWNDELAY	20
+
+// CPM megahealth: polls every second until the holder drops below 100hp,
+// then schedules a respawn 20s later.
+static void CPM_HealthDecay( gentity_t *ent ) {
+	if ( !ent->activator || !ent->activator->inuse || !ent->activator->client
+		|| ent->activator->health <= 100 ) {
+		ent->nextthink = level.time + CPM_MEGARESPAWNDELAY * 1000;
+		ent->think = RespawnItem;
+		return;
+	}
+	// holder still above 100hp, check again in 1 second
+	ent->nextthink = level.time + 1000;
+}
+
 static int Pickup_Health( gentity_t *ent, gentity_t *other ) {
 	int			max;
 	int			quantity;
@@ -345,11 +377,17 @@ static int Pickup_Health( gentity_t *ent, gentity_t *other ) {
 	}
 	other->client->ps.stats[STAT_HEALTH] = other->health;
 
-	//if ( ent->item->quantity == 100 ) { // mega health respawns slow
-	//	return RESPAWN_MEGAHEALTH;
-	//} else {
-	//	return RESPAWN_HEALTH;
-	//}
+	// CPM megahealth: respawns 20s after holder drops below 100hp
+	if ( ent->item->quantity == 100 && GP_GetConfig( g_gameplay.integer )->megaStyle ) {
+		if ( g_gametype.integer >= GT_TEAM ) {
+			// team modes use standard timer even in CPM
+			return SpawnTime( ent, qfalse );
+		}
+		ent->think = CPM_HealthDecay;
+		ent->activator = other;
+		return 1000;	// check again in 1 second
+	}
+
 	return SpawnTime( ent, qfalse );
 }
 
@@ -357,27 +395,64 @@ static int Pickup_Health( gentity_t *ent, gentity_t *other ) {
 //======================================================================
 
 int Pickup_Armor( gentity_t *ent, gentity_t *other ) {
+	const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+
+	if ( cb->armorTiered ) {
+		// CPM tiered armor system
+		// When changing tiers, convert existing armor based on protection ratios
+		int curType = other->client->ps.stats[STAT_ARMORTYPE];
+		int curArmor = other->client->ps.stats[STAT_ARMOR];
+		int newType, pickupValue, maxArmor, converted;
+
+		if ( ent->item->quantity == 100 ) {
+			newType = ARMORTYPE_RA;
+			pickupValue = cb->armorRAPickupValue;
+			maxArmor = cb->armorRAMax;
+		} else if ( ent->item->quantity == 50 ) {
+			newType = ARMORTYPE_YA;
+			pickupValue = cb->armorYAPickupValue;
+			maxArmor = cb->armorYAMax;
+		} else if ( ent->item->quantity == 25 ) {
+			newType = ARMORTYPE_GA;
+			pickupValue = cb->armorGAPickupValue;
+			maxArmor = cb->armorGAMax;
+		} else {
+			// Shard: add value, cap at current tier's max
+			if ( curArmor <= 0 ) {
+				other->client->ps.stats[STAT_ARMORTYPE] = ARMORTYPE_GA;
+			}
+			other->client->ps.stats[STAT_ARMOR] = curArmor + cb->armorShardValue;
+			maxArmor = GP_ArmorMax( cb, other->client->ps.stats[STAT_ARMORTYPE] );
+			if ( other->client->ps.stats[STAT_ARMOR] > maxArmor ) {
+				other->client->ps.stats[STAT_ARMOR] = maxArmor;
+			}
+			return SpawnTime( ent, qfalse );
+		}
+
+		// convert existing armor to new tier's rate, add pickup, cap
+		converted = GP_ConvertArmor( cb, curArmor, curType, newType );
+		converted += pickupValue;
+		if ( converted > maxArmor ) {
+			converted = maxArmor;
+		}
+		other->client->ps.stats[STAT_ARMOR] = converted;
+		other->client->ps.stats[STAT_ARMORTYPE] = newType;
+	} else {
+		// VQ3/QL flat armor system
+		int upperBound;
 #ifdef MISSIONPACK
-	int		upperBound;
-
-	other->client->ps.stats[STAT_ARMOR] += ent->item->quantity;
-
-	if( other->client && bg_itemlist[other->client->ps.stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
-		upperBound = other->client->ps.stats[STAT_MAX_HEALTH];
-	}
-	else {
-		upperBound = other->client->ps.stats[STAT_MAX_HEALTH] * 2;
-	}
-
-	if ( other->client->ps.stats[STAT_ARMOR] > upperBound ) {
-		other->client->ps.stats[STAT_ARMOR] = upperBound;
-	}
-#else
-	other->client->ps.stats[STAT_ARMOR] += ent->item->quantity;
-	if ( other->client->ps.stats[STAT_ARMOR] > other->client->ps.stats[STAT_MAX_HEALTH] * 2 ) {
-		other->client->ps.stats[STAT_ARMOR] = other->client->ps.stats[STAT_MAX_HEALTH] * 2;
-	}
+		if ( other->client && bg_itemlist[other->client->ps.stats[STAT_PERSISTANT_POWERUP]].giTag == PW_GUARD ) {
+			upperBound = other->client->ps.stats[STAT_MAX_HEALTH];
+		} else
 #endif
+		{
+			upperBound = other->client->ps.stats[STAT_MAX_HEALTH] * 2;
+		}
+		other->client->ps.stats[STAT_ARMOR] += ent->item->quantity;
+		if ( other->client->ps.stats[STAT_ARMOR] > upperBound ) {
+			other->client->ps.stats[STAT_ARMOR] = upperBound;
+		}
+	}
 
 	return SpawnTime( ent, qfalse ); // return RESPAWN_ARMOR;
 }
@@ -480,7 +555,7 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		return;		// dead people can't pickup
 
 	// the same pickup rules are used for client side and server side
-	if ( !BG_CanItemBeGrabbed( g_gametype.integer, &ent->s, &other->client->ps ) ) {
+	if ( !BG_CanItemBeGrabbed( g_gametype.integer, g_gameplay.integer, &ent->s, &other->client->ps ) ) {
 		return;
 	}
 
@@ -568,20 +643,6 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		return;
 	}
 
-	// non zero wait overrides respawn time
-	if ( ent->wait ) {
-		respawn = ent->wait;
-		respawn *= 1000;
-	}
-
-	// random can be used to vary the respawn time
-	if ( ent->random ) {
-		respawn += (crandom() * ent->random) * 1000;
-		if ( respawn < 1000 ) {
-			respawn = 1000;
-		}
-	}
-
 	// dropped items will not respawn
 	if ( ent->flags & FL_DROPPED_ITEM ) {
 		ent->freeAfterEvent = qtrue;
@@ -594,16 +655,36 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 	ent->s.eFlags |= EF_NODRAW;
 	ent->r.contents = 0;
 
-	// ZOID
-	// A negative respawn times means to never respawn this item (but don't 
-	// delete it).  This is used by items that are respawned by third party 
-	// events such as ctf flags
-	if ( respawn <= 0 ) {
-		ent->nextthink = 0;
-		ent->think = 0;
-	} else {
+	// CPM mega health decay
+	// use the respawn value directly, skip wait/random overrides
+	if ( ent->think == CPM_HealthDecay ) {
 		ent->nextthink = level.time + respawn;
-		ent->think = RespawnItem;
+	} else {
+		// non zero wait overrides respawn time
+		if ( ent->wait ) {
+			respawn = ent->wait;
+			respawn *= 1000;
+		}
+
+		// random can be used to vary the respawn time
+		if ( ent->random ) {
+			respawn += (crandom() * ent->random) * 1000;
+			if ( respawn < 1000 ) {
+				respawn = 1000;
+			}
+		}
+
+		// ZOID
+		// A negative respawn times means to never respawn this item (but don't
+		// delete it).  This is used by items that are respawned by third party
+		// events such as ctf flags
+		if ( respawn <= 0 ) {
+			ent->nextthink = 0;
+			ent->think = 0;
+		} else {
+			ent->nextthink = level.time + respawn;
+			ent->think = RespawnItem;
+		}
 	}
 
 	trap_LinkEntity( ent );
@@ -953,6 +1034,13 @@ void G_SpawnItem( gentity_t *ent, gitem_t *item ) {
 	RegisterItem( item );
 
 	if ( G_ItemDisabled( item ) ) {
+		ent->tag = TAG_DONTSPAWN;
+		return;
+	}
+
+	// green armor is CPM-only
+	if ( item->giType == IT_ARMOR && item->quantity == 25
+		&& !GP_GetConfig( g_gameplay.integer )->armorTiered ) {
 		ent->tag = TAG_DONTSPAWN;
 		return;
 	}

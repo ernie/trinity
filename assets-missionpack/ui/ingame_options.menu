@@ -186,14 +186,30 @@ itemDef {
 itemDef {
 	name options
 	group grpOptions
-	text "Physics:"
+	text "Movement:"
 	type ITEM_TYPE_MULTI
-	cvar "ui_physics"
+	cvar "ui_movement"
 	cvarFloatList { "Vanilla Quake 3" 0 "CPMA" 1 "Quake Live" 2 "Quake Live Turbo" 3 }
-	rect 3 20 200 20
+	rect 3 20 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 1
+	}
+
+itemDef {
+	name options
+	group grpOptions
+	text "Gameplay:"
+	type ITEM_TYPE_MULTI
+	cvar "ui_gameplay"
+	cvarFloatList { "Vanilla Quake 3" 0 "CPMA" 1 "Quake Live" 2 }
+	rect 3 37 200 17
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 146
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -205,10 +221,10 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Marks On Walls:"
 	cvar "cg_marks"
-	rect 3 37 200 20
+	rect 3 54 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -219,10 +235,10 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Show Floating Scores:"
 	cvar "cg_scorePlums"
-	rect 3 54 200 20
+	rect 3 71 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -235,10 +251,10 @@ itemDef {
 	text "Ejecting Brass:"
 	cvar "cg_brassTime"
 	cvarFloatList { "High" 2500 "Med" 1250 "Off" 0 }
-	rect 3 71 200 20
+	rect 3 88 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -250,10 +266,10 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Dynamic Lights:"
 	cvar "r_dynamiclight"
-	rect 3 88 200 20
+	rect 3 105 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -265,25 +281,10 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Identify Target:"
 	cvar "cg_drawCrosshairNames"
-	rect 3 105 200 20
+	rect 3 122 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
-	textscale .25
-	forecolor 1 1 1 1
-	visible 1
-	}
-
-	itemDef {
-	name options
-	group grpOptions
-	type ITEM_TYPE_YESNO
-	text "Draw Gun:"
-	cvar "cg_drawGun"
-	rect 3 122 200 20
-	textalign ITEM_ALIGN_RIGHT
-	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -295,10 +296,10 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Force Player Models:"
 	cvar "cg_forceModel"
-	rect 3 139 200 20
+	rect 3 139 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -310,10 +311,10 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Draw Team Overlay:"
 	cvar "cg_drawTeamOverlay"
-	rect 3 156 200 20
+	rect 3 156 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -325,10 +326,10 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Show Time:"
 	cvar "cg_drawTimer"
-	rect 3 173 200 20
+	rect 3 173 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -340,10 +341,10 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Taunts Off:"
 	cvar "cg_noTaunt"
-	rect 3 190 200 20
+	rect 3 190 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -355,10 +356,10 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "In Game Videos:"
 	cvar "r_inGameVideo"
-	rect 3 207 200 20
+	rect 3 207 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -371,10 +372,10 @@ itemDef {
 	text "Statusbar:"
 	cvar "cg_hudfiles"
 	cvarStrList { Normal "ui/hud.txt" Small "ui/hud2.txt" }
-	rect 3 224 200 20
+	rect 3 224 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -400,10 +401,10 @@ itemDef {
 	group grpOptions
 	text "Crosshair Color:"
 	ownerdraw UI_CROSSHAIRCOLOR
-	rect 3 258 200 20
+	rect 3 258 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -415,10 +416,10 @@ itemDef {
 	text "Modern Damage Effect:"
 	type ITEM_TYPE_YESNO
 	cvar "cg_damageEffect"
-	rect 3 275 200 20
+	rect 3 275 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -430,10 +431,10 @@ itemDef {
 	text "Blood Particles:"
 	type ITEM_TYPE_YESNO
 	cvar "cg_bloodParticles"
-	rect 3 292 200 20
+	rect 3 292 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -445,10 +446,10 @@ itemDef {
 	text "Damage Numbers:"
 	type ITEM_TYPE_YESNO
 	cvar "cg_damagePlums"
-	rect 3 309 200 20
+	rect 3 309 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -461,10 +462,10 @@ itemDef {
 	type ITEM_TYPE_MULTI
 	cvar "cg_followMode"
 	cvarFloatList { "First-person" 0 "Orbit" 1 }
-	rect 3 326 200 20
+	rect 3 326 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
@@ -477,10 +478,10 @@ itemDef {
 	type ITEM_TYPE_MULTI
 	cvar "cl_tvDownload"
 	cvarFloatList { "Off" 0 "Decline" 1 "Accept" 2 }
-	rect 3 343 200 20
+	rect 3 343 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
-	textaligny 17
+	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 1
