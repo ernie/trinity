@@ -321,40 +321,40 @@ void CG_PlayDroppedEvents( playerState_t *ps, playerState_t *ops ) {
 
 
 static void CG_AddArmor( const gitem_t *item, int quantity ) {
-	const gameplayConfig_t *cb = GP_GetConfig( cgs.gameplay );
+	const gameplayConfig_t *gp = GP_GetConfig( cgs.gameplay );
 	playerState_t *ps = &cg.predictedPlayerState;
 
-	if ( cb->armorTiered ) {
+	if ( gp->armorTiered ) {
 		int curType = ps->stats[STAT_ARMORTYPE];
 		int curArmor = ps->stats[STAT_ARMOR];
 		int newType, pickupValue, maxArmor, converted;
 
 		if ( item->quantity == 100 ) {
 			newType = ARMORTYPE_RA;
-			pickupValue = cb->armorRAPickupValue;
-			maxArmor = cb->armorRAMax;
+			pickupValue = gp->armorRAPickupValue;
+			maxArmor = gp->armorRAMax;
 		} else if ( item->quantity == 50 ) {
 			newType = ARMORTYPE_YA;
-			pickupValue = cb->armorYAPickupValue;
-			maxArmor = cb->armorYAMax;
+			pickupValue = gp->armorYAPickupValue;
+			maxArmor = gp->armorYAMax;
 		} else if ( item->quantity == 25 ) {
 			newType = ARMORTYPE_GA;
-			pickupValue = cb->armorGAPickupValue;
-			maxArmor = cb->armorGAMax;
+			pickupValue = gp->armorGAPickupValue;
+			maxArmor = gp->armorGAMax;
 		} else {
 			// shard
 			if ( curArmor <= 0 ) {
 				ps->stats[STAT_ARMORTYPE] = ARMORTYPE_GA;
 			}
-			ps->stats[STAT_ARMOR] = curArmor + cb->armorShardValue;
-			maxArmor = GP_ArmorMax( cb, ps->stats[STAT_ARMORTYPE] );
+			ps->stats[STAT_ARMOR] = curArmor + gp->armorShardValue;
+			maxArmor = GP_ArmorMax( gp, ps->stats[STAT_ARMORTYPE] );
 			if ( ps->stats[STAT_ARMOR] > maxArmor ) {
 				ps->stats[STAT_ARMOR] = maxArmor;
 			}
 			return;
 		}
 
-		converted = GP_ConvertArmor( cb, curArmor, curType, newType );
+		converted = GP_ConvertArmor( gp, curArmor, curType, newType );
 		converted += pickupValue;
 		if ( converted > maxArmor ) {
 			converted = maxArmor;

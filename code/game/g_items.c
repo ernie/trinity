@@ -40,12 +40,12 @@
 
 int SpawnTime( gentity_t *ent, qboolean firstSpawn )
 {
-	const gameplayConfig_t *cb;
+	const gameplayConfig_t *gp;
 
 	if ( !ent->item )
 		return 0;
 
-	cb = GP_GetConfig( g_gameplay.integer );
+	gp = GP_GetConfig( g_gameplay.integer );
 
 	switch( ent->item->giType ) {
 	case IT_WEAPON:
@@ -57,26 +57,26 @@ int SpawnTime( gentity_t *ent, qboolean firstSpawn )
 			return g_weaponRespawn.value * 1000 ;
 
 	case IT_AMMO:
-		return firstSpawn ? SPAWN_AMMO : cb->respawnAmmo * 1000;
+		return firstSpawn ? SPAWN_AMMO : gp->respawnAmmo * 1000;
 
 	case IT_ARMOR:
-		return firstSpawn ? SPAWN_ARMOR : cb->respawnArmor * 1000;
+		return firstSpawn ? SPAWN_ARMOR : gp->respawnArmor * 1000;
 
 	case IT_HEALTH:
 		if ( ent->item->quantity == 100 ) // mega health respawns slow
-			return firstSpawn ? SPAWN_MEGAHEALTH : cb->respawnMegahealth * 1000;
+			return firstSpawn ? SPAWN_MEGAHEALTH : gp->respawnMegahealth * 1000;
 		else
-			return firstSpawn ? SPAWN_HEALTH : cb->respawnHealth * 1000;
+			return firstSpawn ? SPAWN_HEALTH : gp->respawnHealth * 1000;
 
 	case IT_POWERUP:
 		{
 			if ( firstSpawn ) {
 				// CPM: powerups available immediately at map start
-				return cb->startPowerups ? 0 : SPAWN_POWERUP;
+				return gp->startPowerups ? 0 : SPAWN_POWERUP;
 			}
 			if ( ent->item->giTag == PW_BATTLESUIT )
-				return cb->respawnBattleSuit * 1000;
-			return cb->respawnPowerup * 1000;
+				return gp->respawnBattleSuit * 1000;
+			return gp->respawnPowerup * 1000;
 		}
 
 #ifdef MISSIONPACK
@@ -297,7 +297,9 @@ static int Pickup_Weapon( gentity_t *ent, gentity_t *other ) {
 		if ( ent->count ) {
 			quantity = ent->count;
 		} else {
-			quantity = ent->item->quantity;
+			qboolean isDuel = ( g_gametype.integer == GT_TOURNAMENT );
+			int initAmmo = GP_GetInitialAmmo( GP_GetConfig( g_gameplay.integer ), ent->item->giTag, isDuel );
+			quantity = initAmmo ? initAmmo : ent->item->quantity;
 		}
 
 		// dropped items and teamplay weapons always have full ammo
@@ -395,9 +397,9 @@ static int Pickup_Health( gentity_t *ent, gentity_t *other ) {
 //======================================================================
 
 int Pickup_Armor( gentity_t *ent, gentity_t *other ) {
-	const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+	const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
 
-	if ( cb->armorTiered ) {
+	if ( gp->armorTiered ) {
 		// CPM tiered armor system
 		// When changing tiers, convert existing armor based on protection ratios
 		int curType = other->client->ps.stats[STAT_ARMORTYPE];
@@ -406,23 +408,23 @@ int Pickup_Armor( gentity_t *ent, gentity_t *other ) {
 
 		if ( ent->item->quantity == 100 ) {
 			newType = ARMORTYPE_RA;
-			pickupValue = cb->armorRAPickupValue;
-			maxArmor = cb->armorRAMax;
+			pickupValue = gp->armorRAPickupValue;
+			maxArmor = gp->armorRAMax;
 		} else if ( ent->item->quantity == 50 ) {
 			newType = ARMORTYPE_YA;
-			pickupValue = cb->armorYAPickupValue;
-			maxArmor = cb->armorYAMax;
+			pickupValue = gp->armorYAPickupValue;
+			maxArmor = gp->armorYAMax;
 		} else if ( ent->item->quantity == 25 ) {
 			newType = ARMORTYPE_GA;
-			pickupValue = cb->armorGAPickupValue;
-			maxArmor = cb->armorGAMax;
+			pickupValue = gp->armorGAPickupValue;
+			maxArmor = gp->armorGAMax;
 		} else {
 			// Shard: add value, cap at current tier's max
 			if ( curArmor <= 0 ) {
 				other->client->ps.stats[STAT_ARMORTYPE] = ARMORTYPE_GA;
 			}
-			other->client->ps.stats[STAT_ARMOR] = curArmor + cb->armorShardValue;
-			maxArmor = GP_ArmorMax( cb, other->client->ps.stats[STAT_ARMORTYPE] );
+			other->client->ps.stats[STAT_ARMOR] = curArmor + gp->armorShardValue;
+			maxArmor = GP_ArmorMax( gp, other->client->ps.stats[STAT_ARMORTYPE] );
 			if ( other->client->ps.stats[STAT_ARMOR] > maxArmor ) {
 				other->client->ps.stats[STAT_ARMOR] = maxArmor;
 			}
@@ -430,7 +432,7 @@ int Pickup_Armor( gentity_t *ent, gentity_t *other ) {
 		}
 
 		// convert existing armor to new tier's rate, add pickup, cap
-		converted = GP_ConvertArmor( cb, curArmor, curType, newType );
+		converted = GP_ConvertArmor( gp, curArmor, curType, newType );
 		converted += pickupValue;
 		if ( converted > maxArmor ) {
 			converted = maxArmor;

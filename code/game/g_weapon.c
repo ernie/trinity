@@ -111,7 +111,7 @@ qboolean CheckGauntletAttack( gentity_t *ent ) {
 	}
 #endif
 
-	damage = GP_GetConfig( g_gameplay.integer )->gauntletDamage * s_quadFactor;
+	damage = GP_GetConfig( g_gameplay.integer )->weapons[WP_GAUNTLET].damage * s_quadFactor;
 	G_Damage( traceEnt, ent, ent, forward, tr.endpos, damage, 0, MOD_GAUNTLET );
 
 	return qtrue;
@@ -292,7 +292,7 @@ static qboolean ShotgunPellet( const vec3_t start, const vec3_t end, gentity_t *
 		}
 
 		if ( traceEnt->takedamage ) {
-			damage = GP_GetConfig( g_gameplay.integer )->sgDamage * s_quadFactor;
+			damage = GP_GetConfig( g_gameplay.integer )->weapons[WP_SHOTGUN].damage * s_quadFactor;
 #ifdef MISSIONPACK
 			if ( traceEnt->client && traceEnt->client->invulnerabilityTime > level.time ) {
 				if (G_InvulnerabilityEffect( traceEnt, forward, tr.endpos, impactpoint, bouncedir )) {
@@ -338,21 +338,21 @@ static void ShotgunPattern( const vec3_t origin, const vec3_t origin2, int seed,
 	G_DoTimeShiftFor( ent );
 
 	{
-		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+		const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
 		float angle, radius;
 		int ring, ringIndex;
 
 		// generate spread pattern
-		for ( i = 0 ; i < cb->sgCount ; i++ ) {
-			if ( cb->sgPatternType == 2 ) {
+		for ( i = 0 ; i < gp->weapons[WP_SHOTGUN].count ; i++ ) {
+			if ( gp->sgPatternType == 2 ) {
 				// CPM dual-ring pattern: 8 inner + 8 outer, offset 22.5° so no pellets at 0/90/180/270
 				ring = ( i < 8 ) ? 0 : 1;
 				ringIndex = ( i < 8 ) ? i : i - 8;
-				radius = ring ? (float)cb->sgSpread * 16.0f : (float)cb->sgSpread * 16.0f * 0.40f;
+				radius = ring ? (float)gp->weapons[WP_SHOTGUN].spread * 16.0f : (float)gp->weapons[WP_SHOTGUN].spread * 16.0f * 0.40f;
 				angle = 2.0f * M_PI * ringIndex / 8.0f + ( M_PI / 8.0f );	// offset 22.5°
 				r = cos( angle ) * radius;
 				u = sin( angle ) * radius;
-			} else if ( cb->sgPatternType == 1 ) {
+			} else if ( gp->sgPatternType == 1 ) {
 				// QL ring pattern: 3 concentric rings (inner 6, middle 6, outer 8)
 				if ( i < 6 ) {
 					ring = 0; ringIndex = i;			// inner ring: 6 pellets at 0°,60°,...
@@ -361,7 +361,7 @@ static void ShotgunPattern( const vec3_t origin, const vec3_t origin2, int seed,
 				} else {
 					ring = 2; ringIndex = i - 12;		// outer ring: 8 pellets at 0°,45°,...
 				}
-				radius = (float)cb->sgSpread * 16.0f * ( ring + 1 ) / 3.0f;
+				radius = (float)gp->weapons[WP_SHOTGUN].spread * 16.0f * ( ring + 1 ) / 3.0f;
 				if ( ring == 0 ) {
 					angle = 2.0f * M_PI * ringIndex / 6.0f;				// 0°, 60°, 120°...
 				} else if ( ring == 1 ) {
@@ -373,8 +373,8 @@ static void ShotgunPattern( const vec3_t origin, const vec3_t origin2, int seed,
 				u = sin( angle ) * radius;
 			} else {
 				// VQ3 random spread
-				r = Q_crandom( &seed ) * cb->sgSpread * 16;
-				u = Q_crandom( &seed ) * cb->sgSpread * 16;
+				r = Q_crandom( &seed ) * gp->weapons[WP_SHOTGUN].spread * 16;
+				u = Q_crandom( &seed ) * gp->weapons[WP_SHOTGUN].spread * 16;
 			}
 			VectorMA( origin, ( 8192.0 * 16.0 ), forward, end );
 			VectorMA( end, r, right, end );
@@ -495,7 +495,7 @@ void weapon_railgun_fire( gentity_t *ent ) {
 	int			passent;
 	gentity_t	*unlinkedEntities[MAX_RAIL_HITS];
 
-	damage = GP_GetConfig( g_gameplay.integer )->rgDamage * s_quadFactor;
+	damage = GP_GetConfig( g_gameplay.integer )->weapons[WP_RAILGUN].damage * s_quadFactor;
 
 	VectorMA( muzzle_origin, 8192.0, forward, end );
 
@@ -676,12 +676,12 @@ void Weapon_LightningFire( gentity_t *ent ) {
 	gentity_t	*traceEnt, *tent;
 	int			damage, i, passent;
 
-	damage = GP_GetConfig( g_gameplay.integer )->lgDamage * s_quadFactor;
+	damage = GP_GetConfig( g_gameplay.integer )->weapons[WP_LIGHTNING].damage * s_quadFactor;
 
 	passent = ent->s.number;
 
 	for (i = 0; i < 10; i++) {
-		VectorMA( muzzle_origin, GP_GetConfig( g_gameplay.integer )->lgRange, forward, end );
+		VectorMA( muzzle_origin, GP_GetConfig( g_gameplay.integer )->weapons[WP_LIGHTNING].range, forward, end );
 
 		// unlagged
 		G_DoTimeShiftFor( ent );
@@ -760,7 +760,7 @@ NAILGUN
 void Weapon_Nailgun_Fire (gentity_t *ent) {
 	gentity_t	*m;
 	int			count;
-	int			nailCount = GP_GetConfig( g_gameplay.integer )->ngCount;
+	int			nailCount = GP_GetConfig( g_gameplay.integer )->weapons[WP_NAILGUN].count;
 
 	for( count = 0; count < nailCount; count++ ) {
 		m = fire_nail (ent, muzzle, forward, right, up );
@@ -854,7 +854,7 @@ void FireWeapon( gentity_t *ent ) {
 	if( ent->s.weapon != WP_GRAPPLING_HOOK && ent->s.weapon != WP_GAUNTLET ) {
 #ifdef MISSIONPACK
 		if( ent->s.weapon == WP_NAILGUN ) {
-			int nc = GP_GetConfig( g_gameplay.integer )->ngCount;
+			int nc = GP_GetConfig( g_gameplay.integer )->weapons[WP_NAILGUN].count;
 			ent->client->accuracy_shots += nc;
 		} else {
 			ent->client->accuracy_shots++;
@@ -882,11 +882,11 @@ void FireWeapon( gentity_t *ent ) {
 		break;
 	case WP_MACHINEGUN:
 		{
-			const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
+			const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
 			if ( g_gametype.integer != GT_TEAM ) {
-				Bullet_Fire( ent, cb->mgSpread, cb->mgDamage, MOD_MACHINEGUN );
+				Bullet_Fire( ent, gp->weapons[WP_MACHINEGUN].spread, gp->weapons[WP_MACHINEGUN].damage, MOD_MACHINEGUN );
 			} else {
-				Bullet_Fire( ent, cb->mgSpread, cb->mgTeamDamage, MOD_MACHINEGUN );
+				Bullet_Fire( ent, gp->weapons[WP_MACHINEGUN].spread, gp->weapons[WP_MACHINEGUN].teamDamage, MOD_MACHINEGUN );
 			}
 		}
 		break;
@@ -917,8 +917,8 @@ void FireWeapon( gentity_t *ent ) {
 		break;
 	case WP_CHAINGUN:
 		{
-			const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
-			Bullet_Fire( ent, cb->cgSpread, cb->cgDamage, MOD_CHAINGUN );
+			const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
+			Bullet_Fire( ent, gp->weapons[WP_CHAINGUN].spread, gp->weapons[WP_CHAINGUN].damage, MOD_CHAINGUN );
 		}
 		break;
 #endif

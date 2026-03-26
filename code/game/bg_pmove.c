@@ -1747,24 +1747,11 @@ static void PM_Weapon( void ) {
 	PM_AddEvent( EV_FIRE_WEAPON );
 
 	{
-		const gameplayConfig_t *cb = GP_GetConfig( pm->pmove_gameplay );
-		switch( pm->ps->weapon ) {
-		default:
-		case WP_GAUNTLET:			addTime = cb->gauntletFireTime; break;
-		case WP_LIGHTNING:			addTime = cb->lgFireTime; break;
-		case WP_SHOTGUN:			addTime = cb->sgFireTime; break;
-		case WP_MACHINEGUN:			addTime = cb->mgFireTime; break;
-		case WP_GRENADE_LAUNCHER:	addTime = cb->glFireTime; break;
-		case WP_ROCKET_LAUNCHER:	addTime = cb->rlFireTime; break;
-		case WP_PLASMAGUN:			addTime = cb->pgFireTime; break;
-		case WP_RAILGUN:			addTime = cb->rgFireTime; break;
-		case WP_BFG:				addTime = cb->bfgFireTime; break;
-		case WP_GRAPPLING_HOOK:		addTime = 400; break;
-#ifdef MISSIONPACK
-		case WP_NAILGUN:			addTime = cb->ngFireTime; break;
-		case WP_PROX_LAUNCHER:		addTime = cb->proxFireTime; break;
-		case WP_CHAINGUN:			addTime = cb->cgFireTime; break;
-#endif
+		const gameplayConfig_t *gp = GP_GetConfig( pm->pmove_gameplay );
+		if ( pm->ps->weapon > WP_NONE && pm->ps->weapon < WP_NUM_WEAPONS ) {
+			addTime = gp->weapons[pm->ps->weapon].fireTime;
+		} else {
+			addTime = gp->weapons[WP_GAUNTLET].fireTime;
 		}
 	}
 

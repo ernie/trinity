@@ -6,133 +6,157 @@
 #include "bg_gameplay.h"
 
 // Balance configurations for each mode.
-// VQ3 values match current hardcoded defaults exactly.
-// CPM values from community sources and testing.
-// QL values from authoritative local QL server cvar dump (verified identical FFA/TDM).
-// QLT is identical to QL for combat (turbo only changes movement physics).
+// VQ3 values match original Quake 3 defaults.
+// CPM values verified against actual CPMA mod (cpma-news.org guide has inaccuracies).
+// QL values from authoritative local QL server cvar dump and in-game testing.
 
 static const gameplayConfig_t gp_configs[] = {
 
 	// ===== GP_VQ3 (0) - Vanilla Quake 3 =====
 	{
-		// damage
-		/* gauntletDamage */	50,
-		/* mgDamage */			7,
-		/* mgTeamDamage */		5,
-		/* mgSpread */			200,
-		/* sgDamage */			10,
-		/* sgCount */			11,
-		/* sgSpread */			700,
+		// weapons[WP_NUM_WEAPONS]
+		{
+		/* WP_NONE */ {
+			/* damage */		0,		/* teamDamage */	0,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		0,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		0,		/* selfKnockback */	0,
+			/* ammoMax */		0,		/* ammoBox */		0,		/* initialAmmo */	0,
+		},
+		/* WP_GAUNTLET */ {
+			/* damage */		50,		/* teamDamage */	50,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		400,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		0,		/* ammoBox */		0,		/* initialAmmo */	0,
+		},
+		/* WP_MACHINEGUN */ {
+			/* damage */		7,		/* teamDamage */	5,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		100,
+			/* count */			0,		/* spread */		200,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		50,		/* initialAmmo */	100,
+		},
+		/* WP_SHOTGUN */ {
+			/* damage */		10,		/* teamDamage */	10,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		1000,
+			/* count */			11,		/* spread */		700,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		10,		/* initialAmmo */	10,
+		},
+		/* WP_GRENADE_LAUNCHER */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	100,	/* splashRadius */	150,
+			/* speed */			700,	/* fireTime */		800,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_ROCKET_LAUNCHER */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	100,	/* splashRadius */	120,
+			/* speed */			900,	/* fireTime */		800,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_LIGHTNING */ {
+			/* damage */		8,		/* teamDamage */	8,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		50,
+			/* count */			0,		/* spread */		0,		/* range */			768,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		60,		/* initialAmmo */	100,
+		},
+		/* WP_RAILGUN */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		1500,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		10,		/* initialAmmo */	10,
+		},
+		/* WP_PLASMAGUN */ {
+			/* damage */		20,		/* teamDamage */	20,
+			/* splashDamage */	15,		/* splashRadius */	20,
+			/* speed */			2000,	/* fireTime */		100,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		30,		/* initialAmmo */	50,
+		},
+		/* WP_BFG */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	100,	/* splashRadius */	120,
+			/* speed */			2000,	/* fireTime */		200,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		15,		/* initialAmmo */	20,
+		},
+		/* WP_GRAPPLING_HOOK */ {
+			/* damage */		0,		/* teamDamage */	0,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		0,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		0,		/* ammoBox */		0,		/* initialAmmo */	0,
+		},
+#ifdef MISSIONPACK
+		/* WP_NAILGUN */ {
+			/* damage */		20,		/* teamDamage */	20,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		1000,
+			/* count */			15,		/* spread */		500,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		20,		/* initialAmmo */	10,
+		},
+		/* WP_PROX_LAUNCHER */ {
+			/* damage */		0,		/* teamDamage */	0,
+			/* splashDamage */	100,	/* splashRadius */	150,
+			/* speed */			700,	/* fireTime */		800,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		10,		/* initialAmmo */	5,
+		},
+		/* WP_CHAINGUN */ {
+			/* damage */		7,		/* teamDamage */	7,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		30,
+			/* count */			0,		/* spread */		600,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		100,	/* initialAmmo */	80,
+		},
+#endif
+		},
 		/* sgPatternType */		0,		// random
-		/* glDamage */			100,
-		/* glSplashDamage */	100,
-		/* glSplashRadius */	150,
-		/* glSpeed */			700,
-		/* rlDamage */			100,
-		/* rlSplashDamage */	100,
-		/* rlSplashRadius */	120,
-		/* rlSpeed */			900,
-		/* lgDamage */			8,
-		/* lgRange */			768,
-		/* rgDamage */			100,
-		/* pgDamage */			20,
-		/* pgSplashDamage */	15,
-		/* pgSplashRadius */	20,
-		/* pgSpeed */			2000,
-		/* bfgDamage */			100,
-		/* bfgSplashDamage */	100,
-		/* bfgSplashRadius */	120,
-		/* bfgSpeed */			2000,
-		/* ghDamage */			0,
-#ifdef MISSIONPACK
-		/* ngDamage */			20,
-		/* ngSpread */			500,
-		/* ngSpeed */			0,		// 0 = random (555-2355)
-		/* ngCount */			15,
-		/* proxSplashDamage */	100,
-		/* proxSplashRadius */	150,
-		/* cgDamage */			7,		// same as MG
-		/* cgSpread */			600,
-#endif
-		// fire rates
-		/* gauntletFireTime */	400,
-		/* mgFireTime */		100,
-		/* sgFireTime */		1000,
-		/* glFireTime */		800,
-		/* rlFireTime */		800,
-		/* lgFireTime */		50,
-		/* rgFireTime */		1500,
-		/* pgFireTime */		100,
-		/* bfgFireTime */		200,
-#ifdef MISSIONPACK
-		/* ngFireTime */		1000,
-		/* proxFireTime */		800,
-		/* cgFireTime */		30,
-#endif
 		// weapon switch
 		/* weaponDropTime */	200,
 		/* weaponRaiseTime */	250,
 		/* noAmmoTime */		500,
-		// knockback multipliers
-		/* gauntletKnockback */	1.0f,
-		/* sgKnockback */		1.0f,
-		/* glKnockback */		1.0f,
-		/* rlKnockback */		1.0f,
-		/* rlSelfKnockback */	1.0f,
-		/* lgKnockback */		1.0f,
-		/* rgKnockback */		1.0f,
-		/* pgKnockback */		1.0f,
-		/* pgSelfKnockback */	1.0f,
-		/* ghKnockback */		1.0f,
 		// splash knockback
 		/* splashZKnockback */		24,
-		/* splashZKnockbackSelf */	24,
 		/* maxKnockback */			200,
-		// ammo max
-		/* mgAmmoMax */			200,
-		/* sgAmmoMax */			200,
-		/* glAmmoMax */			200,
-		/* rlAmmoMax */			200,
-		/* lgAmmoMax */			200,
-		/* rgAmmoMax */			200,
-		/* pgAmmoMax */			200,
-		/* bfgAmmoMax */		200,
-#ifdef MISSIONPACK
-		/* ngAmmoMax */			200,
-		/* proxAmmoMax */		200,
-		/* cgAmmoMax */			200,
-#endif
-		// ammo box
-		/* mgAmmoBox */			50,
-		/* sgAmmoBox */			10,
-		/* glAmmoBox */			5,
-		/* rlAmmoBox */			5,
-		/* lgAmmoBox */			60,
-		/* rgAmmoBox */			10,
-		/* pgAmmoBox */			30,
-		/* bfgAmmoBox */		15,
-#ifdef MISSIONPACK
-		/* ngAmmoBox */			20,
-		/* proxAmmoBox */		10,
-		/* cgAmmoBox */			100,
-#endif
-		/* mgStartAmmo */		100,
-		/* mgStartAmmoTeam */	50,
+		// duel
+		/* duelInitialAmmoHalve */	0,
 		// armor
 		/* armorTiered */		0,
 		/* armorProtection */	0.66f,
-		/* armorGAProtection */	0.66f,	// unused outside of CPM
-		/* armorYAProtection */	0.66f,	// unused outside of CPM
-		/* armorRAProtection */	0.66f,	// unused outside of CPM
-		/* armorSelfProtection */ 0.66f,	// unused outside of CPM
-		/* armorGAMax */		100,	// unused outside of CPM
-		/* armorYAMax */		150,	// unused outside of CPM
-		/* armorRAMax */		200,	// unused outside of CPM
+		/* armorGAProtection */	0.66f,
+		/* armorYAProtection */	0.66f,
+		/* armorRAProtection */	0.66f,
+		/* armorSelfProtection */ 0.66f,
+		/* armorGAMax */		100,
+		/* armorYAMax */		150,
+		/* armorRAMax */		200,
 		/* armorShardValue */	5,
-		/* armorGAPickupValue */50,		// unused outside of CPM
-		/* armorYAPickupValue */50,		// from bg_itemlist quantity
-		/* armorRAPickupValue */100,	// from bg_itemlist quantity
+		/* armorGAPickupValue */50,
+		/* armorYAPickupValue */50,
+		/* armorRAPickupValue */100,
 		/* battleSuitProtection */ 0.5f,
+		// spawn
 		/* spawnHealthBonus */	25,
 		// respawn timing (seconds)
 		/* respawnArmor */		25,
@@ -146,112 +170,135 @@ static const gameplayConfig_t gp_configs[] = {
 	},
 
 	// ===== GP_CPM (1) - CPMA =====
-	// Based on http://cpma-news.org/guides/content/basics
-	// with a few adjustments from testing
+	// Verified against actual CPMA mod (cpma-news.org guide has inaccuracies)
 	{
-		// damage
-		/* gauntletDamage */	50,
-		/* mgDamage */			5,
-		/* mgTeamDamage */		5,
-		/* mgSpread */			200,
-		/* sgDamage */			6,
-		/* sgCount */			16,
-		/* sgSpread */			750,
-		/* sgPatternType */		2,		// CPM dual-ring pattern (8 inner + 8 outer, offset 22.5°)
-		/* glDamage */			100,
-		/* glSplashDamage */	100,
-		/* glSplashRadius */	150,
-		/* glSpeed */			800,
-		/* rlDamage */			100,
-		/* rlSplashDamage */	100,
-		/* rlSplashRadius */	120,
-		/* rlSpeed */			1000,
-		/* lgDamage */			10,
-		/* lgRange */			768,
-		/* rgDamage */			80,
-		/* pgDamage */			18,
-		/* pgSplashDamage */	15,
-		/* pgSplashRadius */	20,
-		/* pgSpeed */			2000,
-		/* bfgDamage */			100,
-		/* bfgSplashDamage */	100,
-		/* bfgSplashRadius */	120,
-		/* bfgSpeed */			1800,
-		/* ghDamage */			0,
+		// weapons[WP_NUM_WEAPONS]
+		{
+		/* WP_NONE */ {
+			/* damage */		0,		/* teamDamage */	0,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		0,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		0,		/* selfKnockback */	0,
+			/* ammoMax */		0,		/* ammoBox */		0,		/* initialAmmo */	0,
+		},
+		/* WP_GAUNTLET */ {
+			/* damage */		50,		/* teamDamage */	50,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		400,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		0.5f,	/* selfKnockback */	0.5f,
+			/* ammoMax */		0,		/* ammoBox */		0,		/* initialAmmo */	0,
+		},
+		/* WP_MACHINEGUN */ {
+			/* damage */		5,		/* teamDamage */	5,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		100,
+			/* count */			0,		/* spread */		200,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		100,	/* ammoBox */		50,		/* initialAmmo */	50,
+		},
+		/* WP_SHOTGUN */ {
+			/* damage */		6,		/* teamDamage */	6,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		950,
+			/* count */			16,		/* spread */		750,	/* range */			0,
+			/* knockback */		0.33f,	/* selfKnockback */	0.33f,
+			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_GRENADE_LAUNCHER */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	100,	/* splashRadius */	150,
+			/* speed */			800,	/* fireTime */		800,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_ROCKET_LAUNCHER */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	100,	/* splashRadius */	120,
+			/* speed */			1000,	/* fireTime */		800,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.2f,	/* selfKnockback */	1.2f,
+			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_LIGHTNING */ {
+			/* damage */		10,		/* teamDamage */	10,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		66,
+			/* count */			0,		/* spread */		0,		/* range */			768,
+			/* knockback */		1.50f,	/* selfKnockback */	1.50f,
+			/* ammoMax */		150,	/* ammoBox */		50,		/* initialAmmo */	100,
+		},
+		/* WP_RAILGUN */ {
+			/* damage */		80,		/* teamDamage */	80,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		1250,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_PLASMAGUN */ {
+			/* damage */		18,		/* teamDamage */	18,
+			/* splashDamage */	14,		/* splashRadius */	20,
+			/* speed */			2000,	/* fireTime */		100,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		100,	/* ammoBox */		50,		/* initialAmmo */	50,
+		},
+		/* WP_BFG */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	100,	/* splashRadius */	120,
+			/* speed */			1800,	/* fireTime */		1250,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	5,
+		},
+		/* WP_GRAPPLING_HOOK */ {
+			/* damage */		0,		/* teamDamage */	0,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		0,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		0,		/* ammoBox */		0,		/* initialAmmo */	0,
+		},
 #ifdef MISSIONPACK
-		/* ngDamage */			20,
-		/* ngSpread */			500,
-		/* ngSpeed */			0,		// random
-		/* ngCount */			15,
-		/* proxSplashDamage */	100,
-		/* proxSplashRadius */	150,
-		/* cgDamage */			5,		// same as CPM MG
-		/* cgSpread */			600,
+		/* WP_NAILGUN */ {
+			/* damage */		20,		/* teamDamage */	20,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		1000,
+			/* count */			15,		/* spread */		500,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		25,		/* ammoBox */		20,		/* initialAmmo */	10,
+		},
+		/* WP_PROX_LAUNCHER */ {
+			/* damage */		0,		/* teamDamage */	0,
+			/* splashDamage */	100,	/* splashRadius */	150,
+			/* speed */			800,	/* fireTime */		800,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		5,		/* ammoBox */		10,		/* initialAmmo */	5,
+		},
+		/* WP_CHAINGUN */ {
+			/* damage */		5,		/* teamDamage */	5,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		30,
+			/* count */			0,		/* spread */		600,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		100,	/* ammoBox */		100,	/* initialAmmo */	80,
+		},
 #endif
-		// fire rates
-		/* gauntletFireTime */	400,
-		/* mgFireTime */		100,
-		/* sgFireTime */		950,
-		/* glFireTime */		800,
-		/* rlFireTime */		800,
-		/* lgFireTime */		66,
-		/* rgFireTime */		1250,
-		/* pgFireTime */		100,
-		/* bfgFireTime */		1250,
-#ifdef MISSIONPACK
-		/* ngFireTime */		1000,
-		/* proxFireTime */		800,
-		/* cgFireTime */		30,
-#endif
+		},
+		/* sgPatternType */		2,		// CPM dual-ring (8 inner + 8 outer, offset 22.5)
 		// weapon switch
 		/* weaponDropTime */	0,
 		/* weaponRaiseTime */	0,
 		/* noAmmoTime */		100,
-		// knockback multipliers
-		/* gauntletKnockback */	0.5f,
-		/* sgKnockback */		0.33f,
-		/* glKnockback */		1.0f,
-		/* rlKnockback */		1.2f,
-		/* rlSelfKnockback */	1.2f,
-		/* lgKnockback */		1.50f,
-		/* rgKnockback */		1.0f,
-		/* pgKnockback */		1.0f,
-		/* pgSelfKnockback */	0.5f,
-		/* ghKnockback */		1.0f,
 		// splash knockback
-		/* splashZKnockback */		40,
-		/* splashZKnockbackSelf */	40,
+		/* splashZKnockback */		36,
 		/* maxKnockback */			200,
-		// ammo max (from cpma-news.org)
-		/* mgAmmoMax */			200,
-		/* sgAmmoMax */			25,
-		/* glAmmoMax */			25,
-		/* rlAmmoMax */			25,
-		/* lgAmmoMax */			150,
-		/* rgAmmoMax */			25,
-		/* pgAmmoMax */			100,
-		/* bfgAmmoMax */		25,
-#ifdef MISSIONPACK
-		/* ngAmmoMax */			100,
-		/* proxAmmoMax */		100,
-		/* cgAmmoMax */			100,
-#endif
-		// ammo box
-		/* mgAmmoBox */			25,
-		/* sgAmmoBox */			5,
-		/* glAmmoBox */			5,
-		/* rlAmmoBox */			5,
-		/* lgAmmoBox */			50,
-		/* rgAmmoBox */			5,
-		/* pgAmmoBox */			50,
-		/* bfgAmmoBox */		5,
-#ifdef MISSIONPACK
-		/* ngAmmoBox */			20,
-		/* proxAmmoBox */		10,
-		/* cgAmmoBox */			100,
-#endif
-		/* mgStartAmmo */		50,
-		/* mgStartAmmoTeam */	50,
+		// duel
+		/* duelInitialAmmoHalve */	(1<<WP_GRENADE_LAUNCHER)|(1<<WP_LIGHTNING)|(1<<WP_RAILGUN),
 		// armor (tiered)
 		/* armorTiered */		1,
 		/* armorProtection */	0.66f,	// fallback for non-tiered code paths
@@ -267,6 +314,7 @@ static const gameplayConfig_t gp_configs[] = {
 		/* armorYAPickupValue */100,	// armorsystem 0: YA=100
 		/* armorRAPickupValue */150,	// CPM RA sets to 150
 		/* battleSuitProtection */ 0.25f,
+		// spawn
 		/* spawnHealthBonus */	0,		// CPM: spawn at 100hp
 		// respawn timing (seconds)
 		/* respawnArmor */		25,
@@ -281,126 +329,151 @@ static const gameplayConfig_t gp_configs[] = {
 
 	// ===== GP_QL (2) - Quake Live =====
 	{
-		// damage (from authoritative local QL server cvar dump)
-		/* gauntletDamage */	50,
-		/* mgDamage */			5,
-		/* mgTeamDamage */		5,
-		/* mgSpread */			200,
-		/* sgDamage */			5,
-		/* sgCount */			20,
-		/* sgSpread */			750,
+		// weapons[WP_NUM_WEAPONS]
+		{
+		/* WP_NONE */ {
+			/* damage */		0,		/* teamDamage */	0,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		0,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		0,		/* selfKnockback */	0,
+			/* ammoMax */		0,		/* ammoBox */		0,		/* initialAmmo */	0,
+		},
+		/* WP_GAUNTLET */ {
+			/* damage */		50,		/* teamDamage */	50,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		400,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		0,		/* ammoBox */		0,		/* initialAmmo */	0,
+		},
+		/* WP_MACHINEGUN */ {
+			/* damage */		5,		/* teamDamage */	5,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		100,
+			/* count */			0,		/* spread */		200,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		150,	/* ammoBox */		50,		/* initialAmmo */	100,
+		},
+		/* WP_SHOTGUN */ {
+			/* damage */		5,		/* teamDamage */	5,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		1000,
+			/* count */			20,		/* spread */		750,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_GRENADE_LAUNCHER */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	100,	/* splashRadius */	150,
+			/* speed */			700,	/* fireTime */		800,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.10f,	/* selfKnockback */	1.10f,
+			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_ROCKET_LAUNCHER */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	84,		/* splashRadius */	120,
+			/* speed */			1000,	/* fireTime */		800,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		0.90f,	/* selfKnockback */	1.10f,
+			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_LIGHTNING */ {
+			/* damage */		6,		/* teamDamage */	6,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		50,
+			/* count */			0,		/* spread */		0,		/* range */			768,
+			/* knockback */		1.75f,	/* selfKnockback */	1.75f,
+			/* ammoMax */		150,	/* ammoBox */		50,		/* initialAmmo */	100,
+		},
+		/* WP_RAILGUN */ {
+			/* damage */		80,		/* teamDamage */	80,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		1500,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		0.85f,	/* selfKnockback */	0.85f,
+			/* ammoMax */		25,		/* ammoBox */		10,		/* initialAmmo */	10,
+		},
+		/* WP_PLASMAGUN */ {
+			/* damage */		20,		/* teamDamage */	20,
+			/* splashDamage */	15,		/* splashRadius */	20,
+			/* speed */			2000,	/* fireTime */		100,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.10f,	/* selfKnockback */	1.30f,
+			/* ammoMax */		150,	/* ammoBox */		50,		/* initialAmmo */	50,
+		},
+		/* WP_BFG */ {
+			/* damage */		100,	/* teamDamage */	100,
+			/* splashDamage */	100,	/* splashRadius */	80,
+			/* speed */			1800,	/* fireTime */		300,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
+		},
+		/* WP_GRAPPLING_HOOK */ {
+			/* damage */		10,		/* teamDamage */	10,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		0,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		-5.0f,	/* selfKnockback */	-5.0f,
+			/* ammoMax */		0,		/* ammoBox */		0,		/* initialAmmo */	0,
+		},
+#ifdef MISSIONPACK
+		/* WP_NAILGUN */ {
+			/* damage */		12,		/* teamDamage */	12,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			1000,	/* fireTime */		1000,
+			/* count */			10,		/* spread */		400,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		25,		/* ammoBox */		20,		/* initialAmmo */	10,
+		},
+		/* WP_PROX_LAUNCHER */ {
+			/* damage */		0,		/* teamDamage */	0,
+			/* splashDamage */	100,	/* splashRadius */	150,
+			/* speed */			700,	/* fireTime */		800,
+			/* count */			0,		/* spread */		0,		/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		5,		/* ammoBox */		10,		/* initialAmmo */	5,
+		},
+		/* WP_CHAINGUN */ {
+			/* damage */		8,		/* teamDamage */	8,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			0,		/* fireTime */		50,
+			/* count */			0,		/* spread */		600,	/* range */			0,
+			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
+			/* ammoMax */		200,	/* ammoBox */		100,	/* initialAmmo */	100,
+		},
+#endif
+		},
 		/* sgPatternType */		1,		// ring pattern
-		/* glDamage */			100,
-		/* glSplashDamage */	100,
-		/* glSplashRadius */	150,
-		/* glSpeed */			700,
-		/* rlDamage */			100,
-		/* rlSplashDamage */	84,
-		/* rlSplashRadius */	120,
-		/* rlSpeed */			1000,
-		/* lgDamage */			6,
-		/* lgRange */			768,
-		/* rgDamage */			80,
-		/* pgDamage */			20,
-		/* pgSplashDamage */	15,
-		/* pgSplashRadius */	20,
-		/* pgSpeed */			2000,
-		/* bfgDamage */			100,
-		/* bfgSplashDamage */	100,
-		/* bfgSplashRadius */	80,
-		/* bfgSpeed */			1800,
-		/* ghDamage */			10,
-#ifdef MISSIONPACK
-		/* ngDamage */			12,
-		/* ngSpread */			400,
-		/* ngSpeed */			1000,	// fixed speed
-		/* ngCount */			10,		// burst fire
-		/* proxSplashDamage */	100,
-		/* proxSplashRadius */	150,
-		/* cgDamage */			8,
-		/* cgSpread */			600,
-#endif
-		// fire rates
-		/* gauntletFireTime */	400,
-		/* mgFireTime */		100,
-		/* sgFireTime */		1000,
-		/* glFireTime */		800,
-		/* rlFireTime */		800,
-		/* lgFireTime */		50,
-		/* rgFireTime */		1500,
-		/* pgFireTime */		100,
-		/* bfgFireTime */		300,
-#ifdef MISSIONPACK
-		/* ngFireTime */		1000,
-		/* proxFireTime */		800,
-		/* cgFireTime */		50,
-#endif
 		// weapon switch
 		/* weaponDropTime */	200,
 		/* weaponRaiseTime */	200,
 		/* noAmmoTime */		500,
-		// knockback multipliers (from QL cvar dump)
-		/* gauntletKnockback */	1.0f,
-		/* sgKnockback */		1.0f,
-		/* glKnockback */		1.10f,
-		/* rlKnockback */		0.90f,
-		/* rlSelfKnockback */	1.10f,
-		/* lgKnockback */		1.75f,
-		/* rgKnockback */		0.85f,
-		/* pgKnockback */		1.10f,
-		/* pgSelfKnockback */	1.30f,
-		/* ghKnockback */		-5.0f,	// grapple pulls
 		// splash knockback
 		/* splashZKnockback */		24,
-		/* splashZKnockbackSelf */	24,
 		/* maxKnockback */			120,
-		// ammo max (QL uses same as VQ3)
-		/* mgAmmoMax */			200,
-		/* sgAmmoMax */			200,
-		/* glAmmoMax */			200,
-		/* rlAmmoMax */			200,
-		/* lgAmmoMax */			200,
-		/* rgAmmoMax */			200,
-		/* pgAmmoMax */			200,
-		/* bfgAmmoMax */		200,
-#ifdef MISSIONPACK
-		/* ngAmmoMax */			200,
-		/* proxAmmoMax */		200,
-		/* cgAmmoMax */			200,
-#endif
-		// ammo box
-		/* mgAmmoBox */			50,
-		/* sgAmmoBox */			10,
-		/* glAmmoBox */			5,
-		/* rlAmmoBox */			5,
-		/* lgAmmoBox */			60,
-		/* rgAmmoBox */			10,
-		/* pgAmmoBox */			30,
-		/* bfgAmmoBox */		15,
-#ifdef MISSIONPACK
-		/* ngAmmoBox */			20,
-		/* proxAmmoBox */		10,
-		/* cgAmmoBox */			100,
-#endif
-		/* mgStartAmmo */		100,
-		/* mgStartAmmoTeam */	100,
+		// duel
+		/* duelInitialAmmoHalve */	0,
 		// armor (flat, same as VQ3)
 		/* armorTiered */		0,
 		/* armorProtection */	0.66f,
-		/* armorGAProtection */	0.66f,	// unused outside of CPM
-		/* armorYAProtection */	0.66f,	// unused outside of CPM
-		/* armorRAProtection */	0.66f,	// unused outside of CPM
-		/* armorSelfProtection */ 0.66f,	// unused outside of CPM
-		/* armorGAMax */		100,	// unused outside of CPM
-		/* armorYAMax */		150,	// unused outside of CPM
-		/* armorRAMax */		200,	// unused outside of CPM
+		/* armorGAProtection */	0.66f,
+		/* armorYAProtection */	0.66f,
+		/* armorRAProtection */	0.66f,
+		/* armorSelfProtection */ 0.66f,
+		/* armorGAMax */		100,
+		/* armorYAMax */		150,
+		/* armorRAMax */		200,
 		/* armorShardValue */	5,
-		/* armorGAPickupValue */50,		// unused outside of CPM
+		/* armorGAPickupValue */50,
 		/* armorYAPickupValue */50,
 		/* armorRAPickupValue */100,
-		/* battleSuitProtection */ 0.25f,	// g_battleSuitDampen = 0.25
+		/* battleSuitProtection */ 0.25f,
+		// spawn
 		/* spawnHealthBonus */	25,
-		// respawn timing (seconds) - QL uses same as VQ3
+		// respawn timing (seconds)
 		/* respawnArmor */		25,
 		/* respawnHealth */		35,
 		/* respawnAmmo */		40,
@@ -418,73 +491,59 @@ const gameplayConfig_t *GP_GetConfig( int balanceMode ) {
 	return &gp_configs[balanceMode];
 }
 
-int GP_GetAmmoBoxQuantity( const gameplayConfig_t *cb, int weaponTag ) {
-	switch ( weaponTag ) {
-	case WP_MACHINEGUN:			return cb->mgAmmoBox;
-	case WP_SHOTGUN:			return cb->sgAmmoBox;
-	case WP_GRENADE_LAUNCHER:	return cb->glAmmoBox;
-	case WP_ROCKET_LAUNCHER:	return cb->rlAmmoBox;
-	case WP_LIGHTNING:			return cb->lgAmmoBox;
-	case WP_RAILGUN:			return cb->rgAmmoBox;
-	case WP_PLASMAGUN:			return cb->pgAmmoBox;
-#ifdef MISSIONPACK
-	case WP_NAILGUN:			return cb->ngAmmoBox;
-	case WP_PROX_LAUNCHER:		return cb->proxAmmoBox;
-	case WP_CHAINGUN:			return cb->cgAmmoBox;
-#endif
-	default:					return 0;
-	}
+int GP_GetAmmoBoxQuantity( const gameplayConfig_t *gp, int weaponTag ) {
+	if ( weaponTag <= WP_NONE || weaponTag >= WP_NUM_WEAPONS )
+		return 0;
+	return gp->weapons[weaponTag].ammoBox;
 }
 
-int GP_GetAmmoMax( const gameplayConfig_t *cb, int weaponTag ) {
-	switch ( weaponTag ) {
-	case WP_MACHINEGUN:			return cb->mgAmmoMax;
-	case WP_SHOTGUN:			return cb->sgAmmoMax;
-	case WP_GRENADE_LAUNCHER:	return cb->glAmmoMax;
-	case WP_ROCKET_LAUNCHER:	return cb->rlAmmoMax;
-	case WP_LIGHTNING:			return cb->lgAmmoMax;
-	case WP_RAILGUN:			return cb->rgAmmoMax;
-	case WP_PLASMAGUN:			return cb->pgAmmoMax;
-	case WP_BFG:				return cb->bfgAmmoMax;
-#ifdef MISSIONPACK
-	case WP_NAILGUN:			return cb->ngAmmoMax;
-	case WP_PROX_LAUNCHER:		return cb->proxAmmoMax;
-	case WP_CHAINGUN:			return cb->cgAmmoMax;
-#endif
-	default:					return 200;
+int GP_GetAmmoMax( const gameplayConfig_t *gp, int weaponTag ) {
+	if ( weaponTag <= WP_NONE || weaponTag >= WP_NUM_WEAPONS )
+		return 200;
+	return gp->weapons[weaponTag].ammoMax;
+}
+
+int GP_GetInitialAmmo( const gameplayConfig_t *gp, int weaponTag, qboolean isDuel ) {
+	int ammo;
+	if ( weaponTag <= WP_NONE || weaponTag >= WP_NUM_WEAPONS )
+		return 0;
+	ammo = gp->weapons[weaponTag].initialAmmo;
+	if ( isDuel && ( gp->duelInitialAmmoHalve & ( 1 << weaponTag ) ) ) {
+		ammo /= 2;
 	}
+	return ammo;
 }
 
 // convert armor points from one tier to another based on protection ratios
-int GP_ConvertArmor( const gameplayConfig_t *cb, int armor, int fromType, int toType ) {
+int GP_ConvertArmor( const gameplayConfig_t *gp, int armor, int fromType, int toType ) {
 	float fromProt, toProt;
 	if ( fromType == toType || armor <= 0 ) return armor;
-	fromProt = GP_ArmorProtection( cb, fromType );
-	toProt = GP_ArmorProtection( cb, toType );
+	fromProt = GP_ArmorProtection( gp, fromType );
+	toProt = GP_ArmorProtection( gp, toType );
 	return (int)( armor * fromProt / toProt );
 }
 
 // returns the protection rate for a given armor tier
-float GP_ArmorProtection( const gameplayConfig_t *cb, int armorType ) {
-	if ( armorType >= ARMORTYPE_RA ) return cb->armorRAProtection;
-	if ( armorType >= ARMORTYPE_YA ) return cb->armorYAProtection;
-	return cb->armorGAProtection;
+float GP_ArmorProtection( const gameplayConfig_t *gp, int armorType ) {
+	if ( armorType >= ARMORTYPE_RA ) return gp->armorRAProtection;
+	if ( armorType >= ARMORTYPE_YA ) return gp->armorYAProtection;
+	return gp->armorGAProtection;
 }
 
 // returns the max armor for a given armor tier
-int GP_ArmorMax( const gameplayConfig_t *cb, int armorType ) {
-	if ( armorType >= ARMORTYPE_RA ) return cb->armorRAMax;
-	if ( armorType >= ARMORTYPE_YA ) return cb->armorYAMax;
-	return cb->armorGAMax;
+int GP_ArmorMax( const gameplayConfig_t *gp, int armorType ) {
+	if ( armorType >= ARMORTYPE_RA ) return gp->armorRAMax;
+	if ( armorType >= ARMORTYPE_YA ) return gp->armorYAMax;
+	return gp->armorGAMax;
 }
 
-qboolean GP_CanGrabArmor( const gameplayConfig_t *cb, const gitem_t *item, const playerState_t *ps ) {
+qboolean GP_CanGrabArmor( const gameplayConfig_t *gp, const gitem_t *item, const playerState_t *ps ) {
 	// GA (item_armor_jacket) is CPM-only
-	if ( item->quantity == 25 && !cb->armorTiered ) {
+	if ( item->quantity == 25 && !gp->armorTiered ) {
 		return qfalse;
 	}
 
-	if ( !cb->armorTiered ) {
+	if ( !gp->armorTiered ) {
 		// flat mode (VQ3/QL): cap at MAX_HEALTH * 2
 		return ( ps->stats[STAT_ARMOR] >= ps->stats[STAT_MAX_HEALTH] * 2 ) ? qfalse : qtrue;
 	}
@@ -498,21 +557,21 @@ qboolean GP_CanGrabArmor( const gameplayConfig_t *cb, const gitem_t *item, const
 		int converted, itemMax;
 
 		if ( item->quantity == 100 ) {
-			toProt = cb->armorRAProtection;
-			itemMax = cb->armorRAMax;
+			toProt = gp->armorRAProtection;
+			itemMax = gp->armorRAMax;
 		} else if ( item->quantity == 50 ) {
-			toProt = cb->armorYAProtection;
-			itemMax = cb->armorYAMax;
+			toProt = gp->armorYAProtection;
+			itemMax = gp->armorYAMax;
 		} else if ( item->quantity == 25 ) {
-			toProt = cb->armorGAProtection;
-			itemMax = cb->armorGAMax;
+			toProt = gp->armorGAProtection;
+			itemMax = gp->armorGAMax;
 		} else {
 			// shards: pickable unless already at 200 (RA cap)
-			return ( curArmor >= cb->armorRAMax ) ? qfalse : qtrue;
+			return ( curArmor >= gp->armorRAMax ) ? qfalse : qtrue;
 		}
 
 		// convert current armor to the item's tier
-		fromProt = GP_ArmorProtection( cb, curType );
+		fromProt = GP_ArmorProtection( gp, curType );
 
 		converted = ( curType == ARMORTYPE_NONE || curArmor <= 0 )
 			? 0 : (int)( curArmor * fromProt / toProt );

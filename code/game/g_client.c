@@ -1124,12 +1124,8 @@ void ClientSpawn(gentity_t *ent) {
 
 	client->ps.stats[STAT_WEAPONS] = ( 1 << WP_MACHINEGUN );
 	{
-		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
-		if ( g_gametype.integer == GT_TEAM ) {
-			client->ps.ammo[WP_MACHINEGUN] = cb->mgStartAmmoTeam;
-		} else {
-			client->ps.ammo[WP_MACHINEGUN] = cb->mgStartAmmo;
-		}
+		const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
+		client->ps.ammo[WP_MACHINEGUN] = gp->weapons[WP_MACHINEGUN].initialAmmo;
 	}
 
 	client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_GAUNTLET );
@@ -1138,8 +1134,8 @@ void ClientSpawn(gentity_t *ent) {
 
 	// health will count down towards max_health
 	{
-		const gameplayConfig_t *cb = GP_GetConfig( g_gameplay.integer );
-		ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + cb->spawnHealthBonus;
+		const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
+		ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + gp->spawnHealthBonus;
 	}
 
 	G_SetOrigin( ent, spawn_origin );
