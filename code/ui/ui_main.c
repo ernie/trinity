@@ -13,6 +13,8 @@ USER INTERFACE MAIN
 
 #include "ui_local.h"
 
+extern displayContextDef_t *DC;
+
 uiInfo_t uiInfo;
 
 static const char *MonthAbbrev[] = {
@@ -1786,6 +1788,13 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 				s = trinityUser[0] ? va( "%s", trinityUser ) : "Account";
 			}
 			break;
+		case UI_TRINITYUPDATE:
+			if ( (int)trap_Cvar_VariableValue( "update_available" ) == 1 )
+				s = "Update Available";
+			break;
+		case UI_UPDATEPROGRESS:
+		case UI_UPDATESTATUS:
+			return 0;
     default:
       break;
   }
@@ -2236,6 +2245,73 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 				label = trinityUser[0] ? trinityUser : "Account";
 				tw = Text_Width( label, scale, 0 );
 				Text_Paint( rect.x - tw, rect.y, scale, color, label, 0, 0, textStyle );
+			}
+			break;
+		case UI_TRINITYUPDATE:
+			if ( (int)trap_Cvar_VariableValue( "update_available" ) == 1 ) {
+				const char *label = "Update Available";
+				float tw = Text_Width( label, scale, 0 );
+				Text_Paint( rect.x - tw, rect.y, scale, color, label, 0, 0, textStyle );
+			}
+			break;
+		case UI_UPDATEPROGRESS:
+			{
+				int state = (int)trap_Cvar_VariableValue( "update_state" );
+				vec4_t barBg = { 0.1f, 0.1f, 0.1f, 0.8f };
+				vec4_t barFg = { 0.1f, 0.5f, 0.1f, 0.9f };
+				vec4_t barBorder = { 0.5f, 0.5f, 0.5f, 0.5f };
+
+				// background
+				DC->fillRect( rect.x, rect.y, rect.w, rect.h, barBg );
+				DC->drawRect( rect.x, rect.y, rect.w, rect.h, 1, barBorder );
+
+				if ( state == 3 ) {
+					// downloading: show fill
+					int progress = (int)trap_Cvar_VariableValue( "update_progress" );
+					float fillW;
+					if ( progress < 0 ) progress = 0;
+					if ( progress > 100 ) progress = 100;
+					fillW = ( rect.w * progress ) / 100.0f;
+					if ( fillW > 0 )
+						DC->fillRect( rect.x, rect.y, fillW, rect.h, barFg );
+				} else if ( state == 5 ) {
+					// staged: full green bar
+					DC->fillRect( rect.x, rect.y, rect.w, rect.h, barFg );
+				}
+			}
+			break;
+		case UI_UPDATESTATUS:
+			{
+				int state = (int)trap_Cvar_VariableValue( "update_state" );
+				const char *label = "";
+				vec4_t white = { 1.0f, 1.0f, 1.0f, 1.0f };
+				vec4_t yellow = { 1.0f, 0.75f, 0.0f, 1.0f };
+				vec4_t green = { 0.0f, 1.0f, 0.0f, 1.0f };
+				vec4_t red = { 1.0f, 0.0f, 0.0f, 1.0f };
+				vec4_t *col = &white;
+				char buf[128];
+
+				switch ( state ) {
+				case 0: label = "Up to date"; break;
+				case 1: label = "Checking for updates..."; break;
+				case 2: label = "Update available"; col = &yellow; break;
+				case 3:
+					Com_sprintf( buf, sizeof( buf ), "Downloading... %i%%",
+						(int)trap_Cvar_VariableValue( "update_progress" ) );
+					label = buf;
+					break;
+				case 4: label = "Extracting..."; break;
+				case 5: label = "Update ready! Restart to apply."; col = &green; break;
+				case 6:
+					trap_Cvar_VariableStringBuffer( "update_error", buf, sizeof( buf ) );
+					label = buf;
+					col = &red;
+					break;
+				}
+				{
+					float tw = Text_Width( label, scale, 0 );
+					Text_Paint( rect.x + ( rect.w - tw ) / 2, rect.y, scale, *col, label, 0, 0, textStyle );
+				}
 			}
 			break;
     default:
@@ -3532,6 +3608,12 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cvar_Set( "cl_trinityLoginPass", UI_Cvar_VariableString("ui_trinityLoginPass") );
 			trap_Cvar_Set( "ui_trinityLoginPass", "" );
 			trap_Cmd_ExecuteText( EXEC_APPEND, "trinity_login\n" );
+		} else if (Q_stricmp(name, "updateDownload") == 0) {
+			trap_Cmd_ExecuteText( EXEC_APPEND, "updatedownload\n" );
+		} else if (Q_stricmp(name, "updateCancel") == 0) {
+			trap_Cmd_ExecuteText( EXEC_APPEND, "updatecancel\n" );
+		} else if (Q_stricmp(name, "updateRestart") == 0) {
+			trap_Cmd_ExecuteText( EXEC_NOW, "updaterestart\n" );
 		} else if (Q_stricmp(name, "trinityLogout") == 0) {
 			trap_Cmd_ExecuteText( EXEC_NOW, "trinity_logout\n" );
 			Menus_CloseByName("login_menu");

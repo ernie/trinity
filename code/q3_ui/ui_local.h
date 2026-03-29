@@ -734,6 +734,12 @@ void Login_Cache( void );
 void UI_LoginMenu( void );
 
 //
+// ui_update.c
+//
+void UI_UpdateMenu_Cache( void );
+void UI_UpdateMenu( void );
+
+//
 // ui_signup.c
 //
 void Signup_Cache( void );

@@ -1,0 +1,260 @@
+#include "ui/menudef.h"
+
+{
+
+menuDef {
+	name "update_menu"
+	visible 0
+	fullscreen 1
+	rect 0 0 640 480
+	background "menuback_a"
+	style 1
+	focusColor 1 .75 0 1
+
+	onEsc { close update_menu ; open main }
+
+	// Background panel
+	itemDef {
+		name window
+		rect 150 140 340 210
+		style WINDOW_STYLE_FILLED
+		border 1
+		bordersize 1
+		bordercolor .5 .5 .5 .5
+		backcolor 0 0 0 .7
+		visible 1
+		decoration
+	}
+
+	// Inner panel
+	itemDef {
+		name window
+		rect 160 150 320 190
+		style WINDOW_STYLE_FILLED
+		border 1
+		bordersize 1
+		bordercolor .3 .3 .3 .3
+		backcolor 0 0 .1 .5
+		visible 1
+		decoration
+	}
+
+	// Title
+	itemDef {
+		name title
+		text "ENGINE UPDATE"
+		style 0
+		textstyle 6
+		rect 150 162 340 30
+		textalign 1
+		textalignx 170
+		textaligny 24
+		textscale .4
+		forecolor 1 1 1 1
+		visible 1
+		decoration
+	}
+
+	// Separator line under title
+	itemDef {
+		name separator
+		rect 185 188 270 1
+		style WINDOW_STYLE_FILLED
+		backcolor .5 .5 .5 .5
+		visible 1
+		decoration
+	}
+
+	// Current version
+	itemDef {
+		name currentLabel
+		text "Current:"
+		style 0
+		textstyle 6
+		rect 185 198 90 18
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 90
+		textaligny 14
+		textscale .28
+		forecolor .8 .8 .8 1
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name currentValue
+		cvar "update_current"
+		style 0
+		textstyle 6
+		rect 285 198 170 18
+		textalign ITEM_ALIGN_LEFT
+		textaligny 14
+		textscale .28
+		forecolor 1 1 1 1
+		visible 1
+		decoration
+	}
+
+	// Available version
+	itemDef {
+		name newLabel
+		text "Available:"
+		style 0
+		textstyle 6
+		rect 185 218 90 18
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 90
+		textaligny 14
+		textscale .28
+		forecolor .8 .8 .8 1
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name newValue
+		cvar "update_version"
+		style 0
+		textstyle 6
+		rect 285 218 170 18
+		textalign ITEM_ALIGN_LEFT
+		textaligny 14
+		textscale .28
+		forecolor 1 .75 0 1
+		visible 1
+		decoration
+	}
+
+	// Status text (ownerdraw — dynamic color per state)
+	itemDef {
+		name statusText
+		ownerdraw UI_UPDATESTATUS
+		rect 160 250 320 18
+		textstyle 6
+		textscale .25
+		visible 1
+		decoration
+	}
+
+	// Progress bar (ownerdraw)
+	itemDef {
+		name progressBar
+		ownerdraw UI_UPDATEPROGRESS
+		rect 195 272 250 12
+		visible 1
+		cvarTest "update_state"
+		showCvar { "3", "5" }
+		decoration
+	}
+
+	// Download button
+	itemDef {
+		name downloadBtn
+		text "Download"
+		type 1
+		style WINDOW_STYLE_FILLED
+		textstyle 6
+		rect 260 294 120 26
+		textalign 1
+		textalignx 60
+		textaligny 20
+		textscale .28
+		forecolor 1 1 1 1
+		backcolor .37 .1 .1 1
+		visible 1
+		cvarTest "update_state"
+		showCvar { "2" }
+		action { play "sound/misc/kcaction.wav" ;
+		uiScript updateDownload }
+		mouseEnter { setitemcolor downloadBtn backcolor .1 .37 .1 1 }
+		mouseExit { setitemcolor downloadBtn backcolor .37 .1 .1 1 }
+	}
+
+	// Cancel button
+	itemDef {
+		name cancelBtn
+		text "Cancel"
+		type 1
+		style WINDOW_STYLE_FILLED
+		textstyle 6
+		rect 260 294 120 26
+		textalign 1
+		textalignx 60
+		textaligny 20
+		textscale .28
+		forecolor 1 1 1 1
+		backcolor .37 .1 .1 1
+		visible 1
+		cvarTest "update_state"
+		showCvar { "3" }
+		action { play "sound/misc/kcaction.wav" ;
+		uiScript updateCancel }
+		mouseEnter { setitemcolor cancelBtn backcolor .1 .37 .1 1 }
+		mouseExit { setitemcolor cancelBtn backcolor .37 .1 .1 1 }
+	}
+
+	// Restart button
+	itemDef {
+		name restartBtn
+		text "Restart Now"
+		type 1
+		style WINDOW_STYLE_FILLED
+		textstyle 6
+		rect 260 294 120 26
+		textalign 1
+		textalignx 60
+		textaligny 20
+		textscale .28
+		forecolor 1 1 1 1
+		backcolor .1 .37 .1 1
+		visible 1
+		cvarTest "update_state"
+		showCvar { "5" }
+		action { play "sound/misc/kcaction.wav" ;
+		uiScript updateRestart }
+		mouseEnter { setitemcolor restartBtn backcolor .37 .37 .1 1 }
+		mouseExit { setitemcolor restartBtn backcolor .1 .37 .1 1 }
+	}
+
+	// Back arrow (bottom-left)
+	itemDef {
+		name back
+		style 3
+		background "ui/assets/backarrow.tga"
+		rect 16 424 50 50
+		visible 1
+		action { close update_menu ; open main }
+		mouseEnter { hide back ; show back_alt ; show message_back }
+	}
+
+	itemDef {
+		name back_alt
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/backarrow_alt.tga"
+		rect 14 422 54 54
+		backcolor 0 0 0 0
+		forecolor 1 1 1 1
+		visible 0
+		type ITEM_TYPE_BUTTON
+		mouseExit { hide back_alt ; show back ; hide message_back }
+		action { close update_menu ; open main }
+	}
+
+	itemDef {
+		name message_back
+		group grpmessage
+		style 0
+		rect 320 430 128 30
+		textstyle 1
+		textalign 1
+		textalignx 0
+		textaligny 25
+		textscale .416
+		text "Back"
+		forecolor 1 1 1 1
+		decoration
+		visible 0
+	}
+}
+
+}

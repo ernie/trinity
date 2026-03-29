@@ -21,6 +21,7 @@ MAIN MENU
 #define ID_MODS					16
 #define ID_EXIT					17
 #define ID_LOGIN				18
+#define ID_UPDATE				19
 
 #define MAIN_BANNER_MODEL				"models/mapobjects/banner/banner5.md3"
 #define MAIN_MENU_VERTICAL_SPACING		34
@@ -37,6 +38,7 @@ typedef struct {
 	menutext_s		teamArena;
 	menutext_s		mods;
 	menutext_s		login;
+	menutext_s		update;
 	menutext_s		exit;
 
 	qhandle_t		bannerModel;
@@ -85,6 +87,31 @@ static void Main_DrawLoginButton( void *self ) {
 	w = strlen( label ) * SMALLCHAR_WIDTH;
 	t->generic.left = t->generic.x - w;
 }
+
+
+/*
+=================
+Main_DrawUpdateButton
+
+Draws the Update Available button using the small bitmap font.
+=================
+*/
+static void Main_DrawUpdateButton( void *self ) {
+	menutext_s	*t = (menutext_s *)self;
+	int			style;
+	int			w;
+
+	style = UI_RIGHT | UI_SMALLFONT;
+	if ( t->generic.flags & QMF_PULSEIFFOCUS && Menu_ItemAtCursor( t->generic.parent ) == t ) {
+		style |= UI_PULSE;
+	}
+
+	UI_DrawString( t->generic.x, t->generic.y, t->string, style, t->color );
+
+	w = strlen( t->string ) * SMALLCHAR_WIDTH;
+	t->generic.left = t->generic.x - w;
+}
+
 
 /*
 =================
@@ -143,6 +170,10 @@ void Main_MenuEvent (void* ptr, int event) {
 
 	case ID_LOGIN:
 		UI_LoginMenu();
+		break;
+
+	case ID_UPDATE:
+		UI_UpdateMenu();
 		break;
 
 	case ID_EXIT:
@@ -253,6 +284,12 @@ static void Main_MenuDraw( void ) {
 		UI_DrawString( 320, 400, "Quake III Arena(c) 1999-2000, Id Software, Inc.  All Rights Reserved", UI_CENTER|UI_SMALLFONT, color );
 	} else {
 		UI_DrawString( 320, 444, "Quake III Arena(c) 1999-2000, Id Software, Inc.  All Rights Reserved", UI_CENTER|UI_SMALLFONT, color );
+	}
+
+	// if update became available after menu was built, rebuild it
+	if ( !s_main.update.string && (int)trap_Cvar_VariableValue( "update_available" ) == 1 ) {
+		UI_MainMenu();
+		return;
 	}
 
 	// Trinity version badge
@@ -446,13 +483,26 @@ void UI_MainMenu( void ) {
 	s_main.login.color					= color_white;
 	s_main.login.style					= UI_RIGHT|UI_SMALLFONT;
 
+	if ( (int)trap_Cvar_VariableValue( "update_available" ) == 1 ) {
+		s_main.update.generic.type			= MTYPE_PTEXT;
+		s_main.update.generic.flags			= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
+		s_main.update.generic.x				= 610;
+		s_main.update.generic.y				= 134 + SMALLCHAR_HEIGHT + 2;
+		s_main.update.generic.id			= ID_UPDATE;
+		s_main.update.generic.callback		= Main_MenuEvent;
+		s_main.update.generic.ownerdraw		= Main_DrawUpdateButton;
+		s_main.update.string				= "Update Available";
+		s_main.update.color					= color_yellow;
+		s_main.update.style					= UI_RIGHT|UI_SMALLFONT;
+	}
+
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.exit.generic.type				= MTYPE_PTEXT;
 	s_main.exit.generic.flags				= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_main.exit.generic.x					= 320;
 	s_main.exit.generic.y					= y;
 	s_main.exit.generic.id					= ID_EXIT;
-	s_main.exit.generic.callback			= Main_MenuEvent; 
+	s_main.exit.generic.callback			= Main_MenuEvent;
 	s_main.exit.string						= "EXIT";
 	s_main.exit.color						= color_red;
 	s_main.exit.style						= style;
@@ -466,6 +516,9 @@ void UI_MainMenu( void ) {
 		Menu_AddItem( &s_main.menu,	&s_main.teamArena );
 	}
 	Menu_AddItem( &s_main.menu,	&s_main.mods );
+	if ( s_main.update.string ) {
+		Menu_AddItem( &s_main.menu,	&s_main.update );
+	}
 	Menu_AddItem( &s_main.menu,	&s_main.exit );
 	Menu_AddItem( &s_main.menu,	&s_main.login );
 	// Override hit rect to match bitmap font size (PText_Init sized it for proportional font)
@@ -475,6 +528,13 @@ void UI_MainMenu( void ) {
 		s_main.login.generic.right  = s_main.login.generic.x;
 		s_main.login.generic.top    = s_main.login.generic.y;
 		s_main.login.generic.bottom = s_main.login.generic.y + SMALLCHAR_HEIGHT;
+	}
+	if ( s_main.update.string ) {
+		int w = strlen( s_main.update.string ) * SMALLCHAR_WIDTH;
+		s_main.update.generic.left   = s_main.update.generic.x - w;
+		s_main.update.generic.right  = s_main.update.generic.x;
+		s_main.update.generic.top    = s_main.update.generic.y;
+		s_main.update.generic.bottom = s_main.update.generic.y + SMALLCHAR_HEIGHT;
 	}
 
 	trap_Key_SetCatcher( KEYCATCH_UI );

@@ -521,16 +521,37 @@ itemDef {
 	type ITEM_TYPE_OWNERDRAW
 	style 0
 	textstyle 6
-	rect 500 8 130 20
+	rect 500 8 130 14
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 130
-	textaligny 16
+	textaligny 12
 	textscale .28
 	forecolor 1 1 1 1
 	visible 1
 	action { play "sound/misc/kcaction.wav" ;
 	close main ;
 	open login_menu }
+}
+
+// Update Available button (top-right, under Account)
+itemDef {
+	name updatebtn
+	ownerdraw UI_TRINITYUPDATE
+	type ITEM_TYPE_OWNERDRAW
+	style 0
+	textstyle 6
+	rect 500 22 130 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 130
+	textaligny 16
+	textscale .28
+	forecolor 1 .75 0 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ;
+	close main ;
+	open update_menu }
+	mouseEnter { setitemcolor updatebtn forecolor 1 1 1 1 }
+	mouseExit { setitemcolor updatebtn forecolor 1 .75 0 1 }
 }
 
 itemDef {
