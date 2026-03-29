@@ -97,4 +97,6 @@ G_CVAR( g_gameplay, "g_gameplay", "0", CVAR_SERVERINFO | CVAR_SYSTEMINFO | CVAR_
 
 G_CVAR( g_rotation, "g_rotation", "0", CVAR_ARCHIVE, 0, qfalse, qfalse )
 
+G_CVAR( g_trinityHandshake, "g_trinityHandshake", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse )
+
 #undef G_CVAR

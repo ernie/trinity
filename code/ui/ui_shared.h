@@ -42,6 +42,7 @@
 #define WINDOW_POPUP					0x00200000	// popup
 #define WINDOW_BACKCOLORSET		0x00400000	// backcolor was explicitly set 
 #define WINDOW_TIMEDVISIBLE		0x00800000	// visibility timing ( NOT implemented )
+#define WINDOW_PASSWORD				0x01000000	// mask editfield contents with *
 
 
 // CGAME cursor type bits
@@ -320,6 +321,7 @@ typedef struct {
   void (*getCVarString)(const char *cvar, char *buffer, int bufsize);
   float (*getCVarValue)(const char *cvar);
   void (*setCVar)(const char *cvar, const char *value);
+  void (*getClipboardData)(char *buf, int bufsize);
   void (*drawTextWithCursor)(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style);
   void (*setOverstrikeMode)(qboolean b);
   qboolean (*getOverstrikeMode)();
@@ -416,6 +418,7 @@ int Display_CursorType(int x, int y);
 qboolean Display_KeyBindPending();
 void Menus_OpenByName(const char *p);
 menuDef_t *Menus_FindByName(const char *p);
+void Menu_ShowItemByName(menuDef_t *menu, const char *p, qboolean bShow);
 void Menu_UpdatePosition(menuDef_t *menu);
 void Menus_ShowByName(const char *p);
 void Menus_CloseByName(const char *p);

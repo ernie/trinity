@@ -6,6 +6,7 @@
 // second version that must match between game and cgame
 
 #define	GAME_VERSION		"baseq3-1"
+#define	TRINITY_PROTO_VERSION	1
 
 #define	DEFAULT_GRAVITY		800
 #define	GIB_HEALTH			-40

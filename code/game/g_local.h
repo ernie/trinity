@@ -256,6 +256,11 @@ typedef struct {
 
 	qboolean	inGame;
 	qboolean	damagePlums;		// do we want to display damage numbers?
+
+	// Trinity handshake state (must survive map restarts)
+	char		handshakeNonce[32];
+	int			handshakeTime;		// negative = queued not sent, positive = level.time when sent, 0 = no handshake
+	qboolean	trinityVerified;
 } clientPersistant_t;
 
 // unlagged
@@ -363,6 +368,7 @@ struct gclient_s {
 	// Roll is sent via standard cmd->angles[ROLL] mechanism
 	float		vrHeadPitch;
 	float		vrHeadYawOffset;
+
 };
 
 

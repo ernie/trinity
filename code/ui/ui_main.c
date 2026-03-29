@@ -586,26 +586,8 @@ static qboolean  trinityVersionLoaded = qfalse;
 static qhandle_t trinityIconShader;
 
 static void UI_LoadTrinityVersion( void ) {
-	fileHandle_t f;
-	int len;
-
 	trinityVersionLoaded = qtrue;
-	trinityVersion[0] = '\0';
-
-	len = trap_FS_FOpenFile( "trinity-version.txt", &f, FS_READ );
-	if ( f == FS_INVALID_HANDLE ) {
-		return;
-	}
-	if ( len >= (int)sizeof( trinityVersion ) ) {
-		len = sizeof( trinityVersion ) - 1;
-	}
-	trap_FS_Read( trinityVersion, len, f );
-	trinityVersion[len] = '\0';
-	trap_FS_FCloseFile( f );
-
-	while ( len > 0 && ( trinityVersion[len-1] == '\n' || trinityVersion[len-1] == '\r' || trinityVersion[len-1] == ' ' ) ) {
-		trinityVersion[--len] = '\0';
-	}
+	Q_strncpyz( trinityVersion, TRINITY_VERSION, sizeof( trinityVersion ) );
 
 	trinityIconShader = trap_R_RegisterShaderNoMip( "menu/art/trinity" );
 }
@@ -652,6 +634,23 @@ void _UI_Refresh( int realtime )
 	if ( ui_gameplay.modificationCount != uiInfo.lastGameplayModCount ) {
 		uiInfo.lastGameplayModCount = ui_gameplay.modificationCount;
 		trap_Cvar_SetValue( "g_gameplay", ui_gameplay.integer );
+	}
+
+	// Poll trinity login status — switch views on success
+	{
+		static char lastLoginStatus[32] = "";
+		char loginStatus[32];
+		trap_Cvar_VariableStringBuffer( "cl_trinityLoginStatus", loginStatus, sizeof(loginStatus) );
+		if ( Q_stricmp( loginStatus, lastLoginStatus ) != 0 ) {
+			Q_strncpyz( lastLoginStatus, loginStatus, sizeof(lastLoginStatus) );
+			if ( !Q_stricmp( loginStatus, "success" ) ) {
+				menuDef_t *loginMenu = Menus_FindByName("login_menu");
+				if ( loginMenu && ( loginMenu->window.flags & WINDOW_VISIBLE ) ) {
+					Menu_ShowItemByName(loginMenu, "grpLoggedIn", qtrue);
+					Menu_ShowItemByName(loginMenu, "grpLoginForm", qfalse);
+				}
+			}
+		}
 	}
 
 	if (Menu_Count() > 0) {
@@ -1780,6 +1779,13 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 		case UI_SERVERREFRESHDATE:
 			s = UI_Cvar_VariableString(va("ui_lastServerRefresh_%i", ui_netSource.integer));
 			break;
+		case UI_TRINITYLOGIN:
+			{
+				char trinityUser[64];
+				trap_Cvar_VariableStringBuffer( "cl_trinityUser", trinityUser, sizeof( trinityUser ) );
+				s = trinityUser[0] ? va( "%s", trinityUser ) : "Account";
+			}
+			break;
     default:
       break;
   }
@@ -2220,6 +2226,17 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 			break;
 		case UI_KEYBINDSTATUS:
 			UI_DrawKeyBindStatus(&rect,scale, color, textStyle);
+			break;
+		case UI_TRINITYLOGIN:
+			{
+				char trinityUser[64];
+				const char *label;
+				float tw;
+				trap_Cvar_VariableStringBuffer( "cl_trinityUser", trinityUser, sizeof( trinityUser ) );
+				label = trinityUser[0] ? trinityUser : "Account";
+				tw = Text_Width( label, scale, 0 );
+				Text_Paint( rect.x - tw, rect.y, scale, color, label, 0, 0, textStyle );
+			}
 			break;
     default:
       break;
@@ -3491,6 +3508,34 @@ static void UI_RunMenuScript(char **args) {
 		} else if (Q_stricmp(name, "Quit") == 0) {
 			trap_Cvar_Set("ui_singlePlayerActive", "0");
 			trap_Cmd_ExecuteText( EXEC_NOW, "quit");
+		} else if (Q_stricmp(name, "trinityLoginInit") == 0) {
+			// Show the right group based on login state
+			char trinityUser[64];
+			menuDef_t *loginMenu = Menus_FindByName("login_menu");
+			trap_Cvar_VariableStringBuffer( "cl_trinityUser", trinityUser, sizeof(trinityUser) );
+			if ( loginMenu ) {
+				if ( trinityUser[0] ) {
+					Menu_ShowItemByName(loginMenu, "grpLoggedIn", qtrue);
+					Menu_ShowItemByName(loginMenu, "grpLoggedInBtn", qtrue);
+					Menu_ShowItemByName(loginMenu, "grpLoginForm", qfalse);
+					Menu_ShowItemByName(loginMenu, "grpLoginBtn", qfalse);
+				} else {
+					Menu_ShowItemByName(loginMenu, "grpLoggedIn", qfalse);
+					Menu_ShowItemByName(loginMenu, "grpLoggedInBtn", qfalse);
+					Menu_ShowItemByName(loginMenu, "grpLoginForm", qtrue);
+					Menu_ShowItemByName(loginMenu, "grpLoginBtn", qtrue);
+				}
+			}
+		} else if (Q_stricmp(name, "trinityLogin") == 0) {
+			// Copy UI cvars to engine-protected cvars and trigger login
+			trap_Cvar_Set( "cl_trinityLoginUser", UI_Cvar_VariableString("ui_trinityLoginUser") );
+			trap_Cvar_Set( "cl_trinityLoginPass", UI_Cvar_VariableString("ui_trinityLoginPass") );
+			trap_Cvar_Set( "ui_trinityLoginPass", "" );
+			trap_Cmd_ExecuteText( EXEC_APPEND, "trinity_login\n" );
+		} else if (Q_stricmp(name, "trinityLogout") == 0) {
+			trap_Cmd_ExecuteText( EXEC_NOW, "trinity_logout\n" );
+			Menus_CloseByName("login_menu");
+			Menus_OpenByName("login_menu");
 		} else if (Q_stricmp(name, "Controls") == 0) {
 		  trap_Cvar_Set( "cl_paused", "1" );
 			trap_Key_SetCatcher( KEYCATCH_UI );
@@ -5230,6 +5275,7 @@ void _UI_Init( qboolean inGameLoad ) {
 	uiInfo.uiDC.getTeamColor = &UI_GetTeamColor;
 	uiInfo.uiDC.setCVar = trap_Cvar_Set;
 	uiInfo.uiDC.getCVarString = trap_Cvar_VariableStringBuffer;
+	uiInfo.uiDC.getClipboardData = trap_GetClipboardData;
 	uiInfo.uiDC.getCVarValue = trap_Cvar_VariableValue;
 	uiInfo.uiDC.drawTextWithCursor = &Text_PaintWithCursor;
 	uiInfo.uiDC.setOverstrikeMode = &trap_Key_SetOverstrikeMode;

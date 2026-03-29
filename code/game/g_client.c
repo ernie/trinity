@@ -963,6 +963,20 @@ void ClientBegin( int clientNum ) {
 	
 	client->pers.inGame = qtrue;
 
+	// Trinity handshake: generate nonce, challenge sent from G_RunFrame
+	// Skip if already verified (persists across map changes) or if bot
+	if ( g_trinityHandshake.integer && !client->pers.trinityVerified && !( ent->r.svFlags & SVF_BOT ) ) {
+		int i;
+		int hs_seed = trap_Milliseconds() ^ ( clientNum * 65537 );
+
+		for ( i = 0; i < 31; i++ ) {
+			Q_rand( &hs_seed );
+			client->pers.handshakeNonce[i] = "0123456789abcdef"[((unsigned)hs_seed >> 28) & 0xf];
+		}
+		client->pers.handshakeNonce[31] = '\0';
+		client->pers.handshakeTime = -(level.time + 1);  // negative = not yet sent (avoid 0)
+	}
+
 	G_LogPrintf( "ClientBegin: %i\n", clientNum );
 
 	// count current clients and rank for scoreboard

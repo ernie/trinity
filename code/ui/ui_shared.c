@@ -2037,6 +2037,24 @@ qboolean Item_TextField_HandleKey(itemDef_t *item, int key) {
 			key &= ~K_CHAR_FLAG;
 
 
+			if (key == 'v' - 'a' + 1 ) {	// ctrl-v is paste
+				char pasteBuffer[MAX_EDITFIELD];
+				int pasteLen, i;
+				DC->getClipboardData( pasteBuffer, sizeof(pasteBuffer) );
+				pasteLen = strlen( pasteBuffer );
+				for ( i = 0; i < pasteLen; i++ ) {
+					if ( pasteBuffer[i] < 32 ) continue;
+					if ( editPtr->maxChars && len >= editPtr->maxChars ) break;
+					if ( len >= MAX_EDITFIELD - 1 ) break;
+					memmove( &buff[item->cursorPos + 1], &buff[item->cursorPos], len + 1 - item->cursorPos );
+					buff[item->cursorPos] = pasteBuffer[i];
+					item->cursorPos++;
+					len++;
+				}
+				DC->setCVar(item->cvar, buff);
+				return qtrue;
+			}
+
 			if (key == 'h' - 'a' + 1 )	{	// ctrl-h is backspace
 				if ( item->cursorPos > 0 ) {
 					memmove( &buff[item->cursorPos - 1], &buff[item->cursorPos], len + 1 - item->cursorPos);
@@ -2768,12 +2786,13 @@ void Item_SetTextExtents(itemDef_t *item, int *width, int *height, const char *t
 	*height = item->textRect.h;
 
 	// keeps us from computing the widths and heights more than once
-	if (*width == 0 || (item->type == ITEM_TYPE_OWNERDRAW && item->textalignment == ITEM_ALIGN_CENTER)) {
+	// always recompute for ownerdraw and cvar-backed text (cvar value may change)
+	if (*width == 0 || (item->type == ITEM_TYPE_OWNERDRAW && item->textalignment == ITEM_ALIGN_CENTER) || (item->type == ITEM_TYPE_TEXT && item->text == NULL && item->cvar)) {
 		int originalWidth = DC->textWidth(item->text, item->textscale, 0);
 
 		if (item->type == ITEM_TYPE_OWNERDRAW && (item->textalignment == ITEM_ALIGN_CENTER || item->textalignment == ITEM_ALIGN_RIGHT)) {
 			originalWidth += DC->ownerDrawWidth(item->window.ownerDraw, item->textscale);
-		} else if (item->type == ITEM_TYPE_EDITFIELD && item->textalignment == ITEM_ALIGN_CENTER && item->cvar) {
+		} else if (item->type == ITEM_TYPE_TEXT && (item->textalignment == ITEM_ALIGN_CENTER || item->textalignment == ITEM_ALIGN_RIGHT) && item->cvar) {
 			char buff[256];
 			DC->getCVarString(item->cvar, buff, 256);
 			originalWidth += DC->textWidth(buff, item->textscale, 0);
@@ -3031,7 +3050,15 @@ void Item_TextField_Paint(itemDef_t *item) {
 
 	if (item->cvar) {
 		DC->getCVarString(item->cvar, buff, sizeof(buff));
-	} 
+	}
+
+	// Mask password fields
+	if (item->window.flags & WINDOW_PASSWORD) {
+		int i;
+		for (i = 0; buff[i]; i++) {
+			buff[i] = '*';
+		}
+	}
 
 	parent = (menuDef_t*)item->parent;
 
@@ -4506,6 +4533,11 @@ qboolean ItemParse_decoration( itemDef_t *item, int handle ) {
 	return qtrue;
 }
 
+qboolean ItemParse_password( itemDef_t *item, int handle ) {
+	item->window.flags |= WINDOW_PASSWORD;
+	return qtrue;
+}
+
 // notselectable
 qboolean ItemParse_notselectable( itemDef_t *item, int handle ) {
 	listBoxDef_t *listPtr;
@@ -5077,6 +5109,7 @@ keywordHash_t itemParseKeywords[] = {
 	{"rect", ItemParse_rect, NULL},
 	{"style", ItemParse_style, NULL},
 	{"decoration", ItemParse_decoration, NULL},
+	{"password", ItemParse_password, NULL},
 	{"notselectable", ItemParse_notselectable, NULL},
 	{"wrapped", ItemParse_wrapped, NULL},
 	{"autowrapped", ItemParse_autowrapped, NULL},

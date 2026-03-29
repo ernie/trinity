@@ -510,6 +510,21 @@ qboolean	ConsoleCommand( void ) {
 		return qtrue;
 	}
 
+	if ( Q_stricmp( cmd, "trinity_auth_fail" ) == 0 ) {
+		char arg[8];
+		int clientNum;
+
+		trap_Argv( 1, arg, sizeof( arg ) );
+		clientNum = atoi( arg );
+
+		if ( clientNum >= 0 && clientNum < level.maxclients &&
+		     level.clients[clientNum].pers.connected == CON_CONNECTED ) {
+			trap_SendServerCommand( clientNum, "trinity_auth_fail" );
+			G_Printf( "Trinity auth fail sent to client %i\n", clientNum );
+		}
+		return qtrue;
+	}
+
 	if (Q_stricmp (cmd, "sv_cmd") == 0) {
 		char	svcmd[MAX_TOKEN_CHARS];
 		char	clientStr[MAX_TOKEN_CHARS];

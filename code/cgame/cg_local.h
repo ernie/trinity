@@ -1772,6 +1772,7 @@ extern  qboolean intShaderTime;
 extern  qboolean linearLight;
 
 #ifdef Q3_VM
+extern qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 extern void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 extern void	(*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 #else

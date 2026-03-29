@@ -1855,6 +1855,79 @@ static void Cmd_Stats_f( gentity_t *ent ) {
 
 
 /*
+==================
+Cmd_TrinityHandshake_f
+
+Handle handshake response from client
+==================
+*/
+static void Cmd_TrinityHandshake_f( gentity_t *ent ) {
+	gclient_t	*client = ent->client;
+	char		nonce[32];
+	char		proto[8];
+	char		version[32];
+	char		engine[64];
+	char		username[20];
+	char		tokenHash[72];
+
+	if ( !g_trinityHandshake.integer ) {
+		return;
+	}
+
+	if ( client->pers.trinityVerified ) {
+		return;  // already verified
+	}
+
+	if ( trap_Argc() < 5 ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Invalid handshake response\n\"" );
+		return;
+	}
+
+	trap_Argv( 1, nonce, sizeof( nonce ) );
+	trap_Argv( 2, proto, sizeof( proto ) );
+	trap_Argv( 3, version, sizeof( version ) );
+	trap_Argv( 4, engine, sizeof( engine ) );
+
+	// Username and token hash are both present (authenticated) or both absent
+	if ( trap_Argc() >= 7 ) {
+		trap_Argv( 5, username, sizeof( username ) );
+		trap_Argv( 6, tokenHash, sizeof( tokenHash ) );
+	} else {
+		username[0] = '\0';
+		tokenHash[0] = '\0';
+	}
+
+	// Validate nonce
+	if ( Q_stricmp( nonce, client->pers.handshakeNonce ) != 0 ) {
+		trap_DropClient( ent - g_entities, "Trinity handshake failed: invalid nonce" );
+		return;
+	}
+
+	// Validate protocol version
+	if ( atoi( proto ) < 1 ) {
+		trap_DropClient( ent - g_entities, "Trinity handshake failed: unsupported protocol" );
+		return;
+	}
+
+	client->pers.trinityVerified = qtrue;
+
+	// Log handshake for tracker
+	if ( username[0] ) {
+		G_LogPrintf( "TrinityHandshake: %i %s %s %s %s %s\n",
+			(int)( ent - g_entities ),
+			proto, version, engine, username, tokenHash );
+	} else {
+		G_LogPrintf( "TrinityHandshake: %i %s %s %s\n",
+			(int)( ent - g_entities ),
+			proto, version, engine );
+	}
+
+	G_Printf( "Client %i Trinity handshake: proto=%s ver=%s engine=%s\n",
+		(int)( ent - g_entities ),
+		proto, version, engine );
+}
+
+/*
 =================
 ClientCommand
 =================
@@ -1969,6 +2042,8 @@ void ClientCommand( int clientNum ) {
 		Cmd_SetViewpos_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)
 		Cmd_Stats_f( ent );
+	else if (Q_stricmp (cmd, "trinity_handshake") == 0)
+		Cmd_TrinityHandshake_f (ent);
 	else
 		trap_SendServerCommand( clientNum, va( "print \"unknown cmd %s\n\"", cmd ) );
 }

@@ -5,6 +5,7 @@
 // be a valid snapshot this frame
 
 #include "cg_local.h"
+#include "../game/bg_hash.h"
 
 #ifdef MISSIONPACK // bk001204
 #include "../../ui/menudef.h" // bk001205 - for Q3_ui as well
@@ -1178,6 +1179,77 @@ static void CG_ServerCommand( void ) {
 
 	if ( !strcmp( cmd, "tinfo" ) ) {
 		CG_ParseTeamInfo();
+		return;
+	}
+
+	if ( !strcmp( cmd, "trinity_challenge" ) ) {
+		char hs_nonce[32];
+		char hs_version[64];
+		char hs_engine[64];
+		char hs_token[256];
+		char hs_user[20];
+		char hs_tokenHash[TRINITY_HASH_HEX_LEN];
+		char hs_response[512];
+		int k;
+
+		Q_strncpyz( hs_nonce, CG_Argv( 1 ), sizeof( hs_nonce ) );
+
+		CG_Printf( "^5Trinity handshake challenge received\n" );
+
+		// Trinity version (compiled in)
+		Q_strncpyz( hs_version, TRINITY_VERSION, sizeof( hs_version ) );
+		// Sanitize: spaces break trap_Argv positional parsing
+		for ( k = 0; hs_version[k]; k++ )
+			if ( hs_version[k] == ' ' ) hs_version[k] = '_';
+
+		// Determine engine
+		trap_Cvar_VariableStringBuffer( "com_engine", hs_engine, sizeof( hs_engine ) );
+		if ( !hs_engine[0] ) {
+			Q_strncpyz( hs_engine, "unknown", sizeof( hs_engine ) );
+		}
+		for ( k = 0; hs_engine[k]; k++ )
+			if ( hs_engine[k] == ' ' ) hs_engine[k] = '_';
+
+		// Hash auth token with nonce if token exists
+		hs_tokenHash[0] = '\0';
+		hs_user[0] = '\0';
+		trap_Cvar_VariableStringBuffer( "cl_trinityToken", hs_token, sizeof( hs_token ) );
+		trap_Cvar_VariableStringBuffer( "cl_trinityUser", hs_user, sizeof( hs_user ) );
+		if ( hs_token[0] && hs_user[0] ) {
+			BG_HashKeyed( hs_token, hs_nonce, hs_tokenHash );
+		} else if ( hs_token[0] && !hs_user[0] ) {
+			CG_Printf( "^3WARNING: cl_trinityToken is set but cl_trinityUser is empty. "
+				"Login again to authenticate.\n" );
+		} else if ( !hs_token[0] && hs_user[0] ) {
+			CG_Printf( "^3WARNING: cl_trinityUser is set but cl_trinityToken is empty. "
+				"Login again to authenticate.\n" );
+		}
+
+		// Build and send handshake response
+		if ( hs_tokenHash[0] && hs_user[0] ) {
+			Com_sprintf( hs_response, sizeof( hs_response ),
+				"trinity_handshake %s %i %s %s %s %s",
+				hs_nonce, TRINITY_PROTO_VERSION,
+				hs_version[0] ? hs_version : "unknown",
+				hs_engine, hs_user, hs_tokenHash );
+		} else {
+			Com_sprintf( hs_response, sizeof( hs_response ),
+				"trinity_handshake %s %i %s %s",
+				hs_nonce, TRINITY_PROTO_VERSION,
+				hs_version[0] ? hs_version : "unknown",
+				hs_engine );
+		}
+		trap_SendClientCommand( hs_response );
+		CG_Printf( "^5Trinity handshake sent: ^7%s ^3%s%s\n",
+			hs_version[0] ? hs_version : "unknown",
+			hs_engine,
+			hs_tokenHash[0] ? " ^2(token)" : "" );
+		return;
+	}
+
+	if ( !strcmp( cmd, "trinity_auth_fail" ) ) {
+		// Token/user cvars are cleared by the engine before this reaches cgame
+		CG_Printf( "^1Trinity auth token invalidated by server\n" );
 		return;
 	}
 

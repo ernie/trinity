@@ -2,7 +2,7 @@
 QA_SRC = \
  g_main $(QADIR)/g_syscalls.asm \
  ai_chat ai_cmd ai_dmnet ai_dmq3 ai_main ai_team ai_vcmd \
- bg_gameplay bg_lib bg_misc bg_pmove bg_slidemove \
+ bg_gameplay bg_lib bg_misc bg_pmove bg_hash bg_slidemove \
  g_active g_arenas g_bot g_client g_cmds g_combat g_items g_mem g_misc \
  g_missile g_mover g_rotation g_session g_spawn g_svcmds g_target g_team \
  g_trigger g_unlagged g_utils g_weapon \
@@ -17,7 +17,7 @@ CG_SRC = \
  cg_localents cg_marks cg_newdraw cg_players cg_playerstate \
  cg_predict cg_scoreboard cg_servercmds cg_snapshot cg_view cg_weapons \
  ui_shared \
- bg_gameplay bg_slidemove bg_pmove bg_lib bg_misc \
+ bg_gameplay bg_hash bg_slidemove bg_pmove bg_lib bg_misc \
  q_math q_shared \
 
 else
@@ -27,7 +27,7 @@ CG_SRC = \
  cg_consolecmds cg_draw cg_drawtools cg_effects cg_ents cg_event cg_info \
  cg_localents cg_marks cg_players cg_playerstate cg_predict cg_scoreboard \
  cg_servercmds cg_snapshot cg_view cg_weapons \
- bg_gameplay bg_slidemove bg_pmove bg_lib bg_misc \
+ bg_gameplay bg_hash bg_slidemove bg_pmove bg_lib bg_misc \
  q_math q_shared \
 
 endif
@@ -47,7 +47,7 @@ UI_SRC = \
  ui_main $(UIDIR)/ui_syscalls.asm \
  ui_addbots ui_atoms ui_cdkey ui_cinematics ui_confirm ui_connect \
  ui_controls2 ui_credits ui_demo2 ui_display ui_gameinfo ui_ingame \
- ui_loadconfig ui_menu ui_mfield ui_mods ui_network ui_options \
+ ui_loadconfig ui_login ui_menu ui_mfield ui_mods ui_network ui_options \
  ui_playermodel ui_players ui_playersettings ui_preferences ui_qmenu \
  ui_removebots ui_saveconfig ui_serverinfo ui_servers2 ui_setup ui_sound \
  ui_sparena ui_specifyserver ui_splevel ui_sppostgame ui_spskill \

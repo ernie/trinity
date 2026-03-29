@@ -1,5 +1,12 @@
 CONFIG ?= baseq3
 DISTDIR ?= .
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "unknown")
+# Windows _spawnvp needs extra escaping to survive argv->cmdline->argv round-trip
+ifeq ($(OS),Windows_NT)
+  VERSION_DEF = -DTRINITY_VERSION=\\\"$(VERSION)\\\"
+else
+  VERSION_DEF = -DTRINITY_VERSION=\"$(VERSION)\"
+endif
 include config-$(CONFIG).mk
 
 BD = vm-$(CONFIG)
@@ -20,13 +27,13 @@ dirs:
 ASSET_FILES = $(wildcard ../assets/*) $(wildcard ../assets/**/*) $(wildcard $(EXTRA_ASSETS)) $(wildcard $(EXTRA_ASSETS)/**/*)
 
 $(DISTDIR)/$(PK3): $(STAGING)/vm/qagame.qvm $(STAGING)/vm/cgame.qvm $(STAGING)/vm/ui.qvm $(ASSET_FILES)
-	git describe --tags --always > $(STAGING)/trinity-version.txt
-	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm trinity-version.txt ../../assets/* ../$(EXTRA_ASSETS)
+	echo $(VERSION) > $(STAGING)/trinity.ver
+	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm trinity.ver ../../assets/* ../$(EXTRA_ASSETS)
 
 $(STAGING)/vm/%.qvm: $(BD)/%.qvm
 	cp $< $@
 
-cc = cd $(BD)/$1 && $(Q3LCC) $2 -o $(notdir $@).tmp ../../$< && mv $(notdir $@).tmp $(notdir $@)
+cc = cd $(BD)/$1 && $(Q3LCC) $2 $(VERSION_DEF) -o $(notdir $@).tmp ../../$< && mv $(notdir $@).tmp $(notdir $@)
 qa_cc = $(call cc,game,$(QA_CFLAGS))
 cg_cc = $(call cc,cgame,$(CG_CFLAGS))
 ui_cc = $(call cc,ui,$(UI_CFLAGS))

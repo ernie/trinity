@@ -1,0 +1,268 @@
+#include "ui/menudef.h"
+
+{
+
+menuDef {
+	name "login_menu"
+	visible 0
+	fullscreen 1
+	rect 0 0 640 480
+	background "menuback_a"
+	style 1
+	focusColor 1 .75 0 1
+
+	onOpen {
+		play "sound/misc/kcswish.wav" ;
+		uiScript trinityLoginInit
+	}
+	onEsc { close login_menu ; open main }
+
+	// Background panel
+	itemDef {
+		name window
+		rect 170 100 300 280
+		style WINDOW_STYLE_FILLED
+		border 1
+		bordersize 1
+		bordercolor .5 .5 .5 .5
+		backcolor 0 0 0 .7
+		visible 1
+		decoration
+	}
+
+	// Inner panel
+	itemDef {
+		name window
+		rect 180 110 280 260
+		style WINDOW_STYLE_FILLED
+		border 1
+		bordersize 1
+		bordercolor .3 .3 .3 .3
+		backcolor 0 0 .1 .5
+		visible 1
+		decoration
+	}
+
+	// Title
+	itemDef {
+		name title
+		text "TRINITY ACCOUNT"
+		style 0
+		textstyle 6
+		rect 170 125 300 30
+		textalign 1
+		textalignx 150
+		textaligny 24
+		textscale .4
+		forecolor 1 1 1 1
+		visible 1
+		decoration
+	}
+
+	// Separator line under title
+	itemDef {
+		name separator
+		rect 200 155 240 1
+		style WINDOW_STYLE_FILLED
+		backcolor .5 .5 .5 .5
+		visible 1
+		decoration
+	}
+
+	// --- Logged-in view ---
+
+	itemDef {
+		name grpLoggedIn
+		type ITEM_TYPE_TEXT
+		text "Logged in as"
+		style 0
+		textstyle 6
+		rect 170 180 300 20
+		textalign 1
+		textalignx 150
+		textaligny 16
+		textscale .25
+		forecolor .8 .8 .8 1
+		visible 0
+		decoration
+	}
+
+	itemDef {
+		name grpLoggedIn
+		type ITEM_TYPE_TEXT
+		cvar "cl_trinityUser"
+		style 0
+		textstyle 6
+		rect 170 205 300 20
+		textalign 1
+		textalignx 150
+		textaligny 16
+		textscale .4
+		forecolor 1 .75 0 1
+		visible 0
+		decoration
+	}
+
+	// Logout button
+	itemDef {
+		name grpLoggedInBtn
+		text "Logout"
+		type 1
+		style WINDOW_STYLE_FILLED
+		textstyle 6
+		rect 280 260 80 26
+		textalign 1
+		textalignx 40
+		textaligny 20
+		textscale .28
+		forecolor 1 1 1 1
+		backcolor .37 .1 .1 1
+		visible 0
+		action { play "sound/misc/kcaction.wav" ;
+		uiScript trinityLogout }
+		mouseEnter { setitemcolor grpLoggedInBtn backcolor .1 .37 .1 1 }
+		mouseExit { setitemcolor grpLoggedInBtn backcolor .37 .1 .1 1 }
+	}
+
+	// --- Login form ---
+
+	itemDef {
+		name grpLoginForm
+		type ITEM_TYPE_EDITFIELD
+		text "Name:"
+		cvar "ui_trinityLoginUser"
+		textstyle 6
+		maxChars 32
+		style WINDOW_STYLE_FILLED
+		rect 200 175 240 22
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 72
+		textaligny 17
+		textscale .28
+		forecolor 1 1 1 1
+		backcolor 0 0 0 .5
+		visible 1
+		mouseEnter { setitemcolor grpLoginForm backcolor 0 0 0 .75 }
+		mouseExit { setitemcolor grpLoginForm backcolor 0 0 0 .5 }
+	}
+
+	itemDef {
+		name grpLoginForm
+		type ITEM_TYPE_EDITFIELD
+		text "Password:"
+		cvar "ui_trinityLoginPass"
+		textstyle 6
+		maxChars 32
+		style WINDOW_STYLE_FILLED
+		rect 200 205 240 22
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 72
+		textaligny 17
+		textscale .28
+		forecolor 1 1 1 1
+		backcolor 0 0 0 .5
+		visible 1
+		password
+		mouseEnter { setitemcolor grpLoginForm backcolor 0 0 0 .75 }
+		mouseExit { setitemcolor grpLoginForm backcolor 0 0 0 .5 }
+	}
+
+	// Status text
+	itemDef {
+		name grpLoginForm
+		text "Logging in..."
+		style 0
+		textstyle 6
+		rect 170 235 300 20
+		textalign 1
+		textalignx 150
+		textaligny 16
+		textscale .25
+		forecolor 1 1 0 1
+		visible 1
+		cvarTest "cl_trinityLoginStatus"
+		showCvar { "pending" }
+		decoration
+	}
+
+	itemDef {
+		name grpLoginForm
+		text "Login failed."
+		style 0
+		textstyle 6
+		rect 170 235 300 20
+		textalign 1
+		textalignx 150
+		textaligny 16
+		textscale .25
+		forecolor 1 0 0 1
+		visible 1
+		cvarTest "cl_trinityLoginStatus"
+		showCvar { "failed" }
+		decoration
+	}
+
+	// Login button
+	itemDef {
+		name grpLoginBtn
+		text "Login"
+		type 1
+		style WINDOW_STYLE_FILLED
+		textstyle 6
+		rect 280 265 80 26
+		textalign 1
+		textalignx 40
+		textaligny 20
+		textscale .28
+		forecolor 1 1 1 1
+		backcolor .37 .1 .1 1
+		visible 1
+		action { play "sound/misc/kcaction.wav" ;
+		uiScript trinityLogin }
+		mouseEnter { setitemcolor grpLoginBtn backcolor .1 .37 .1 1 }
+		mouseExit { setitemcolor grpLoginBtn backcolor .37 .1 .1 1 }
+	}
+
+	// Back arrow (bottom-left, always visible)
+	itemDef {
+		name back
+		style 3
+		background "ui/assets/backarrow.tga"
+		rect 16 424 50 50
+		visible 1
+		action { close login_menu ; open main }
+		mouseEnter { hide back ; show back_alt ; show message_back }
+	}
+
+	itemDef {
+		name back_alt
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/backarrow_alt.tga"
+		rect 14 422 54 54
+		backcolor 0 0 0 0
+		forecolor 1 1 1 1
+		visible 0
+		type ITEM_TYPE_BUTTON
+		mouseExit { hide back_alt ; show back ; hide message_back }
+		action { close login_menu ; open main }
+	}
+
+	itemDef {
+		name message_back
+		group grpmessage
+		style 0
+		rect 320 430 128 30
+		textstyle 1
+		textalign 1
+		textalignx 0
+		textaligny 25
+		textscale .416
+		text "Back"
+		forecolor 1 1 1 1
+		decoration
+		visible 0
+	}
+}
+
+
+}
