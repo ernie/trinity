@@ -419,12 +419,12 @@ int Pickup_Armor( gentity_t *ent, gentity_t *other ) {
 			pickupValue = gp->armorGAPickupValue;
 			maxArmor = gp->armorGAMax;
 		} else {
-			// Shard: add value, cap at current tier's max
+			// Shard: add value, cap at RA max (shards bypass tier caps in CPM)
 			if ( curArmor <= 0 ) {
 				other->client->ps.stats[STAT_ARMORTYPE] = ARMORTYPE_GA;
 			}
 			other->client->ps.stats[STAT_ARMOR] = curArmor + gp->armorShardValue;
-			maxArmor = GP_ArmorMax( gp, other->client->ps.stats[STAT_ARMORTYPE] );
+			maxArmor = gp->armorRAMax;
 			if ( other->client->ps.stats[STAT_ARMOR] > maxArmor ) {
 				other->client->ps.stats[STAT_ARMOR] = maxArmor;
 			}
