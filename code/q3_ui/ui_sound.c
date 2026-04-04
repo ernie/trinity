@@ -25,6 +25,7 @@ SOUND OPTIONS MENU
 #define ID_QUALITY			16
 //#define ID_A3D				17
 #define ID_BACK				18
+#define ID_VOIPVOLUME		19
 
 
 static const char *quality_items[] = {
@@ -47,6 +48,7 @@ typedef struct {
 	menuslider_s		musicvolume;
 	menulist_s			quality;
 //	menuradiobutton_s	a3d;
+	menuslider_s		voipvolume;
 
 	menubitmap_s		back;
 } soundOptionsInfo_t;
@@ -89,6 +91,10 @@ static void UI_SoundOptionsMenu_Event( void* ptr, int event ) {
 
 	case ID_MUSICVOLUME:
 		trap_Cvar_SetValue( "s_musicvolume", soundOptionsInfo.musicvolume.curvalue / 10 );
+		break;
+
+	case ID_VOIPVOLUME:
+		trap_Cvar_SetValue( "cl_voipVolume", soundOptionsInfo.voipvolume.curvalue / 5 );
 		break;
 
 	case ID_QUALITY:
@@ -222,6 +228,17 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.musicvolume.maxvalue			= 10;
 
 	y += BIGCHAR_HEIGHT+2;
+	soundOptionsInfo.voipvolume.generic.type		= MTYPE_SLIDER;
+	soundOptionsInfo.voipvolume.generic.name		= "VOIP Volume:";
+	soundOptionsInfo.voipvolume.generic.flags	= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	soundOptionsInfo.voipvolume.generic.callback	= UI_SoundOptionsMenu_Event;
+	soundOptionsInfo.voipvolume.generic.id		= ID_VOIPVOLUME;
+	soundOptionsInfo.voipvolume.generic.x		= 400;
+	soundOptionsInfo.voipvolume.generic.y		= y;
+	soundOptionsInfo.voipvolume.minvalue		= 0;
+	soundOptionsInfo.voipvolume.maxvalue		= 10;
+
+	y += BIGCHAR_HEIGHT+2;
 	soundOptionsInfo.quality.generic.type		= MTYPE_SPINCONTROL;
 	soundOptionsInfo.quality.generic.name		= "Sound Quality:";
 	soundOptionsInfo.quality.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -260,6 +277,7 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.network );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.sfxvolume );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.musicvolume );
+	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.voipvolume );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.quality );
 //	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.a3d );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.back );
@@ -267,6 +285,7 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.sfxvolume.curvalue = trap_Cvar_VariableValue( "s_volume" ) * 10;
 	soundOptionsInfo.musicvolume.curvalue = trap_Cvar_VariableValue( "s_musicvolume" ) * 10;
 	soundOptionsInfo.quality.curvalue = !trap_Cvar_VariableValue( "s_compression" );
+	soundOptionsInfo.voipvolume.curvalue = trap_Cvar_VariableValue( "cl_voipVolume" ) * 5;
 //	soundOptionsInfo.a3d.curvalue = (int)trap_Cvar_VariableValue( "s_usingA3D" );
 }
 
