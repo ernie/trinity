@@ -1484,7 +1484,36 @@ void CG_DrawMedal(int ownerDraw, rectDef_t *rect, float scale, vec4_t color, qha
 
 }
 
-	
+
+static void CG_DrawPlayerVoipBadge(rectDef_t *rect) {
+	vec4_t txColor;
+	qboolean transmitting;
+
+	if (cg.demoPlayback || cgs.tvPlayback) {
+		int cn = cg.snap->ps.clientNum;
+		transmitting = cg.voipTalking[cn];
+		if (cgs.voipVersion >= 2 && cg.voipChannel[cn]) {
+			CG_VoipChannelFlagsToColor(cg.voipChannel[cn], txColor);
+		} else {
+			VectorSet(txColor, 1.0f, 1.0f, 1.0f);
+		}
+	} else {
+		transmitting = CG_GetVoipChannelColor(txColor);
+	}
+
+	if (transmitting) {
+		txColor[3] = 0.5f + 0.3f * sin(cg.time * 0.008f);
+	} else {
+		txColor[3] = 0.2f;
+	}
+
+	trap_R_SetColor(txColor);
+	CG_DrawPic(rect->x, rect->y, rect->w, rect->h,
+		transmitting ? cgs.media.speakerShader : cgs.media.speakerIdleShader);
+	trap_R_SetColor(NULL);
+}
+
+
 //
 void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle) {
 	rectDef_t rect;
@@ -1668,6 +1697,9 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
   case CG_2NDPLACE:
     CG_Draw2ndPlace(&rect, scale, color, shader, textStyle);
 		break;
+  case CG_PLAYER_VOIP_BADGE:
+    CG_DrawPlayerVoipBadge(&rect);
+    break;
   default:
     break;
   }

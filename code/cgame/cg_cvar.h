@@ -81,6 +81,7 @@ CG_CVAR( cg_drawTeamOverlay, "cg_drawTeamOverlay", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_teamOverlayUserinfo, "teamoverlay", "0", CVAR_ROM | CVAR_USERINFO )
 CG_CVAR( cg_stats, "cg_stats", "0", 0 )
 CG_CVAR( cg_drawFriend, "cg_drawFriend", "1", CVAR_ARCHIVE )
+CG_CVAR( cg_drawVoipSpeakers, "cg_drawVoipSpeakers", "1", CVAR_ARCHIVE )
 CG_CVAR( cg_teamChatsOnly, "cg_teamChatsOnly", "0", CVAR_ARCHIVE )
 #ifdef MISSIONPACK
 CG_CVAR( cg_noVoiceChats, "cg_noVoiceChats", "0", CVAR_ARCHIVE )

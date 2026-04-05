@@ -210,8 +210,12 @@ typedef enum {
 
 	CG_MOUSE_EVENT,
 //	void	(*CG_MouseEvent)( int dx, int dy );
-	CG_EVENT_HANDLING
+	CG_EVENT_HANDLING,
 //	void (*CG_EventHandling)(int type);
+
+	CG_VOIP_TEAM
+//	int (*CG_VoipTeam)( void );
+//	Sets cl_voipSendTarget to comma-separated teammate IDs. Returns 0 on success, -1 on failure.
 } cgameExport_t;
 
 //----------------------------------------------

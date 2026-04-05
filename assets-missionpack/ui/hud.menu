@@ -377,8 +377,17 @@ menuDef {
 	rect 70 10 45 45
 	visible 1
     	decoration
-	ownerdraw CG_PLAYER_HEAD 
+	ownerdraw CG_PLAYER_HEAD
 	}
+
+	itemDef {
+	name "voipBadge"
+	rect 99 39 16 16
+	visible 1
+	decoration
+	ownerdraw CG_PLAYER_VOIP_BADGE
+	}
+
   	}
 
 

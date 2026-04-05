@@ -71,6 +71,15 @@ DLLEXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2 ) {
 	case CG_EVENT_HANDLING:
 		CG_EventHandling(arg0);
 		return 0;
+	case CG_VOIP_TEAM:
+		{
+			char target[256];
+			if ( CG_BuildTeamVoipTarget( target, sizeof( target ) ) ) {
+				trap_Cvar_Set( "cl_voipTeamTargets", target );
+				return 0;
+			}
+			return -1;
+		}
 	default:
 		CG_Error( "vmMain: unknown command %i", command );
 		break;
@@ -201,6 +210,97 @@ void CG_UpdateCvars( void ) {
 		teamColorsModificationCount = cg_teamColors.modificationCount;
 
 		CG_ForceModelChange();
+	}
+}
+
+
+static int CG_HexDigit( char c ) {
+	if ( c >= '0' && c <= '9' ) return c - '0';
+	if ( c >= 'a' && c <= 'f' ) return c - 'a' + 10;
+	if ( c >= 'A' && c <= 'F' ) return c - 'A' + 10;
+	return 0;
+}
+
+static void CG_ParseHexBitmask( const char *hex, qboolean *out, int count ) {
+	byte mask[(MAX_CLIENTS + 7) / 8];
+	int i, len;
+
+	Com_Memset( mask, 0, sizeof( mask ) );
+	len = strlen( hex );
+
+	for ( i = 0; i < len && i < (int)sizeof(mask) * 2; i += 2 ) {
+		int byteIdx = i / 2;
+		int hi = CG_HexDigit( hex[i] );
+		int lo = ( i + 1 < len ) ? CG_HexDigit( hex[i + 1] ) : 0;
+		mask[byteIdx] = (byte)( (hi << 4) | lo );
+	}
+
+	for ( i = 0; i < count && i < MAX_CLIENTS; i++ ) {
+		out[i] = ( mask[i / 8] & ( 1 << (i % 8) ) ) ? qtrue : qfalse;
+	}
+}
+
+static qboolean CG_TrapGetValueAvailable( void ) {
+#ifdef Q3_VM
+	return trap_GetValue != NULL;
+#else
+	return dll_com_trapGetValue != 0;
+#endif
+}
+
+void CG_UpdateVoipTalkingState( void ) {
+	char value[MAX_CLIENTS / 4 + 2];
+	int i;
+
+	if ( !CG_TrapGetValueAvailable() ) {
+		return;
+	}
+
+	if ( trap_GetValue( value, sizeof( value ), "voip_talking" ) ) {
+		CG_ParseHexBitmask( value, cg.voipTalking, MAX_CLIENTS );
+	} else {
+		for ( i = 0; i < MAX_CLIENTS; i++ ) {
+			cg.voipTalking[i] = qfalse;
+		}
+	}
+}
+
+void CG_UpdateVoipChannelState( void ) {
+	char value[MAX_CLIENTS * 2 + 2];
+	int i;
+
+	if ( !CG_TrapGetValueAvailable() || cgs.voipVersion < 2 ) {
+		return;
+	}
+
+	if ( trap_GetValue( value, sizeof( value ), "voip_channels" ) ) {
+		int len = strlen( value );
+		for ( i = 0; i < MAX_CLIENTS; i++ ) {
+			if ( i * 2 + 1 < len ) {
+				int hi = CG_HexDigit( value[i * 2] );
+				int lo = CG_HexDigit( value[i * 2 + 1] );
+				cg.voipChannel[i] = (hi << 4) | lo;
+			} else {
+				cg.voipChannel[i] = 0;
+			}
+		}
+	}
+}
+
+void CG_UpdateVoipMuteState( void ) {
+	char value[MAX_CLIENTS / 4 + 2];
+	int i;
+
+	if ( !CG_TrapGetValueAvailable() ) {
+		return;
+	}
+
+	if ( trap_GetValue( value, sizeof( value ), "voip_muted" ) ) {
+		CG_ParseHexBitmask( value, cgs.voipMuted, MAX_CLIENTS );
+	} else {
+		for ( i = 0; i < MAX_CLIENTS; i++ ) {
+			cgs.voipMuted[i] = qfalse;
+		}
 	}
 }
 
@@ -821,6 +921,8 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.smoke2 = trap_R_RegisterModel( "models/weapons2/shells/s_shell.md3" );
 
 	cgs.media.balloonShader = trap_R_RegisterShader( "sprites/balloon3" );
+	cgs.media.speakerShader = trap_R_RegisterShader( "gfx/2d/speaker" );
+	cgs.media.speakerIdleShader = trap_R_RegisterShader( "gfx/2d/speaker_idle" );
 
 	cgs.media.bloodExplosionShader = trap_R_RegisterShader( "bloodExplosion" );
 
@@ -1359,7 +1461,7 @@ static qboolean CG_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, 
 }
 
 
-static int CG_FeederCount(float feederID) {
+int CG_FeederCount(float feederID) {
 	int i, count;
 	count = 0;
 	if (feederID == FEEDER_REDTEAM_LIST) {
@@ -1416,7 +1518,7 @@ void CG_SetScoreSelection(void *p) {
 }
 
 // FIXME: might need to cache this info
-static clientInfo_t * CG_InfoFromScoreIndex(int index, int team, int *scoreIndex) {
+clientInfo_t * CG_InfoFromScoreIndex(int index, int team, int *scoreIndex) {
 	int i, count;
 	if ( cgs.gametype >= GT_TEAM ) {
 		count = 0;
@@ -1839,6 +1941,14 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 
 	CG_ParseServerinfo();
 	CG_ParseSysteminfo();
+
+	// query engine VOIP version
+	{
+		char val[8];
+		if ( CG_TrapGetValueAvailable() && trap_GetValue( val, sizeof( val ), "voip_version" ) ) {
+			cgs.voipVersion = atoi( val );
+		}
+	}
 
 	// load the new map
 	CG_LoadingString( "collision map" );

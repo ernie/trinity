@@ -143,11 +143,52 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 	VectorClear( headAngles );
 	headAngles[YAW] = 180;
 	if( largeFormat ) {
-		CG_DrawHead( headx, y - ( ICON_SIZE - BIGCHAR_HEIGHT ) / 2, ICON_SIZE, ICON_SIZE, 
+		CG_DrawHead( headx, y - ( ICON_SIZE - BIGCHAR_HEIGHT ) / 2, ICON_SIZE, ICON_SIZE,
 			score->client, headAngles );
 	}
 	else {
 		CG_DrawHead( headx, y, 16, 16, score->client, headAngles );
+	}
+
+	// draw VOIP status overlay on head portrait
+	if ( ci->voipEnabled || cgs.voipMuted[score->client] ) {
+		vec4_t voipColor;
+		int hx, hy, hsz;
+		qboolean talking;
+
+		if ( largeFormat ) {
+			hsz = ICON_SIZE / 3;
+			hx = headx + ICON_SIZE - hsz;
+			hy = y - ( ICON_SIZE - BIGCHAR_HEIGHT ) / 2 + ICON_SIZE - hsz;
+		} else {
+			hsz = 8;
+			hx = headx + 16 - 8;
+			hy = y + 16 - 8;
+		}
+
+		if ( cgs.voipMuted[score->client] ) {
+			voipColor[0] = 1.0f; voipColor[1] = 0.2f; voipColor[2] = 0.2f; voipColor[3] = 0.5f;
+			talking = qfalse;
+		} else if ( score->client == cg.snap->ps.clientNum && !cg.demoPlayback && !cgs.tvPlayback ) {
+			talking = CG_GetVoipChannelColor( voipColor );
+			voipColor[3] = talking ? 0.8f : 0.2f;
+		} else if ( cg.voipTalking[score->client] ) {
+			if ( cgs.voipVersion >= 2 && cg.voipChannel[score->client] ) {
+				CG_VoipChannelFlagsToColor( cg.voipChannel[score->client], voipColor );
+			} else {
+				VectorSet( voipColor, 1.0f, 1.0f, 1.0f );
+			}
+			voipColor[3] = 0.8f;
+			talking = qtrue;
+		} else {
+			voipColor[0] = 1.0f; voipColor[1] = 1.0f; voipColor[2] = 1.0f; voipColor[3] = 0.2f;
+			talking = qfalse;
+		}
+
+		trap_R_SetColor( voipColor );
+		CG_DrawPic( hx, hy, hsz, hsz, talking
+			? cgs.media.speakerShader : cgs.media.speakerIdleShader );
+		trap_R_SetColor( NULL );
 	}
 
 #ifdef MISSIONPACK
@@ -348,6 +389,9 @@ qboolean CG_DrawOldScoreboard( void ) {
 		}
 		fade = fadeColor[3];
 	}
+
+	// refresh VOIP mute state for scoreboard display
+	CG_UpdateVoipMuteState();
 
 	// fragged by ... line
 	if ( cg.killerName[0] ) {

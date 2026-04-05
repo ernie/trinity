@@ -1554,6 +1554,10 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// update cvars
 	CG_UpdateCvars();
 
+	// update VOIP state
+	CG_UpdateVoipTalkingState();
+	CG_UpdateVoipChannelState();
+
 	// if we are only updating the screen as a loading
 	// pacifier, don't even try to read snapshots
 	if ( cg.infoScreenText[0] != 0 ) {

@@ -5,6 +5,11 @@
 #include "../game/bg_public.h"
 #include "cg_public.h"
 
+// VOIP channel flags (must match engine q_shared.h)
+#define VOIP_SPATIAL	0x01
+#define VOIP_DIRECT		0x02
+#define VOIP_TEAM		0x04
+#define VOIP_ALL		0x08
 
 // The entire cgame module is unloaded and reloaded on each level change,
 // so there is NO persistant data between levels on the client side.
@@ -334,6 +339,7 @@ typedef struct {
 
 	int				botSkill;		// 0 = not bot, 1-5 = bot
 	qboolean		vrPlayer;		// qtrue if VR client
+	qboolean		voipEnabled;	// qtrue if client has VOIP support
 
 	vec3_t			color1;
 	vec3_t			color2;
@@ -729,6 +735,11 @@ typedef struct {
 	// local vote tracking (0=not voted, 1=yes, -1=no)
 	int				myVote;
 	int				myTeamVote;
+
+	// VOIP state
+	qboolean		voipTalking[MAX_CLIENTS];
+	int				voipTalkingTime[MAX_CLIENTS];	// cg.time when last seen talking (for HUD fade)
+	int				voipChannel[MAX_CLIENTS];		// per-client channel flags from engine
 } cg_t;
 
 
@@ -815,6 +826,8 @@ typedef struct {
 	qhandle_t	friendShader;
 
 	qhandle_t	balloonShader;
+	qhandle_t	speakerShader;
+	qhandle_t	speakerIdleShader;
 	qhandle_t	connectionShader;
 
 	qhandle_t	selectShader;
@@ -1216,6 +1229,10 @@ typedef struct {
 	qboolean		tvScrubActive;		// currently scrubbing the timeline
 	int				tvScrubKey;			// keycode that activated scrub (for phantom key-up filtering)
 	qboolean		tvScrubFilterKeyUp;	// filter phantom -tv_scrub from catcher change
+
+	// VOIP state
+	int				voipVersion;				// engine VOIP version (0 = legacy, 2 = channels)
+	qboolean		voipMuted[MAX_CLIENTS];
 } cgs_t;
 
 //==============================================================================
@@ -1246,6 +1263,14 @@ void QDECL CG_Error( const char *msg, ... );
 void CG_StartMusic( void );
 
 void CG_UpdateCvars( void );
+void CG_UpdateVoipTalkingState( void );
+void CG_UpdateVoipChannelState( void );
+void CG_UpdateVoipMuteState( void );
+qboolean CG_GetVoipChannelColor( vec3_t color );
+void CG_VoipChannelFlagsToColor( int flags, vec3_t color );
+
+int CG_FeederCount( float feederID );
+clientInfo_t *CG_InfoFromScoreIndex( int index, int team, int *scoreIndex );
 
 int CG_CrosshairPlayer( void );
 int CG_LastAttacker( void );
@@ -1521,6 +1546,7 @@ void CG_ScoreboardClick( void );
 //
 qboolean CG_ConsoleCommand( void );
 void CG_InitConsoleCommands( void );
+qboolean CG_BuildTeamVoipTarget( char *buf, int bufSize );
 qboolean CG_VoteActive( void );
 qboolean CG_TeamVoteActive( void );
 qboolean CG_TVDOfferActive( void );

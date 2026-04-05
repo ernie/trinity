@@ -635,6 +635,42 @@ static void CG_DrawStatusBar( void ) {
 
 	CG_DrawStatusBarHead( 185 + CHAR_WIDTH*3 + TEXT_ICON_SPACE );
 
+	// VOIP target/transmit indicator on player portrait
+	{
+		vec4_t txColor;
+		qboolean transmitting;
+		float headsize = ICON_SIZE * 1.25f;
+		float headx = 185 + CHAR_WIDTH*3 + TEXT_ICON_SPACE;
+		float heady = cgs.screenYmax + 1 - headsize;
+		float bsz = headsize * 0.35f;
+		float bx = headx + headsize - bsz;
+		float by = heady + headsize - bsz;
+
+		if ( cg.demoPlayback || cgs.tvPlayback ) {
+			// during playback, use channel info from engine for followed player
+			int cn = cg.snap->ps.clientNum;
+			transmitting = cg.voipTalking[cn];
+			if ( cgs.voipVersion >= 2 && cg.voipChannel[cn] ) {
+				CG_VoipChannelFlagsToColor( cg.voipChannel[cn], txColor );
+			} else {
+				VectorSet( txColor, 1.0f, 1.0f, 1.0f );
+			}
+		} else {
+			transmitting = CG_GetVoipChannelColor( txColor );
+		}
+
+		if ( transmitting ) {
+			txColor[3] = 0.5f + 0.3f * sin( cg.time * 0.008f );
+		} else {
+			txColor[3] = 0.2f;
+		}
+
+		trap_R_SetColor( txColor );
+		CG_DrawPic( bx, by, bsz, bsz, transmitting
+			? cgs.media.speakerShader : cgs.media.speakerIdleShader );
+		trap_R_SetColor( NULL );
+	}
+
 	if( cg.predictedPlayerState.powerups[PW_REDFLAG] ) {
 		CG_DrawStatusBarFlag( 185 + CHAR_WIDTH*3 + TEXT_ICON_SPACE + ICON_SIZE, TEAM_RED );
 	} else if( cg.predictedPlayerState.powerups[PW_BLUEFLAG] ) {
@@ -1223,6 +1259,133 @@ static float CG_DrawModeIndicators( float y ) {
 
 /*
 =====================
+CG_GetVoipChannelColor
+
+Sets RGB based on cl_voipSendTarget value.
+Returns qtrue if actively transmitting.
+=====================
+*/
+qboolean CG_GetVoipChannelColor( vec3_t color ) {
+	char voipSend[4];
+	char target[256];
+	int flags = 0;
+
+	trap_Cvar_VariableStringBuffer( "cl_voipSend", voipSend, sizeof( voipSend ) );
+	trap_Cvar_VariableStringBuffer( "cl_voipSendTarget", target, sizeof( target ) );
+
+	// derive flags from target string
+	if ( !Q_stricmp( target, "all" ) ) {
+		flags = VOIP_ALL;
+	} else if ( !Q_stricmp( target, "spatial" ) ) {
+		flags = VOIP_SPATIAL;
+	} else if ( !Q_stricmp( target, "team" ) ) {
+		flags = VOIP_TEAM;
+	} else if ( target[0] >= '0' && target[0] <= '9' ) {
+		flags = VOIP_DIRECT;
+	}
+
+	CG_VoipChannelFlagsToColor( flags, color );
+	return atoi( voipSend ) != 0;
+}
+
+
+/*
+=====================
+CG_VoipChannelFlagsToColor
+
+Map VOIP channel flags to a display color.
+Priority: direct > all > team > spatial > white
+=====================
+*/
+void CG_VoipChannelFlagsToColor( int flags, vec3_t color ) {
+	if ( (flags & VOIP_DIRECT) && !(flags & (VOIP_TEAM | VOIP_ALL)) ) {
+		VectorSet( color, 1.0f, 0.2f, 1.0f );	// magenta (direct)
+	} else if ( flags & VOIP_ALL ) {
+		VectorSet( color, 0.2f, 1.0f, 0.2f );	// green (all)
+	} else if ( flags & VOIP_TEAM ) {
+		VectorSet( color, 0.2f, 1.0f, 1.0f );	// cyan (team)
+	} else if ( flags & VOIP_SPATIAL ) {
+		VectorSet( color, 1.0f, 1.0f, 0.2f );	// yellow (spatial)
+	} else {
+		VectorSet( color, 1.0f, 1.0f, 1.0f );	// white (unknown/legacy)
+	}
+}
+
+
+/*
+=====================
+CG_DrawVoipSpeakers
+
+Show a stack of player names for active VOIP speakers.
+Fades out 300ms after they stop talking.
+=====================
+*/
+#define VOIP_SPEAKER_DISPLAY_TIME	1000
+#define VOIP_SPEAKER_FADE_TIME		300
+#define VOIP_SPEAKER_ICON_SIZE		8
+
+static float CG_DrawVoipSpeakers( float y ) {
+	int		i;
+	float	x;
+	float	*fadeColor;
+	vec4_t	bgColor;
+
+	if ( !cg_drawVoipSpeakers.integer ) {
+		return y;
+	}
+
+	for ( i = 0; i < cgs.maxclients; i++ ) {
+		if ( cg.voipTalking[i] ) {
+			cg.voipTalkingTime[i] = cg.time;
+		}
+
+		if ( !cg.voipTalkingTime[i] ) {
+			continue;
+		}
+
+		fadeColor = CG_FadeColorTime( cg.voipTalkingTime[i], VOIP_SPEAKER_DISPLAY_TIME, VOIP_SPEAKER_FADE_TIME );
+		if ( !fadeColor ) {
+			cg.voipTalkingTime[i] = 0;
+			continue;
+		}
+
+		if ( !cgs.clientinfo[i].infoValid ) {
+			continue;
+		}
+
+		// background rect
+		x = cgs.screenXmax + 1 - 120;
+		bgColor[0] = 0.0f; bgColor[1] = 0.0f; bgColor[2] = 0.0f; bgColor[3] = 0.33f * fadeColor[3];
+		CG_FillRect( x, y, 120, TINYCHAR_HEIGHT + 2, bgColor );
+
+		// speaker icon — channel-colored, with waves while talking
+		{
+			vec4_t iconColor;
+			if ( cgs.voipVersion >= 2 && cg.voipChannel[i] ) {
+				CG_VoipChannelFlagsToColor( cg.voipChannel[i], iconColor );
+			} else {
+				VectorSet( iconColor, 1.0f, 1.0f, 1.0f );
+			}
+			iconColor[3] = fadeColor[3];
+			trap_R_SetColor( iconColor );
+			CG_DrawPic( x + 2, y + 1, VOIP_SPEAKER_ICON_SIZE, VOIP_SPEAKER_ICON_SIZE,
+				cg.voipTalking[i] ? cgs.media.speakerShader : cgs.media.speakerIdleShader );
+			trap_R_SetColor( NULL );
+		}
+
+		// player name
+		CG_DrawString( x + 2 + VOIP_SPEAKER_ICON_SIZE + 2, y + 1, cgs.clientinfo[i].name,
+			fadeColor, TINYCHAR_WIDTH, TINYCHAR_HEIGHT, 12, DS_PROPORTIONAL | DS_SHADOW );
+
+		y += TINYCHAR_HEIGHT + 2;
+	}
+
+	return y;
+}
+
+
+/*
+=====================
 CG_DrawUpperRight
 
 =====================
@@ -1255,6 +1418,7 @@ static void CG_DrawUpperRight(stereoFrame_t stereoFrame)
 		y = CG_DrawVRFollowIcon( y );
 	}
 	y = CG_DrawModeIndicators( y );
+	y = CG_DrawVoipSpeakers( y );
 }
 
 
@@ -2506,6 +2670,92 @@ static float CG_DrawTeamVote( float y, qboolean highlighted ) {
 }
 
 
+#ifdef MISSIONPACK
+static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
+	int i, j;
+
+	if ( !menu )
+		return;
+
+	// refresh VOIP mute state for scoreboard display
+	CG_UpdateVoipMuteState();
+
+	for ( i = 0; i < menu->itemCount; i++ ) {
+		itemDef_t *item = menu->items[i];
+		listBoxDef_t *listPtr;
+		int feederID, team, count, visibleRows;
+		float listX, listY;
+
+		if ( item->type != ITEM_TYPE_LISTBOX || !item->typeData )
+			continue;
+
+		listPtr = (listBoxDef_t *)item->typeData;
+		feederID = (int)item->special;
+
+		if ( feederID != FEEDER_SCOREBOARD &&
+			 feederID != FEEDER_REDTEAM_LIST &&
+			 feederID != FEEDER_BLUETEAM_LIST )
+			continue;
+
+		listX = item->window.rect.x;
+		listY = item->window.rect.y;
+		visibleRows = (int)( item->window.rect.h / listPtr->elementHeight );
+
+		team = -1;
+		if ( feederID == FEEDER_REDTEAM_LIST ) team = TEAM_RED;
+		else if ( feederID == FEEDER_BLUETEAM_LIST ) team = TEAM_BLUE;
+
+		count = CG_FeederCount( (float)feederID );
+
+		for ( j = listPtr->startPos; j < listPtr->startPos + visibleRows && j < count; j++ ) {
+			int scoreIndex;
+			clientInfo_t *ci = CG_InfoFromScoreIndex( j, team, &scoreIndex );
+			score_t *sp = &cg.scores[scoreIndex];
+			float rowY, bsz, bx, by;
+			vec4_t voipColor;
+			qboolean talking;
+
+			if ( !ci || !ci->infoValid )
+				continue;
+			if ( !ci->voipEnabled && !cgs.voipMuted[sp->client] )
+				continue;
+
+			rowY = listY + 1 + ( j - listPtr->startPos ) * listPtr->elementHeight;
+			bsz = listPtr->columnInfo[0].width;
+			bx = listX + 1 + 4 + listPtr->columnInfo[0].pos;
+			by = rowY - 1 + listPtr->elementHeight / 2;
+
+			if ( cgs.voipMuted[sp->client] ) {
+				voipColor[0] = 1.0f; voipColor[1] = 0.2f;
+				voipColor[2] = 0.2f; voipColor[3] = 0.5f;
+				talking = qfalse;
+			} else if ( sp->client == cg.snap->ps.clientNum &&
+						!cg.demoPlayback && !cgs.tvPlayback ) {
+				talking = CG_GetVoipChannelColor( voipColor );
+				voipColor[3] = talking ? 0.8f : 0.2f;
+			} else if ( cg.voipTalking[sp->client] ) {
+				if ( cgs.voipVersion >= 2 && cg.voipChannel[sp->client] ) {
+					CG_VoipChannelFlagsToColor( cg.voipChannel[sp->client], voipColor );
+				} else {
+					VectorSet( voipColor, 1.0f, 1.0f, 1.0f );
+				}
+				voipColor[3] = 0.8f;
+				talking = qtrue;
+			} else {
+				voipColor[0] = 1.0f; voipColor[1] = 1.0f;
+				voipColor[2] = 1.0f; voipColor[3] = 0.2f;
+				talking = qfalse;
+			}
+
+			trap_R_SetColor( voipColor );
+			CG_DrawPic( bx, by, bsz, bsz,
+				talking ? cgs.media.speakerShader : cgs.media.speakerIdleShader );
+			trap_R_SetColor( NULL );
+		}
+	}
+}
+#endif
+
 static qboolean CG_DrawScoreboard( void ) {
 #ifdef MISSIONPACK
 	static qboolean firstTime = qtrue;
@@ -2585,6 +2835,7 @@ static qboolean CG_DrawScoreboard( void ) {
 	}
 
 	Menu_Paint(menuScoreboard, qtrue);
+	CG_DrawScoreboardVoipBadges(menuScoreboard);
 
 	// Scoreboard cursor for spectators (enables click-to-follow)
 	spectator = cg.snap && (cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ||

@@ -1231,8 +1231,19 @@ void CG_NewClientInfo( int clientNum ) {
 
 	configstring = CG_ConfigString( clientNum + CS_PLAYERS );
 	if ( !configstring[0] ) {
+		// player disconnected — clear VOIP mute for this slot
+		if ( cgs.voipMuted[clientNum] ) {
+			cgs.voipMuted[clientNum] = qfalse;
+			trap_SendConsoleCommand( va( "voip unignore %i\n", clientNum ) );
+		}
 		memset( ci, 0, sizeof( *ci ) );
 		return;	// player just left
+	}
+
+	// new player in this slot — clear VOIP mute
+	if ( !ci->infoValid && cgs.voipMuted[clientNum] ) {
+		cgs.voipMuted[clientNum] = qfalse;
+		trap_SendConsoleCommand( va( "voip unignore %i\n", clientNum ) );
 	}
 
 	if ( cg.snap ) {
@@ -1291,6 +1302,10 @@ void CG_NewClientInfo( int clientNum ) {
 	// VR player
 	v = Info_ValueForKey( configstring, "vr" );
 	newInfo.vrPlayer = atoi( v ) ? qtrue : qfalse;
+
+	// VOIP enabled
+	v = Info_ValueForKey( configstring, "voip" );
+	newInfo.voipEnabled = *v ? qtrue : qfalse;
 
 	// handicap
 	v = Info_ValueForKey( configstring, "hc" );
@@ -2353,6 +2368,39 @@ static void CG_PlayerSprites( centity_t *cent ) {
 
 	if ( cent->currentState.eFlags & EF_CONNECTION ) {
 		CG_PlayerFloatSprite( cent, cgs.media.connectionShader );
+		return;
+	}
+
+	if ( cg.voipTalking[cent->currentState.clientNum] ) {
+		int rf;
+		refEntity_t ent;
+
+		if ( cent->currentState.number == cg.snap->ps.clientNum && !cg.renderingThirdPerson ) {
+			rf = RF_THIRD_PERSON;
+		} else {
+			rf = 0;
+		}
+
+		memset( &ent, 0, sizeof( ent ) );
+		VectorCopy( cent->lerpOrigin, ent.origin );
+		ent.origin[2] += 48;
+		ent.reType = RT_SPRITE;
+		ent.customShader = cgs.media.speakerShader;
+		ent.radius = 6;
+		ent.renderfx = rf;
+		if ( cgs.voipVersion >= 2 && cg.voipChannel[cent->currentState.clientNum] ) {
+			vec3_t c;
+			CG_VoipChannelFlagsToColor( cg.voipChannel[cent->currentState.clientNum], c );
+			ent.shaderRGBA.rgba[0] = (byte)( c[0] * 255 );
+			ent.shaderRGBA.rgba[1] = (byte)( c[1] * 255 );
+			ent.shaderRGBA.rgba[2] = (byte)( c[2] * 255 );
+		} else {
+			ent.shaderRGBA.rgba[0] = 255;
+			ent.shaderRGBA.rgba[1] = 255;
+			ent.shaderRGBA.rgba[2] = 255;
+		}
+		ent.shaderRGBA.rgba[3] = 255;
+		trap_R_AddRefEntityToScene( &ent );
 		return;
 	}
 
