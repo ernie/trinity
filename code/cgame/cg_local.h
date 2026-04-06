@@ -828,6 +828,7 @@ typedef struct {
 	qhandle_t	balloonShader;
 	qhandle_t	speakerShader;
 	qhandle_t	speakerIdleShader;
+	qhandle_t	speakerMutedShader;
 	qhandle_t	connectionShader;
 
 	qhandle_t	selectShader;
@@ -1268,6 +1269,7 @@ void CG_UpdateVoipChannelState( void );
 void CG_UpdateVoipMuteState( void );
 qboolean CG_GetVoipChannelColor( vec3_t color );
 void CG_VoipChannelFlagsToColor( int flags, vec3_t color );
+qboolean CG_LocalVoipMuted( void );
 
 int CG_FeederCount( float feederID );
 clientInfo_t *CG_InfoFromScoreIndex( int index, int team, int *scoreIndex );

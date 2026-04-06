@@ -147,6 +147,8 @@ CG_CVAR( cg_tvdTimeout,    "cg_tvdTimeout",    "10", CVAR_ARCHIVE )
 CG_CVAR( cg_tvdOffer,      "cl_tvdOffer",      "", CVAR_ROM )
 CG_CVAR( cg_voteYesKey,    "cl_voteYesKey",    "", CVAR_ROM )
 CG_CVAR( cg_voteNoKey,     "cl_voteNoKey",     "", CVAR_ROM )
+CG_CVAR( cg_voipUseVAD,    "cl_voipUseVAD",    "0", CVAR_ARCHIVE )
+CG_CVAR( cg_voipVADMuted,  "cl_voipVADMuted",  "0", CVAR_ARCHIVE )
 
 CG_CVAR( cg_trueShotgun, "cg_trueShotgun", "0", CVAR_ARCHIVE )
 

@@ -1488,28 +1488,37 @@ void CG_DrawMedal(int ownerDraw, rectDef_t *rect, float scale, vec4_t color, qha
 static void CG_DrawPlayerVoipBadge(rectDef_t *rect) {
 	vec4_t txColor;
 	qboolean transmitting;
+	qboolean muted;
+	qhandle_t iconShader;
 
 	if (cg.demoPlayback || cgs.tvPlayback) {
 		int cn = cg.snap->ps.clientNum;
 		transmitting = cg.voipTalking[cn];
+		muted = qfalse;
 		if (cgs.voipVersion >= 2 && cg.voipChannel[cn]) {
 			CG_VoipChannelFlagsToColor(cg.voipChannel[cn], txColor);
 		} else {
 			VectorSet(txColor, 1.0f, 1.0f, 1.0f);
 		}
 	} else {
-		transmitting = CG_GetVoipChannelColor(txColor);
+		(void)CG_GetVoipChannelColor(txColor);
+		transmitting = cg.voipTalking[cg.clientNum];
+		muted = CG_LocalVoipMuted();
 	}
 
-	if (transmitting) {
+	if (muted) {
+		iconShader = cgs.media.speakerMutedShader;
+		txColor[3] = 0.5f;
+	} else if (transmitting) {
+		iconShader = cgs.media.speakerShader;
 		txColor[3] = 0.5f + 0.3f * sin(cg.time * 0.008f);
 	} else {
+		iconShader = cgs.media.speakerIdleShader;
 		txColor[3] = 0.2f;
 	}
 
 	trap_R_SetColor(txColor);
-	CG_DrawPic(rect->x, rect->y, rect->w, rect->h,
-		transmitting ? cgs.media.speakerShader : cgs.media.speakerIdleShader);
+	CG_DrawPic(rect->x, rect->y, rect->w, rect->h, iconShader);
 	trap_R_SetColor(NULL);
 }
 

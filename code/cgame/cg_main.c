@@ -923,6 +923,7 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.balloonShader = trap_R_RegisterShader( "sprites/balloon3" );
 	cgs.media.speakerShader = trap_R_RegisterShader( "gfx/2d/speaker" );
 	cgs.media.speakerIdleShader = trap_R_RegisterShader( "gfx/2d/speaker_idle" );
+	cgs.media.speakerMutedShader = trap_R_RegisterShader( "gfx/2d/speaker_muted" );
 
 	cgs.media.bloodExplosionShader = trap_R_RegisterShader( "bloodExplosion" );
 

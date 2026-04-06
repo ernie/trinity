@@ -639,6 +639,8 @@ static void CG_DrawStatusBar( void ) {
 	{
 		vec4_t txColor;
 		qboolean transmitting;
+		qboolean muted;
+		qhandle_t iconShader;
 		float headsize = ICON_SIZE * 1.25f;
 		float headx = 185 + CHAR_WIDTH*3 + TEXT_ICON_SPACE;
 		float heady = cgs.screenYmax + 1 - headsize;
@@ -650,24 +652,31 @@ static void CG_DrawStatusBar( void ) {
 			// during playback, use channel info from engine for followed player
 			int cn = cg.snap->ps.clientNum;
 			transmitting = cg.voipTalking[cn];
+			muted = qfalse;	// remote players' self-mute state is not on the wire
 			if ( cgs.voipVersion >= 2 && cg.voipChannel[cn] ) {
 				CG_VoipChannelFlagsToColor( cg.voipChannel[cn], txColor );
 			} else {
 				VectorSet( txColor, 1.0f, 1.0f, 1.0f );
 			}
 		} else {
-			transmitting = CG_GetVoipChannelColor( txColor );
+			(void)CG_GetVoipChannelColor( txColor );
+			transmitting = cg.voipTalking[cg.clientNum];
+			muted = CG_LocalVoipMuted();
 		}
 
-		if ( transmitting ) {
+		if ( muted ) {
+			iconShader = cgs.media.speakerMutedShader;
+			txColor[3] = 0.5f;
+		} else if ( transmitting ) {
+			iconShader = cgs.media.speakerShader;
 			txColor[3] = 0.5f + 0.3f * sin( cg.time * 0.008f );
 		} else {
+			iconShader = cgs.media.speakerIdleShader;
 			txColor[3] = 0.2f;
 		}
 
 		trap_R_SetColor( txColor );
-		CG_DrawPic( bx, by, bsz, bsz, transmitting
-			? cgs.media.speakerShader : cgs.media.speakerIdleShader );
+		CG_DrawPic( bx, by, bsz, bsz, iconShader );
 		trap_R_SetColor( NULL );
 	}
 
@@ -1286,6 +1295,18 @@ qboolean CG_GetVoipChannelColor( vec3_t color ) {
 
 	CG_VoipChannelFlagsToColor( flags, color );
 	return atoi( voipSend ) != 0;
+}
+
+
+/*
+=====================
+CG_LocalVoipMuted
+
+True when the local player has muted their VAD mic; inert in PTT mode.
+=====================
+*/
+qboolean CG_LocalVoipMuted( void ) {
+	return (qboolean)( cg_voipUseVAD.integer != 0 && cg_voipVADMuted.integer != 0 );
 }
 
 
@@ -2713,11 +2734,14 @@ static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
 			score_t *sp = &cg.scores[scoreIndex];
 			float rowY, bsz, bx, by;
 			vec4_t voipColor;
-			qboolean talking;
+			qhandle_t voipIcon;
+			qboolean isLocalSelf = ( sp->client == cg.snap->ps.clientNum
+				&& !cg.demoPlayback && !cgs.tvPlayback );
+			qboolean selfMuted = ( isLocalSelf && CG_LocalVoipMuted() );
 
 			if ( !ci || !ci->infoValid )
 				continue;
-			if ( !ci->voipEnabled && !cgs.voipMuted[sp->client] )
+			if ( !ci->voipEnabled && !cgs.voipMuted[sp->client] && !selfMuted )
 				continue;
 
 			rowY = listY + 1 + ( j - listPtr->startPos ) * listPtr->elementHeight;
@@ -2725,14 +2749,20 @@ static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
 			bx = listX + 1 + 4 + listPtr->columnInfo[0].pos;
 			by = rowY - 1 + listPtr->elementHeight / 2;
 
-			if ( cgs.voipMuted[sp->client] ) {
+			if ( selfMuted ) {
+				(void)CG_GetVoipChannelColor( voipColor );
+				voipColor[3] = 0.5f;
+				voipIcon = cgs.media.speakerMutedShader;
+			} else if ( cgs.voipMuted[sp->client] ) {
 				voipColor[0] = 1.0f; voipColor[1] = 0.2f;
 				voipColor[2] = 0.2f; voipColor[3] = 0.5f;
-				talking = qfalse;
-			} else if ( sp->client == cg.snap->ps.clientNum &&
-						!cg.demoPlayback && !cgs.tvPlayback ) {
-				talking = CG_GetVoipChannelColor( voipColor );
+				voipIcon = cgs.media.speakerIdleShader;
+			} else if ( isLocalSelf ) {
+				qboolean talking;
+				(void)CG_GetVoipChannelColor( voipColor );
+				talking = cg.voipTalking[cg.clientNum];
 				voipColor[3] = talking ? 0.8f : 0.2f;
+				voipIcon = talking ? cgs.media.speakerShader : cgs.media.speakerIdleShader;
 			} else if ( cg.voipTalking[sp->client] ) {
 				if ( cgs.voipVersion >= 2 && cg.voipChannel[sp->client] ) {
 					CG_VoipChannelFlagsToColor( cg.voipChannel[sp->client], voipColor );
@@ -2740,16 +2770,15 @@ static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
 					VectorSet( voipColor, 1.0f, 1.0f, 1.0f );
 				}
 				voipColor[3] = 0.8f;
-				talking = qtrue;
+				voipIcon = cgs.media.speakerShader;
 			} else {
 				voipColor[0] = 1.0f; voipColor[1] = 1.0f;
 				voipColor[2] = 1.0f; voipColor[3] = 0.2f;
-				talking = qfalse;
+				voipIcon = cgs.media.speakerIdleShader;
 			}
 
 			trap_R_SetColor( voipColor );
-			CG_DrawPic( bx, by, bsz, bsz,
-				talking ? cgs.media.speakerShader : cgs.media.speakerIdleShader );
+			CG_DrawPic( bx, by, bsz, bsz, voipIcon );
 			trap_R_SetColor( NULL );
 		}
 	}

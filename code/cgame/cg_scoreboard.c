@@ -151,44 +151,56 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 	}
 
 	// draw VOIP status overlay on head portrait
-	if ( ci->voipEnabled || cgs.voipMuted[score->client] ) {
-		vec4_t voipColor;
-		int hx, hy, hsz;
-		qboolean talking;
+	{
+		qboolean isLocalSelf = ( score->client == cg.snap->ps.clientNum
+			&& !cg.demoPlayback && !cgs.tvPlayback );
+		qboolean selfMuted = ( isLocalSelf && CG_LocalVoipMuted() );
 
-		if ( largeFormat ) {
-			hsz = ICON_SIZE / 3;
-			hx = headx + ICON_SIZE - hsz;
-			hy = y - ( ICON_SIZE - BIGCHAR_HEIGHT ) / 2 + ICON_SIZE - hsz;
-		} else {
-			hsz = 8;
-			hx = headx + 16 - 8;
-			hy = y + 16 - 8;
-		}
+		if ( ci->voipEnabled || cgs.voipMuted[score->client] || selfMuted ) {
+			vec4_t voipColor;
+			int hx, hy, hsz;
+			qhandle_t voipIcon;
 
-		if ( cgs.voipMuted[score->client] ) {
-			voipColor[0] = 1.0f; voipColor[1] = 0.2f; voipColor[2] = 0.2f; voipColor[3] = 0.5f;
-			talking = qfalse;
-		} else if ( score->client == cg.snap->ps.clientNum && !cg.demoPlayback && !cgs.tvPlayback ) {
-			talking = CG_GetVoipChannelColor( voipColor );
-			voipColor[3] = talking ? 0.8f : 0.2f;
-		} else if ( cg.voipTalking[score->client] ) {
-			if ( cgs.voipVersion >= 2 && cg.voipChannel[score->client] ) {
-				CG_VoipChannelFlagsToColor( cg.voipChannel[score->client], voipColor );
+			if ( largeFormat ) {
+				hsz = ICON_SIZE / 3;
+				hx = headx + ICON_SIZE - hsz;
+				hy = y - ( ICON_SIZE - BIGCHAR_HEIGHT ) / 2 + ICON_SIZE - hsz;
 			} else {
-				VectorSet( voipColor, 1.0f, 1.0f, 1.0f );
+				hsz = 8;
+				hx = headx + 16 - 8;
+				hy = y + 16 - 8;
 			}
-			voipColor[3] = 0.8f;
-			talking = qtrue;
-		} else {
-			voipColor[0] = 1.0f; voipColor[1] = 1.0f; voipColor[2] = 1.0f; voipColor[3] = 0.2f;
-			talking = qfalse;
-		}
 
-		trap_R_SetColor( voipColor );
-		CG_DrawPic( hx, hy, hsz, hsz, talking
-			? cgs.media.speakerShader : cgs.media.speakerIdleShader );
-		trap_R_SetColor( NULL );
+			if ( selfMuted ) {
+				(void)CG_GetVoipChannelColor( voipColor );
+				voipColor[3] = 0.5f;
+				voipIcon = cgs.media.speakerMutedShader;
+			} else if ( cgs.voipMuted[score->client] ) {
+				voipColor[0] = 1.0f; voipColor[1] = 0.2f; voipColor[2] = 0.2f; voipColor[3] = 0.5f;
+				voipIcon = cgs.media.speakerIdleShader;
+			} else if ( isLocalSelf ) {
+				qboolean talking;
+				(void)CG_GetVoipChannelColor( voipColor );
+				talking = cg.voipTalking[cg.clientNum];
+				voipColor[3] = talking ? 0.8f : 0.2f;
+				voipIcon = talking ? cgs.media.speakerShader : cgs.media.speakerIdleShader;
+			} else if ( cg.voipTalking[score->client] ) {
+				if ( cgs.voipVersion >= 2 && cg.voipChannel[score->client] ) {
+					CG_VoipChannelFlagsToColor( cg.voipChannel[score->client], voipColor );
+				} else {
+					VectorSet( voipColor, 1.0f, 1.0f, 1.0f );
+				}
+				voipColor[3] = 0.8f;
+				voipIcon = cgs.media.speakerShader;
+			} else {
+				voipColor[0] = 1.0f; voipColor[1] = 1.0f; voipColor[2] = 1.0f; voipColor[3] = 0.2f;
+				voipIcon = cgs.media.speakerIdleShader;
+			}
+
+			trap_R_SetColor( voipColor );
+			CG_DrawPic( hx, hy, hsz, hsz, voipIcon );
+			trap_R_SetColor( NULL );
+		}
 	}
 
 #ifdef MISSIONPACK

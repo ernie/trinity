@@ -1,6 +1,9 @@
 CONFIG ?= baseq3
 DISTDIR ?= .
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "unknown")
+# Evaluate git describe at most once per make run, but still allow env/CLI override.
+ifndef VERSION
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "unknown")
+endif
 # Windows _spawnvp needs extra escaping to survive argv->cmdline->argv round-trip
 ifeq ($(OS),Windows_NT)
   VERSION_DEF = -DTRINITY_VERSION=\\\"$(VERSION)\\\"
@@ -11,6 +14,16 @@ include config-$(CONFIG).mk
 
 BD = vm-$(CONFIG)
 STAGING = staging-$(CONFIG)
+
+# Version stamp: rewrite $(BD)/version.stamp only when VERSION changes, so
+# pattern rules that depend on it will force a rebuild of TRINITY_VERSION
+# consumers (e.g. cg_servercmds.c, ui_main.c, ui_menu.c) when a new git tag
+# is cut. Without this, .asm files cached from a previous tag keep the old
+# version string baked in, because their .c sources haven't changed.
+VERSION_STAMP := $(BD)/version.stamp
+$(shell mkdir -p $(BD) 2>/dev/null; \
+  [ "$$(cat $(VERSION_STAMP) 2>/dev/null)" = "$(VERSION)" ] || \
+    printf '%s' "$(VERSION)" > $(VERSION_STAMP))
 
 srcs = $(foreach file,$1,$(if $(patsubst %.asm,,$(file)),$2/$(file).asm,$(file)))
 qa_asm = $(call srcs,$(QA_SRC),$(BD)/game)
@@ -52,9 +65,9 @@ GAME_HEADERS = $(QADIR)/g_local.h $(QADIR)/g_cvar.h $(QADIR)/bg_public.h $(QADIR
 CGAME_HEADERS = $(CGDIR)/cg_local.h $(CGDIR)/cg_cvar.h $(QADIR)/bg_public.h $(QADIR)/q_shared.h
 UI_HEADERS = $(UIDIR)/ui_local.h $(UIDIR)/ui_cvar.h $(QADIR)/q_shared.h
 
-$(BD)/game/%.asm: $(QADIR)/%.c $(GAME_HEADERS); $(qa_cc)
-$(BD)/cgame/%.asm: $(QADIR)/%.c $(CGAME_HEADERS); $(cg_cc)
-$(BD)/cgame/%.asm: $(CGDIR)/%.c $(CGAME_HEADERS); $(cg_cc)
-$(BD)/cgame/%.asm: $(UIDIR)/%.c $(CGAME_HEADERS); $(cg_cc)
-$(BD)/ui/%.asm: $(QADIR)/%.c $(UI_HEADERS); $(ui_cc)
-$(BD)/ui/%.asm: $(UIDIR)/%.c $(UI_HEADERS); $(ui_cc)
+$(BD)/game/%.asm: $(QADIR)/%.c $(GAME_HEADERS) $(VERSION_STAMP); $(qa_cc)
+$(BD)/cgame/%.asm: $(QADIR)/%.c $(CGAME_HEADERS) $(VERSION_STAMP); $(cg_cc)
+$(BD)/cgame/%.asm: $(CGDIR)/%.c $(CGAME_HEADERS) $(VERSION_STAMP); $(cg_cc)
+$(BD)/cgame/%.asm: $(UIDIR)/%.c $(CGAME_HEADERS) $(VERSION_STAMP); $(cg_cc)
+$(BD)/ui/%.asm: $(QADIR)/%.c $(UI_HEADERS) $(VERSION_STAMP); $(ui_cc)
+$(BD)/ui/%.asm: $(UIDIR)/%.c $(UI_HEADERS) $(VERSION_STAMP); $(ui_cc)

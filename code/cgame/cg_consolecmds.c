@@ -711,20 +711,16 @@ static void CG_TeamVote_f( void ) {
 
 /*
 =================
-CG_VoipToggle_f
+CG_VoipVADToggle_f
 
-Toggle VOIP recording on/off
+Toggle cl_voipVADMuted. Inert in PTT mode.
 =================
 */
-static void CG_VoipToggle_f( void ) {
+static void CG_VoipVADToggle_f( void ) {
 	char value[4];
 
-	trap_Cvar_VariableStringBuffer( "cl_voipSend", value, sizeof( value ) );
-	if ( atoi( value ) ) {
-		trap_Cvar_Set( "cl_voipSend", "0" );
-	} else {
-		trap_Cvar_Set( "cl_voipSend", "1" );
-	}
+	trap_Cvar_VariableStringBuffer( "cl_voipVADMuted", value, sizeof( value ) );
+	trap_Cvar_Set( "cl_voipVADMuted", atoi( value ) ? "0" : "1" );
 }
 
 
@@ -922,7 +918,7 @@ static consoleCommand_t	commands[] = {
 	{ "vote", CG_Vote_f },
 	{ "callteamvote", CG_CallTeamVote_f },
 	{ "teamvote", CG_TeamVote_f },
-	{ "voiptoggle", CG_VoipToggle_f },
+	{ "voipvadtoggle", CG_VoipVADToggle_f },
 	{ "voiptarget", CG_VoipTarget_f }
 };
 
