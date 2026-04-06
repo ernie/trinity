@@ -1382,7 +1382,15 @@ static float CG_DrawVoipSpeakers( float y ) {
 		// speaker icon — channel-colored, with waves while talking
 		{
 			vec4_t iconColor;
-			if ( cgs.voipVersion >= 2 && cg.voipChannel[i] ) {
+			qboolean isLocalSelf = ( i == cg.clientNum
+				&& !cg.demoPlayback && !cgs.tvPlayback );
+
+			if ( isLocalSelf ) {
+				// voip_channels only tracks incoming packets, so the local
+				// slot is always zero — derive our own channel from
+				// cl_voipSendTarget instead.
+				(void)CG_GetVoipChannelColor( iconColor );
+			} else if ( cgs.voipVersion >= 2 && cg.voipChannel[i] ) {
 				CG_VoipChannelFlagsToColor( cg.voipChannel[i], iconColor );
 			} else {
 				VectorSet( iconColor, 1.0f, 1.0f, 1.0f );
