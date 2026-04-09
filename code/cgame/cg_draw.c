@@ -996,7 +996,7 @@ static float CG_DrawTimer( float y ) {
 		int timelimitMsec = cgs.timelimit * 60 * 1000;
 		int overtimeElapsed = msec - timelimitMsec;
 
-		if ( overtimeElapsed > 0 ) {
+		if ( overtimeElapsed >= 1000 ) {
 			if ( cgs.overtimelimit > 0 ) {
 				// overtime with limit: count down
 				int remaining = ( cgs.overtimelimit * 60 * 1000 ) - overtimeElapsed;
