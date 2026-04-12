@@ -585,13 +585,15 @@ int startTime;
 
 static char      trinityVersion[64];
 static qboolean  trinityVersionLoaded = qfalse;
-static qhandle_t trinityIconShader;
+static qhandle_t trinityModel;
+static qhandle_t trinityFlameShader;
 
 static void UI_LoadTrinityVersion( void ) {
 	trinityVersionLoaded = qtrue;
 	Q_strncpyz( trinityVersion, TRINITY_VERSION, sizeof( trinityVersion ) );
 
-	trinityIconShader = trap_R_RegisterShaderNoMip( "menu/art/trinity" );
+	trinityModel = trap_R_RegisterModel( "models/trinity/trinity.md3" );
+	trinityFlameShader = trap_R_RegisterShaderNoMip( "gfx/trinity/flameball" );
 }
 
 #define	UI_FPS_FRAMES	4
@@ -675,13 +677,21 @@ void _UI_Refresh( int realtime )
 		if ( focused && focused->window.name && Q_stricmp( focused->window.name, "main" ) == 0 ) {
 			float scale = 0.2f;
 			int textWidth = Text_Width( trinityVersion, scale, 0 );
-			int iconSize = 16;
+			int modelSize = 16;
 			int rightMargin = 4;
 			float vx = 640 - rightMargin - textWidth;
 			float vy = 464;
 			vec4_t versionColor = { 1.0f, 1.0f, 1.0f, 0.8f };
 
-			UI_DrawHandlePic( vx - iconSize, vy, iconSize, iconSize, trinityIconShader );
+			if ( trinityModel ) {
+				rectDef_t badgeRect;
+				badgeRect.x = vx - modelSize;
+				badgeRect.y = vy;
+				badgeRect.w = modelSize;
+				badgeRect.h = modelSize;
+				UI_DrawTrinitySigil( &badgeRect );
+			}
+
 			Text_Paint( vx, vy + 12, scale, versionColor, trinityVersion, 0, 0, ITEM_TEXTSTYLE_NORMAL );
 		}
 	}
@@ -1235,6 +1245,94 @@ static void UI_DrawEffects(rectDef_t *rect, float scale, vec4_t color) {
 
 	UI_DrawHandlePic( rect->x, rect->y - 14, 128, 8, uiInfo.uiDC.Assets.fxBasePic );
 	UI_DrawHandlePic( markerX, rect->y - 16, 16, 12, uiInfo.uiDC.Assets.fxPic[uiInfo.effectsColor] );
+}
+
+static void UI_DrawTrinitySigil( rectDef_t *rect ) {
+	refdef_t refdef;
+	refEntity_t ent;
+	vec3_t mins, maxs, origin, angles;
+	float x, y, w, h, len;
+
+	if ( !trinityVersionLoaded ) {
+		UI_LoadTrinityVersion();
+	}
+	if ( !trinityModel ) {
+		return;
+	}
+
+	x = rect->x;
+	y = rect->y;
+	w = rect->w;
+	h = rect->h;
+
+	memset( &refdef, 0, sizeof( refdef ) );
+	refdef.rdflags = RDF_NOWORLDMODEL;
+	AxisClear( refdef.viewaxis );
+
+	refdef.fov_x = 30;
+	refdef.fov_y = 30;
+
+	UI_AdjustFrom640( &x, &y, &w, &h );
+	refdef.x = x;
+	refdef.y = y;
+	refdef.width = w;
+	refdef.height = h;
+
+	trap_R_ModelBounds( trinityModel, mins, maxs );
+	len = 0.5 * ( maxs[2] - mins[2] );
+	origin[0] = len / tan( DEG2RAD( refdef.fov_x ) * 0.5 );
+	origin[1] = 0.5 * ( mins[1] + maxs[1] );
+	origin[2] = -0.5 * ( mins[2] + maxs[2] );
+
+	refdef.time = uiInfo.uiDC.realTime;
+
+	trap_R_ClearScene();
+
+	// All positions/sizes below are in world-space model units, so the same
+	// values work for the big center render and the tiny version badge.
+	if ( trinityFlameShader ) {
+		refEntity_t flameEnt;
+		memset( &flameEnt, 0, sizeof( flameEnt ) );
+		flameEnt.reType = RT_SPRITE;
+		flameEnt.customShader = trinityFlameShader;
+		flameEnt.origin[0] = origin[0] + 60.0f;
+		flameEnt.origin[1] = origin[1];
+		// +Z shift puts the glow over the thicker upper portion of the sigil.
+		flameEnt.origin[2] = origin[2] + 15.0f;
+		VectorCopy( flameEnt.origin, flameEnt.oldorigin );
+		flameEnt.radius = len * 0.6f;
+		flameEnt.shaderRGBA.rgba[0] = 255;
+		flameEnt.shaderRGBA.rgba[1] = 255;
+		flameEnt.shaderRGBA.rgba[2] = 255;
+		flameEnt.shaderRGBA.rgba[3] = 255;
+		trap_R_AddRefEntityToScene( &flameEnt );
+
+		// Light sits in front of the sigil (camera-side) so the lit face is
+		// always the one facing the camera. Distance is kept large so the
+		// world lightDir doesn't swing wildly as the model rotates.
+		{
+			vec3_t lightPos;
+			float t = uiInfo.uiDC.realTime * 0.001f;
+			float flick = 0.8f + 0.15f * sin( t * 5.3f ) + 0.1f * sin( t * 13.7f );
+			lightPos[0] = origin[0] - 120.0f;
+			lightPos[1] = origin[1];
+			lightPos[2] = origin[2] - 35.0f;
+			trap_R_AddLightToScene( lightPos, 600.0f * flick, 1.0f, 0.25f, 0.05f );
+		}
+	}
+
+	memset( &ent, 0, sizeof( ent ) );
+	VectorSet( angles, 0, -( uiInfo.uiDC.realTime / 100.0f ), 0 );
+	AnglesToAxis( angles, ent.axis );
+
+	ent.hModel = trinityModel;
+	VectorCopy( origin, ent.origin );
+	VectorCopy( origin, ent.lightingOrigin );
+	ent.renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
+	VectorCopy( ent.origin, ent.oldorigin );
+
+	trap_R_AddRefEntityToScene( &ent );
+	trap_R_RenderScene( &refdef );
 }
 
 static void UI_DrawMapPreview(rectDef_t *rect, float scale, vec4_t color, qboolean net) {
@@ -2089,6 +2187,9 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
       break;
     case UI_PLAYERMODEL:
       UI_DrawPlayerModel(&rect);
+      break;
+    case UI_TRINITYSIGIL:
+      UI_DrawTrinitySigil(&rect);
       break;
     case UI_CLANNAME:
       UI_DrawClanName(&rect, scale, color, textStyle);

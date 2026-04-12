@@ -23,7 +23,6 @@ MAIN MENU
 #define ID_LOGIN				18
 #define ID_UPDATE				19
 
-#define MAIN_BANNER_MODEL				"models/mapobjects/banner/banner5.md3"
 #define MAIN_MENU_VERTICAL_SPACING		34
 
 
@@ -49,12 +48,15 @@ static mainmenu_t s_main;
 
 static char      trinityVersion[64];
 static qboolean  trinityVersionLoaded = qfalse;
-static qhandle_t trinityIconShader;
+static qhandle_t trinityModel;
+static qhandle_t trinityFlameShader;
 
 typedef struct {
 	menuframework_s menu;	
 	char errorMessage[4096];
 } errorMessage_t;
+
+#define MAIN_BANNER_MODEL				"models/mapobjects/banner/banner5.md3"
 
 static errorMessage_t s_errorMessage;
 
@@ -190,6 +192,8 @@ MainMenu_Cache
 */
 void MainMenu_Cache( void ) {
 	s_main.bannerModel = trap_R_RegisterModel( MAIN_BANNER_MODEL );
+	trinityModel = trap_R_RegisterModel( "models/trinity/trinity.md3" );
+	trinityFlameShader = trap_R_RegisterShaderNoMip( "gfx/trinity/flameball" );
 }
 
 sfxHandle_t ErrorMessage_Key(int key)
@@ -203,7 +207,8 @@ static void MainMenu_LoadTrinityVersion( void ) {
 	trinityVersionLoaded = qtrue;
 	Q_strncpyz( trinityVersion, TRINITY_VERSION, sizeof( trinityVersion ) );
 
-	trinityIconShader = trap_R_RegisterShaderNoMip( "menu/art/trinity" );
+	trinityModel = trap_R_RegisterModel( "models/trinity/trinity.md3" );
+	trinityFlameShader = trap_R_RegisterShaderNoMip( "gfx/trinity/flameball" );
 }
 
 /*
@@ -221,6 +226,81 @@ static void Main_MenuDraw( void ) {
 	float			adjust;
 	float			x, y, w, h;
 	vec4_t			color = {0.5, 0, 0, 1};
+
+	if ( trinityModel ) {
+		refdef_t		bgRefdef;
+		refEntity_t		bgEnt;
+		vec3_t			bgMins, bgMaxs, bgOrigin, bgAngles;
+		float			bgX, bgY, bgW, bgH, bgLen;
+
+		memset( &bgRefdef, 0, sizeof( bgRefdef ) );
+		bgRefdef.rdflags = RDF_NOWORLDMODEL;
+		AxisClear( bgRefdef.viewaxis );
+
+		bgX = 0;
+		bgY = 0;
+		bgW = 640;
+		bgH = 480;
+		UI_AdjustFrom640( &bgX, &bgY, &bgW, &bgH );
+		bgRefdef.x = bgX;
+		bgRefdef.y = bgY;
+		bgRefdef.width = bgW;
+		bgRefdef.height = bgH;
+
+		bgRefdef.fov_x = 30;
+		bgRefdef.fov_y = 22.5;
+		bgRefdef.time = uis.realtime;
+
+		trap_R_ModelBounds( trinityModel, bgMins, bgMaxs );
+		bgLen = 0.5 * ( bgMaxs[2] - bgMins[2] );
+		bgOrigin[0] = ( bgLen / tan( DEG2RAD( bgRefdef.fov_y ) * 0.5 ) ) * 1.5;
+		bgOrigin[1] = 0.5 * ( bgMins[1] + bgMaxs[1] );
+		bgOrigin[2] = -0.5 * ( bgMins[2] + bgMaxs[2] ) - 0.08 * ( bgMaxs[2] - bgMins[2] );
+
+		trap_R_ClearScene();
+
+		// See UI_DrawTrinitySigil in missionpack ui_main.c for the
+		// rationale behind the flame sprite + dlight placement.
+		if ( trinityFlameShader ) {
+			refEntity_t flameEnt;
+			memset( &flameEnt, 0, sizeof( flameEnt ) );
+			flameEnt.reType = RT_SPRITE;
+			flameEnt.customShader = trinityFlameShader;
+			flameEnt.origin[0] = bgOrigin[0] + 60.0f;
+			flameEnt.origin[1] = bgOrigin[1];
+			flameEnt.origin[2] = bgOrigin[2] + 15.0f;
+			VectorCopy( flameEnt.origin, flameEnt.oldorigin );
+			flameEnt.radius = bgLen * 0.6f;
+			flameEnt.shaderRGBA.rgba[0] = 255;
+			flameEnt.shaderRGBA.rgba[1] = 255;
+			flameEnt.shaderRGBA.rgba[2] = 255;
+			flameEnt.shaderRGBA.rgba[3] = 255;
+			trap_R_AddRefEntityToScene( &flameEnt );
+
+			{
+				vec3_t lightPos;
+				float t = uis.realtime * 0.001f;
+				float flick = 0.8f + 0.15f * sin( t * 5.3f ) + 0.1f * sin( t * 13.7f );
+				lightPos[0] = bgOrigin[0] - 120.0f;
+				lightPos[1] = bgOrigin[1];
+				lightPos[2] = bgOrigin[2] - 35.0f;
+				trap_R_AddLightToScene( lightPos, 600.0f * flick, 1.0f, 0.25f, 0.05f );
+			}
+		}
+
+		memset( &bgEnt, 0, sizeof( bgEnt ) );
+		VectorSet( bgAngles, 0, -( uis.realtime / 100.0f ), 0 );
+		AnglesToAxis( bgAngles, bgEnt.axis );
+
+		bgEnt.hModel = trinityModel;
+		VectorCopy( bgOrigin, bgEnt.origin );
+		VectorCopy( bgOrigin, bgEnt.lightingOrigin );
+		bgEnt.renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
+		VectorCopy( bgEnt.origin, bgEnt.oldorigin );
+
+		trap_R_AddRefEntityToScene( &bgEnt );
+		trap_R_RenderScene( &bgRefdef );
+	}
 
 	// setup the refdef
 
@@ -298,13 +378,90 @@ static void Main_MenuDraw( void ) {
 	}
 	if ( trinityVersion[0] ) {
 		int textWidth = strlen( trinityVersion ) * SMALLCHAR_WIDTH;
-		int iconSize = 16;
+		int modelSize = 16;
 		int rightMargin = 4;
 		int vx = 640 - rightMargin - textWidth;
 		int vy = 464;
 		vec4_t versionColor = { 1.0f, 1.0f, 1.0f, 0.8f };
 
-		UI_DrawHandlePic( vx - iconSize, vy, iconSize, iconSize, trinityIconShader );
+		// Draw rotating 3D trinity model
+		if ( trinityModel ) {
+			refdef_t rd;
+			refEntity_t re;
+			vec3_t mins, maxs, org, ang;
+			float mx, my, mw, mh, len;
+
+			mx = vx - modelSize;
+			my = vy;
+			mw = modelSize;
+			mh = modelSize;
+
+			memset( &rd, 0, sizeof( rd ) );
+			rd.rdflags = RDF_NOWORLDMODEL;
+			AxisClear( rd.viewaxis );
+
+			rd.fov_x = 30;
+			rd.fov_y = 30;
+
+			UI_AdjustFrom640( &mx, &my, &mw, &mh );
+			rd.x = mx;
+			rd.y = my;
+			rd.width = mw;
+			rd.height = mh;
+
+			trap_R_ModelBounds( trinityModel, mins, maxs );
+
+			len = 0.5 * ( maxs[2] - mins[2] );
+			org[0] = len / tan( DEG2RAD( rd.fov_x ) * 0.5 );
+			org[1] = 0.5 * ( mins[1] + maxs[1] );
+			org[2] = -0.5 * ( mins[2] + maxs[2] );
+
+			rd.time = uis.realtime;
+
+			trap_R_ClearScene();
+
+			if ( trinityFlameShader ) {
+				refEntity_t flameEnt;
+				memset( &flameEnt, 0, sizeof( flameEnt ) );
+				flameEnt.reType = RT_SPRITE;
+				flameEnt.customShader = trinityFlameShader;
+				flameEnt.origin[0] = org[0] + 60.0f;
+				flameEnt.origin[1] = org[1];
+				flameEnt.origin[2] = org[2] + 15.0f;
+				VectorCopy( flameEnt.origin, flameEnt.oldorigin );
+				flameEnt.radius = len * 0.6f;
+				flameEnt.shaderRGBA.rgba[0] = 255;
+				flameEnt.shaderRGBA.rgba[1] = 255;
+				flameEnt.shaderRGBA.rgba[2] = 255;
+				flameEnt.shaderRGBA.rgba[3] = 255;
+				trap_R_AddRefEntityToScene( &flameEnt );
+
+				{
+					vec3_t lightPos;
+					float t = uis.realtime * 0.001f;
+					float flick = 0.8f + 0.15f * sin( t * 5.3f ) + 0.1f * sin( t * 13.7f );
+					lightPos[0] = org[0] - 120.0f;
+					lightPos[1] = org[1];
+					lightPos[2] = org[2] - 35.0f;
+					trap_R_AddLightToScene( lightPos, 600.0f * flick, 1.0f, 0.25f, 0.05f );
+				}
+			}
+
+			memset( &re, 0, sizeof( re ) );
+
+			VectorSet( ang, 0, -( uis.realtime / 100.0f ), 0 );
+			AnglesToAxis( ang, re.axis );
+
+			re.hModel = trinityModel;
+			VectorCopy( org, re.origin );
+			VectorCopy( org, re.lightingOrigin );
+			re.renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
+			VectorCopy( re.origin, re.oldorigin );
+
+			trap_R_AddRefEntityToScene( &re );
+			trap_R_RenderScene( &rd );
+		}
+
 		UI_DrawString( vx, vy, trinityVersion, UI_LEFT|UI_SMALLFONT|UI_DROPSHADOW, versionColor );
 	}
 }
