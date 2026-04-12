@@ -227,7 +227,7 @@ static void Main_MenuDraw( void ) {
 	float			x, y, w, h;
 	vec4_t			color = {0.5, 0, 0, 1};
 
-	if ( trinityModel ) {
+	if ( trinityModel && trap_Cvar_VariableValue( "ui_trinitySigil" ) ) {
 		refdef_t		bgRefdef;
 		refEntity_t		bgEnt;
 		vec3_t			bgMins, bgMaxs, bgOrigin, bgAngles;

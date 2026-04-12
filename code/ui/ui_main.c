@@ -2189,7 +2189,9 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
       UI_DrawPlayerModel(&rect);
       break;
     case UI_TRINITYSIGIL:
-      UI_DrawTrinitySigil(&rect);
+      if ( trap_Cvar_VariableValue( "ui_trinitySigil" ) ) {
+        UI_DrawTrinitySigil(&rect);
+      }
       break;
     case UI_CLANNAME:
       UI_DrawClanName(&rect, scale, color, textStyle);

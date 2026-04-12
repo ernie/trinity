@@ -131,4 +131,6 @@ UI_CVAR( ui_realWarmUp, "g_warmup", "20", CVAR_ARCHIVE )
 UI_CVAR( ui_realCaptureLimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART )
 UI_CVAR( ui_serverStatusTimeOut, "ui_serverStatusTimeOut", "7000", CVAR_ARCHIVE )
 
+UI_CVAR( ui_trinitySigil, "ui_trinitySigil", "1", CVAR_ARCHIVE )
+
 #undef UI_CVAR
