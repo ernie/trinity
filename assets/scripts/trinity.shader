@@ -22,15 +22,17 @@ gfx/trinity/flameball
 	cull none
 	nomipmaps
 	{
-		clampmap models/mapobjects/baph/bapholamp_fx.tga
-		blendFunc GL_ONE GL_ONE
+		clampmap gfx/trinity_flame_a.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen const ( 1.0 0.6 0.15 )
+		alphaGen wave sin 0.65 0.2 0 0.7
 		tcmod rotate 40
-		rgbGen wave sin 0.65 0.2 0 0.7
 	}
 	{
-		clampmap models/mapobjects/baph/bapholamp_fx2.tga
-		blendFunc GL_ONE GL_ONE
+		clampmap gfx/trinity_flame_b.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen const ( 1.0 0.5 0.1 )
+		alphaGen wave sin 0.7 0.2 0.35 0.9
 		tcmod rotate -35
-		rgbGen wave sin 0.7 0.2 0.35 0.9
 	}
 }
