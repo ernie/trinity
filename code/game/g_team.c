@@ -228,8 +228,16 @@ static void Team_SetFlagStatus( team_t team, flagStatus_t status ) {
 				teamgame.redStatus, redCarrier,
 				teamgame.blueStatus, blueCarrier ) );
 		} else {	// GT_1FCTF
+			int carrier;
+
 			st[0] = oneFlagStatusRemap[teamgame.flagStatus];
 			st[1] = '\0';
+
+			// Update cvar for UDP getstatus queries (stats tools)
+			// Format: "<status>:<carrier>" (single neutral flag)
+			carrier = Team_GetFlagCarrier( PW_NEUTRALFLAG );
+			trap_Cvar_Set( "g_flagStatus", va( "%d:%d",
+				teamgame.flagStatus, carrier ) );
 		}
 
 		trap_SetConfigstring( CS_FLAGSTATUS, st );

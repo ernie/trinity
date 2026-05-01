@@ -1621,6 +1621,7 @@ void G_UpdateMatchStateCvars( void ) {
 	trap_Cvar_Set( "g_levelStartTime", va( "%d", level.startTime ) );
 
 	// Flag status for CTF: "<red_status>:<red_carrier>,<blue_status>:<blue_carrier>"
+	// Flag status for 1FCTF: "<status>:<carrier>" (single neutral flag)
 	if ( g_gametype.integer == GT_CTF ) {
 		int redCarrier = Team_GetFlagCarrier( PW_REDFLAG );
 		int blueCarrier = Team_GetFlagCarrier( PW_BLUEFLAG );
@@ -1628,6 +1629,13 @@ void G_UpdateMatchStateCvars( void ) {
 			teamgame.redStatus, redCarrier,
 			teamgame.blueStatus, blueCarrier ) );
 	}
+#ifdef MISSIONPACK
+	else if ( g_gametype.integer == GT_1FCTF ) {
+		int carrier = Team_GetFlagCarrier( PW_NEUTRALFLAG );
+		trap_Cvar_Set( "g_flagStatus", va( "%d:%d",
+			teamgame.flagStatus, carrier ) );
+	}
+#endif
 }
 
 
