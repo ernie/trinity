@@ -38,7 +38,7 @@ static const int numSkillLevels = sizeof(skillLevels) / sizeof(const char*);
 
 static const char *netSources[] = {
 	"Local",
-	"Mplayer",
+	"Trinity",
 	"Internet",
 	"Favorites"
 };
@@ -2773,17 +2773,12 @@ static qboolean UI_TeamMember_HandleKey(int flags, float *special, int key, qboo
 
 static qboolean UI_NetSource_HandleKey(int flags, float *special, int key) {
   if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_ENTER || key == K_KP_ENTER) {
-		
 		if (key == K_MOUSE2) {
 			ui_netSource.integer--;
-			if (ui_netSource.integer == AS_MPLAYER)
-				ui_netSource.integer--;
 		} else {
 			ui_netSource.integer++;
-			if (ui_netSource.integer == AS_MPLAYER)
-				ui_netSource.integer++;
 		}
-    
+
 		if (ui_netSource.integer >= numNetSources) {
       ui_netSource.integer = 0;
     } else if (ui_netSource.integer < 0) {
@@ -2791,7 +2786,7 @@ static qboolean UI_NetSource_HandleKey(int flags, float *special, int key) {
 		}
 
 		UI_BuildServerDisplayList(qtrue);
-		if (ui_netSource.integer != AS_GLOBAL) {
+		if (ui_netSource.integer != AS_GLOBAL && ui_netSource.integer != AS_MPLAYER) {
 			UI_StartServerRefresh(qtrue);
 		}
   	trap_Cvar_Set( "ui_netSource", va("%d", ui_netSource.integer));
@@ -6187,11 +6182,12 @@ static void UI_StartServerRefresh(qboolean full)
 
 	uiInfo.serverStatus.refreshtime = uiInfo.uiDC.realTime + 5000;
 	if( ui_netSource.integer == AS_GLOBAL || ui_netSource.integer == AS_MPLAYER ) {
+		// AS_GLOBAL → 0 (all masters); AS_MPLAYER → 2 (sv_master2 = Trinity directory).
 		if( ui_netSource.integer == AS_GLOBAL ) {
 			i = 0;
 		}
 		else {
-			i = 1;
+			i = 2;
 		}
 
 		ptr = UI_Cvar_VariableString("debug_protocol");

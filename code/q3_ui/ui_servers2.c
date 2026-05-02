@@ -85,6 +85,7 @@ MULTIPLAYER MENU (SERVER BROWSER)
 
 static const char *master_items[] = {
 	"Local",
+	"Trinity",
 	"Internet",
 	"Favorites",
 	NULL
@@ -215,6 +216,8 @@ static arenaservers_t	g_arenaservers;
 
 static servernode_t		g_globalserverlist[MAX_GLOBALSERVERS];
 static int				g_numglobalservers;
+static servernode_t		g_mplayerserverlist[MAX_GLOBALSERVERS];
+static int				g_nummplayerservers;
 static servernode_t		g_localserverlist[MAX_LOCALSERVERS];
 static int				g_numlocalservers;
 static servernode_t		g_favoriteserverlist[MAX_FAVORITESERVERS];
@@ -1208,7 +1211,9 @@ static void ArenaServers_StartRefresh( void )
 		return;
 	}
 
-	if ( g_servertype == AS_GLOBAL ) {
+	if ( g_servertype == AS_GLOBAL || g_servertype == AS_MPLAYER ) {
+		// AS_GLOBAL → masterIdx 0 (all masters); AS_MPLAYER → 2 (sv_master2 = Trinity directory).
+		int masterIdx = ( g_servertype == AS_MPLAYER ) ? 2 : 0;
 #if 1
 		myargs[0] = '\0';
 #else
@@ -1247,9 +1252,9 @@ static void ArenaServers_StartRefresh( void )
 		protocol[0] = '\0';
 		trap_Cvar_VariableStringBuffer( "debug_protocol", protocol, sizeof( protocol ) );
 		if ( protocol[0] ) {
-			trap_Cmd_ExecuteText( EXEC_APPEND, va( "globalservers 0 %s%s\n", protocol, myargs ));
+			trap_Cmd_ExecuteText( EXEC_APPEND, va( "globalservers %d %s%s\n", masterIdx, protocol, myargs ));
 		} else {
-			trap_Cmd_ExecuteText( EXEC_APPEND, va( "globalservers 0 %d%s\n", (int)trap_Cvar_VariableValue( "protocol" ), myargs ) );
+			trap_Cmd_ExecuteText( EXEC_APPEND, va( "globalservers %d %d%s\n", masterIdx, (int)trap_Cvar_VariableValue( "protocol" ), myargs ) );
 		}
 	}
 }
@@ -1312,11 +1317,18 @@ void ArenaServers_SetType( int type )
 		break;
 
 	case AS_GLOBAL:
-	case AS_MPLAYER:
 		g_arenaservers.save.generic.flags &= ~(QMF_INACTIVE|QMF_HIDDEN);
 		g_arenaservers.remove.generic.flags |= (QMF_INACTIVE|QMF_HIDDEN);
 		g_arenaservers.serverlist = g_globalserverlist;
 		g_arenaservers.numservers = &g_numglobalservers;
+		g_arenaservers.maxservers = MAX_GLOBALSERVERS;
+		break;
+
+	case AS_MPLAYER:
+		g_arenaservers.save.generic.flags &= ~(QMF_INACTIVE|QMF_HIDDEN);
+		g_arenaservers.remove.generic.flags |= (QMF_INACTIVE|QMF_HIDDEN);
+		g_arenaservers.serverlist = g_mplayerserverlist;
+		g_arenaservers.numservers = &g_nummplayerservers;
 		g_arenaservers.maxservers = MAX_GLOBALSERVERS;
 		break;
 
@@ -1335,7 +1347,7 @@ void ArenaServers_SetType( int type )
 	else {
 		// avoid slow operation, use existing results
 		g_arenaservers.currentping       = *g_arenaservers.numservers;
-		g_arenaservers.numqueriedservers = *g_arenaservers.numservers; 
+		g_arenaservers.numqueriedservers = *g_arenaservers.numservers;
 		ArenaServers_UpdateMenu();
 	}
 	strcpy( g_arenaservers.status.string, "hit refresh to update" );
@@ -1360,10 +1372,6 @@ static void ArenaServers_Event( void* ptr, int event ) {
 	switch( id ) {
 	case ID_MASTER:
 		value = g_arenaservers.master.curvalue;
-		if (value >= 1)
-		{
-			value++;
-		}
 		trap_Cvar_SetValue( "ui_browserMaster", value );
 		ArenaServers_SetType( value );
 		break;
@@ -1788,11 +1796,7 @@ static void ArenaServers_MenuInit( void ) {
 	ArenaServers_LoadFavorites();
 
 	g_servertype = Com_Clamp( 0, 3, ui_browserMaster.integer );
-	// hack to get rid of MPlayer stuff
-	value = g_servertype;
-	if (value >= 1)
-		value--;
-	g_arenaservers.master.curvalue = value;
+	g_arenaservers.master.curvalue = g_servertype;
 
 	g_gametype = Com_Clamp( 0, GT_MAX_GAME_TYPE-1, ui_browserGameType.integer );
 	g_arenaservers.gametype.curvalue = g_gametype;
