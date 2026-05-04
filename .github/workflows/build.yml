@@ -33,11 +33,20 @@ jobs:
           name: trinity
           path: dist/*.pk3
 
+      - name: Build sha256sums.txt
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euxo pipefail
+          ( cd dist && sha256sum *.pk3 > sha256sums.txt )
+          cat dist/sha256sums.txt
+
       - name: Create release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.pk3
+          files: |
+            dist/*.pk3
+            dist/sha256sums.txt
           generate_release_notes: true
           body: |
             To update, ensure your Quake 3 client isn't running, and copy:
