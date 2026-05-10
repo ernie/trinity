@@ -185,3 +185,8 @@ trinity/
 ├── dist/           # Build output (pk3 files)
 └── ui/             # Menu definitions
 ```
+
+## Documentation
+
+- [Color schemes reference](docs/COLOR_SCHEMES.md) — chat `^N`, `color1`/`color2`, `cg_enemyColors`, the UI slider, and how they all map to each other
+- [VR protocol](docs/VR_PROTOCOL.md) — how VR head tracking is networked

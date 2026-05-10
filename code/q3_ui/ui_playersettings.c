@@ -1,6 +1,7 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "ui_local.h"
+#include "../game/ui_swatches.h"
 
 #define ART_FRAMEL			"menu/art/frame2_l"
 #define ART_FRAMER			"menu/art/frame1_r"
@@ -50,12 +51,6 @@ typedef struct {
 } playersettings_t;
 
 static playersettings_t	s_playersettings;
-
-// Maps cvar value (1-7) to UI slider position (0-6)
-// Cvar: 1=red,2=green,3=yellow,4=blue,5=cyan,6=magenta,7=white
-// UI order: red,yellow,green,teal,blue,cyan,white (color spectrum)
-static int gamecodetoui[] = {4,2,3,0,5,1,6};
-static int uitogamecode[] = {4,6,2,3,1,5,7};
 
 static const char *handicap_items[] = {
 	"None",

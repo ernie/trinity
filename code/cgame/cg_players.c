@@ -669,8 +669,12 @@ static qboolean CG_IsKnownModel( const char *modelName ) {
 ====================
 CG_ColorFromString
 
-Convert color character value (1-7) to RGB color
-Values: 1=red, 2=green, 3=yellow, 4=blue, 5=cyan, 6=magenta, 7=white
+Convert color character '1'-'7' to RGB. Uses a bit-pattern mapping that is
+NOT the chat ^N palette (see docs/COLOR_SCHEMES.md):
+  bit 0 (val & 1) -> Blue, bit 1 (val & 2) -> Green, bit 2 (val & 4) -> Red
+Producing: 1=blue, 2=green, 3=cyan, 4=red, 5=magenta, 6=yellow, 7=white.
+'0' and characters outside '1'-'7' return white (the safe fallback, NOT
+black). Empty/null input also returns white.
 ====================
 */
 static void CG_ColorFromString( const char *v, vec3_t color ) {
@@ -731,6 +735,22 @@ static void CG_SetColorInfo( const char *color, clientInfo_t *info )
 }
 
 
+/*
+====================
+CG_GetTeamColors
+
+Substitutes '?' placeholders in a cg_enemyColors / cg_teamColors string with
+a team-specific digit before parsing. Digits substituted in (1, 4, 7) look
+like CPMA/OSP chat-color convention (1=red, 4=blue, 7=white) so user-typed
+config strings read intuitively. But they're fed to CG_ColorFromString which
+uses bit-pattern semantics, so the *visible* rendering is inverted:
+  TEAM_RED  -> '?' = '1' -> renders BLUE
+  TEAM_BLUE -> '?' = '4' -> renders RED
+  TEAM_FREE -> '?' = '7' -> renders WHITE
+This asymmetry is preserved as historical CPMA/OSP-compatible behavior.
+See docs/COLOR_SCHEMES.md.
+====================
+*/
 static const char *CG_GetTeamColors( const char *color, team_t team ) {
 	static char str[6];
 
