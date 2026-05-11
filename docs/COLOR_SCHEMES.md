@@ -208,26 +208,27 @@ Players without a model override see other players' normal `color1` /
 ### The `'?'` placeholder
 
 [`CG_GetTeamColors` cg_players.c:754](../code/cgame/cg_players.c#L754)
-substitutes `'?'` characters in the cvar string with a team-specific digit
-before parsing:
+substitutes `'?'` characters in the cvar string with the bit-pattern digit
+for the player's team color before parsing:
 
 ```c
-case TEAM_RED:  replace1( '?', '1', str ); break;
-case TEAM_BLUE: replace1( '?', '4', str ); break;
+case TEAM_RED:  replace1( '?', '4', str ); break;
+case TEAM_BLUE: replace1( '?', '1', str ); break;
 case TEAM_FREE: replace1( '?', '7', str ); break;
 ```
 
-The digits used (`1`, `4`, `7`) are the CPMA/OSP chat-color convention so that
-user-typed configs read like CPMA configs. But they're fed to the bit-pattern
-parser, so the *visible* rendering is inverted:
+Substituted digits feed `CG_ColorFromString` ([§4](#4-player-color1--color2-userinfo)),
+which uses the same bit-pattern semantics — so `'?'` renders as the player's own
+team color:
 
-- `TEAM_RED  → '?' = '1' → renders BLUE`
-- `TEAM_BLUE → '?' = '4' → renders RED`
-- `TEAM_FREE → '?' = '7' → renders WHITE`
+- `TEAM_RED  → '?' = '4' → renders red`
+- `TEAM_BLUE → '?' = '1' → renders blue`
+- `TEAM_FREE → '?' = '7' → renders white`
 
-This asymmetry is preserved intentionally as CPMA/OSP-compatible behavior.
-Legacy configs that target this convention render the same way they always
-have.
+So `cg_teamColors "?????"` paints every teammate's head/body/legs/color1/color2
+in their team color, and `cg_enemyColors "1????"` always paints enemy heads
+blue while letting the rest of the body and the rail colors follow whichever
+team the enemy happens to be on.
 
 ---
 

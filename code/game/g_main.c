@@ -1988,7 +1988,7 @@ void SetLeader( team_t team, int client ) {
 	}
 	level.clients[client].sess.teamLeader = qtrue;
 	ClientUserinfoChanged( client );
-	PrintTeam( team, va("print \"%s is the new team leader\n\"", level.clients[client].pers.netname) );
+	PrintTeam( team, va("print \"%s "S_COLOR_STRIP"is the new team leader\n\"", level.clients[client].pers.netname) );
 }
 
 

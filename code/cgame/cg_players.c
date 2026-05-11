@@ -740,14 +740,12 @@ static void CG_SetColorInfo( const char *color, clientInfo_t *info )
 CG_GetTeamColors
 
 Substitutes '?' placeholders in a cg_enemyColors / cg_teamColors string with
-a team-specific digit before parsing. Digits substituted in (1, 4, 7) look
-like CPMA/OSP chat-color convention (1=red, 4=blue, 7=white) so user-typed
-config strings read intuitively. But they're fed to CG_ColorFromString which
-uses bit-pattern semantics, so the *visible* rendering is inverted:
-  TEAM_RED  -> '?' = '1' -> renders BLUE
-  TEAM_BLUE -> '?' = '4' -> renders RED
-  TEAM_FREE -> '?' = '7' -> renders WHITE
-This asymmetry is preserved as historical CPMA/OSP-compatible behavior.
+the bit-pattern digit for the player's team color before parsing:
+  TEAM_RED  -> '?' = '4' (bit pattern 100, renders red)
+  TEAM_BLUE -> '?' = '1' (bit pattern 001, renders blue)
+  TEAM_FREE -> '?' = '7' (bit pattern 111, renders white)
+The substituted digits feed CG_ColorFromString, which uses the same
+bit-pattern semantics -- so '?' renders as the player's own team color.
 See docs/COLOR_SCHEMES.md.
 ====================
 */
@@ -757,8 +755,8 @@ static const char *CG_GetTeamColors( const char *color, team_t team ) {
 	Q_strncpyz( str, color, sizeof( str ) );
 
 	switch ( team ) {
-		case TEAM_RED:  replace1( '?', '1', str ); break;
-		case TEAM_BLUE: replace1( '?', '4', str ); break;
+		case TEAM_RED:  replace1( '?', '4', str ); break;
+		case TEAM_BLUE: replace1( '?', '1', str ); break;
 		case TEAM_FREE: replace1( '?', '7', str ); break;
 		default: break;
     }
