@@ -99,6 +99,10 @@ static void BotSetUserInfo( bot_state_t *bs, const char *key, const char *value 
 	char userinfo[MAX_INFO_STRING];
 
 	trap_GetUserinfo( bs->client, userinfo, sizeof( userinfo ) );
+	// skip CUIC churn when the bot AI re-asserts its current task
+	if ( !strcmp( Info_ValueForKey( userinfo, key ), value ) ) {
+		return;
+	}
 	Info_SetValueForKey( userinfo, key, value );
 	trap_SetUserinfo( bs->client, userinfo );
 	ClientUserinfoChanged( bs->client );
