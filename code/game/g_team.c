@@ -8,10 +8,65 @@ teamgame_t teamgame;
 
 gentity_t	*neutralObelisk;
 
+// Quiet window before the sweep emits an ObeliskDamageStop.
+#define OBELISK_ATTACK_QUIET_MS 3000
+
 static void Team_SetFlagStatus( team_t team, flagStatus_t status );
 
+#ifdef MISSIONPACK
+// Per-frame sweep: emit ObeliskDamageStop for any attacker quiet for the
+// window. No-op outside GT_OBELISK. Called from G_RunFrame.
+void Team_CheckObeliskAttacks( void ) {
+	int i;
+	if ( g_gametype.integer != GT_OBELISK ) return;
+	for ( i = 0 ; i < MAX_CLIENTS ; i++ ) {
+		obeliskAttackInfo_t *info = &teamgame.obeliskAttacks[i];
+		if ( info->lastAttackTime == 0 ) continue;
+		if ( level.time - info->lastAttackTime < OBELISK_ATTACK_QUIET_MS ) continue;
+		// Skip disconnected slots — pers.netname could already belong to
+		// the next occupant, and the tracker's player_leave handling
+		// keeps the indicator from sticking on the new player.
+		if ( level.clients[i].pers.connected != CON_CONNECTED ) {
+			info->lastAttackTime = 0;
+			continue;
+		}
+		G_LogPrintf( "ObeliskDamageStop: %d %d: %s\n",
+			info->team, i, level.clients[i].pers.netname );
+		info->lastAttackTime = 0;
+	}
+}
+
+// Clear and emit Stop for a specific client. Called from terminal sites
+// (ClientDisconnect, SetTeam, ObeliskDie) where waiting on the sweep
+// would leave a stale indicator lit briefly.
+void Team_ClearObeliskAttacker( int clientNum ) {
+	obeliskAttackInfo_t *info;
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) return;
+	info = &teamgame.obeliskAttacks[clientNum];
+	if ( info->lastAttackTime == 0 ) return;
+	if ( level.clients[clientNum].pers.connected == CON_CONNECTED ) {
+		G_LogPrintf( "ObeliskDamageStop: %d %d: %s\n",
+			info->team, clientNum, level.clients[clientNum].pers.netname );
+	}
+	info->lastAttackTime = 0;
+}
+#endif
+
 void Team_InitGame( void ) {
+#ifdef MISSIONPACK
+	// SpawnObelisk runs in G_SpawnEntitiesFromString, before us via
+	// G_CheckTeamItems — preserve the populated pointers across memset.
+	gentity_t *redObeliskSave = teamgame.redObelisk;
+	gentity_t *blueObeliskSave = teamgame.blueObelisk;
+	int destroysSave[MAX_CLIENTS];
+	memcpy(destroysSave, teamgame.obeliskDestroysPerClient, sizeof destroysSave);
+#endif
 	memset(&teamgame, 0, sizeof teamgame);
+#ifdef MISSIONPACK
+	teamgame.redObelisk = redObeliskSave;
+	teamgame.blueObelisk = blueObeliskSave;
+	memcpy(teamgame.obeliskDestroysPerClient, destroysSave, sizeof destroysSave);
+#endif
 
 	switch( g_gametype.integer ) {
 	case GT_CTF:
@@ -24,6 +79,12 @@ void Team_InitGame( void ) {
 	case GT_1FCTF:
 		teamgame.flagStatus = -1; // Invalid to force update
 		Team_SetFlagStatus( TEAM_FREE, FLAG_ATBASE );
+		break;
+	case GT_HARVESTER:
+		SetHarvesterStatus(); // seed "0,0" from level start
+		break;
+	case GT_OBELISK:
+		SetObeliskStatus(); // canonical seed after pointers + array are settled
 		break;
 #endif
 	default:
@@ -215,28 +276,28 @@ static void Team_SetFlagStatus( team_t team, flagStatus_t status ) {
 
 		if ( g_gametype.integer == GT_CTF ) {
 			int redCarrier, blueCarrier;
+			int redOut, blueOut;
 
 			st[0] = ctfFlagStatusRemap[teamgame.redStatus];
 			st[1] = ctfFlagStatusRemap[teamgame.blueStatus];
 			st[2] = '\0';
 
-			// Update cvar for UDP getstatus queries (stats tools)
-			// Format: "<red_status>:<red_carrier>,<blue_status>:<blue_carrier>"
 			redCarrier = Team_GetFlagCarrier( PW_REDFLAG );
 			blueCarrier = Team_GetFlagCarrier( PW_BLUEFLAG );
-			trap_Cvar_Set( "g_flagStatus", va( "%d:%d,%d:%d",
-				teamgame.redStatus, redCarrier,
-				teamgame.blueStatus, blueCarrier ) );
+			// Normalize FLAG_DROPPED (4) to 2 — matches ctfFlagStatusRemap.
+			redOut  = ( teamgame.redStatus  == FLAG_DROPPED ) ? 2 : teamgame.redStatus;
+			blueOut = ( teamgame.blueStatus == FLAG_DROPPED ) ? 2 : teamgame.blueStatus;
+			trap_Cvar_Set( "g_objStatus", va( "%d:%d,%d:%d",
+				redOut, redCarrier,
+				blueOut, blueCarrier ) );
 		} else {	// GT_1FCTF
 			int carrier;
 
 			st[0] = oneFlagStatusRemap[teamgame.flagStatus];
 			st[1] = '\0';
 
-			// Update cvar for UDP getstatus queries (stats tools)
-			// Format: "<status>:<carrier>" (single neutral flag)
 			carrier = Team_GetFlagCarrier( PW_NEUTRALFLAG );
-			trap_Cvar_Set( "g_flagStatus", va( "%d:%d",
+			trap_Cvar_Set( "g_objStatus", va( "%d:%d",
 				teamgame.flagStatus, carrier ) );
 		}
 
@@ -922,6 +983,7 @@ int Pickup_Team( gentity_t *ent, gentity_t *other ) {
 			G_LogPrintf( "SkullPickup: %d %d %d: %s\n",
 				cl->ps.clientNum, cl->sess.sessionTeam, cl->ps.generic1,
 				cl->pers.netname );
+			SetHarvesterStatus();
 		}
 		G_FreeEntity( ent );
 		return 0;
@@ -1349,6 +1411,60 @@ Obelisks
 ================
 */
 
+// SetHarvesterStatus rewrites g_objStatus from current ps.generic1 carry
+// totals. Grammar contract at the cvar registration site in g_main.c.
+void SetHarvesterStatus( void ) {
+	char buf[MAX_INFO_VALUE];
+	char tail[MAX_INFO_VALUE] = "";
+	int redCarrying  = 0;
+	int blueCarrying = 0;
+	int i, tailLen = 0;
+
+	if ( g_gametype.integer != GT_HARVESTER ) return;
+
+	for ( i = 0 ; i < level.maxclients ; i++ ) {
+		gclient_t *cl = &level.clients[i];
+		if ( cl->pers.connected != CON_CONNECTED ) continue;
+		if ( cl->ps.generic1 <= 0 ) continue;
+		if ( cl->sess.sessionTeam != TEAM_RED && cl->sess.sessionTeam != TEAM_BLUE ) continue;
+		if ( cl->sess.sessionTeam == TEAM_RED )  redCarrying  += cl->ps.generic1;
+		if ( cl->sess.sessionTeam == TEAM_BLUE ) blueCarrying += cl->ps.generic1;
+		Q_strcat( tail, sizeof tail,
+			va( "%s%d:%d", tailLen++ == 0 ? "" : ",", i, cl->ps.generic1 ) );
+	}
+	if ( tailLen > 0 ) {
+		Com_sprintf( buf, sizeof buf, "%d,%d|%s", redCarrying, blueCarrying, tail );
+	} else {
+		Com_sprintf( buf, sizeof buf, "%d,%d", redCarrying, blueCarrying );
+	}
+	trap_Cvar_Set( "g_objStatus", buf );
+}
+
+// SetObeliskStatus rewrites g_objStatus from current obelisk HPs +
+// teamgame.obeliskDestroysPerClient tail. See g_main.c for grammar.
+// Health clamped to 0 — overkill leaves self->health negative until
+// g_combat.c clamps it post-die, but the cvar must read 0 for the UI.
+void SetObeliskStatus( void ) {
+	char buf[MAX_INFO_VALUE];
+	int redHP, blueHP;
+	int i, tailLen = 0;
+
+	if ( g_gametype.integer != GT_OBELISK ) return;
+
+	redHP  = teamgame.redObelisk  && teamgame.redObelisk->health  > 0 ? teamgame.redObelisk->health  : 0;
+	blueHP = teamgame.blueObelisk && teamgame.blueObelisk->health > 0 ? teamgame.blueObelisk->health : 0;
+
+	Com_sprintf( buf, sizeof buf, "%d,%d", redHP, blueHP );
+	for ( i = 0 ; i < level.maxclients ; i++ ) {
+		if ( teamgame.obeliskDestroysPerClient[i] > 0 ) {
+			Q_strcat( buf, sizeof buf,
+				va( "%s%d:%d", tailLen++ == 0 ? "|" : ",",
+					i, teamgame.obeliskDestroysPerClient[i] ) );
+		}
+	}
+	trap_Cvar_Set( "g_objStatus", buf );
+}
+
 static void ObeliskRegen( gentity_t *self ) {
 	self->nextthink = level.time + g_obeliskRegenPeriod.integer * 1000;
 	if( self->health >= g_obeliskHealth.integer ) {
@@ -1363,6 +1479,7 @@ static void ObeliskRegen( gentity_t *self ) {
 
 	self->activator->s.modelindex2 = self->health * 0xff / g_obeliskHealth.integer;
 	self->activator->s.frame = 0;
+	SetObeliskStatus();
 }
 
 
@@ -1374,19 +1491,26 @@ static void ObeliskRespawn( gentity_t *self ) {
 	self->nextthink = level.time + g_obeliskRegenPeriod.integer * 1000;
 
 	self->activator->s.frame = 0;
+	SetObeliskStatus();
 }
 
 
 static void ObeliskDie( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int mod ) {
 	int			otherTeam;
+	int			attackerClientNum = attacker->client ? attacker->client->ps.clientNum : -1;
 
 	otherTeam = OtherTeam( self->spawnflags );
 	AddTeamScore(self->s.pos.trBase, otherTeam, 1);
 	Team_ForceGesture(otherTeam);
 
 	G_LogPrintf( "ObeliskDestroy: %d %d: %s\n",
-		self->spawnflags, attacker->client ? attacker->client->ps.clientNum : -1,
+		self->spawnflags, attackerClientNum,
 		attacker->client ? attacker->client->pers.netname : "" );
+
+	// Credit only player kills (excludes world / -1).
+	if ( attackerClientNum >= 0 && attackerClientNum < MAX_CLIENTS ) {
+		teamgame.obeliskDestroysPerClient[attackerClientNum]++;
+	}
 
 	CalculateRanks();
 
@@ -1409,6 +1533,21 @@ static void ObeliskDie( gentity_t *self, gentity_t *inflictor, gentity_t *attack
 
 	teamgame.redObeliskAttackedTime = 0;
 	teamgame.blueObeliskAttackedTime = 0;
+
+	// Terminal state — clear any attacker indicators for this obelisk's
+	// team. Sweep would fade them anyway after the quiet window, but
+	// proactive cleanup keeps the indicator from briefly persisting
+	// over the destroy moment.
+	{
+		int i;
+		for ( i = 0 ; i < MAX_CLIENTS ; i++ ) {
+			if ( teamgame.obeliskAttacks[i].team == self->spawnflags ) {
+				Team_ClearObeliskAttacker( i );
+			}
+		}
+	}
+
+	SetObeliskStatus();
 }
 
 
@@ -1447,6 +1586,7 @@ static void ObeliskTouch( gentity_t *self, gentity_t *other, trace_t *trace ) {
 	other->client->ps.persistant[PERS_CAPTURES] += tokens;
 	
 	other->client->ps.generic1 = 0;
+	SetHarvesterStatus();
 	CalculateRanks();
 
 	Team_CaptureFlagSound( self, self->spawnflags );
@@ -1464,11 +1604,28 @@ static void ObeliskPain( gentity_t *self, gentity_t *attacker, int damage ) {
 	self->activator->s.frame = 1;
 	AddScore(attacker, self->r.currentOrigin, actualDamage);
 
-	// Log obelisk damage: team, health remaining, damage dealt, attacker
-	G_LogPrintf( "ObeliskDamage: %d %d %d %d: %s\n",
-		self->spawnflags, self->health, damage,
-		attacker->client ? attacker->client->ps.clientNum : -1,
-		attacker->client ? attacker->client->pers.netname : "" );
+	// Per-attacker coalescing: emit Start on the off→on transition and
+	// when the target obelisk changes; Team_CheckObeliskAttacks (called
+	// every G_RunFrame) emits the matching Stop after the quiet window.
+	if ( attacker->client ) {
+		int cn = attacker->client->ps.clientNum;
+		int team = self->spawnflags;
+		obeliskAttackInfo_t *info = &teamgame.obeliskAttacks[cn];
+
+		if ( info->lastAttackTime == 0 ) {
+			G_LogPrintf( "ObeliskDamageStart: %d %d: %s\n",
+				team, cn, attacker->client->pers.netname );
+		} else if ( info->team != team ) {
+			G_LogPrintf( "ObeliskDamageStop: %d %d: %s\n",
+				info->team, cn, attacker->client->pers.netname );
+			G_LogPrintf( "ObeliskDamageStart: %d %d: %s\n",
+				team, cn, attacker->client->pers.netname );
+		}
+		info->team = team;
+		info->lastAttackTime = level.time;
+	}
+
+	SetObeliskStatus();
 }
 
 gentity_t *SpawnObelisk( vec3_t origin, int team, int spawnflags) {
@@ -1496,6 +1653,9 @@ gentity_t *SpawnObelisk( vec3_t origin, int team, int spawnflags) {
 		ent->pain = ObeliskPain;
 		ent->think = ObeliskRegen;
 		ent->nextthink = level.time + g_obeliskRegenPeriod.integer * 1000;
+		// Cache for SetObeliskStatus's HP read.
+		if ( team == TEAM_RED )  teamgame.redObelisk  = ent;
+		if ( team == TEAM_BLUE ) teamgame.blueObelisk = ent;
 	}
 	if( g_gametype.integer == GT_HARVESTER ) {
 		ent->r.contents = CONTENTS_TRIGGER;
@@ -1530,6 +1690,9 @@ gentity_t *SpawnObelisk( vec3_t origin, int team, int spawnflags) {
 	ent->spawnflags = team;
 
 	trap_LinkEntity( ent );
+
+	// g_objStatus is seeded once from Team_InitGame's GT_OBELISK case
+	// (runs after both obelisks have been linked), so no per-spawn write here.
 
 	return ent;
 }

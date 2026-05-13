@@ -152,6 +152,7 @@ void TossClientCubes( gentity_t *self ) {
 	vec3_t		origin;
 
 	self->client->ps.generic1 = 0;
+	SetHarvesterStatus();
 
 	// this should never happen but we should never
 	// get the server to crash due to skull being spawned in

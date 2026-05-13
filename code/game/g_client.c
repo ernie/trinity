@@ -1250,6 +1250,12 @@ void ClientDisconnect( int clientNum ) {
 		return;
 	}
 
+#ifdef MISSIONPACK
+	// Emit ObeliskDamageStop while pers.netname is still this client's;
+	// after we return, the slot may be reused by the next connect.
+	Team_ClearObeliskAttacker( clientNum );
+#endif
+
 	// stop any following clients
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
 		if ( level.clients[i].sess.sessionTeam == TEAM_SPECTATOR
@@ -1310,6 +1316,16 @@ void ClientDisconnect( int clientNum ) {
 	G_ClearClientSessionData( ent->client );
 
 	CalculateRanks();
+
+#ifdef MISSIONPACK
+	// Reset this slot's objective state so a new occupant starts clean.
+	if ( g_gametype.integer == GT_OBELISK ) {
+		teamgame.obeliskDestroysPerClient[clientNum] = 0;
+		SetObeliskStatus();
+	} else if ( g_gametype.integer == GT_HARVESTER ) {
+		SetHarvesterStatus();
+	}
+#endif
 
 	if ( ent->r.svFlags & SVF_BOT ) {
 		BotAIShutdownClient( clientNum, qfalse );

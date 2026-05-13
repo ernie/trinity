@@ -611,6 +611,15 @@ qboolean SetTeam( gentity_t *ent, const char *s ) {
 	// decide if we will allow the change
 	//
 	oldTeam = client->sess.sessionTeam;
+
+#ifdef MISSIONPACK
+	// Team change ends any in-flight obelisk attack from this slot.
+	// No-op if not actually changing teams (the same-team branch below).
+	if ( team != oldTeam ) {
+		Team_ClearObeliskAttacker( clientNum );
+	}
+#endif
+
 	if ( team == oldTeam ) {
 		if ( team != TEAM_SPECTATOR )
 			return qfalse;

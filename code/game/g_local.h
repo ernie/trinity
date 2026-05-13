@@ -6,6 +6,14 @@
 #include "bg_public.h"
 #include "g_public.h"
 
+// Per-client obelisk-attack tracker (Overload). lastAttackTime is the
+// level.time of the most recent damage hit, 0 if the slot is idle.
+// Drives ObeliskDamageStart / ObeliskDamageStop log line emission.
+typedef struct {
+	int		lastAttackTime;
+	int		team;	// obelisk being attacked (TEAM_RED / TEAM_BLUE)
+} obeliskAttackInfo_t;
+
 // Team game state (for CTF flag status etc.)
 typedef struct teamgame_s {
 	float			last_flag_capture;
@@ -17,9 +25,17 @@ typedef struct teamgame_s {
 	int				blueTakenTime;
 	int				redObeliskAttackedTime;
 	int				blueObeliskAttackedTime;
+	// Overload: obelisk pointers + per-player destroys, both fed into the g_objStatus tail.
+	struct gentity_s	*redObelisk;
+	struct gentity_s	*blueObelisk;
+	int				obeliskDestroysPerClient[MAX_CLIENTS];
+	obeliskAttackInfo_t	obeliskAttacks[MAX_CLIENTS];
 } teamgame_t;
 
 extern teamgame_t teamgame;
+
+void Team_CheckObeliskAttacks( void );
+void Team_ClearObeliskAttacker( int clientNum );
 
 //==================================================================
 
@@ -716,6 +732,10 @@ void Team_CheckDroppedItem( gentity_t *dropped );
 qboolean CheckObeliskAttack( gentity_t *obelisk, gentity_t *attacker );
 void Team_ResetFlags( void );
 int Team_GetFlagCarrier( int flagPowerup );
+#ifdef MISSIONPACK
+void SetObeliskStatus( void );
+void SetHarvesterStatus( void );
+#endif
 
 //
 // g_mem.c

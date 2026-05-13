@@ -251,12 +251,30 @@ void G_RegisterCvars( void ) {
 	trap_Cvar_Register( NULL, "g_doWarmup", "1", CVAR_ROM );
 	trap_Cvar_Set( "g_doWarmup", "1" );
 
-	// Register stats cvars (exposed via getstatus for external tools)
+	// Register stats cvars (exposed via getstatus for external tools).
 	trap_Cvar_Register( NULL, "g_matchState", "waiting", CVAR_SERVERINFO );
 	trap_Cvar_Register( NULL, "g_warmupEndTime", "0", CVAR_SERVERINFO );
 	trap_Cvar_Register( NULL, "g_levelStartTime", "0", CVAR_SERVERINFO );
 	trap_Cvar_Register( NULL, "g_levelTime", "0", CVAR_SERVERINFO );
-	trap_Cvar_Register( NULL, "g_flagStatus", "00", CVAR_SERVERINFO );
+	// g_objStatus — per-gametype objective state. Outer grammar is
+	// "TEAM|PLAYERS" where the pipe and PLAYERS tail are omitted when
+	// empty. TEAM format depends on g_gametype; PLAYERS is always a
+	// comma-separated list of "<clientNum>:<count>" entries with team
+	// attribution implied by each player's team in the status player list.
+	//
+	//   CTF       "<red_state>:<red_carrier>,<blue_state>:<blue_carrier>"
+	//             (no PLAYERS tail — carrier already in TEAM section)
+	//   1FCTF     "<state>:<carrier>"  (single neutral flag, no tail)
+	//   Overload  "<red_hp>,<blue_hp>[|<cn>:<destroys>,...]"
+	//   Harvester "<red_skulls>,<blue_skulls>[|<cn>:<skulls_held>,...]"
+	//   FFA/TDM/1v1  ""  (empty — not applicable)
+	//
+	// state codes (flag): 0 at base, 1 taken, 2 dropped.
+	// carrier: clientNum 0-63 or -1 when not held.
+	// hp: raw obelisk health, 0..g_obeliskHealth (default 2500).
+	// skulls (team section): count of enemy skulls carried by team.
+	// PLAYERS entries emitted only for non-zero counts.
+	trap_Cvar_Register( NULL, "g_objStatus", "", CVAR_SERVERINFO );
 	trap_Cvar_Register( NULL, "g_redscore", "0", CVAR_SERVERINFO );
 	trap_Cvar_Register( NULL, "g_bluescore", "0", CVAR_SERVERINFO );
 }
@@ -1620,19 +1638,19 @@ void G_UpdateMatchStateCvars( void ) {
 	}
 	trap_Cvar_Set( "g_levelStartTime", va( "%d", level.startTime ) );
 
-	// Flag status for CTF: "<red_status>:<red_carrier>,<blue_status>:<blue_carrier>"
-	// Flag status for 1FCTF: "<status>:<carrier>" (single neutral flag)
+	// Per-tick refresh catches carrier-disconnect edges that
+	// Team_SetFlagStatus's event-driven path misses.
 	if ( g_gametype.integer == GT_CTF ) {
 		int redCarrier = Team_GetFlagCarrier( PW_REDFLAG );
 		int blueCarrier = Team_GetFlagCarrier( PW_BLUEFLAG );
-		trap_Cvar_Set( "g_flagStatus", va( "%d:%d,%d:%d",
+		trap_Cvar_Set( "g_objStatus", va( "%d:%d,%d:%d",
 			teamgame.redStatus, redCarrier,
 			teamgame.blueStatus, blueCarrier ) );
 	}
 #ifdef MISSIONPACK
 	else if ( g_gametype.integer == GT_1FCTF ) {
 		int carrier = Team_GetFlagCarrier( PW_NEUTRALFLAG );
-		trap_Cvar_Set( "g_flagStatus", va( "%d:%d",
+		trap_Cvar_Set( "g_objStatus", va( "%d:%d",
 			teamgame.flagStatus, carrier ) );
 	}
 #endif
@@ -2267,6 +2285,11 @@ static void G_RunFrame( int levelTime ) {
 
 	// update to team status?
 	CheckTeamStatus();
+
+#ifdef MISSIONPACK
+	// Coalesced obelisk-attack indicator: emit Stop after the quiet window.
+	Team_CheckObeliskAttacks();
+#endif
 
 	// cancel vote if timed out
 	CheckVote();

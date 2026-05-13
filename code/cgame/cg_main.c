@@ -958,6 +958,12 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.medalDefend = trap_R_RegisterShaderNoMip( "medal_defend" );
 	cgs.media.medalAssist = trap_R_RegisterShaderNoMip( "medal_assist" );
 	cgs.media.medalCapture = trap_R_RegisterShaderNoMip( "medal_capture" );
+#ifdef MISSIONPACK
+	// Full asset path so the renderer's direct-texture fallback finds
+	// these without a .shader-script bridge.
+	cgs.media.medalSkull = trap_R_RegisterShaderNoMip( "menu/medals/medal_skull" );
+	cgs.media.medalObelisk = trap_R_RegisterShaderNoMip( "menu/medals/medal_obelisk" );
+#endif
 
 
 	memset( cg_items, 0, sizeof( cg_items ) );
@@ -1052,8 +1058,18 @@ static void CG_RegisterGraphics( void ) {
 }
 
 
+// Medal art for EF_AWARD_CAP / PERS_CAPTURES (capture / skull-deliver /
+// obelisk-destroy share the engine flag).
+qhandle_t CG_CaptureMedalForGametype( void ) {
+#ifdef MISSIONPACK
+	if ( cgs.gametype == GT_HARVESTER ) return cgs.media.medalSkull;
+	if ( cgs.gametype == GT_OBELISK )   return cgs.media.medalObelisk;
+#endif
+	return cgs.media.medalCapture;
+}
 
-/*																																			
+
+/*
 =======================
 CG_BuildSpectatorString
 

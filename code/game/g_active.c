@@ -597,6 +597,7 @@ void ClientEvents( gentity_t *ent, int oldEventSequence ) {
 						}
 					}
 					ent->client->ps.generic1 = 0;
+					SetHarvesterStatus();
 				}
 			}
 #endif

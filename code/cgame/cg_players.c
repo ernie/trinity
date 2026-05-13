@@ -2453,7 +2453,7 @@ static void CG_PlayerSprites( centity_t *cent ) {
 	}
 
 	if ( cent->currentState.eFlags & EF_AWARD_CAP ) {
-		CG_PlayerFloatSprite( cent, cgs.media.medalCapture );
+		CG_PlayerFloatSprite( cent, CG_CaptureMedalForGametype() );
 		return;
 	}
 

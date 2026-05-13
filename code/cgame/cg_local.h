@@ -931,6 +931,10 @@ typedef struct {
 	qhandle_t	medalDefend;
 	qhandle_t	medalAssist;
 	qhandle_t	medalCapture;
+#ifdef MISSIONPACK
+	qhandle_t	medalSkull;		// Harvester skull-delivery medal
+	qhandle_t	medalObelisk;	// Overload obelisk-destroy medal
+#endif
 
 	// sounds
 	sfxHandle_t	quadSound;
@@ -1262,6 +1266,8 @@ void QDECL CG_Printf( const char *msg, ... );
 void QDECL CG_Error( const char *msg, ... );
 
 void CG_StartMusic( void );
+
+qhandle_t CG_CaptureMedalForGametype( void );
 
 void CG_UpdateCvars( void );
 void CG_UpdateVoipTalkingState( void );
