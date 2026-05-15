@@ -548,6 +548,11 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	level.previousTime = levelTime;
 	level.msec = FRAMETIME;
 
+	// Sync match-state cvars to the freshly-init'd level so the
+	// InitGame log line's serverinfo embed and any UDP status poll
+	// between now and WarmupEnd see this map's values.
+	G_UpdateMatchStateCvars();
+
 	level.snd_fry = G_SoundIndex("sound/player/fry.wav");	// FIXME standing in lava / slime
 
 	// Generate unique match identifier and expose to engine
