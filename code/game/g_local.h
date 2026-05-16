@@ -246,6 +246,15 @@ typedef struct {
 	int			spectatorClient;	// for chasecam and follow mode
 	int			wins, losses;		// tournament stats
 	qboolean	teamLeader;			// true when this client is a team leader
+
+	// Trinity handshake state. Lives here (not pers) so it survives the
+	// G_InitGame memset at level change — pers gets wiped, sess gets
+	// round-tripped through the session<N> cvar. Identity: a verified
+	// client stays verified until they actually disconnect, regardless
+	// of how many map rotations they sit through.
+	char		handshakeNonce[32]; // 31 hex chars + NUL when set, empty otherwise
+	int			handshakeTime;      // 0 = no handshake; negative = queued not yet sent; positive = level.time when sent
+	qboolean	trinityVerified;
 } clientSession_t;
 
 //
@@ -272,11 +281,6 @@ typedef struct {
 
 	qboolean	inGame;
 	qboolean	damagePlums;		// do we want to display damage numbers?
-
-	// Trinity handshake state (must survive map restarts)
-	char		handshakeNonce[32];
-	int			handshakeTime;		// negative = queued not sent, positive = level.time when sent, 0 = no handshake
-	qboolean	trinityVerified;
 } clientPersistant_t;
 
 // unlagged

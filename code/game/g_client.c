@@ -965,18 +965,20 @@ void ClientBegin( int clientNum ) {
 	
 	client->pers.inGame = qtrue;
 
-	// Trinity handshake: generate nonce, challenge sent from G_RunFrame
-	// Skip if already verified (persists across map changes) or if bot
-	if ( g_trinityHandshake.integer && !client->pers.trinityVerified && !( ent->r.svFlags & SVF_BOT ) ) {
+	// Trinity handshake: generate nonce, challenge sent from G_RunFrame.
+	// trinityVerified lives in sess so it really does persist across
+	// map changes — G_InitGame's g_clients memset wipes pers but sess
+	// is restored from the session<N> cvar by G_ReadClientSessionData.
+	if ( g_trinityHandshake.integer && !client->sess.trinityVerified && !( ent->r.svFlags & SVF_BOT ) ) {
 		int i;
 		int hs_seed = trap_Milliseconds() ^ ( clientNum * 65537 );
 
 		for ( i = 0; i < 31; i++ ) {
 			Q_rand( &hs_seed );
-			client->pers.handshakeNonce[i] = "0123456789abcdef"[((unsigned)hs_seed >> 28) & 0xf];
+			client->sess.handshakeNonce[i] = "0123456789abcdef"[((unsigned)hs_seed >> 28) & 0xf];
 		}
-		client->pers.handshakeNonce[31] = '\0';
-		client->pers.handshakeTime = -(level.time + 1);  // negative = not yet sent (avoid 0)
+		client->sess.handshakeNonce[31] = '\0';
+		client->sess.handshakeTime = -(level.time + 1);  // negative = not yet sent (avoid 0)
 	}
 
 	G_LogPrintf( "ClientBegin: %i\n", clientNum );

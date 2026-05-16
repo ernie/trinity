@@ -2311,23 +2311,23 @@ static void G_RunFrame( int levelTime ) {
 		for ( i = 0; i < level.maxclients; i++ ) {
 			gclient_t *cl = &level.clients[i];
 			if ( cl->pers.connected != CON_CONNECTED ||
-			     cl->pers.trinityVerified ||
-			     !cl->pers.handshakeTime ||
+			     cl->sess.trinityVerified ||
+			     !cl->sess.handshakeTime ||
 			     ( g_entities[i].r.svFlags & SVF_BOT ) ) {
 				continue;
 			}
-			if ( cl->pers.handshakeTime < 0 ) {
+			if ( cl->sess.handshakeTime < 0 ) {
 				char hs_userinfo[MAX_INFO_STRING];
 				// Negative = challenge not yet sent
-				trap_SendServerCommand( i, va( "trinity_challenge %s", cl->pers.handshakeNonce ) );
+				trap_SendServerCommand( i, va( "trinity_challenge %s", cl->sess.handshakeNonce ) );
 				trap_GetUserinfo( i, hs_userinfo, sizeof( hs_userinfo ) );
 				G_LogPrintf( "TrinityChallenge: %i %s %s\n", i,
 					Info_ValueForKey( hs_userinfo, "cl_guid" ),
-					cl->pers.handshakeNonce );
-				cl->pers.handshakeTime = level.time;
+					cl->sess.handshakeNonce );
+				cl->sess.handshakeTime = level.time;
 				G_LogPrintf( "TrinityChallengeSent: %i (time=%i)\n", i, level.time );
-			} else if ( level.time - cl->pers.handshakeTime > 10000 ) {
-				G_LogPrintf( "TrinityTimeout: %i (time=%i hstime=%i)\n", i, level.time, cl->pers.handshakeTime );
+			} else if ( level.time - cl->sess.handshakeTime > 10000 ) {
+				G_LogPrintf( "TrinityTimeout: %i (time=%i hstime=%i)\n", i, level.time, cl->sess.handshakeTime );
 				trap_DropClient( i, "Trinity handshake timed out" );
 			}
 		}
