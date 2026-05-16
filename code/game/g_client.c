@@ -1221,7 +1221,7 @@ void ClientSpawn(gentity_t *ent) {
 
 	// log spawn for non-spectators when match is active
 	if ( !isSpectator && level.warmupTime == 0 ) {
-		G_LogPrintf( "Spawn: %d: %s\n", index, client->pers.netname );
+		G_LogPrintf( "Spawn: %d: %s" S_COLOR_WHITE "\n", index, client->pers.netname );
 	}
 }
 

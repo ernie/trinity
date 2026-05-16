@@ -945,7 +945,7 @@ static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chat
 	// Trinity commands: messages starting with ! are logged but not broadcast
 	// The collector server handles these commands and responds via RCON
 	if ( chatText[0] == '!' && !(ent->r.svFlags & SVF_BOT) ) {
-		G_LogPrintf( "Command: %d \"%s\": %s\n", (int)(ent - g_entities), ent->client->pers.netname, chatText + 1 );
+		G_LogPrintf( "Command: %d \"%s" S_COLOR_WHITE "\": %s" S_COLOR_WHITE "\n", (int)(ent - g_entities), ent->client->pers.netname, chatText + 1 );
 		trap_SendServerCommand( ent-g_entities, va( "print \"^6Command: ^7%s\n\"", chatText + 1 ) );
 		return;
 	}
@@ -955,7 +955,7 @@ static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chat
 	case SAY_ALL:
 		// Log chat from humans only (not bots)
 		if ( !(ent->r.svFlags & SVF_BOT) ) {
-			G_LogPrintf( "Say: %d \"%s\": %s\n", (int)(ent - g_entities), ent->client->pers.netname, chatText );
+			G_LogPrintf( "Say: %d \"%s" S_COLOR_WHITE "\": %s" S_COLOR_WHITE "\n", (int)(ent - g_entities), ent->client->pers.netname, chatText );
 		}
 		Com_sprintf (name, sizeof(name), "%s%c%c"EC": ", ent->client->pers.netname, Q_COLOR_ESCAPE, COLOR_WHITE );
 		color = COLOR_GREEN;
@@ -963,7 +963,7 @@ static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chat
 	case SAY_TEAM:
 		// Log chat from humans only (not bots)
 		if ( !(ent->r.svFlags & SVF_BOT) ) {
-			G_LogPrintf( "SayTeam: %d \"%s\": %s\n", (int)(ent - g_entities), ent->client->pers.netname, chatText );
+			G_LogPrintf( "SayTeam: %d \"%s" S_COLOR_WHITE "\": %s" S_COLOR_WHITE "\n", (int)(ent - g_entities), ent->client->pers.netname, chatText );
 		}
 		if (Team_GetLocationMsg(ent, location, sizeof(location)))
 			Com_sprintf (name, sizeof(name), EC"(%s%c%c"EC") (%s)"EC": ",
@@ -1062,7 +1062,7 @@ static void Cmd_Tell_f( gentity_t *ent ) {
 
 	p = ConcatArgs( 2 );
 
-	G_LogPrintf( "tell: %s to %s: %s\n", ent->client->pers.netname, target->client->pers.netname, p );
+	G_LogPrintf( "tell: %s" S_COLOR_WHITE " to %s" S_COLOR_WHITE ": %s" S_COLOR_WHITE "\n", ent->client->pers.netname, target->client->pers.netname, p );
 	G_Say( ent, target, SAY_TELL, p );
 	// don't tell to the player self if it was already directed to this player
 	// also don't send the chat back to a bot
@@ -1125,7 +1125,7 @@ void G_Voice( gentity_t *ent, gentity_t *target, int mode, const char *id, qbool
 
 	// echo the text to the console
 	if ( g_dedicated.integer ) {
-		G_Printf( "voice: %s %s\n", ent->client->pers.netname, id);
+		G_Printf( "voice: %s" S_COLOR_WHITE " %s\n", ent->client->pers.netname, id);
 	}
 
 	// send it to all the apropriate clients
@@ -1187,7 +1187,7 @@ static void Cmd_VoiceTell_f( gentity_t *ent, qboolean voiceonly ) {
 
 	id = ConcatArgs( 2 );
 
-	G_LogPrintf( "vtell: %s to %s: %s\n", ent->client->pers.netname, target->client->pers.netname, id );
+	G_LogPrintf( "vtell: %s" S_COLOR_WHITE " to %s" S_COLOR_WHITE ": %s\n", ent->client->pers.netname, target->client->pers.netname, id );
 	G_Voice( ent, target, SAY_TELL, id, voiceonly );
 	// don't tell to the player self if it was already directed to this player
 	// also don't send the chat back to a bot
