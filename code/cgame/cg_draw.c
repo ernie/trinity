@@ -23,6 +23,13 @@ char systemChat[256];
 char teamChat1[256];
 char teamChat2[256];
 
+// VOIP speaker HUD timing — used by the status-bar icon's fade-window
+// extension and by CG_DrawVoipSpeakers. Hoisted up here so the status bar
+// (which appears earlier in this file) can reference them too.
+#define VOIP_SPEAKER_DISPLAY_TIME	1000
+#define VOIP_SPEAKER_FADE_TIME		300
+#define VOIP_SPEAKER_ICON_SIZE		8
+
 #ifdef MISSIONPACK
 
 int CG_Text_Width(const char *text, float scale, int limit) {
@@ -660,7 +667,11 @@ static void CG_DrawStatusBar( void ) {
 			}
 		} else {
 			(void)CG_GetVoipChannelColor( txColor );
-			transmitting = cg.voipTalking[cg.clientNum];
+			// Show as transmitting during the active state OR briefly after, to bridge
+			// VAD-utterance gaps. Mirrors the talker-list's existing fade window.
+			transmitting = cg.voipTalking[cg.clientNum] ||
+				( cg.voipTalkingTime[cg.clientNum] &&
+				  cg.time - cg.voipTalkingTime[cg.clientNum] < VOIP_SPEAKER_DISPLAY_TIME );
 			muted = CG_LocalVoipMuted();
 		}
 
@@ -668,7 +679,7 @@ static void CG_DrawStatusBar( void ) {
 			iconShader = cgs.media.speakerMutedShader;
 			txColor[3] = 0.5f;
 		} else if ( transmitting ) {
-			iconShader = cgs.media.speakerShader;
+			iconShader = CG_VoipSpeakerShader( cg.voipLevel[cg.clientNum] );
 			txColor[3] = 0.5f + 0.3f * sin( cg.time * 0.008f );
 		} else {
 			iconShader = cgs.media.speakerIdleShader;
@@ -1358,10 +1369,6 @@ Show a stack of player names for active VOIP speakers.
 Fades out 300ms after they stop talking.
 =====================
 */
-#define VOIP_SPEAKER_DISPLAY_TIME	1000
-#define VOIP_SPEAKER_FADE_TIME		300
-#define VOIP_SPEAKER_ICON_SIZE		8
-
 static float CG_DrawVoipSpeakers( float y ) {
 	int		i;
 	float	x;
@@ -1415,7 +1422,7 @@ static float CG_DrawVoipSpeakers( float y ) {
 			iconColor[3] = fadeColor[3];
 			trap_R_SetColor( iconColor );
 			CG_DrawPic( x + 2, y + 1, VOIP_SPEAKER_ICON_SIZE, VOIP_SPEAKER_ICON_SIZE,
-				cg.voipTalking[i] ? cgs.media.speakerShader : cgs.media.speakerIdleShader );
+				CG_VoipSpeakerShader( cg.voipLevel[i] ) );
 			trap_R_SetColor( NULL );
 		}
 
@@ -2787,7 +2794,7 @@ static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
 				(void)CG_GetVoipChannelColor( voipColor );
 				talking = cg.voipTalking[cg.clientNum];
 				voipColor[3] = talking ? 0.8f : 0.2f;
-				voipIcon = talking ? cgs.media.speakerShader : cgs.media.speakerIdleShader;
+				voipIcon = talking ? CG_VoipSpeakerShader( cg.voipLevel[cg.clientNum] ) : cgs.media.speakerIdleShader;
 			} else if ( cg.voipTalking[sp->client] ) {
 				if ( cgs.voipVersion >= 2 && cg.voipChannel[sp->client] ) {
 					CG_VoipChannelFlagsToColor( cg.voipChannel[sp->client], voipColor );
@@ -2795,7 +2802,7 @@ static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
 					VectorSet( voipColor, 1.0f, 1.0f, 1.0f );
 				}
 				voipColor[3] = 0.8f;
-				voipIcon = cgs.media.speakerShader;
+				voipIcon = CG_VoipSpeakerShader( cg.voipLevel[sp->client] );
 			} else {
 				voipColor[0] = 1.0f; voipColor[1] = 1.0f;
 				voipColor[2] = 1.0f; voipColor[3] = 0.2f;
