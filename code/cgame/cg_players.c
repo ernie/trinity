@@ -2403,7 +2403,7 @@ static void CG_PlayerSprites( centity_t *cent ) {
 		VectorCopy( cent->lerpOrigin, ent.origin );
 		ent.origin[2] += 48;
 		ent.reType = RT_SPRITE;
-		ent.customShader = cgs.media.speakerShader;
+		ent.customShader = CG_VoipSpeakerShader( cg.voipLevel[cent->currentState.clientNum] );
 		ent.radius = 6;
 		ent.renderfx = rf;
 		if ( cgs.voipVersion >= 2 && cg.voipChannel[cent->currentState.clientNum] ) {
