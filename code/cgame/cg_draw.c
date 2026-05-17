@@ -654,10 +654,11 @@ static void CG_DrawStatusBar( void ) {
 		float bsz = headsize * 0.35f;
 		float bx = headx + headsize - bsz;
 		float by = heady + headsize - bsz;
+		int cn;
 
 		if ( cg.demoPlayback || cgs.tvPlayback ) {
 			// during playback, use channel info from engine for followed player
-			int cn = cg.snap->ps.clientNum;
+			cn = cg.snap->ps.clientNum;
 			transmitting = cg.voipTalking[cn];
 			muted = qfalse;	// remote players' self-mute state is not on the wire
 			if ( cgs.voipVersion >= 2 && cg.voipChannel[cn] ) {
@@ -666,12 +667,13 @@ static void CG_DrawStatusBar( void ) {
 				VectorSet( txColor, 1.0f, 1.0f, 1.0f );
 			}
 		} else {
+			cn = cg.clientNum;
 			(void)CG_GetVoipChannelColor( txColor );
 			// Show as transmitting during the active state OR briefly after, to bridge
 			// VAD-utterance gaps. Mirrors the talker-list's existing fade window.
-			transmitting = cg.voipTalking[cg.clientNum] ||
-				( cg.voipTalkingTime[cg.clientNum] &&
-				  cg.time - cg.voipTalkingTime[cg.clientNum] < VOIP_SPEAKER_DISPLAY_TIME );
+			transmitting = cg.voipTalking[cn] ||
+				( cg.voipTalkingTime[cn] &&
+				  cg.time - cg.voipTalkingTime[cn] < VOIP_SPEAKER_DISPLAY_TIME );
 			muted = CG_LocalVoipMuted();
 		}
 
@@ -679,7 +681,7 @@ static void CG_DrawStatusBar( void ) {
 			iconShader = cgs.media.speakerMutedShader;
 			txColor[3] = 0.5f;
 		} else if ( transmitting ) {
-			iconShader = CG_VoipSpeakerShader( cg.voipLevel[cg.clientNum] );
+			iconShader = CG_VoipSpeakerShader( cg.voipLevel[cn] );
 			txColor[3] = 0.5f + 0.3f * sin( cg.time * 0.008f );
 		} else {
 			iconShader = cgs.media.speakerIdleShader;
