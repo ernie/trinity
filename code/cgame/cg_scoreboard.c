@@ -183,7 +183,7 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 				(void)CG_GetVoipChannelColor( voipColor );
 				talking = cg.voipTalking[cg.clientNum];
 				voipColor[3] = talking ? 0.8f : 0.2f;
-				voipIcon = talking ? cgs.media.speakerShader : cgs.media.speakerIdleShader;
+				voipIcon = talking ? CG_VoipSpeakerShader( cg.voipLevel[cg.clientNum] ) : cgs.media.speakerIdleShader;
 			} else if ( cg.voipTalking[score->client] ) {
 				if ( cgs.voipVersion >= 2 && cg.voipChannel[score->client] ) {
 					CG_VoipChannelFlagsToColor( cg.voipChannel[score->client], voipColor );
@@ -191,7 +191,7 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 					VectorSet( voipColor, 1.0f, 1.0f, 1.0f );
 				}
 				voipColor[3] = 0.8f;
-				voipIcon = cgs.media.speakerShader;
+				voipIcon = CG_VoipSpeakerShader( cg.voipLevel[score->client] );
 			} else {
 				voipColor[0] = 1.0f; voipColor[1] = 1.0f; voipColor[2] = 1.0f; voipColor[3] = 0.2f;
 				voipIcon = cgs.media.speakerIdleShader;
