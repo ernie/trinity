@@ -265,20 +265,28 @@ void CG_UpdateVoipLevels( void ) {
 	char value[MAX_CLIENTS + 2];
 	int i;
 	int d;
+	qboolean playback = (qboolean)( cg.demoPlayback || cgs.tvPlayback );
 
-	// Local self from cg_voipLevel (single integer 0-5)
-	d = cg_voipLevel.integer;
-	if ( d < 0 ) d = 0;
-	if ( d > 5 ) d = 5;
-	cg.voipTalking[cg.clientNum] = (d > 0);
-	cg.voipLevel[cg.clientNum]   = (d > 1) ? (d - 1) : 0;
+	// Local self from cg_voipLevel (single integer 0-5). Only valid during live play —
+	// during demo/TV playback there's no local capture and cl_voipLevel stays 0, while
+	// cg.clientNum tracks the followed player whose received audio data is in the
+	// cl_voipLevels per-client string (engine populates that slot during playback).
+	if ( !playback ) {
+		d = cg_voipLevel.integer;
+		if ( d < 0 ) d = 0;
+		if ( d > 5 ) d = 5;
+		cg.voipTalking[cg.clientNum] = (d > 0);
+		cg.voipLevel[cg.clientNum]   = (d > 1) ? (d - 1) : 0;
+	}
 
-	// Per-client received from cl_voipLevels (MAX_CLIENTS hex digits)
+	// Per-client received from cl_voipLevels (MAX_CLIENTS hex digits). During playback
+	// we also parse the cg.clientNum slot (the followed player); during live play we
+	// skip it because cg_voipLevel above is the authoritative self signal.
 	trap_Cvar_VariableStringBuffer( "cl_voipLevels", value, sizeof( value ) );
 	{
 		int len = (int) strlen( value );
 		for ( i = 0; i < MAX_CLIENTS; i++ ) {
-			if ( i == cg.clientNum ) continue;  // self handled above
+			if ( i == cg.clientNum && !playback ) continue;  // self handled above (live only)
 
 			if ( i < len ) {
 				char c = value[i];
