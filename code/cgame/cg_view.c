@@ -1555,7 +1555,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	CG_UpdateCvars();
 
 	// update VOIP state
-	CG_UpdateVoipTalkingState();
+	CG_UpdateVoipLevels();
 	CG_UpdateVoipChannelState();
 
 	// if we are only updating the screen as a loading

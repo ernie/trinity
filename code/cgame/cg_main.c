@@ -248,19 +248,65 @@ static qboolean CG_TrapGetValueAvailable( void ) {
 #endif
 }
 
-void CG_UpdateVoipTalkingState( void ) {
-	char value[MAX_CLIENTS / 4 + 2];
-	int i;
+/*
+=====================
+CG_UpdateVoipLevels
 
-	if ( !CG_TrapGetValueAvailable() ) {
-		return;
+Decompose the engine's cl_voipLevel (local self) and cl_voipLevels (per-client
+hex digits) into separate "is transmitting" (cg.voipTalking[i]) and "shader
+level" (cg.voipLevel[i]) signals. Called once per frame from cg_view.c.
+
+Encoding: cvar digit 0 = inactive/stale, digit 1 = active+silent, digits 2-5 =
+active + level 1-4. Decomposes to voipTalking = (digit > 0), voipLevel =
+max(0, digit - 1).
+=====================
+*/
+void CG_UpdateVoipLevels( void ) {
+	char value[MAX_CLIENTS + 2];
+	int i;
+	int d;
+
+	// Local self from cg_voipLevel (single integer 0-5)
+	d = cg_voipLevel.integer;
+	if ( d < 0 ) d = 0;
+	if ( d > 5 ) d = 5;
+	cg.voipTalking[cg.clientNum] = (d > 0);
+	cg.voipLevel[cg.clientNum]   = (d > 1) ? (d - 1) : 0;
+
+	// Per-client received from cl_voipLevels (MAX_CLIENTS hex digits)
+	trap_Cvar_VariableStringBuffer( "cl_voipLevels", value, sizeof( value ) );
+	{
+		int len = (int) strlen( value );
+		for ( i = 0; i < MAX_CLIENTS; i++ ) {
+			if ( i == cg.clientNum ) continue;  // self handled above
+
+			if ( i < len ) {
+				char c = value[i];
+				if ( c >= '0' && c <= '9' ) {
+					d = c - '0';
+				} else if ( c >= 'a' && c <= 'f' ) {
+					d = 10 + (c - 'a');
+				} else if ( c >= 'A' && c <= 'F' ) {
+					d = 10 + (c - 'A');
+				} else {
+					d = 0;
+				}
+				if ( d < 0 ) d = 0;
+				if ( d > 5 ) d = 5;
+			} else {
+				d = 0;
+			}
+
+			cg.voipTalking[i] = (d > 0);
+			cg.voipLevel[i]   = (d > 1) ? (d - 1) : 0;
+		}
 	}
 
-	if ( trap_GetValue( value, sizeof( value ), "voip_talking" ) ) {
-		CG_ParseHexBitmask( value, cg.voipTalking, MAX_CLIENTS );
-	} else {
-		for ( i = 0; i < MAX_CLIENTS; i++ ) {
-			cg.voipTalking[i] = qfalse;
+	// Refresh fade timestamps for any active slot — drives the talker-list fade
+	// window. Updates even when the talker list isn't drawn (intentional fix).
+	for ( i = 0; i < MAX_CLIENTS; i++ ) {
+		if ( cg.voipTalking[i] ) {
+			cg.voipTalkingTime[i] = cg.time;
 		}
 	}
 }
