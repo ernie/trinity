@@ -738,6 +738,7 @@ typedef struct {
 
 	// VOIP state
 	qboolean		voipTalking[MAX_CLIENTS];
+	int				voipLevel[MAX_CLIENTS];			// 0 = idle/silent, 1-4 = audible level (selects speakerLevelShader[level-1])
 	int				voipTalkingTime[MAX_CLIENTS];	// cg.time when last seen talking (for HUD fade)
 	int				voipChannel[MAX_CLIENTS];		// per-client channel flags from engine
 } cg_t;
@@ -829,6 +830,7 @@ typedef struct {
 	qhandle_t	speakerShader;
 	qhandle_t	speakerIdleShader;
 	qhandle_t	speakerMutedShader;
+	qhandle_t	speakerLevelShader[4];	// [0] = level1, [1] = level2, [2] = level3, [3] = level4
 	qhandle_t	connectionShader;
 
 	qhandle_t	selectShader;
@@ -1270,7 +1272,8 @@ void CG_StartMusic( void );
 qhandle_t CG_CaptureMedalForGametype( void );
 
 void CG_UpdateCvars( void );
-void CG_UpdateVoipTalkingState( void );
+void CG_UpdateVoipLevels( void );
+qhandle_t CG_VoipSpeakerShader( int level );
 void CG_UpdateVoipChannelState( void );
 void CG_UpdateVoipMuteState( void );
 qboolean CG_GetVoipChannelColor( vec3_t color );
