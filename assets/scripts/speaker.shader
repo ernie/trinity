@@ -22,6 +22,46 @@ gfx/2d/speaker_idle
 	}
 }
 
+gfx/2d/speaker_level1
+{
+	nopicmip
+	{
+		map gfx/2d/speaker_level1.tga
+		blendFunc BLEND
+		rgbGen exactVertex
+	}
+}
+
+gfx/2d/speaker_level2
+{
+	nopicmip
+	{
+		map gfx/2d/speaker_level2.tga
+		blendFunc BLEND
+		rgbGen exactVertex
+	}
+}
+
+gfx/2d/speaker_level3
+{
+	nopicmip
+	{
+		map gfx/2d/speaker_level3.tga
+		blendFunc BLEND
+		rgbGen exactVertex
+	}
+}
+
+gfx/2d/speaker_level4
+{
+	nopicmip
+	{
+		map gfx/2d/speaker_level4.tga
+		blendFunc BLEND
+		rgbGen exactVertex
+	}
+}
+
 gfx/2d/speaker_muted
 {
 	nopicmip
