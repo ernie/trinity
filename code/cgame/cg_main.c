@@ -924,6 +924,10 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.speakerShader = trap_R_RegisterShader( "gfx/2d/speaker" );
 	cgs.media.speakerIdleShader = trap_R_RegisterShader( "gfx/2d/speaker_idle" );
 	cgs.media.speakerMutedShader = trap_R_RegisterShader( "gfx/2d/speaker_muted" );
+	cgs.media.speakerLevelShader[0] = trap_R_RegisterShader( "gfx/2d/speaker_level1" );
+	cgs.media.speakerLevelShader[1] = trap_R_RegisterShader( "gfx/2d/speaker_level2" );
+	cgs.media.speakerLevelShader[2] = trap_R_RegisterShader( "gfx/2d/speaker_level3" );
+	cgs.media.speakerLevelShader[3] = trap_R_RegisterShader( "gfx/2d/speaker_level4" );
 
 	cgs.media.bloodExplosionShader = trap_R_RegisterShader( "bloodExplosion" );
 

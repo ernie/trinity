@@ -1300,6 +1300,23 @@ qboolean CG_GetVoipChannelColor( vec3_t color ) {
 
 /*
 =====================
+CG_VoipSpeakerShader
+
+Pick a speaker shader for a given level value (0-4). Level 0 returns the idle
+shader (used both for "not transmitting" and "transmitting but silent" — the
+caller distinguishes those by checking cg.voipTalking[i]). Levels 1-4 return
+the corresponding speakerLevelShader entry.
+=====================
+*/
+qhandle_t CG_VoipSpeakerShader( int level ) {
+	if ( level <= 0 ) return cgs.media.speakerIdleShader;
+	if ( level > 4 )  level = 4;
+	return cgs.media.speakerLevelShader[level - 1];
+}
+
+
+/*
+=====================
 CG_LocalVoipMuted
 
 True when the local player has muted their VAD mic; inert in PTT mode.
