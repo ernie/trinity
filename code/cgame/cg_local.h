@@ -827,7 +827,6 @@ typedef struct {
 	qhandle_t	friendShader;
 
 	qhandle_t	balloonShader;
-	qhandle_t	speakerShader;
 	qhandle_t	speakerIdleShader;
 	qhandle_t	speakerMutedShader;
 	qhandle_t	speakerLevelShader[4];	// [0] = level1, [1] = level2, [2] = level3, [3] = level4
