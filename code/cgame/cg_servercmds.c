@@ -1062,6 +1062,24 @@ static void CG_ServerCommand( void ) {
 		return;
 	}
 
+	if ( !strcmp( cmd, "tann" ) ) {
+		if ( trap_Argc() >= 3 ) {
+			char	subtype;
+			int		clientNum;
+
+			// Copy the subtype char immediately — CG_Argv buffers may be
+			// reused across calls in some engines, so don't keep a pointer
+			// from CG_Argv(1) while calling CG_Argv(2).
+			subtype = CG_Argv( 1 )[0];
+			clientNum = atoi( CG_Argv( 2 ) );
+
+			if ( subtype ) {
+				CG_TrinityAnnounce_Play( subtype, clientNum );
+			}
+		}
+		return;
+	}
+
 	if ( !strcmp( cmd, "tv_seek_sync" ) ) {
 		int i;
 		int newClientNum = atoi( CG_Argv(1) );
