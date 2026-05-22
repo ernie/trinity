@@ -1652,6 +1652,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// add buffered sounds
 	CG_PlayBufferedSounds();
+	CG_TrinityAnnounce_Tick();
 
 #ifdef MISSIONPACK
 	// play buffered voice chats

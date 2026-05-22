@@ -106,9 +106,62 @@ void CG_TrinityAnnounce_Play( char subtype, int clientNum ) {
 		return;
 	}
 
-	// Route through the buffered-sound queue so we don't stomp on (or get
-	// stomped by) other queued CHAN_ANNOUNCER callouts like team flag /
-	// score / lead-change announcements. Plays at the 750ms cadence
-	// enforced by CG_PlayBufferedSounds.
-	CG_AddBufferedSound( h );
+	// Enqueue. CG_TrinityAnnounce_Tick drains the queue with pacing that
+	// defers to the reward stack (Excellent/Impressive/etc.) and the
+	// buffered-sound queue (CTF/score/lead callouts).
+	{
+		int next = ( cg.trinityAnnounceIn + 1 ) % MAX_TRINITY_ANNOUNCE_QUEUE;
+		if ( next == cg.trinityAnnounceOut ) {
+			// Buffer full: drop the oldest, keep the newest (matches the
+			// existing soundBuffer drop policy in CG_AddBufferedSound).
+			cg.trinityAnnounceOut = ( cg.trinityAnnounceOut + 1 ) % MAX_TRINITY_ANNOUNCE_QUEUE;
+		}
+		cg.trinityAnnounceQueue[cg.trinityAnnounceIn] = h;
+		cg.trinityAnnounceIn = next;
+	}
+}
+
+// How long to hold the channel between consecutive Trinity announcements.
+// Larger than CG_PlayBufferedSounds's 750ms gate because name .wav files
+// typically run 1-1.5s; a 2s spacing keeps the tail of one announcement
+// from being clipped by the next one starting.
+#define TRINITY_ANNOUNCE_SPACING_MS	2000
+
+// Called once per frame from CG_DrawActiveFrame (next to CG_PlayBufferedSounds).
+void CG_TrinityAnnounce_Tick( void ) {
+	sfxHandle_t h;
+
+	if ( cg.trinityAnnounceIn == cg.trinityAnnounceOut ) {
+		return;  // queue empty
+	}
+
+	// Pace our own consecutive plays.
+	if ( cg.time - cg.trinityAnnounceTime < TRINITY_ANNOUNCE_SPACING_MS ) {
+		return;
+	}
+
+	// Defer to the reward stack (medal sounds run ~1.5s, plus 3s visual fade).
+	if ( cg.rewardStack > 0 || cg.time - cg.rewardTime < REWARD_TIME ) {
+		return;
+	}
+
+	// Defer to the buffered-sound queue (CTF/score/lead callouts) — both
+	// any pending entries and the 750ms recovery window after a recent play.
+	if ( cg.soundBufferIn != cg.soundBufferOut ) {
+		return;
+	}
+	if ( cg.time < cg.soundTime ) {
+		return;
+	}
+
+	h = cg.trinityAnnounceQueue[cg.trinityAnnounceOut];
+	cg.trinityAnnounceOut = ( cg.trinityAnnounceOut + 1 ) % MAX_TRINITY_ANNOUNCE_QUEUE;
+
+	trap_S_StartLocalSound( h, CHAN_ANNOUNCER );
+	cg.trinityAnnounceTime = cg.time;
+
+	// Bump soundTime so the buffered-sound queue defers to us for the
+	// expected duration of this announcement. Bidirectional defer keeps
+	// flag/score callouts from clipping our tail.
+	cg.soundTime = cg.time + TRINITY_ANNOUNCE_SPACING_MS;
 }

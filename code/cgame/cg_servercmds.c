@@ -499,6 +499,9 @@ static void CG_MapRestart( void ) {
 
 	cg.rewardTime = 0;
 	cg.rewardStack = 0;
+	cg.trinityAnnounceIn = 0;
+	cg.trinityAnnounceOut = 0;
+	cg.trinityAnnounceTime = 0;
 	cg.intermissionStarted = qfalse;
 	cg.levelShot = qfalse;
 

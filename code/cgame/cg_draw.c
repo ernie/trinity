@@ -3825,6 +3825,11 @@ void CG_ResetSeekState( void ) {
 	cg.rewardStack = 0;
 	cg.rewardTime = 0;
 
+	// Trinity announcement queue
+	cg.trinityAnnounceIn = 0;
+	cg.trinityAnnounceOut = 0;
+	cg.trinityAnnounceTime = 0;
+
 	// Center print — CG_DrawCenterString: CG_FadeColor(centerPrintTime, 1000*cg_centertime)
 	cg.centerPrintTime = 0;
 
@@ -3900,7 +3905,11 @@ void CG_WarmupEvent( void ) {
 
 	cg.rewardStack = 0;
 	cg.rewardTime = 0;
-	
+
+	cg.trinityAnnounceIn = 0;
+	cg.trinityAnnounceOut = 0;
+	cg.trinityAnnounceTime = 0;
+
 	cg.weaponSelectTime = cg.time;
 
 	cg.lowAmmoWarning = 0;
