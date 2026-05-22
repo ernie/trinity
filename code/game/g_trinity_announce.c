@@ -9,7 +9,10 @@ void G_TrinityMaybeAnnounceJoin( gentity_t *ent ) {
 	if ( !ent || !ent->client ) {
 		return;
 	}
-	if ( !ent->client->sess.trinityVerified ) {
+	// When handshake is enabled, only verified players announce. When it
+	// is disabled server-wide there's no way to verify anyone, so fall
+	// back to announcing based on name alone for any non-bot player.
+	if ( g_trinityHandshake.integer && !ent->client->sess.trinityVerified ) {
 		return;
 	}
 	if ( ent->client->sess.announcedJoin ) {
@@ -40,7 +43,9 @@ void G_TrinityAnnounceWinner( int clientNum ) {
 	if ( ent->client->pers.connected != CON_CONNECTED ) {
 		return;
 	}
-	if ( !ent->client->sess.trinityVerified ) {
+	// Same fallback policy as G_TrinityMaybeAnnounceJoin: verified-only when
+	// the server runs handshake, name-only otherwise.
+	if ( g_trinityHandshake.integer && !ent->client->sess.trinityVerified ) {
 		return;
 	}
 	if ( ent->r.svFlags & SVF_BOT ) {
