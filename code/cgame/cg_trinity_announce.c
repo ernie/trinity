@@ -106,5 +106,9 @@ void CG_TrinityAnnounce_Play( char subtype, int clientNum ) {
 		return;
 	}
 
-	trap_S_StartLocalSound( h, CHAN_ANNOUNCER );
+	// Route through the buffered-sound queue so we don't stomp on (or get
+	// stomped by) other queued CHAN_ANNOUNCER callouts like team flag /
+	// score / lead-change announcements. Plays at the 750ms cadence
+	// enforced by CG_PlayBufferedSounds.
+	CG_AddBufferedSound( h );
 }
