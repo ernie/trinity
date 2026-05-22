@@ -254,7 +254,8 @@ typedef struct {
 	// of how many map rotations they sit through.
 	char		handshakeNonce[32]; // 31 hex chars + NUL when set, empty otherwise
 	int			handshakeTime;      // 0 = no handshake; negative = queued not yet sent; positive = level.time when sent
-	qboolean	trinityVerified;
+	qboolean	trinityVerified;	// Trinity handshake completed successfully
+	qboolean	announcedJoin;		// tann join announcement already broadcast this connection
 } clientSession_t;
 
 //

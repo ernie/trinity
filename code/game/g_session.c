@@ -24,11 +24,11 @@ void G_WriteClientSessionData( gclient_t *client ) {
 	const char	*s;
 	const char	*var;
 
-	// Trinity handshake fields (nonce/time/verified) are appended after
+	// Trinity handshake fields (nonce/time/verified/announcedJoin) are appended after
 	// the stock seven session ints. The nonce is serialized as either
 	// the 31-hex-char value or a single "-" sentinel when unset, so the
 	// column count stays fixed for the reader's Q_sscanf format.
-	s = va("%i %i %i %i %i %i %i %s %i %i",
+	s = va("%i %i %i %i %i %i %i %s %i %i %i",
 		client->sess.sessionTeam,
 		client->sess.spectatorTime,
 		client->sess.spectatorState,
@@ -38,7 +38,8 @@ void G_WriteClientSessionData( gclient_t *client ) {
 		client->sess.teamLeader,
 		client->sess.handshakeNonce[0] ? client->sess.handshakeNonce : "-",
 		client->sess.handshakeTime,
-		(int)client->sess.trinityVerified
+		(int)client->sess.trinityVerified,
+		(int)client->sess.announcedJoin
 		);
 
 	var = va( "session%i", client - level.clients );
@@ -69,6 +70,7 @@ void G_ReadClientSessionData( gclient_t *client ) {
 	char nonceIn[64];
 	int  handshakeTimeIn;
 	int  trinityVerifiedIn;
+	int  announcedJoinIn;
 
 	var = va( "session%i", client - level.clients );
 	trap_Cvar_VariableStringBuffer( var, s, sizeof(s) );
@@ -80,9 +82,10 @@ void G_ReadClientSessionData( gclient_t *client ) {
 	nonceIn[1] = '\0';
 	handshakeTimeIn = 0;
 	trinityVerifiedIn = 0;
+	announcedJoinIn = 0;
 
-	// Stock seven ints first, then the three Trinity fields.
-	Q_sscanf( s, "%i %i %i %i %i %i %i %s %i %i",
+	// Stock seven ints first, then the four Trinity fields.
+	Q_sscanf( s, "%i %i %i %i %i %i %i %s %i %i %i",
 		&sessionTeam,
 		&client->sess.spectatorTime,
 		&spectatorState,
@@ -92,7 +95,8 @@ void G_ReadClientSessionData( gclient_t *client ) {
 		&teamLeader,
 		nonceIn,
 		&handshakeTimeIn,
-		&trinityVerifiedIn
+		&trinityVerifiedIn,
+		&announcedJoinIn
 		);
 
 	client->sess.sessionTeam = (team_t)sessionTeam;
@@ -112,6 +116,7 @@ void G_ReadClientSessionData( gclient_t *client ) {
 	}
 	client->sess.handshakeTime = handshakeTimeIn;
 	client->sess.trinityVerified = trinityVerifiedIn ? qtrue : qfalse;
+	client->sess.announcedJoin = announcedJoinIn ? qtrue : qfalse;
 }
 
 
