@@ -1920,6 +1920,9 @@ static void Cmd_TrinityHandshake_f( gentity_t *ent ) {
 
 	client->sess.trinityVerified = qtrue;
 
+	// Re-broadcast CS_PLAYERS so the new tv\1 reaches all clients.
+	ClientUserinfoChanged( ent - g_entities );
+
 	// Log handshake for tracker
 	if ( username[0] ) {
 		G_LogPrintf( "TrinityHandshake: %i %s %s %s %s %s\n",
