@@ -743,6 +743,12 @@ void SetHarvesterStatus( void );
 #endif
 
 //
+// g_trinity_announce.c
+//
+void G_TrinityMaybeAnnounceJoin( gentity_t *ent );
+void G_TrinityAnnounceWinner( int clientNum );
+
+//
 // g_mem.c
 //
 void *G_Alloc( size_t size );

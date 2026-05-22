@@ -5,7 +5,7 @@ QA_SRC = \
  bg_gameplay bg_lib bg_misc bg_pmove bg_hash bg_slidemove \
  g_active g_arenas g_bot g_client g_cmds g_combat g_items g_mem g_misc \
  g_missile g_mover g_rotation g_session g_spawn g_svcmds g_target g_team \
- g_trigger g_unlagged g_utils g_weapon \
+ g_trigger g_trinity_announce g_unlagged g_utils g_weapon \
  q_math q_shared \
 
 # CGgame sources differ between baseq3 and missionpack
