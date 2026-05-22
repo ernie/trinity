@@ -1923,6 +1923,10 @@ static void Cmd_TrinityHandshake_f( gentity_t *ent ) {
 	// Re-broadcast CS_PLAYERS so the new tv\1 reaches all clients.
 	ClientUserinfoChanged( ent - g_entities );
 
+	// Try to announce now. Suppressed if still spectator; ClientBegin
+	// will retry later when the player joins a team.
+	G_TrinityMaybeAnnounceJoin( ent );
+
 	// Log handshake for tracker
 	if ( username[0] ) {
 		G_LogPrintf( "TrinityHandshake: %i %s %s %s %s %s\n",

@@ -963,8 +963,13 @@ void ClientBegin( int clientNum ) {
 		if ( g_gametype.integer != GT_TOURNAMENT && !client->pers.inGame ) {
 			G_BroadcastServerCommand( -1, va("print \"%s" S_COLOR_WHITE " entered the game\n\"", client->pers.netname) );
 		}
+
+		// Trinity join announcement for already-verified players coming back
+		// after a map rotation or switching from spectator to playing. The
+		// helper is idempotent — bails if announcedJoin is set.
+		G_TrinityMaybeAnnounceJoin( ent );
 	}
-	
+
 	client->pers.inGame = qtrue;
 
 	// Trinity handshake: generate nonce, challenge sent from G_RunFrame.
