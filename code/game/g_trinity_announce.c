@@ -9,16 +9,16 @@ void G_TrinityMaybeAnnounceJoin( gentity_t *ent ) {
 	if ( !ent || !ent->client ) {
 		return;
 	}
-	// When handshake is enabled, only verified players announce. When it
-	// is disabled server-wide there's no way to verify anyone, so fall
-	// back to announcing based on name alone for any non-bot player.
-	if ( g_trinityHandshake.integer && !ent->client->sess.trinityVerified ) {
+	// Verification gate: humans on a handshake-enabled server must be
+	// verified. Bots can't run the handshake, so they're announced on
+	// name alone (their personality names are stable). With handshake
+	// disabled, all clients fall back to name-only announcements.
+	if ( g_trinityHandshake.integer &&
+	     !ent->client->sess.trinityVerified &&
+	     !( ent->r.svFlags & SVF_BOT ) ) {
 		return;
 	}
 	if ( ent->client->sess.announcedJoin ) {
-		return;
-	}
-	if ( ent->r.svFlags & SVF_BOT ) {
 		return;
 	}
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
@@ -43,12 +43,12 @@ void G_TrinityAnnounceWinner( int clientNum ) {
 	if ( ent->client->pers.connected != CON_CONNECTED ) {
 		return;
 	}
-	// Same fallback policy as G_TrinityMaybeAnnounceJoin: verified-only when
-	// the server runs handshake, name-only otherwise.
-	if ( g_trinityHandshake.integer && !ent->client->sess.trinityVerified ) {
-		return;
-	}
-	if ( ent->r.svFlags & SVF_BOT ) {
+	// Same gate as G_TrinityMaybeAnnounceJoin: humans on a handshake
+	// server must be verified; bots are always eligible (no handshake);
+	// name-only fallback when handshake is disabled.
+	if ( g_trinityHandshake.integer &&
+	     !ent->client->sess.trinityVerified &&
+	     !( ent->r.svFlags & SVF_BOT ) ) {
 		return;
 	}
 
