@@ -1562,6 +1562,28 @@ static void CheckExitRules( void ) {
 			}
 			G_BroadcastServerCommand( -1, "print \"Timelimit hit.\n\"" );
 			LogExit( "Timelimit hit." );
+
+			// On timelimit in FFA/1v1, identify the winner by highest score
+			// and announce. Skipped for team games (no single-player winner).
+			if ( g_gametype.integer == GT_FFA || g_gametype.integer == GT_TOURNAMENT ) {
+				int		j, bestScore, bestClient;
+				gclient_t *winCl;
+				bestScore = -999999;
+				bestClient = -1;
+				for ( j = 0; j < level.maxclients; j++ ) {
+					winCl = level.clients + j;
+					if ( winCl->pers.connected != CON_CONNECTED ) continue;
+					if ( winCl->sess.sessionTeam != TEAM_FREE ) continue;
+					if ( winCl->ps.persistant[PERS_SCORE] > bestScore ) {
+						bestScore = winCl->ps.persistant[PERS_SCORE];
+						bestClient = j;
+					}
+				}
+				if ( bestClient >= 0 ) {
+					G_TrinityAnnounceWinner( bestClient );
+				}
+			}
+
 			return;
 		}
 	}
@@ -1601,6 +1623,10 @@ static void CheckExitRules( void ) {
 				LogExit( "Fraglimit hit." );
 				G_BroadcastServerCommand( -1, va("print \"%s" S_COLOR_WHITE " hit the fraglimit.\n\"",
 					cl->pers.netname ) );
+
+				// Trinity win announcement for the winning client. No-op
+				// if not verified. cl - level.clients is the winner's clientNum.
+				G_TrinityAnnounceWinner( cl - level.clients );
 				return;
 			}
 		}
