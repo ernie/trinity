@@ -37,6 +37,9 @@ void G_TrinityAnnounceWinner( int clientNum ) {
 	if ( !ent->client ) {
 		return;
 	}
+	if ( ent->client->pers.connected != CON_CONNECTED ) {
+		return;
+	}
 	if ( !ent->client->sess.trinityVerified ) {
 		return;
 	}

@@ -1565,6 +1565,9 @@ static void CheckExitRules( void ) {
 
 			// On timelimit in FFA/1v1, identify the winner by highest score
 			// and announce. Skipped for team games (no single-player winner).
+			// No ScoreIsTied() check needed — the tied case branched into
+			// overtime earlier in this function, so reaching here implies
+			// a unique winner exists.
 			if ( g_gametype.integer == GT_FFA || g_gametype.integer == GT_TOURNAMENT ) {
 				int		j, bestScore, bestClient;
 				gclient_t *winCl;
