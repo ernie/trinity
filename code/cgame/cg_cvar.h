@@ -153,5 +153,6 @@ CG_CVAR( cg_voipLevels, "cl_voipLevels", "",  0 )
 CG_CVAR( cg_voipVADMuted,  "cl_voipVADMuted",  "0", CVAR_ARCHIVE )
 
 CG_CVAR( cg_trueShotgun, "cg_trueShotgun", "0", CVAR_ARCHIVE )
+CG_CVAR( cg_trinityAnnounce, "cg_trinityAnnounce", "1", CVAR_ARCHIVE )
 
 #undef CG_CVAR

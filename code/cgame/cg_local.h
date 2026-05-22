@@ -1580,6 +1580,11 @@ void CG_PlayBufferedVoiceChats( void );
 #endif
 
 //
+// cg_trinity_announce.c
+//
+void CG_TrinityAnnounce_Play( char subtype, int clientNum );
+
+//
 // cg_playerstate.c
 //
 void CG_Respawn( void );
