@@ -17,7 +17,7 @@ static qboolean ShouldAnnounceJoin( gentity_t *ent ) {
 	// name alone. With handshake disabled, everyone falls back to
 	// name-only.
 	if ( g_trinityHandshake.integer &&
-	     !ent->client->sess.trinityVerified &&
+	     !ent->client->sess.trinityUserType &&
 	     !( ent->r.svFlags & SVF_BOT ) ) {
 		return qfalse;
 	}
@@ -128,7 +128,7 @@ void G_TrinityAnnounceWinner( int clientNum ) {
 	// server must be verified; bots are always eligible (no handshake);
 	// name-only fallback when handshake is disabled.
 	if ( g_trinityHandshake.integer &&
-	     !ent->client->sess.trinityVerified &&
+	     !ent->client->sess.trinityUserType &&
 	     !( ent->r.svFlags & SVF_BOT ) ) {
 		return;
 	}

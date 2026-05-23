@@ -722,20 +722,24 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 
 	// send over a subset of the userinfo keys so other clients can
 	// print scoreboards, display models, and play custom sounds
+	// tu enum: 0 = not authenticated, 1 = verified user, 2 = admin.
+	// Higher values reserved (and projected through as-is so any future
+	// reader that knows about them sees the real value). Bots can't
+	// authenticate against the hub so they're always tu\0.
 	if ( ent->r.svFlags & SVF_BOT ) {
-		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\skill\\%s\\tt\\%d\\tl\\%d\\tv\\%i",
+		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\skill\\%s\\tt\\%d\\tl\\%d\\tu\\%i",
 			client->pers.netname, client->sess.sessionTeam, model, headModel, c1, c2,
 			client->pers.maxHealth, client->sess.wins, client->sess.losses,
 			Info_ValueForKey( userinfo, "skill" ), teamTask, teamLeader,
-			client->sess.trinityVerified ? 1 : 0 );
+			client->sess.trinityUserType );
 	} else {
 		const char *voipProto = Info_ValueForKey( userinfo, "cl_voipProtocol" );
-		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d\\vr\\%s\\voip\\%s\\tv\\%i",
+		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d\\vr\\%s\\voip\\%s\\tu\\%i",
 			client->pers.netname, client->sess.sessionTeam, model, headModel, c1, c2,
 			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader,
 			atoi(Info_ValueForKey( userinfo, "vr" )) ? "1" : "0",
 			*voipProto ? voipProto : "",
-			client->sess.trinityVerified ? 1 : 0 );
+			client->sess.trinityUserType );
 	}
 
 	trap_SetConfigstring( CS_PLAYERS+clientNum, s );
