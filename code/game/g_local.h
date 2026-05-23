@@ -256,6 +256,7 @@ typedef struct {
 	int			handshakeTime;      // 0 = no handshake; negative = queued not yet sent; positive = level.time when sent
 	qboolean	trinityVerified;	// Trinity handshake completed successfully
 	qboolean	announcedJoin;		// tann join announcement already broadcast this connection
+	qboolean	pendingAnnounceJoin;// queued in ClientBegin; G_RunFrame drains on next tick
 } clientSession_t;
 
 //
@@ -747,6 +748,7 @@ void SetHarvesterStatus( void );
 //
 void G_TrinityMaybeAnnounceJoin( gentity_t *ent );
 void G_TrinityAnnounceWinner( int clientNum );
+void G_TrinityProcessAnnouncements( void );
 
 //
 // g_mem.c

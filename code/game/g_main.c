@@ -2382,6 +2382,11 @@ static void G_RunFrame( int levelTime ) {
 		}
 	}
 
+	// Trinity announcements: emit any queued join broadcasts. Deferred
+	// from ClientBegin so the local client on a listen server is past
+	// its serverCommandSequence baseline by the time commands fire.
+	G_TrinityProcessAnnouncements();
+
 	if (g_listEntity.integer) {
 		for (i = 0; i < MAX_GENTITIES; i++) {
 			G_Printf("%4i: %s\n", i, g_entities[i].classname);
