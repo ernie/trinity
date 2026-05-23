@@ -58,6 +58,18 @@ void G_TrinityMaybeAnnounceJoin( gentity_t *ent ) {
 // Drain the queue. Called from G_RunFrame.
 void G_TrinityProcessAnnouncements( void ) {
 	int i;
+
+	// Hold all broadcasts for the first two seconds of the level so a
+	// listen-server host who is still finishing their own connection
+	// handshake doesn't miss announcements for clients that spawn during
+	// that window (e.g. the two duel bots in a missionpack tournament).
+	// Mirrors the gate in G_CheckMinimumPlayers (g_bot.c:534), which
+	// is why announcements driven by bot_minplayers already work — those
+	// bots don't get added until after the same 2s mark.
+	if ( level.time - level.startTime < 2000 ) {
+		return;
+	}
+
 	for ( i = 0; i < level.maxclients; i++ ) {
 		gentity_t *ent = &g_entities[i];
 		if ( !ent->client ) {
