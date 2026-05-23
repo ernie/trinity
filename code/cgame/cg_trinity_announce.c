@@ -76,6 +76,18 @@ void CG_TrinityAnnounce_Play( char subtype, int clientNum ) {
 	Q_CleanStr( clean );
 	StripVRTag( clean );
 
+	// Replace interior whitespace with underscores so multi-word names
+	// resolve to a filename a pk3 author can ship: "Nil Class" looks up
+	// "Nil_Class.wav" (and "nil_class_wins.wav" for the win subtype).
+	{
+		char *p;
+		for ( p = clean; *p; p++ ) {
+			if ( *p == ' ' || *p == '\t' ) {
+				*p = '_';
+			}
+		}
+	}
+
 	if ( clean[0] == '\0' ) {
 		return;
 	}
