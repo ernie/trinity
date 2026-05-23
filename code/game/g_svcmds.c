@@ -519,9 +519,67 @@ qboolean	ConsoleCommand( void ) {
 
 		if ( clientNum >= 0 && clientNum < level.maxclients &&
 		     level.clients[clientNum].pers.connected == CON_CONNECTED ) {
+			gclient_t *cl = &level.clients[clientNum];
+			// Clear server-side verification. The announcement may have
+			// already fired — we don't try to un-announce, but tu\0 in
+			// the configstring will reflect current truth for the
+			// scoreboard and any future UI.
+			cl->sess.trinityUserType = 0;
+			ClientUserinfoChanged( clientNum );
 			trap_SendServerCommand( clientNum, "trinity_auth_fail" );
 			G_Printf( "Trinity auth fail sent to client %i\n", clientNum );
 		}
+		return qtrue;
+	}
+
+	if ( Q_stricmp( cmd, "trinity_auth_ok" ) == 0 ) {
+		char arg[8];
+		int clientNum;
+		int userType;
+
+		// Bail on handshake-off servers — auth_ok is meaningless there
+		// and the name-only announcement fallback handles those.
+		if ( !g_trinityHandshake.integer ) {
+			return qtrue;
+		}
+
+		if ( trap_Argc() < 2 ) {
+			G_Printf( "Usage: trinity_auth_ok <slot> [<level>]\n" );
+			return qtrue;
+		}
+
+		trap_Argv( 1, arg, sizeof( arg ) );
+		clientNum = atoi( arg );
+
+		if ( clientNum < 0 || clientNum >= level.maxclients ||
+		     level.clients[clientNum].pers.connected != CON_CONNECTED ) {
+			G_Printf( "trinity_auth_ok: slot %i not connected\n", clientNum );
+			return qtrue;
+		}
+
+		// Default user-type 1 (verified). Optional second arg from the
+		// tracker overrides — 2 means admin, higher reserved. We clamp
+		// negative values (defensive against malformed rcon) and pass
+		// higher values through unchanged so a future tracker emitting
+		// e.g. 3 still gets stored and projected to `tu\3` for any
+		// future UI that knows about it.
+		userType = 1;
+		if ( trap_Argc() >= 3 ) {
+			trap_Argv( 2, arg, sizeof( arg ) );
+			userType = atoi( arg );
+			if ( userType < 0 ) {
+				userType = 0;
+			}
+		}
+
+		level.clients[clientNum].sess.trinityUserType = userType;
+		ClientUserinfoChanged( clientNum );
+		// Idempotent: bails if already announced or not eligible.
+		// Routes through pendingAnnounceJoin so the broadcast fires
+		// from the next G_RunFrame tick, matching the queue model
+		// used by ClientBegin.
+		G_TrinityMaybeAnnounceJoin( &g_entities[clientNum] );
+		G_Printf( "Trinity auth ok for client %i (userType=%i)\n", clientNum, userType );
 		return qtrue;
 	}
 
