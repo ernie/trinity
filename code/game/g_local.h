@@ -264,7 +264,7 @@ typedef struct {
 	char		handshakeNonce[32];     // 31 hex chars + NUL when set, empty otherwise
 	int			handshakeTime;          // 0 = no handshake; negative = queued not yet sent; positive = level.time when sent
 	qboolean	handshakeResponded;     // protocol handshake completed; gates 10s timeout
-	int			trinityUserType;           // 0/1/2/... hub-confirmed identity tier
+	int			trinityUserType;        // 0/1/2/... hub-confirmed identity tier
 	qboolean	announcedJoin;          // tann join announcement already broadcast this connection
 	qboolean	pendingAnnounceJoin;    // queued in ClientBegin; G_RunFrame drains on next tick
 } clientSession_t;

@@ -76,16 +76,30 @@ void CG_TrinityAnnounce_Play( char subtype, int clientNum ) {
 	Q_CleanStr( clean );
 	StripVRTag( clean );
 
-	// Replace interior whitespace with underscores so multi-word names
+	// Collapse whitespace runs to a single underscore so multi-word names
 	// resolve to a filename a pk3 author can ship: "Nil Class" looks up
 	// "Nil_Class.wav" (and "nil_class_wins.wav" for the win subtype).
+	// "Nil  Class" (two spaces) ALSO resolves to "Nil_Class.wav" — this
+	// matches the tracker's canonical-name normalization at
+	// internal/storage/displayname.go::canonicalizeDisplayName, which
+	// collapses whitespace runs to a single space. Keeping the two paths
+	// in agreement means the file the pk3 author ships works whether the
+	// name flowed through the canonical-name lock or directly from
+	// userinfo (handshake-off, bots).
 	{
-		char *p;
-		for ( p = clean; *p; p++ ) {
-			if ( *p == ' ' || *p == '\t' ) {
-				*p = '_';
+		char *src, *dst;
+		dst = clean;
+		for ( src = clean; *src; src++ ) {
+			if ( *src == ' ' || *src == '\t' ) {
+				*dst++ = '_';
+				while ( src[1] == ' ' || src[1] == '\t' ) {
+					src++;
+				}
+			} else {
+				*dst++ = *src;
 			}
 		}
+		*dst = '\0';
 	}
 
 	if ( clean[0] == '\0' ) {
