@@ -973,10 +973,11 @@ void ClientBegin( int clientNum ) {
 	client->pers.inGame = qtrue;
 
 	// Trinity handshake: generate nonce, challenge sent from G_RunFrame.
-	// trinityVerified lives in sess so it really does persist across
-	// map changes — G_InitGame's g_clients memset wipes pers but sess
-	// is restored from the session<N> cvar by G_ReadClientSessionData.
-	if ( g_trinityHandshake.integer && !client->sess.trinityVerified && !( ent->r.svFlags & SVF_BOT ) ) {
+	// handshakeResponded persists across map rotation via the session<N>
+	// cvar, so a client that already completed the protocol handshake on
+	// a prior map doesn't re-handshake here. trinityVerified (identity,
+	// set by trinity_auth_ok rcon) persists the same way.
+	if ( g_trinityHandshake.integer && !client->sess.handshakeResponded && !( ent->r.svFlags & SVF_BOT ) ) {
 		int i;
 		int hs_seed = trap_Milliseconds() ^ ( clientNum * 65537 );
 

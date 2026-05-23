@@ -2355,12 +2355,15 @@ static void G_RunFrame( int levelTime ) {
 	// for tracking changes
 	CheckCvars();
 
-	// Trinity handshake: send pending challenges and kick unverified clients
+	// Trinity handshake: send pending challenges and kick clients
+	// that don't respond to the protocol challenge within 10s.
+	// Identity verification (trinityVerified) is separate — set by
+	// the trinity_auth_ok rcon, not by this loop.
 	if ( g_trinityHandshake.integer ) {
 		for ( i = 0; i < level.maxclients; i++ ) {
 			gclient_t *cl = &level.clients[i];
 			if ( cl->pers.connected != CON_CONNECTED ||
-			     cl->sess.trinityVerified ||
+			     cl->sess.handshakeResponded ||
 			     !cl->sess.handshakeTime ||
 			     ( g_entities[i].r.svFlags & SVF_BOT ) ) {
 				continue;
