@@ -249,14 +249,24 @@ typedef struct {
 
 	// Trinity handshake state. Lives here (not pers) so it survives the
 	// G_InitGame memset at level change — pers gets wiped, sess gets
-	// round-tripped through the session<N> cvar. Identity: a verified
-	// client stays verified until they actually disconnect, regardless
-	// of how many map rotations they sit through.
-	char		handshakeNonce[32]; // 31 hex chars + NUL when set, empty otherwise
-	int			handshakeTime;      // 0 = no handshake; negative = queued not yet sent; positive = level.time when sent
-	qboolean	trinityVerified;	// Trinity handshake completed successfully
-	qboolean	announcedJoin;		// tann join announcement already broadcast this connection
-	qboolean	pendingAnnounceJoin;// queued in ClientBegin; G_RunFrame drains on next tick
+	// round-tripped through the session<N> cvar. Two separate signals:
+	//   - handshakeResponded: protocol completed (nonce+proto check).
+	//     Gates the 10s drop-on-no-response timer. Set by the QVM.
+	//   - trinityUserType:       hub-confirmed identity tier. Set ONLY by
+	//     the trinity_auth_ok svcmd handler. Projects directly to the
+	//     `tu` key in CS_PLAYERS+slot.
+	//       0 = unauthenticated
+	//       1 = verified user
+	//       2 = admin
+	//       higher reserved (handler treats >=2 as admin for forward-
+	//       compat with future tracker emissions)
+	// Both persist across map rotation via the session<N> cvar.
+	char		handshakeNonce[32];     // 31 hex chars + NUL when set, empty otherwise
+	int			handshakeTime;          // 0 = no handshake; negative = queued not yet sent; positive = level.time when sent
+	qboolean	handshakeResponded;     // protocol handshake completed; gates 10s timeout
+	int			trinityUserType;           // 0/1/2/... hub-confirmed identity tier
+	qboolean	announcedJoin;          // tann join announcement already broadcast this connection
+	qboolean	pendingAnnounceJoin;    // queued in ClientBegin; G_RunFrame drains on next tick
 } clientSession_t;
 
 //
