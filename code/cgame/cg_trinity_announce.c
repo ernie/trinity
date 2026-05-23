@@ -147,13 +147,19 @@ void CG_TrinityAnnounce_Tick( void ) {
 		return;  // queue empty
 	}
 
-	// Pace our own consecutive plays.
-	if ( cg.time - cg.trinityAnnounceTime < TRINITY_ANNOUNCE_SPACING_MS ) {
+	// Pace our own consecutive plays. trinityAnnounceTime == 0 means "never
+	// played" (cg is memset to 0 at init), not "played at time 0" — without
+	// this guard, a fresh-server join (level.time < SPACING_MS) would defer
+	// the first announcement spuriously. Same convention as CG_FadeColor.
+	if ( cg.trinityAnnounceTime > 0 &&
+	     cg.time - cg.trinityAnnounceTime < TRINITY_ANNOUNCE_SPACING_MS ) {
 		return;
 	}
 
 	// Defer to the reward stack (medal sounds run ~1.5s, plus 3s visual fade).
-	if ( cg.rewardStack > 0 || cg.time - cg.rewardTime < REWARD_TIME ) {
+	// Likewise guard against rewardTime == 0 meaning "never set".
+	if ( cg.rewardStack > 0 ||
+	     ( cg.rewardTime > 0 && cg.time - cg.rewardTime < REWARD_TIME ) ) {
 		return;
 	}
 
