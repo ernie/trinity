@@ -3883,6 +3883,12 @@ void CG_ResetSeekState( void ) {
 	// Flush queued announcer sounds (e.g. stale "Excellent!")
 	CG_AddBufferedSound( -1 );
 
+	// Buffered-sound gate — leaving the old value here means any sound
+	// that played in a forward-of-here timeline pushes cg.soundTime into
+	// our future, blocking both the buffered queue and the Trinity tick
+	// until cg.time catches up (which it never does after a backward seek).
+	cg.soundTime = 0;
+
 	// Force VR head-tracking EMA to re-seed from the new timeline
 	cg.vrViewInitialized = qfalse;
 }
