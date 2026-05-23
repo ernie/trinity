@@ -57,7 +57,7 @@ void G_TrinityMaybeAnnounceJoin( gentity_t *ent ) {
 
 // Drain the queue. Called from G_RunFrame.
 void G_TrinityProcessAnnouncements( void ) {
-	int i;
+	int i, pass;
 
 	// Hold all broadcasts for the first two seconds of the level so a
 	// listen-server host who is still finishing their own connection
@@ -70,28 +70,43 @@ void G_TrinityProcessAnnouncements( void ) {
 		return;
 	}
 
-	for ( i = 0; i < level.maxclients; i++ ) {
-		gentity_t *ent = &g_entities[i];
-		if ( !ent->client ) {
-			continue;
+	// Two passes so humans get announced before bots regardless of slot
+	// order. The missionpack tournament launch UI fills the low client
+	// slots with the duel bots before the local player connects, so a
+	// straight slot-order drain would announce the bots first; that's
+	// inconsistent with the baseq3 case where the local player is
+	// always slot 0.
+	for ( pass = 0; pass < 2; pass++ ) {
+		qboolean wantBots = ( pass == 1 );
+		for ( i = 0; i < level.maxclients; i++ ) {
+			gentity_t *ent = &g_entities[i];
+			qboolean isBot;
+			if ( !ent->client ) {
+				continue;
+			}
+			if ( ent->client->pers.connected != CON_CONNECTED ) {
+				continue;
+			}
+			if ( !ent->client->sess.pendingAnnounceJoin ) {
+				continue;
+			}
+			isBot = ( ent->r.svFlags & SVF_BOT ) != 0;
+			if ( isBot != wantBots ) {
+				continue;
+			}
+			// Clear pending unconditionally; if eligibility lapsed
+			// (player moved to spectator, lost verification, etc.)
+			// we just drop.
+			ent->client->sess.pendingAnnounceJoin = qfalse;
+			if ( ent->client->sess.announcedJoin ) {
+				continue;
+			}
+			if ( !ShouldAnnounceJoin( ent ) ) {
+				continue;
+			}
+			G_BroadcastServerCommand( -1, va("tann j %d", i) );
+			ent->client->sess.announcedJoin = qtrue;
 		}
-		if ( ent->client->pers.connected != CON_CONNECTED ) {
-			continue;
-		}
-		if ( !ent->client->sess.pendingAnnounceJoin ) {
-			continue;
-		}
-		// Clear pending unconditionally; if eligibility lapsed (player
-		// moved to spectator, lost verification, etc.) we just drop.
-		ent->client->sess.pendingAnnounceJoin = qfalse;
-		if ( ent->client->sess.announcedJoin ) {
-			continue;
-		}
-		if ( !ShouldAnnounceJoin( ent ) ) {
-			continue;
-		}
-		G_BroadcastServerCommand( -1, va("tann j %d", i) );
-		ent->client->sess.announcedJoin = qtrue;
 	}
 }
 
