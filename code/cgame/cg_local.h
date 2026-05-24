@@ -340,6 +340,7 @@ typedef struct {
 	int				botSkill;		// 0 = not bot, 1-5 = bot
 	qboolean		vrPlayer;		// qtrue if VR client
 	qboolean		voipEnabled;	// qtrue if client has VOIP support
+	int				trinityUserType;	// 0 = unauth, 1 = verified, 2 = admin
 
 	vec3_t			color1;
 	vec3_t			color2;
@@ -871,6 +872,8 @@ typedef struct {
 
 	qhandle_t	botSkillShaders[5];
 	qhandle_t	vrPlayerShader;
+	qhandle_t	verifiedShader;
+	qhandle_t	adminShader;
 
 	// wall mark shaders
 	qhandle_t	wakeMarkShader;

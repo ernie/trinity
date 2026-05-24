@@ -826,6 +826,8 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.botSkillShaders[3] = trap_R_RegisterShader( "menu/art/skill4.tga" );
 	cgs.media.botSkillShaders[4] = trap_R_RegisterShader( "menu/art/skill5.tga" );
 	cgs.media.vrPlayerShader = trap_R_RegisterShader( "menu/art/vr.tga" );
+	cgs.media.verifiedShader = trap_R_RegisterShader( "gfx/2d/verified" );
+	cgs.media.adminShader    = trap_R_RegisterShader( "gfx/2d/admin" );
 
 	cgs.media.viewBloodShader = trap_R_RegisterShader( "viewBloodBlend" );
 	cgs.media.vignetteShader = trap_R_RegisterShader( "gfx/vignette" );
@@ -1665,13 +1667,13 @@ static const char *CG_FeederItemText(float feederID, int index, int column, qhan
 					if (cgs.gametype == GT_TOURNAMENT) {
 						return va("%i/%i", info->wins, info->losses);
 					} else if (info->infoValid && info->team == TEAM_SPECTATOR ) {
-						return "Spectator";
+						return "Spec";
 					} else {
 						return "";
 					}
 				} else {
 					if (info->teamLeader) {
-						return "Leader";
+						return "Lead";
 					}
 				}
 			break;

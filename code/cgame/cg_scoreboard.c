@@ -102,7 +102,19 @@ static void CG_DrawClientScore( int y, score_t *score, float *color, float fade,
 			CG_DrawFlagModel( iconx, y, 16, 16, TEAM_BLUE, qfalse );
 		}
 	} else {
-		if ( ci->botSkill > 0 && ci->botSkill <= 5 ) {
+		if ( ci->trinityUserType >= 1 && cg_drawIcons.integer ) {
+			int sz  = largeFormat ? 32 : 16;
+			int vy  = largeFormat ? y - ( 32 - BIGCHAR_HEIGHT ) / 2 : y;
+			int vsz = sz / 2;
+			int voff = ( sz - vsz ) / 2;
+
+			if ( ci->vrPlayer ) {
+				CG_DrawPic( iconx, vy, sz, sz, cgs.media.vrPlayerShader );
+			}
+
+			CG_DrawPic( iconx + voff, vy + voff, vsz, vsz,
+				ci->trinityUserType >= 2 ? cgs.media.adminShader : cgs.media.verifiedShader );
+		} else if ( ci->botSkill > 0 && ci->botSkill <= 5 ) {
 			if ( cg_drawIcons.integer ) {
 				if( largeFormat ) {
 					CG_DrawPic( iconx, y - ( 32 - BIGCHAR_HEIGHT ) / 2, 32, 32, cgs.media.botSkillShaders[ ci->botSkill - 1 ] );

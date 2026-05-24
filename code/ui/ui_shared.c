@@ -3789,7 +3789,7 @@ void Item_ListBox_Paint(itemDef_t *item) {
 					for (j = 0; j < listPtr->numColumns; j++) {
 						text = DC->feederItemText(item->special, i, j, &optionalImage);
 						if (optionalImage >= 0) {
-							DC->drawHandlePic(x + 4 + listPtr->columnInfo[j].pos, y - 1 + listPtr->elementHeight / 2, listPtr->columnInfo[j].width, listPtr->columnInfo[j].width, optionalImage);
+							DC->drawHandlePic(x + 4 + listPtr->columnInfo[j].pos, y + (listPtr->elementHeight - listPtr->columnInfo[j].width) / 2 + 4, listPtr->columnInfo[j].width, listPtr->columnInfo[j].width, optionalImage);
 						} else if (text) {
 							DC->drawText(x + 4 + listPtr->columnInfo[j].pos, y + listPtr->elementHeight, item->textscale, item->window.foreColor, text, 0, listPtr->columnInfo[j].maxChars, item->textStyle);
 						}

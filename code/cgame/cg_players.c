@@ -1325,6 +1325,10 @@ void CG_NewClientInfo( int clientNum ) {
 	v = Info_ValueForKey( configstring, "voip" );
 	newInfo.voipEnabled = *v ? qtrue : qfalse;
 
+	// trinity user type
+	v = Info_ValueForKey( configstring, "tu" );
+	newInfo.trinityUserType = atoi( v );
+
 	// handicap
 	v = Info_ValueForKey( configstring, "hc" );
 	newInfo.handicap = atoi( v );

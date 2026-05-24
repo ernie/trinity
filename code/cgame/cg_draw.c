@@ -2726,6 +2726,67 @@ static float CG_DrawTeamVote( float y, qboolean highlighted ) {
 
 
 #ifdef MISSIONPACK
+static void CG_DrawScoreboardVerifiedBadges( menuDef_t *menu ) {
+	int i, j;
+
+	if ( !menu )
+		return;
+
+	for ( i = 0; i < menu->itemCount; i++ ) {
+		itemDef_t *item = menu->items[i];
+		listBoxDef_t *listPtr;
+		int feederID, team, count, visibleRows;
+		float listX, listY;
+
+		if ( item->type != ITEM_TYPE_LISTBOX || !item->typeData )
+			continue;
+
+		listPtr = (listBoxDef_t *)item->typeData;
+		feederID = (int)item->special;
+
+		if ( feederID != FEEDER_SCOREBOARD &&
+			 feederID != FEEDER_REDTEAM_LIST &&
+			 feederID != FEEDER_BLUETEAM_LIST )
+			continue;
+
+		listX = item->window.rect.x + 1;
+		listY = item->window.rect.y + 1;
+		visibleRows = (int)( item->window.rect.h / listPtr->elementHeight );
+
+		team = -1;
+		if ( feederID == FEEDER_REDTEAM_LIST ) team = TEAM_RED;
+		else if ( feederID == FEEDER_BLUETEAM_LIST ) team = TEAM_BLUE;
+
+		count = CG_FeederCount( (float)feederID );
+
+		for ( j = listPtr->startPos; j < listPtr->startPos + visibleRows && j < count; j++ ) {
+			int scoreIndex;
+			clientInfo_t *ci = CG_InfoFromScoreIndex( j, team, &scoreIndex );
+			float rowY, bx, by;
+			float sz;
+
+			if ( !ci || !ci->infoValid || ci->trinityUserType < 1 )
+				continue;
+
+			rowY = listY + ( j - listPtr->startPos ) * listPtr->elementHeight;
+			sz = listPtr->columnInfo[0].width;
+			bx = listX + 4 + listPtr->columnInfo[0].pos;
+			by = rowY + (listPtr->elementHeight - sz) / 2 + 4;
+
+			if ( ci->vrPlayer ) {
+				CG_DrawPic( bx, by, sz, sz, cgs.media.vrPlayerShader );
+			}
+
+			{
+				float vsz = sz / 2;
+				float voff = ( sz - vsz ) / 2;
+				CG_DrawPic( bx + voff, by + voff, vsz, vsz,
+					ci->trinityUserType >= 2 ? cgs.media.adminShader : cgs.media.verifiedShader );
+			}
+		}
+	}
+}
+
 static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
 	int i, j;
 
@@ -2752,8 +2813,8 @@ static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
 			 feederID != FEEDER_BLUETEAM_LIST )
 			continue;
 
-		listX = item->window.rect.x;
-		listY = item->window.rect.y;
+		listX = item->window.rect.x + 1;
+		listY = item->window.rect.y + 1;
 		visibleRows = (int)( item->window.rect.h / listPtr->elementHeight );
 
 		team = -1;
@@ -2769,7 +2830,7 @@ static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
 			float rowY, bsz, bx, by;
 			vec4_t voipColor;
 			qhandle_t voipIcon;
-			qboolean isLocalSelf = ( sp->client == cg.snap->ps.clientNum
+			qboolean isLocalSelf = ( sp->client == cg.clientNum
 				&& !cg.demoPlayback && !cgs.tvPlayback );
 			qboolean selfMuted = ( isLocalSelf && CG_LocalVoipMuted() );
 
@@ -2778,10 +2839,10 @@ static void CG_DrawScoreboardVoipBadges( menuDef_t *menu ) {
 			if ( !ci->voipEnabled && !cgs.voipMuted[sp->client] && !selfMuted )
 				continue;
 
-			rowY = listY + 1 + ( j - listPtr->startPos ) * listPtr->elementHeight;
+			rowY = listY + ( j - listPtr->startPos ) * listPtr->elementHeight;
 			bsz = listPtr->columnInfo[0].width;
-			bx = listX + 1 + 4 + listPtr->columnInfo[0].pos;
-			by = rowY - 1 + listPtr->elementHeight / 2;
+			bx = listX + listPtr->columnInfo[3].pos - bsz - 2;
+			by = rowY + (listPtr->elementHeight - bsz) / 2 + 4;
 
 			if ( selfMuted ) {
 				(void)CG_GetVoipChannelColor( voipColor );
@@ -2898,6 +2959,7 @@ static qboolean CG_DrawScoreboard( void ) {
 	}
 
 	Menu_Paint(menuScoreboard, qtrue);
+	CG_DrawScoreboardVerifiedBadges(menuScoreboard);
 	CG_DrawScoreboardVoipBadges(menuScoreboard);
 
 	// Scoreboard cursor for spectators (enables click-to-follow)
