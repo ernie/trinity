@@ -24,13 +24,6 @@ static qboolean ShouldAnnounceJoin( gentity_t *ent ) {
 	if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		return qfalse;
 	}
-	// In single-player, g_bot.c's PlayerIntroSound() already plays the bot
-	// intro via the legacy `play` console command from G_CheckBotSpawn.
-	// Skip our broadcast for SP bots to avoid double-announcing.
-	if ( g_gametype.integer == GT_SINGLE_PLAYER &&
-	     ( ent->r.svFlags & SVF_BOT ) ) {
-		return qfalse;
-	}
 	return qtrue;
 }
 

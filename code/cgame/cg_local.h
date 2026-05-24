@@ -633,8 +633,12 @@ typedef struct {
 
 	// Trinity announcement queue — paced separately from soundBuffer because
 	// name .wav files are typically longer than that queue's 750ms gate.
-	// See cg_trinity_announce.c.
-#define MAX_TRINITY_ANNOUNCE_QUEUE	4
+	// See cg_trinity_announce.c. Sized for the worst-case match-load burst:
+	// G_TrinityProcessAnnouncements emits every pending tann j in a single
+	// server frame, so the client may enqueue up to MAX_CLIENTS entries
+	// before pacing starts. +1 because the ring buffer's "next == out → full"
+	// convention costs one slot.
+#define MAX_TRINITY_ANNOUNCE_QUEUE	(MAX_CLIENTS + 1)
 	int			trinityAnnounceIn;
 	int			trinityAnnounceOut;
 	int			trinityAnnounceTime;
