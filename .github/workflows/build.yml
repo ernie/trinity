@@ -33,6 +33,13 @@ jobs:
           name: trinity
           path: dist/*.pk3
 
+      - name: Download announcer pk3
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.ANNOUNCER_PAT }}
+        run: |
+          gh release download --repo ernie/q3-announcer-tts --pattern 'zzz-trinity-announcer.pk3' --dir dist || echo "No announcer release found — skipping"
+
       - name: Build sha256sums.txt
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -52,3 +59,4 @@ jobs:
             To update, ensure your Quake 3 client isn't running, and copy:
             - `pak8t.pk3` → `baseq3`
             - `pak3t.pk3` → `missionpack`
+            - `zzz-trinity-announcer.pk3` → `baseq3`
