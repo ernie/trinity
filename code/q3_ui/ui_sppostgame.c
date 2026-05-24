@@ -611,7 +611,21 @@ void UI_SPPostgameMenu_f( void ) {
 		trap_Cmd_ExecuteText( EXEC_APPEND, "music music/loss\n" );
 	}
 	else {
-		postgameMenuInfo.winnerSound = trap_S_RegisterSound( "sound/player/announce/youwin.wav", qfalse );
+		// Try the player's named callout first (normalized the same way
+		// Trinity's tann handler resolves it, so the same pk3 file works
+		// here and in-game). Fall back to the generic youwin.wav when no
+		// recording is shipped under the player's name.
+		char	winnerName[MAX_QPATH];
+		char	winnerLower[MAX_QPATH];
+		Q_NormalizeAnnounceName( winnerName, postgameMenuInfo.placeNames[0], sizeof( winnerName ) );
+		Q_strncpyz( winnerLower, winnerName, sizeof( winnerLower ) );
+		Q_strlwr( winnerLower );
+		postgameMenuInfo.winnerSound = winnerLower[0]
+			? trap_S_RegisterSound( va( "sound/player/announce/%s_wins.wav", winnerLower ), qfalse )
+			: 0;
+		if ( !postgameMenuInfo.winnerSound ) {
+			postgameMenuInfo.winnerSound = trap_S_RegisterSound( "sound/player/announce/youwin.wav", qfalse );
+		}
 		trap_Cmd_ExecuteText( EXEC_APPEND, "music music/win\n" );
 	}
 

@@ -977,6 +977,79 @@ char *Q_CleanStr( char *string ) {
 }
 
 
+/*
+=============
+Q_NormalizeAnnounceName
+
+Canonicalizes a display name into the filename component used for
+sound/player/announce/<name>[_wins].wav lookups: strips Q3 color codes,
+removes "[VR]" tags (case-insensitive) wherever they appear, trims
+surrounding whitespace, and collapses internal whitespace runs to a
+single underscore so "Nil  Class" becomes "Nil_Class".
+
+The pak shipped by the tracker uses original case for join announces
+("Nil_Class.wav") and lowercase for win announces ("nil_class_wins.wav"),
+matching id's idTech 3 sound-file convention. Callers that need the win
+form should Q_strlwr the result.
+
+This mirrors the tracker's canonicalizeDisplayName so the same pk3
+filename works whether the name reached us via the handshake-locked
+canonical-name path or directly from userinfo (handshake-off, bots).
+=============
+*/
+void Q_NormalizeAnnounceName( char *out, const char *in, int outSize ) {
+	char	*p;
+	char	*src, *dst;
+	int		n;
+
+	if ( !out || outSize <= 0 ) {
+		return;
+	}
+
+	Q_strncpyz( out, in ? in : "", outSize );
+	Q_CleanStr( out );
+
+	// Strip "[VR]" markers (case-insensitive) wherever they appear.
+	for ( p = out; *p; p++ ) {
+		if ( p[0] == '[' &&
+		     ( p[1] == 'v' || p[1] == 'V' ) &&
+		     ( p[2] == 'r' || p[2] == 'R' ) &&
+		     p[3] == ']' ) {
+			memmove( p, p + 4, strlen( p + 4 ) + 1 );
+			p--;
+		}
+	}
+
+	// Trim leading whitespace.
+	p = out;
+	while ( *p == ' ' || *p == '\t' ) {
+		p++;
+	}
+	if ( p != out ) {
+		memmove( out, p, strlen( p ) + 1 );
+	}
+
+	// Trim trailing whitespace.
+	for ( n = (int)strlen( out ) - 1; n >= 0 && ( out[n] == ' ' || out[n] == '\t' ); n-- ) {
+		out[n] = '\0';
+	}
+
+	// Collapse internal whitespace runs to single underscores.
+	dst = out;
+	for ( src = out; *src; src++ ) {
+		if ( *src == ' ' || *src == '\t' ) {
+			*dst++ = '_';
+			while ( src[1] == ' ' || src[1] == '\t' ) {
+				src++;
+			}
+		} else {
+			*dst++ = *src;
+		}
+	}
+	*dst = '\0';
+}
+
+
 int QDECL Com_sprintf( char *dest, int size, const char *fmt, ... ) {
 	va_list argptr;
 	int len;

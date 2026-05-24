@@ -18,40 +18,6 @@ static qboolean HasPathTraversal( const char *name ) {
 	return qfalse;
 }
 
-// Remove "[VR]" tags (case-insensitive) from anywhere in the name, then
-// trim leading/trailing whitespace. q3vr's default name is
-// "[VR] Player #NNNN", and players often add the tag manually before or
-// after their chosen name. The announcement should match the player's
-// underlying identity, not the VR decoration.
-static void StripVRTag( char *s ) {
-	char	*p;
-	int		n;
-
-	for ( p = s; *p; p++ ) {
-		if ( p[0] == '[' &&
-		     ( p[1] == 'v' || p[1] == 'V' ) &&
-		     ( p[2] == 'r' || p[2] == 'R' ) &&
-		     p[3] == ']' ) {
-			memmove( p, p + 4, strlen( p + 4 ) + 1 );
-			p--;  // re-scan from the same position
-		}
-	}
-
-	// Trim leading whitespace
-	p = s;
-	while ( *p == ' ' || *p == '\t' ) {
-		p++;
-	}
-	if ( p != s ) {
-		memmove( s, p, strlen( p ) + 1 );
-	}
-
-	// Trim trailing whitespace
-	for ( n = (int)strlen( s ) - 1; n >= 0 && ( s[n] == ' ' || s[n] == '\t' ); n-- ) {
-		s[n] = '\0';
-	}
-}
-
 void CG_TrinityAnnounce_Play( char subtype, int clientNum ) {
 	clientInfo_t	*ci;
 	char			clean[MAX_QPATH];
@@ -72,35 +38,7 @@ void CG_TrinityAnnounce_Play( char subtype, int clientNum ) {
 		return;
 	}
 
-	Q_strncpyz( clean, ci->name, sizeof( clean ) );
-	Q_CleanStr( clean );
-	StripVRTag( clean );
-
-	// Collapse whitespace runs to a single underscore so multi-word names
-	// resolve to a filename a pk3 author can ship: "Nil Class" looks up
-	// "Nil_Class.wav" (and "nil_class_wins.wav" for the win subtype).
-	// "Nil  Class" (two spaces) ALSO resolves to "Nil_Class.wav" — this
-	// matches the tracker's canonical-name normalization at
-	// internal/storage/displayname.go::canonicalizeDisplayName, which
-	// collapses whitespace runs to a single space. Keeping the two paths
-	// in agreement means the file the pk3 author ships works whether the
-	// name flowed through the canonical-name lock or directly from
-	// userinfo (handshake-off, bots).
-	{
-		char *src, *dst;
-		dst = clean;
-		for ( src = clean; *src; src++ ) {
-			if ( *src == ' ' || *src == '\t' ) {
-				*dst++ = '_';
-				while ( src[1] == ' ' || src[1] == '\t' ) {
-					src++;
-				}
-			} else {
-				*dst++ = *src;
-			}
-		}
-		*dst = '\0';
-	}
+	Q_NormalizeAnnounceName( clean, ci->name, sizeof( clean ) );
 
 	if ( clean[0] == '\0' ) {
 		return;

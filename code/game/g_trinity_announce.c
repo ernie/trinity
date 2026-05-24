@@ -48,6 +48,37 @@ void G_TrinityMaybeAnnounceJoin( gentity_t *ent ) {
 	ent->client->sess.pendingAnnounceJoin = qtrue;
 }
 
+// Pending winner broadcast. We defer the broadcast so the callout lines
+// up with the intermission scoreboard fade-in instead of stepping on the
+// final frag. -1 means "nothing pending".
+static int trinityPendingWinClient = -1;
+static int trinityPendingWinFireTime = 0;
+
+static void G_TrinityBroadcastWinner( int clientNum ) {
+	gentity_t *ent;
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+	ent = &g_entities[clientNum];
+	if ( !ent->client ) {
+		return;
+	}
+	if ( ent->client->pers.connected != CON_CONNECTED ) {
+		return;
+	}
+	// Same gate as G_TrinityMaybeAnnounceJoin: humans on a handshake
+	// server must be verified; bots are always eligible (no handshake);
+	// name-only fallback when handshake is disabled.
+	if ( g_trinityHandshake.integer &&
+	     !ent->client->sess.trinityUserType &&
+	     !( ent->r.svFlags & SVF_BOT ) ) {
+		return;
+	}
+
+	G_BroadcastServerCommand( -1, va("tann w %d", clientNum) );
+}
+
 // Drain the queue. Called from G_RunFrame.
 void G_TrinityProcessAnnouncements( void ) {
 	int i, pass;
@@ -101,32 +132,30 @@ void G_TrinityProcessAnnouncements( void ) {
 			ent->client->sess.announcedJoin = qtrue;
 		}
 	}
+
+	if ( trinityPendingWinClient >= 0 &&
+	     level.time >= trinityPendingWinFireTime ) {
+		G_TrinityBroadcastWinner( trinityPendingWinClient );
+		trinityPendingWinClient = -1;
+	}
 }
 
 void G_TrinityAnnounceWinner( int clientNum ) {
-	gentity_t *ent;
-
 	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
 		return;
 	}
-
-	ent = &g_entities[clientNum];
-	if ( !ent->client ) {
+	// Campaign already plays a named callout via the SP postgame menu
+	// (ui_sppostgame.c), and tries the player's name first too. A Trinity
+	// broadcast here would duplicate that callout. Skirmish (FFA/Tournament
+	// /Team/CTF on a local server) uses regular gametypes and isn't
+	// affected.
+	if ( g_gametype.integer == GT_SINGLE_PLAYER ) {
 		return;
 	}
-	if ( ent->client->pers.connected != CON_CONNECTED ) {
-		return;
-	}
-	// Same gate as G_TrinityMaybeAnnounceJoin: humans on a handshake
-	// server must be verified; bots are always eligible (no handshake);
-	// name-only fallback when handshake is disabled.
-	if ( g_trinityHandshake.integer &&
-	     !ent->client->sess.trinityUserType &&
-	     !( ent->r.svFlags & SVF_BOT ) ) {
-		return;
-	}
-
-	G_BroadcastServerCommand( -1, va("tann w %d", clientNum) );
+	// Defer the broadcast so the callout starts as the intermission
+	// scoreboard fades in (matches BeginIntermission timing in g_main.c).
+	trinityPendingWinClient = clientNum;
+	trinityPendingWinFireTime = level.time + INTERMISSION_DELAY_TIME;
 }
 
 void G_TrinityAnnounceInit( void ) {
