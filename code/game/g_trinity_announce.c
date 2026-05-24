@@ -135,3 +135,12 @@ void G_TrinityAnnounceWinner( int clientNum ) {
 
 	G_BroadcastServerCommand( -1, va("tann w %d", clientNum) );
 }
+
+void G_TrinityAnnounceInit( void ) {
+	fileHandle_t f;
+
+	trap_FS_FOpenFile( "trinity-announcer.ver", &f, FS_READ );
+	if ( f ) {
+		trap_FS_FCloseFile( f );
+	}
+}

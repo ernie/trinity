@@ -569,6 +569,7 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	G_UpdateMatchStateCvars();
 
 	level.snd_fry = G_SoundIndex("sound/player/fry.wav");	// FIXME standing in lava / slime
+	G_TrinityAnnounceInit();
 
 	// Generate unique match identifier and expose to engine
 	G_GenerateMatchUUID( level.matchUUID, sizeof( level.matchUUID ) );
