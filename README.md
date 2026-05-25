@@ -2,10 +2,6 @@
 
 Unified Quake 3 mod codebase that builds both baseq3 and missionpack (Team Arena) QVMs from a single source tree.
 
-Based primarily on ec-/baseq3a with some additions from Kr3m/missionpackplus.
-
-This mod would not be possible without their amazing work.
-
 ## Features
 
 ### From baseq3a
@@ -185,6 +181,14 @@ trinity/
 ├── dist/           # Build output (pk3 files)
 └── ui/             # Menu definitions
 ```
+
+## Credits
+
+Trinity was initially based on ec-/baseq3a with some additions from Kr3m/missionpackplus.
+
+This mod would not be possible without their amazing work.
+
+Trinity bundles HD asset improvements derived from **High Quality Quake 3 Team Arena (HQQ3)** by **ZerTerO** ([ModDB profile](https://www.moddb.com/members/zertero)) — specifically HD UI graphics, weapon and player model textures, additional player model geometry (fritzkrieg, pi, james, janet, and head variants), HD HUD elements, and HD levelshots.
 
 ## Documentation
 

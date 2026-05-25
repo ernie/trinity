@@ -41,7 +41,10 @@ ASSET_FILES = $(wildcard ../assets/*) $(wildcard ../assets/**/*) $(wildcard $(EX
 
 $(DISTDIR)/$(PK3): $(STAGING)/vm/qagame.qvm $(STAGING)/vm/cgame.qvm $(STAGING)/vm/ui.qvm $(ASSET_FILES)
 	echo $(VERSION) > $(STAGING)/trinity.ver
-	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm trinity.ver ../../assets/* ../$(EXTRA_ASSETS)
+	rm -f $(DISTDIR)/$(PK3)
+	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm trinity.ver
+	cd ../assets && $(7Z) ../build/$(DISTDIR)/$(PK3) *
+	if [ -n "$$(ls -A ../assets-$(CONFIG) 2>/dev/null)" ]; then cd ../assets-$(CONFIG) && $(7Z) ../build/$(DISTDIR)/$(PK3) *; fi
 
 $(STAGING)/vm/%.qvm: $(BD)/%.qvm
 	cp $< $@
