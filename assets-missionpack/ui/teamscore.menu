@@ -210,7 +210,7 @@ itemDef {
 itemDef {
       	name bluelogo
       	style WINDOW_STYLE_SHADER
-      	background "textures/ctf2/blueteam01"
+      	background "textures/ctf2/blueteam01.tga"
       	rect 416 189 128 128 
 	forecolor 0 0 .75 0.5
       	visible 1 

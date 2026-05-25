@@ -202,27 +202,35 @@ void G_RemapTeamShaders( void ) {
 #ifdef MISSIONPACK
 	char string[1024];
 	float f = level.time * 0.001;
-	// Only remap when the configured team name has a real team_icon
-	// shader. With g_redteam/g_blueteam set to a basic color word
-	// ("Red"/"Blue") the resulting shader name (team_icon/Red_red) has
-	// no artwork — RE_RemapShader silently falls back to the default
-	// ctf2 textures (which are already red/blue) but spams the client
-	// log with "new shader ... not found" warnings. Skipping the call
-	// for color-word teams keeps the visual result identical without
-	// the noise. Real team names (Stroggs/Pagans/Marines/...) still
-	// take the remap path.
+	// Always emit a remap so the renderer's shader state is fully
+	// determined by the current g_redteam/g_blueteam values — never
+	// inherited from a prior team setting. For real clan names
+	// (Stroggs/Pagans/...) we point textures/ctf2/redteam01 at
+	// team_icon/<clan>_red. For color-word teams ("Red"/"Blue") the
+	// derived shader name (team_icon/Red_red) has no artwork, so we
+	// remap-to-self instead — the engine treats sh == sh2 as "clear the
+	// remap" (see RE_RemapShader, tr_shader.c), which lets our own
+	// trinity_teamicons.shader fallback take effect without spamming
+	// "new shader not found" warnings or requiring a vid_restart to
+	// purge a stale clan remap.
 	if ( Q_stricmp( g_redteam.string, "red" ) != 0 &&
 	     Q_stricmp( g_redteam.string, "blue" ) != 0 ) {
 		Com_sprintf( string, sizeof(string), "team_icon/%s_red", g_redteam.string );
-		AddRemap("textures/ctf2/redteam01", string, f);
-		AddRemap("textures/ctf2/redteam02", string, f);
+	} else {
+		Q_strncpyz( string, "textures/ctf2/redteam01", sizeof(string) );
 	}
+	AddRemap("textures/ctf2/redteam01", string, f);
+	AddRemap("textures/ctf2/redteam02", string, f);
+
 	if ( Q_stricmp( g_blueteam.string, "red" ) != 0 &&
 	     Q_stricmp( g_blueteam.string, "blue" ) != 0 ) {
 		Com_sprintf( string, sizeof(string), "team_icon/%s_blue", g_blueteam.string );
-		AddRemap("textures/ctf2/blueteam01", string, f);
-		AddRemap("textures/ctf2/blueteam02", string, f);
+	} else {
+		Q_strncpyz( string, "textures/ctf2/blueteam01", sizeof(string) );
 	}
+	AddRemap("textures/ctf2/blueteam01", string, f);
+	AddRemap("textures/ctf2/blueteam02", string, f);
+
 	trap_SetConfigstring(CS_SHADERSTATE, BuildShaderStateConfig());
 #endif
 }
