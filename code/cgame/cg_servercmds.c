@@ -1068,15 +1068,22 @@ static void CG_ServerCommand( void ) {
 	if ( !strcmp( cmd, "tann" ) ) {
 		if ( trap_Argc() >= 3 ) {
 			char	subtype;
-			int		clientNum;
+			char	teamTok;
 
 			// Copy the subtype char immediately — CG_Argv buffers may be
 			// reused across calls in some engines, so don't keep a pointer
 			// from CG_Argv(1) while calling CG_Argv(2).
 			subtype = CG_Argv( 1 )[0];
-			clientNum = atoi( CG_Argv( 2 ) );
 
-			if ( subtype ) {
+			if ( subtype == 't' ) {
+				teamTok = CG_Argv( 2 )[0];
+				if ( teamTok == 'r' ) {
+					CG_TrinityAnnounce_PlayTeam( TEAM_RED );
+				} else if ( teamTok == 'b' ) {
+					CG_TrinityAnnounce_PlayTeam( TEAM_BLUE );
+				}
+			} else if ( subtype ) {
+				int clientNum = atoi( CG_Argv( 2 ) );
 				CG_TrinityAnnounce_Play( subtype, clientNum );
 			}
 		}

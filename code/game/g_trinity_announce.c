@@ -54,6 +54,10 @@ void G_TrinityMaybeAnnounceJoin( gentity_t *ent ) {
 static int trinityPendingWinClient = -1;
 static int trinityPendingWinFireTime = 0;
 
+// Same idea for team-game winners; holds TEAM_RED or TEAM_BLUE.
+static int trinityPendingWinTeam = -1;
+static int trinityPendingWinTeamFireTime = 0;
+
 static void G_TrinityBroadcastWinner( int clientNum ) {
 	gentity_t *ent;
 
@@ -77,6 +81,24 @@ static void G_TrinityBroadcastWinner( int clientNum ) {
 	}
 
 	G_BroadcastServerCommand( -1, va("tann w %d", clientNum) );
+}
+
+// No handshake gate here — team names come from the server's g_redteam/
+// g_blueteam cvars, not from user-controlled data, so the
+// verification dimension that motivates the player-name gate doesn't
+// apply.
+static void G_TrinityBroadcastTeamWinner( int team ) {
+	char tok;
+
+	if ( team == TEAM_RED ) {
+		tok = 'r';
+	} else if ( team == TEAM_BLUE ) {
+		tok = 'b';
+	} else {
+		return;
+	}
+
+	G_BroadcastServerCommand( -1, va("tann t %c", tok) );
 }
 
 // Drain the queue. Called from G_RunFrame.
@@ -138,6 +160,12 @@ void G_TrinityProcessAnnouncements( void ) {
 		G_TrinityBroadcastWinner( trinityPendingWinClient );
 		trinityPendingWinClient = -1;
 	}
+
+	if ( trinityPendingWinTeam >= 0 &&
+	     level.time >= trinityPendingWinTeamFireTime ) {
+		G_TrinityBroadcastTeamWinner( trinityPendingWinTeam );
+		trinityPendingWinTeam = -1;
+	}
 }
 
 void G_TrinityAnnounceWinner( int clientNum ) {
@@ -156,6 +184,17 @@ void G_TrinityAnnounceWinner( int clientNum ) {
 	// scoreboard fades in (matches BeginIntermission timing in g_main.c).
 	trinityPendingWinClient = clientNum;
 	trinityPendingWinFireTime = level.time + INTERMISSION_DELAY_TIME;
+}
+
+void G_TrinityAnnounceTeamWinner( int team ) {
+	if ( team != TEAM_RED && team != TEAM_BLUE ) {
+		return;
+	}
+	if ( g_gametype.integer == GT_SINGLE_PLAYER ) {
+		return;
+	}
+	trinityPendingWinTeam = team;
+	trinityPendingWinTeamFireTime = level.time + INTERMISSION_DELAY_TIME;
 }
 
 void G_TrinityAnnounceInit( void ) {

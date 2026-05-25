@@ -1594,6 +1594,12 @@ static void CheckExitRules( void ) {
 				if ( bestClient >= 0 ) {
 					G_TrinityAnnounceWinner( bestClient );
 				}
+			} else if ( g_gametype.integer >= GT_TEAM ) {
+				// ScoreIsTied() above already redirected ties into overtime,
+				// so a strict winner exists here.
+				int winTeam = ( level.teamScores[TEAM_RED] > level.teamScores[TEAM_BLUE] )
+					? TEAM_RED : TEAM_BLUE;
+				G_TrinityAnnounceTeamWinner( winTeam );
 			}
 
 			return;
@@ -1613,12 +1619,14 @@ static void CheckExitRules( void ) {
 		if ( level.teamScores[TEAM_RED] >= g_fraglimit.integer ) {
 			G_BroadcastServerCommand( -1, "print \"Red hit the fraglimit.\n\"" );
 			LogExit( "Fraglimit hit." );
+			G_TrinityAnnounceTeamWinner( TEAM_RED );
 			return;
 		}
 
 		if ( level.teamScores[TEAM_BLUE] >= g_fraglimit.integer ) {
 			G_BroadcastServerCommand( -1, "print \"Blue hit the fraglimit.\n\"" );
 			LogExit( "Fraglimit hit." );
+			G_TrinityAnnounceTeamWinner( TEAM_BLUE );
 			return;
 		}
 
@@ -1649,12 +1657,14 @@ static void CheckExitRules( void ) {
 		if ( level.teamScores[TEAM_RED] >= g_capturelimit.integer ) {
 			G_BroadcastServerCommand( -1, "print \"Red hit the capturelimit.\n\"" );
 			LogExit( "Capturelimit hit." );
+			G_TrinityAnnounceTeamWinner( TEAM_RED );
 			return;
 		}
 
 		if ( level.teamScores[TEAM_BLUE] >= g_capturelimit.integer ) {
 			G_BroadcastServerCommand( -1, "print \"Blue hit the capturelimit.\n\"" );
 			LogExit( "Capturelimit hit." );
+			G_TrinityAnnounceTeamWinner( TEAM_BLUE );
 			return;
 		}
 	}
