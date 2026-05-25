@@ -1450,6 +1450,9 @@ void CG_DrawMedal(int ownerDraw, rectDef_t *rect, float scale, vec4_t color, qha
 			break;
 		case CG_CAPTURES:
 			value = score->captures;
+			// Server reuses PERS_CAPTURES for skull-deliver / obelisk-destroy,
+			// so swap in the matching medal art for those modes.
+			shader = CG_CaptureMedalForGametype();
 			break;
 	}
 
