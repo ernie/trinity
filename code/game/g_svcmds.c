@@ -532,6 +532,37 @@ qboolean	ConsoleCommand( void ) {
 		return qtrue;
 	}
 
+	if ( Q_stricmp( cmd, "trinity_name_conflict" ) == 0 ) {
+		char arg[8];
+		int clientNum;
+		char userinfo[MAX_INFO_STRING];
+
+		if ( trap_Argc() < 2 ) {
+			G_Printf( "Usage: trinity_name_conflict <slot>\n" );
+			return qtrue;
+		}
+
+		trap_Argv( 1, arg, sizeof( arg ) );
+		clientNum = atoi( arg );
+
+		if ( clientNum < 0 || clientNum >= level.maxclients ||
+		     level.clients[clientNum].pers.connected != CON_CONNECTED ) {
+			G_Printf( "trinity_name_conflict: slot %i not connected\n", clientNum );
+			return qtrue;
+		}
+
+		trap_GetUserinfo( clientNum, userinfo, sizeof( userinfo ) );
+		Info_SetValueForKey( userinfo, "name", "UnnamedPlayer" );
+		trap_SetUserinfo( clientNum, userinfo );
+		ClientUserinfoChanged( clientNum );
+
+		trap_SendServerCommand( clientNum,
+			"print \"Your name is reserved. Use ^3/name ^7to choose another.\n\"" );
+
+		G_Printf( "Trinity name conflict for client %i, reset to UnnamedPlayer\n", clientNum );
+		return qtrue;
+	}
+
 	if ( Q_stricmp( cmd, "trinity_auth_ok" ) == 0 ) {
 		char arg[8];
 		int clientNum;
