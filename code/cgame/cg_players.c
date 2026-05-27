@@ -792,9 +792,9 @@ static void CG_LoadClientInfo( clientInfo_t *ci ) {
 #ifdef MISSIONPACK
 	if( cgs.gametype >= GT_TEAM) {
 		if( ci->team == TEAM_BLUE ) {
-			Q_strncpyz(teamname, cg_blueTeamName.string, sizeof(teamname) );
+			Q_strncpyz(teamname, cgs.blueTeam, sizeof(teamname) );
 		} else {
-			Q_strncpyz(teamname, cg_redTeamName.string, sizeof(teamname) );
+			Q_strncpyz(teamname, cgs.redTeam, sizeof(teamname) );
 		}
 	}
 	if( teamname[0] ) {

@@ -2013,6 +2013,14 @@ void ClientCommand( int clientNum ) {
 		return;
 	}
 
+	// Trinity protocol handshake — must dispatch during intermission too,
+	// otherwise the stock id chat fallback below eats it and we 10s-kick
+	// a client who happened to join while the match was at intermission.
+	if (Q_stricmp (cmd, "trinity_handshake") == 0) {
+		Cmd_TrinityHandshake_f (ent);
+		return;
+	}
+
 	// ignore all other commands when at intermission
 	if (level.intermissiontime) {
 		Cmd_Say_f (ent, qfalse, qtrue);
@@ -2057,8 +2065,6 @@ void ClientCommand( int clientNum ) {
 		Cmd_SetViewpos_f( ent );
 	else if (Q_stricmp (cmd, "stats") == 0)
 		Cmd_Stats_f( ent );
-	else if (Q_stricmp (cmd, "trinity_handshake") == 0)
-		Cmd_TrinityHandshake_f (ent);
 	else
 		trap_SendServerCommand( clientNum, va( "print \"unknown cmd %s\n\"", cmd ) );
 }
