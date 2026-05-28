@@ -42,6 +42,31 @@ static int CG_ValidOrder(const char *p) {
 
 /*
 =================
+CG_SortScores
+
+qsort comparator for cg.scores[], modeled on the server's SortRanks
+(g_main.c). Used only during demo/TVD playback, where the recorded "scores"
+command arrives in client-slot order rather than leader order.
+=================
+*/
+static int QDECL CG_SortScores( const void *a, const void *b ) {
+	const score_t *sa = (const score_t *)a;
+	const score_t *sb = (const score_t *)b;
+
+	// spectators always sink to the bottom
+	if ( (sa->team == TEAM_SPECTATOR) != (sb->team == TEAM_SPECTATOR) ) {
+		return (sa->team == TEAM_SPECTATOR) ? 1 : -1;
+	}
+	// higher score first
+	if ( sa->score != sb->score ) {
+		return sb->score - sa->score;
+	}
+	// deterministic tiebreak
+	return sa->client - sb->client;
+}
+
+/*
+=================
 CG_ParseScores
 
 =================
@@ -82,6 +107,13 @@ static void CG_ParseScores( void ) {
 		cgs.clientinfo[ cg.scores[i].client ].powerups = powerups;
 
 		cg.scores[i].team = cgs.clientinfo[cg.scores[i].client].team;
+	}
+
+	// The server sends scores pre-sorted by SortRanks, but demo/TVD playback
+	// receives them in client-slot order with no way to re-request. Sort here so
+	// the board matches live; live play is left untouched (authoritative order).
+	if ( cg.demoPlayback || cgs.tvPlayback ) {
+		qsort( cg.scores, cg.numScores, sizeof( cg.scores[0] ), CG_SortScores );
 	}
 #ifdef MISSIONPACK
 	CG_SetScoreSelection(NULL);
