@@ -21,11 +21,11 @@ static qboolean HasPathTraversal( const char *name ) {
 // Resolve the clan-specific team callout sound/teamplay/voc_<clan>_<verb>.wav,
 // or 0 when the announcer is disabled, the team name is empty/unsafe, or the
 // per-clan file isn't installed. The clan name is whatever g_redteam/g_blueteam
-// hold — "Stroggs"/"Pagans" in missionpack, empty in baseq3 (which short-
+// hold -- "Stroggs"/"Pagans" in missionpack, empty in baseq3 (which short-
 // circuits to 0 here, so baseq3 always uses the caller's color fallback).
 // Filenames follow the teamplay grammar (see the plan
 // ~/.claude/plans/i-d-like-to-find-sharded-thunder.md): a clan is a collective
-// plural, so it takes the singular verb — voc_<clan>_win.wav, _score.wav,
+// plural, so it takes the singular verb -- voc_<clan>_win.wav, _score.wav,
 // _lead.wav. This resolves ONLY the clan form; callers supply their own generic
 // red/blue color fallback, because it differs per callout: the win/score
 // generics are voc_ teamplay files, while the lead generic is the base-Q3
@@ -99,7 +99,7 @@ void CG_TrinityAnnounce_PlayTeam( int team ) {
 // Team scoring callout (cg_event.c, GTS_*TEAM_SCORED). The caller routes the
 // result through the buffered-sound queue, keeping the existing CTF/score
 // pacing. Falls back to cgs.media.red/blueScoredSound, which is the generic
-// voc_red_scores.wav / voc_blue_scores.wav — so base behavior is preserved
+// voc_red_scores.wav / voc_blue_scores.wav -- so base behavior is preserved
 // when the announcer is off or no clan file is installed. Returns 0 if the
 // fallback handle itself failed to register (non-team game / asset missing).
 sfxHandle_t CG_TrinityAnnounce_TeamScoreSound( int team ) {
@@ -113,8 +113,8 @@ sfxHandle_t CG_TrinityAnnounce_TeamScoreSound( int team ) {
 // Team-took-the-lead callout (cg_event.c, GTS_*TEAM_TOOK_LEAD). AddTeamScore
 // (g_team.c) emits TOOK_LEAD *instead of* SCORED when a score changes who's
 // ahead, so this is the lead-changing sibling of the score callout and shares
-// the buffered-sound queue. Falls back to cgs.media.red/blueLeadsSound — the
-// base-Q3 "Red/Blue leads" voice — so the long-standing lead callout keeps
+// the buffered-sound queue. Falls back to cgs.media.red/blueLeadsSound -- the
+// base-Q3 "Red/Blue leads" voice -- so the long-standing lead callout keeps
 // working even before any clan voc_<clan>_lead.wav audio exists.
 sfxHandle_t CG_TrinityAnnounce_TeamLeadSound( int team ) {
 	sfxHandle_t h = CG_TrinityResolveClanSound( team, "lead" );
