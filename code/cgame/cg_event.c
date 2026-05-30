@@ -1132,16 +1132,16 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 #endif
 
 				case GTS_REDTEAM_SCORED:
-					CG_AddBufferedSound(cgs.media.redScoredSound);
+					CG_AddBufferedSound( CG_TrinityAnnounce_TeamScoreSound( TEAM_RED ) );
 					break;
 				case GTS_BLUETEAM_SCORED:
-					CG_AddBufferedSound(cgs.media.blueScoredSound);
+					CG_AddBufferedSound( CG_TrinityAnnounce_TeamScoreSound( TEAM_BLUE ) );
 					break;
 				case GTS_REDTEAM_TOOK_LEAD:
-					CG_AddBufferedSound(cgs.media.redLeadsSound);
+					CG_AddBufferedSound( CG_TrinityAnnounce_TeamLeadSound( TEAM_RED ) );
 					break;
 				case GTS_BLUETEAM_TOOK_LEAD:
-					CG_AddBufferedSound(cgs.media.blueLeadsSound);
+					CG_AddBufferedSound( CG_TrinityAnnounce_TeamLeadSound( TEAM_BLUE ) );
 					break;
 				case GTS_TEAMS_ARE_TIED:
 					CG_AddBufferedSound( cgs.media.teamsTiedSound );
