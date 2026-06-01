@@ -12,7 +12,7 @@
 //
 // Trinity: pak1's copy with one fix in aliases — Whyrlwynd's base was "Ursla"
 // (typo for Ursula), so the skirmish addbot never resolved and Whyrlwynd
-// never spawned for the Intruders.
+// never spawned for the Intruders. Also added a special treat for VR fans.
 //
 teams {
   { "Crusaders" "ui/assets/crusaders"  "Darkangel" "Lionheart" "Bradamante" "Furioso" "Aria"  }
@@ -20,6 +20,7 @@ teams {
   { "Pagans"  "ui/assets/pagans" "Khan" "Deadeye" "WarLokk" "Callisto" "Gargouille" }
   { "Stroggs" "ui/assets/stroggs" "Enforcer" "Icarus" "Gammy" "Gladiator" "Paracyte" }
   { "The Fallen" "ui/assets/thefallen" "Neptune" "Stalker" "Ursula" "Abominator" "Sinister" }
+  { "Team Beef" "ui/assets/teambeef" "DrBeef" "Baggy" "Bummser" "Lubos" "Wellington" }
 }
 
 
@@ -64,6 +65,11 @@ aliases {
 	{ "Abominator"			"James"		"o"		}
 	{ "Stalker"		"Morgan" 	"o"			}
 	{ "Neptune"			"Neptune"	"a"				}
+	{ "DrBeef"			"Morgan"	"o"				}
+	{ "Baggy"			"Khan"		"o"				}
+	{ "Bummser"			"Neptune"	"a"				}
+	{ "Lubos"			"Gaunt"		"d"				}
+	{ "Wellington"			"James"		"o"				}
 }
 
 
