@@ -82,6 +82,13 @@ static void CG_ParseScores( void ) {
 	cg.teamScores[0] = atoi( CG_Argv( 2 ) );
 	cg.teamScores[1] = atoi( CG_Argv( 3 ) );
 
+	// Playback: the "scores" command can carry stale team scores; CS_SCORES is
+	// authoritative.
+	if ( cg.demoPlayback || cgs.tvPlayback ) {
+		cg.teamScores[0] = cgs.scores1;
+		cg.teamScores[1] = cgs.scores2;
+	}
+
 	memset( cg.scores, 0, sizeof( cg.scores ) );
 	for ( i = 0 ; i < cg.numScores ; i++ ) {
 		//

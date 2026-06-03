@@ -2063,8 +2063,11 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	// remove the last loading update
 	cg.infoScreenText[0] = 0;
 
-	// Make sure we have update values (scores)
-	// CG_SetConfigValues();
+	// Playback: seed cached configstring values (scores/flags) from the initial
+	// keyframe; no server delivers them and the TV dedup won't re-assert them.
+	if ( cgs.tvPlayback ) {
+		CG_SetConfigValues();
+	}
 
 	CG_StartMusic();
 
