@@ -82,11 +82,11 @@ static void CG_ParseScores( void ) {
 	cg.teamScores[0] = atoi( CG_Argv( 2 ) );
 	cg.teamScores[1] = atoi( CG_Argv( 3 ) );
 
-	// Playback: the "scores" command can carry stale team scores; CS_SCORES is
-	// authoritative.
+	// Playback: the "scores" command carries stale team scores; CS_SCORES is
+	// authoritative (read direct — cgs.scores1/2 aren't seeded after a TV CG_Init).
 	if ( cg.demoPlayback || cgs.tvPlayback ) {
-		cg.teamScores[0] = cgs.scores1;
-		cg.teamScores[1] = cgs.scores2;
+		cg.teamScores[0] = atoi( CG_ConfigString( CS_SCORES1 ) );
+		cg.teamScores[1] = atoi( CG_ConfigString( CS_SCORES2 ) );
 	}
 
 	memset( cg.scores, 0, sizeof( cg.scores ) );
