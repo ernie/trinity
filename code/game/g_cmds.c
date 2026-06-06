@@ -976,7 +976,7 @@ static void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chat
 	case SAY_TELL:
 		// Log tell from humans only (not bots)
 		if ( !(ent->r.svFlags & SVF_BOT) && target && target->client ) {
-			G_LogPrintf( "Tell: %d %d \"%s\" \"%s\": %s\n", (int)(ent - g_entities), (int)(target - g_entities),
+			G_LogPrintf( "Tell: %d %d \"%s" S_COLOR_WHITE "\" \"%s" S_COLOR_WHITE "\": %s\n", (int)(ent - g_entities), (int)(target - g_entities),
 				ent->client->pers.netname, target->client->pers.netname, chatText );
 		}
 		if (target && target->inuse && target->client && g_gametype.integer >= GT_TEAM &&
