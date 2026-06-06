@@ -828,6 +828,8 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.vrPlayerShader = trap_R_RegisterShader( "menu/art/vr.tga" );
 	cgs.media.verifiedShader = trap_R_RegisterShader( "gfx/2d/verified" );
 	cgs.media.adminShader    = trap_R_RegisterShader( "gfx/2d/admin" );
+	cgs.media.eyeShader      = trap_R_RegisterShaderNoMip( "gfx/2d/eye" );
+	cgs.media.eyeEmptyShader = trap_R_RegisterShaderNoMip( "gfx/2d/eye_empty" );
 
 	cgs.media.viewBloodShader = trap_R_RegisterShader( "viewBloodBlend" );
 	cgs.media.vignetteShader = trap_R_RegisterShader( "gfx/vignette" );

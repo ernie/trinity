@@ -264,3 +264,48 @@ void CG_TrinityAnnounce_Tick( void ) {
 	// flag/score callouts from clipping our tail.
 	cg.soundTime = cg.time + TRINITY_ANNOUNCE_SPACING_MS;
 }
+
+/*
+===============================================================================
+Web-viewer presence (CS_TRINITY_VIEWERS)
+
+Tracker rcon's `trinity_watch <n>`; the game QVM mirrors n into the
+configstring. 0<->n flips present a moment: eye drawn above the stock
+centerprint (CG_DrawViewerMoment — not the reward stack, and clear of
+the medal slot), callout played directly. Count moves while watched only
+refresh CG_DrawWebViewers. Initial gamestate values are cached silently
+in CG_SetConfigValues, so a late joiner gets the indicator without a
+retroactive announcement.
+===============================================================================
+*/
+
+static void CG_TrinityViewersMoment( qhandle_t shader, const char *soundPath, const char *text ) {
+	cg.viewerMomentShader = shader;
+	cg.viewerMomentTime = cg.time;
+
+	if ( cg_trinityAnnounce.integer ) {
+		sfxHandle_t sfx = trap_S_RegisterSound( soundPath, qfalse );
+		if ( sfx ) {
+			trap_S_StartLocalSound( sfx, CHAN_ANNOUNCER );
+		}
+	}
+	CG_CenterPrint( text, SCREEN_HEIGHT * 0.30, BIGCHAR_WIDTH );
+}
+
+void CG_TrinityViewers_Update( int count ) {
+	int prev = cgs.webViewers;
+
+	cgs.webViewers = count;
+
+	if ( ( prev > 0 ) == ( count > 0 ) ) {
+		return;	// no watched-state flip
+	}
+
+	if ( count > 0 ) {
+		CG_TrinityViewersMoment( cgs.media.eyeShader,
+			"sound/feedback/vadrigar_watch.wav", "The Vadrigar watch." );
+	} else {
+		CG_TrinityViewersMoment( cgs.media.eyeEmptyShader,
+			"sound/feedback/vadrigar_gone.wav", "The Vadrigar depart." );
+	}
+}

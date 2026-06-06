@@ -614,6 +614,29 @@ qboolean	ConsoleCommand( void ) {
 		return qtrue;
 	}
 
+	// Web live-stream viewer count, rcon'd by the tracker on debounced
+	// changes; the cgame derives all presentation from the configstring.
+	// Doubles as the force-test hook: `\trinity_watch 3` then
+	// `\trinity_watch 0` from a listen-server console.
+	if ( Q_stricmp( cmd, "trinity_watch" ) == 0 ) {
+		char arg[16];
+		int count;
+
+		if ( trap_Argc() < 2 ) {
+			G_Printf( "Usage: trinity_watch <count>  (web viewers; 0 = unwatched)\n" );
+			G_Printf( "  current: %i\n", level.webViewers );
+			return qtrue;
+		}
+		trap_Argv( 1, arg, sizeof( arg ) );
+		count = atoi( arg );
+		if ( count < 0 ) {
+			count = 0;
+		}
+		level.webViewers = count;
+		trap_SetConfigstring( CS_TRINITY_VIEWERS, count > 0 ? va( "%i", count ) : "" );
+		return qtrue;
+	}
+
 	if (Q_stricmp (cmd, "sv_cmd") == 0) {
 		char	svcmd[MAX_TOKEN_CHARS];
 		char	clientStr[MAX_TOKEN_CHARS];

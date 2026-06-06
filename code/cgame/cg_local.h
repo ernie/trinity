@@ -625,6 +625,10 @@ typedef struct {
 	qhandle_t	rewardShader[MAX_REWARDSTACK];
 	qhandle_t	rewardSound[MAX_REWARDSTACK];
 
+	// web-viewer presence moment: custom-drawn in the medal slot
+	int			viewerMomentTime;		// 0 = none
+	qhandle_t	viewerMomentShader;
+
 	// sound buffer mainly for announcer sounds
 	int			soundBufferIn;
 	int			soundBufferOut;
@@ -874,6 +878,8 @@ typedef struct {
 	qhandle_t	vrPlayerShader;
 	qhandle_t	verifiedShader;
 	qhandle_t	adminShader;
+	qhandle_t	eyeShader;		// web-viewer presence: open eye (watched)
+	qhandle_t	eyeEmptyShader;	// web-viewer presence: empty eye (departed)
 
 	// wall mark shaders
 	qhandle_t	wakeMarkShader;
@@ -1180,6 +1186,7 @@ typedef struct {
 	int				scores1, scores2;		// from configstrings
 	int				redflag, blueflag;		// flag status from configstrings
 	int				flagStatus;
+	int				webViewers;				// CS_TRINITY_VIEWERS: web live-stream viewers; 0 = unwatched
 
 	qboolean  newHud;
 
@@ -1603,6 +1610,7 @@ void CG_TrinityAnnounce_PlayTeam( int team );
 sfxHandle_t CG_TrinityAnnounce_TeamScoreSound( int team );
 sfxHandle_t CG_TrinityAnnounce_TeamLeadSound( int team );
 void CG_TrinityAnnounce_Tick( void );
+void CG_TrinityViewers_Update( int count );
 
 //
 // cg_playerstate.c

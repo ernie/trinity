@@ -65,6 +65,7 @@
 #define CS_VOTE_CALLER			26		// clientnum of vote caller
 #define	CS_ITEMS				27		// string of 0's and 1's that tell which items are present
 #define CS_TEAMVOTE_CALLER		28		// +0 red, +1 blue
+#define CS_TRINITY_VIEWERS		30		// web live-stream viewer count; "" when unwatched
 
 #define	CS_MODELS				32
 #define	CS_SOUNDS				(CS_MODELS+MAX_MODELS)

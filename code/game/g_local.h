@@ -516,6 +516,10 @@ typedef struct {
 	// overtime
 	qboolean	inOvertime;				// qtrue once overtime has been announced
 
+	// web live-stream viewers: last trinity_watch svcmd from the tracker,
+	// mirrored to CS_TRINITY_VIEWERS (the cgame owns all presentation)
+	int			webViewers;
+
 } level_locals_t;
 
 

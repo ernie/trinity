@@ -1055,6 +1055,63 @@ static float CG_DrawTimer( float y ) {
 }
 
 
+static vec4_t trinityGold = { 0.88f, 0.66f, 0.18f, 1.0f };
+
+/*
+=================
+CG_DrawViewerMoment
+
+Watch/depart eye, centered just above the stock centerprint height with
+the medal fade. Deliberately not a reward and not in the medal slot — a
+simultaneous medal draws at y=56 unobstructed. CG_TrinityViewersMoment
+plays the callout directly when the configstring flips.
+=================
+*/
+static void CG_DrawViewerMoment( void ) {
+	float	*fade;
+	vec4_t	color;
+	float	y;
+
+	if ( !cg.viewerMomentTime ) {
+		return;
+	}
+	fade = CG_FadeColor( cg.viewerMomentTime, REWARD_TIME );
+	if ( !fade ) {
+		cg.viewerMomentTime = 0;
+		return;
+	}
+	// Icon bottom 8px above the centerprint's top line (one-line text is
+	// centered on 0.30 * SCREEN_HEIGHT).
+	y = SCREEN_HEIGHT * 0.30 - BIGCHAR_HEIGHT / 2 - 8 - (ICON_SIZE-4);
+	VectorCopy( trinityGold, color );
+	color[3] = fade[3];
+	trap_R_SetColor( color );
+	CG_DrawPic( 320 - ICON_SIZE/2, y, ICON_SIZE-4, ICON_SIZE-4, cg.viewerMomentShader );
+	trap_R_SetColor( NULL );
+}
+
+/*
+=================
+CG_DrawWebViewers
+
+Web live-stream viewer presence: gold eye + white count, just under the
+timer. Only called while watched (cgs.webViewers > 0).
+=================
+*/
+static float CG_DrawWebViewers( float y ) {
+	float size = BIGCHAR_HEIGHT;
+	float x = cgs.screenXmax - 4;
+
+	trap_R_SetColor( trinityGold );
+	CG_DrawPic( x - size, y + 2, size, size, cgs.media.eyeShader );
+	trap_R_SetColor( NULL );
+	CG_DrawString( x - size - 4, y + 2, va( "%i", cgs.webViewers ), colorWhite,
+		BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW | DS_RIGHT | DS_PROPORTIONAL );
+
+	return y + size + 4;
+}
+
+
 /*
 =================
 CG_DrawTeamOverlay
@@ -1465,6 +1522,9 @@ static void CG_DrawUpperRight(stereoFrame_t stereoFrame)
 	}	
 	if ( cg_drawTimer.integer ) {
 		y = CG_DrawTimer( y );
+	}
+	if ( cg_drawViewers.integer && cgs.webViewers > 0 ) {
+		y = CG_DrawWebViewers( y );
 	}
 	if ( cg_drawAttacker.integer ) {
 		y = CG_DrawAttacker( y );
@@ -3732,6 +3792,10 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 
 	CG_DrawLagometer();
 
+	// Arena-wide, so outside the alive-only block CG_DrawReward sits in:
+	// dead players and spectators see the watch/depart moment too.
+	CG_DrawViewerMoment();
+
 #ifdef MISSIONPACK
 	if (!cg_paused.integer) {
 		CG_DrawUpperRight(stereoFrame);
@@ -3883,6 +3947,9 @@ void CG_ResetSeekState( void ) {
 	// Medal display — CG_DrawReward: CG_FadeColor(rewardTime, 3000)
 	cg.rewardStack = 0;
 	cg.rewardTime = 0;
+
+	// Web-viewer moment
+	cg.viewerMomentTime = 0;
 
 	// Trinity announcement queue
 	cg.trinityAnnounceIn = 0;

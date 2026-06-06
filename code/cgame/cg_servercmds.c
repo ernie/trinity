@@ -289,6 +289,9 @@ void CG_SetConfigValues( void ) {
 		cgs.flagStatus = s[0] - '0';
 	}
 #endif
+	// Cached silently (no moment): a late joiner gets the upper-right
+	// indicator but no retroactive watch announcement.
+	cgs.webViewers = atoi( CG_ConfigString( CS_TRINITY_VIEWERS ) );
 	CG_ParseWarmup();
 }
 
@@ -431,6 +434,9 @@ static void CG_ConfigStringModified( void ) {
 			cgs.flagStatus = str[0] - '0';
 		}
 #endif
+	}
+	else if ( num == CS_TRINITY_VIEWERS ) {
+		CG_TrinityViewers_Update( atoi( str ) );
 	}
 	else if ( num == CS_SHADERSTATE ) {
 		CG_ShaderStateChanged();
