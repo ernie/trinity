@@ -571,6 +571,14 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 	level.previousTime = levelTime;
 	level.msec = FRAMETIME;
 
+	// Seed warmup state before the cvar sync below: the zeroed struct
+	// reads as "match live", and SP_worldspawn's identical init runs
+	// too late — the stale "active" made the TV auto-recorder open on
+	// empty arenas.
+	if ( g_gametype.integer != GT_SINGLE_PLAYER ) {
+		level.warmupTime = -1;
+	}
+
 	// Sync match-state cvars to the freshly-init'd level so the
 	// InitGame log line's serverinfo embed and any UDP status poll
 	// between now and WarmupEnd see this map's values.
