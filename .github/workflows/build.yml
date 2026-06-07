@@ -38,7 +38,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ANNOUNCER_PAT }}
         run: |
-          gh release download --repo ernie/q3-announcer-tts --pattern 'zzz-trinity-announcer.pk3' --dir dist || echo "No announcer release found — skipping"
+          gh release download --repo ernie/trinity-announcer --pattern 'zzz-trinity-announcer.pk3' --dir dist || echo "No announcer release found — skipping"
 
       - name: Build sha256sums.txt
         if: startsWith(github.ref, 'refs/tags/v')
