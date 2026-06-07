@@ -1312,6 +1312,19 @@ static float CG_DrawModeIndicators( float y ) {
 
 	x = cgs.screenXmax - pad;
 
+	// identical modes: collapse to M+G [icon]
+	if ( cgs.gameplay == cgs.pmove_movement ) {
+		x -= iconSize;
+		if ( cgs.gameplay >= GP_VQ3 && cgs.gameplay <= GP_QL ) {
+			CG_DrawPic( x, y, iconSize, iconSize, cgs.media.modeIcons[cgs.gameplay] );
+		}
+		x -= pad;
+		x -= BIGCHAR_WIDTH * 3;
+		CG_DrawString( x, y + 2, "M+G", color, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW );
+
+		return y + iconSize + 4;
+	}
+
 	// gameplay: G [icon]  (rightmost)
 	x -= iconSize;
 	if ( cgs.gameplay >= GP_VQ3 && cgs.gameplay <= GP_QL ) {
