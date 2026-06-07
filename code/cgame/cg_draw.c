@@ -3792,10 +3792,6 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 
 	CG_DrawLagometer();
 
-	// Arena-wide, so outside the alive-only block CG_DrawReward sits in:
-	// dead players and spectators see the watch/depart moment too.
-	CG_DrawViewerMoment();
-
 #ifdef MISSIONPACK
 	if (!cg_paused.integer) {
 		CG_DrawUpperRight(stereoFrame);
@@ -3816,6 +3812,9 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 	// don't draw center string if scoreboard is up
 	cg.scoreBoardShowing = CG_DrawScoreboard();
 	if ( !cg.scoreBoardShowing ) {
+		// arena-wide (unlike CG_DrawReward's alive-only block), and gated
+		// like the centerprint so the eye hides under the scoreboard
+		CG_DrawViewerMoment();
 		CG_DrawCenterString();
 	}
 
