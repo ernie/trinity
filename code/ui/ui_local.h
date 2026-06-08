@@ -726,8 +726,7 @@ typedef struct {
 
 	qboolean inGameLoad;
 
-	int lastMovementModCount;
-	int lastGameplayModCount;
+	int lastModeModCount;
 
 }	uiInfo_t;
 

@@ -5,6 +5,7 @@
 
 #include "cg_local.h"
 #include "../game/bg_gameplay.h"
+#include "../game/bg_mode.h"
 
 #ifdef MISSIONPACK
 #include "../ui/ui_shared.h"
@@ -1304,46 +1305,16 @@ static float CG_DrawModeIndicators( float y ) {
 	int		iconSize = 20;
 	int		pad = 4;
 	int		x;
-	vec4_t	color = { 1, 1, 1, 1 };
 
 	if ( !cg.showScores ) {
 		return y;
 	}
 
-	x = cgs.screenXmax - pad;
-
-	// identical modes: collapse to M+G [icon]
-	if ( cgs.gameplay == cgs.pmove_movement ) {
-		x -= iconSize;
-		if ( cgs.gameplay >= GP_VQ3 && cgs.gameplay <= GP_QL ) {
-			CG_DrawPic( x, y, iconSize, iconSize, cgs.media.modeIcons[cgs.gameplay] );
-		}
-		x -= pad;
-		x -= BIGCHAR_WIDTH * 3;
-		CG_DrawString( x, y + 2, "M+G", color, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW );
-
-		return y + iconSize + 4;
+	// single profile icon (g_mode), upper-right
+	x = cgs.screenXmax - pad - iconSize;
+	if ( cgs.mode >= MODE_VQ3 && cgs.mode < MODE_COUNT ) {
+		CG_DrawPic( x, y, iconSize, iconSize, cgs.media.modeIcons[cgs.mode] );
 	}
-
-	// gameplay: G [icon]  (rightmost)
-	x -= iconSize;
-	if ( cgs.gameplay >= GP_VQ3 && cgs.gameplay <= GP_QL ) {
-		CG_DrawPic( x, y, iconSize, iconSize, cgs.media.modeIcons[cgs.gameplay] );
-	}
-	x -= pad;
-	x -= BIGCHAR_WIDTH;
-	CG_DrawString( x, y + 2, "G", color, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW );
-
-	x -= pad * 2;
-
-	// movement: M [icon]
-	x -= iconSize;
-	if ( cgs.pmove_movement >= PM_MOVEMENT_VQ3 && cgs.pmove_movement <= PM_MOVEMENT_QLT ) {
-		CG_DrawPic( x, y, iconSize, iconSize, cgs.media.modeIcons[cgs.pmove_movement] );
-	}
-	x -= pad;
-	x -= BIGCHAR_WIDTH;
-	CG_DrawString( x, y + 2, "M", color, BIGCHAR_WIDTH, BIGCHAR_HEIGHT, 0, DS_SHADOW );
 
 	return y + iconSize + 4;
 }

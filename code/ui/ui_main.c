@@ -625,16 +625,10 @@ void _UI_Refresh( int realtime )
 
 	UI_UpdateCvars();
 
-	// sync ui_movement to g_movement for local games
-	if ( ui_movement.modificationCount != uiInfo.lastMovementModCount ) {
-		uiInfo.lastMovementModCount = ui_movement.modificationCount;
-		trap_Cvar_SetValue( "g_movement", ui_movement.integer );
-	}
-
-	// sync ui_gameplay to g_gameplay for local games
-	if ( ui_gameplay.modificationCount != uiInfo.lastGameplayModCount ) {
-		uiInfo.lastGameplayModCount = ui_gameplay.modificationCount;
-		trap_Cvar_SetValue( "g_gameplay", ui_gameplay.integer );
+	// sync ui_mode to g_mode for local games
+	if ( ui_mode.modificationCount != uiInfo.lastModeModCount ) {
+		uiInfo.lastModeModCount = ui_mode.modificationCount;
+		trap_Cvar_SetValue( "g_mode", ui_mode.integer );
 	}
 
 	// Poll trinity login status — switch views on success

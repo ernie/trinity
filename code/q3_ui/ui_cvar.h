@@ -66,8 +66,7 @@ UI_CVAR( ui_server14, "server14", "", CVAR_ARCHIVE )
 UI_CVAR( ui_server15, "server15", "", CVAR_ARCHIVE )
 UI_CVAR( ui_server16, "server16", "", CVAR_ARCHIVE )
 
-UI_CVAR( ui_movement, "ui_movement", "0", CVAR_ARCHIVE )
-UI_CVAR( ui_gameplay, "ui_gameplay", "0", CVAR_ARCHIVE )
+UI_CVAR( ui_mode, "ui_mode", "0", CVAR_ARCHIVE )
 
 UI_CVAR( ui_cdkeychecked, "ui_cdkeychecked", "0", CVAR_ROM )
 

@@ -11,6 +11,7 @@ GAME OPTIONS MENU
 
 #include "ui_local.h"
 #include "../game/ui_swatches.h"
+#include "../game/bg_mode.h"
 
 
 #define ART_FRAMEL				"menu/art/frame2_l"
@@ -46,8 +47,7 @@ GAME OPTIONS MENU
 #define ID_DAMAGEPLUMS			142
 #define ID_FOLLOWMODE			143
 #define ID_TVDOWNLOAD			144
-#define ID_MOVEMENT				145
-#define ID_COMBATBALANCE		146
+#define ID_MODE					145
 
 #define	NUM_CROSSHAIRS			10
 
@@ -76,8 +76,7 @@ typedef struct {
 	menulist_s			followmode;
 	menuradiobutton_s	allowdownload;
 	menulist_s			tvdownload;
-	menulist_s			movement;
-	menulist_s			gameplay;
+	menulist_s			mode;
 	menubitmap_s		back;
 
 	qboolean			hasTvDownload;
@@ -113,22 +112,8 @@ static const char *tvdownload_names[] =
 	NULL
 };
 
-static const char *movement_names[] =
-{
-	"Vanilla Quake 3",
-	"CPMA",
-	"Quake Live",
-	"Quake Live Turbo",
-	NULL
-};
-
-static const char *gameplay_names[] =
-{
-	"Vanilla Quake 3",
-	"CPMA",
-	"Quake Live",
-	NULL
-};
+// profile labels are sourced from BG_ModeName at menu init
+static const char *mode_names[MODE_COUNT + 1];
 
 static void Preferences_SetMenuItems( void ) {
 	int c;
@@ -163,8 +148,7 @@ static void Preferences_SetMenuItems( void ) {
 		s_preferences.tvdownload.curvalue = Com_Clamp( 0, 2, atoi( buf ) );
 	}
 
-	s_preferences.movement.curvalue = Com_Clamp( 0, 3, trap_Cvar_VariableValue( "ui_movement" ) );
-	s_preferences.gameplay.curvalue = Com_Clamp( 0, 2, trap_Cvar_VariableValue( "ui_gameplay" ) );
+	s_preferences.mode.curvalue = Com_Clamp( 0, MODE_COUNT - 1, trap_Cvar_VariableValue( "ui_mode" ) );
 }
 
 
@@ -250,14 +234,9 @@ static void Preferences_Event( void* ptr, int notification ) {
 		trap_Cvar_SetValue( "cg_followMode", s_preferences.followmode.curvalue );
 		break;
 
-	case ID_MOVEMENT:
-		trap_Cvar_SetValue( "ui_movement", s_preferences.movement.curvalue );
-		trap_Cvar_SetValue( "g_movement", s_preferences.movement.curvalue );
-		break;
-
-	case ID_COMBATBALANCE:
-		trap_Cvar_SetValue( "ui_gameplay", s_preferences.gameplay.curvalue );
-		trap_Cvar_SetValue( "g_gameplay", s_preferences.gameplay.curvalue );
+	case ID_MODE:
+		trap_Cvar_SetValue( "ui_mode", s_preferences.mode.curvalue );
+		trap_Cvar_SetValue( "g_mode", s_preferences.mode.curvalue );
 		break;
 
 	case ID_BACK:
@@ -454,24 +433,20 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.crosshaircolor.numitems			= 7;
 
 	y += BIGCHAR_HEIGHT;
-	s_preferences.movement.generic.type          = MTYPE_SPINCONTROL;
-	s_preferences.movement.generic.name          = "Movement:";
-	s_preferences.movement.generic.flags         = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_preferences.movement.generic.callback      = Preferences_Event;
-	s_preferences.movement.generic.id            = ID_MOVEMENT;
-	s_preferences.movement.generic.x             = PREFERENCES_X_POS;
-	s_preferences.movement.generic.y             = y;
-	s_preferences.movement.itemnames             = movement_names;
-
-	y += BIGCHAR_HEIGHT;
-	s_preferences.gameplay.generic.type          = MTYPE_SPINCONTROL;
-	s_preferences.gameplay.generic.name          = "Gameplay:";
-	s_preferences.gameplay.generic.flags         = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_preferences.gameplay.generic.callback      = Preferences_Event;
-	s_preferences.gameplay.generic.id            = ID_COMBATBALANCE;
-	s_preferences.gameplay.generic.x             = PREFERENCES_X_POS;
-	s_preferences.gameplay.generic.y             = y;
-	s_preferences.gameplay.itemnames             = gameplay_names;
+	{
+		int m;
+		for ( m = 0; m < MODE_COUNT; m++ )
+			mode_names[m] = BG_ModeName( m );
+		mode_names[MODE_COUNT] = NULL;
+	}
+	s_preferences.mode.generic.type          = MTYPE_SPINCONTROL;
+	s_preferences.mode.generic.name          = "Mode:";
+	s_preferences.mode.generic.flags         = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.mode.generic.callback      = Preferences_Event;
+	s_preferences.mode.generic.id            = ID_MODE;
+	s_preferences.mode.generic.x             = PREFERENCES_X_POS;
+	s_preferences.mode.generic.y             = y;
+	s_preferences.mode.itemnames             = mode_names;
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.simpleitems.generic.type        = MTYPE_RADIOBUTTON;
@@ -629,8 +604,7 @@ static void Preferences_MenuInit( void ) {
 
 	Menu_AddItem( &s_preferences.menu, &s_preferences.crosshair );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.crosshaircolor );
-	Menu_AddItem( &s_preferences.menu, &s_preferences.movement );
-	Menu_AddItem( &s_preferences.menu, &s_preferences.gameplay );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.mode );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.simpleitems );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.wallmarks );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.brass );

@@ -6,6 +6,7 @@
 
 #include "cg_local.h"
 #include "../game/bg_hash.h"
+#include "../game/bg_mode.h"
 
 #ifdef MISSIONPACK // bk001204
 #include "../../ui/menudef.h" // bk001205 - for Q3_ui as well
@@ -200,15 +201,11 @@ void CG_ParseSysteminfo( void ) {
 		cgs.pmove_msec = 33;
 	}
 
-	cgs.pmove_movement = atoi( Info_ValueForKey( info, "g_movement" ) );
-	if ( cgs.pmove_movement < PM_MOVEMENT_VQ3 || cgs.pmove_movement > PM_MOVEMENT_QLT ) {
-		cgs.pmove_movement = PM_MOVEMENT_VQ3;
+	cgs.mode = atoi( Info_ValueForKey( info, "g_mode" ) );
+	if ( cgs.mode < MODE_VQ3 || cgs.mode >= MODE_COUNT ) {
+		cgs.mode = MODE_VQ3;
 	}
-
-	cgs.gameplay = atoi( Info_ValueForKey( info, "g_gameplay" ) );
-	if ( cgs.gameplay < GP_VQ3 || cgs.gameplay > GP_QL ) {
-		cgs.gameplay = GP_VQ3;
-	}
+	BG_ModeToAxes( cgs.mode, &cgs.pmove_movement, &cgs.gameplay );
 
 	cgs.synchronousClients = ( atoi( Info_ValueForKey( info, "g_synchronousClients" ) ) ) ? qtrue : qfalse;
 }

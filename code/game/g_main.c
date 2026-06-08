@@ -2,6 +2,7 @@
 //
 
 #include "g_local.h"
+#include "bg_mode.h"
 
 level_locals_t	level;
 
@@ -537,22 +538,26 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	G_RegisterCvars();
 
-	// apply client's preferred movement mode for local games
-	if ( g_movement.integer == 0 ) {
-		trap_Cvar_VariableStringBuffer( "ui_movement", value, sizeof( value ) );
-		if ( value[0] && atoi( value ) != 0 ) {
-			trap_Cvar_Set( "g_movement", value );
-			trap_Cvar_Update( &g_movement );
-		}
-	}
+	// derive the two axis cvars from the unified g_mode profile
+	{
+		int mode = g_mode.integer;
+		int mv, gp;
 
-	// apply client's preferred combat balance for local games
-	if ( g_gameplay.integer == 0 ) {
-		trap_Cvar_VariableStringBuffer( "ui_gameplay", value, sizeof( value ) );
-		if ( value[0] && atoi( value ) != 0 ) {
-			trap_Cvar_Set( "g_gameplay", value );
-			trap_Cvar_Update( &g_gameplay );
+		// local games: adopt the player's menu preference when g_mode is unset
+		if ( mode == 0 ) {
+			trap_Cvar_VariableStringBuffer( "ui_mode", value, sizeof( value ) );
+			if ( value[0] && atoi( value ) != 0 ) {
+				mode = atoi( value );
+				trap_Cvar_Set( "g_mode", value );
+				trap_Cvar_Update( &g_mode );
+			}
 		}
+
+		BG_ModeToAxes( mode, &mv, &gp );
+		trap_Cvar_Set( "g_movement", va( "%i", mv ) );
+		trap_Cvar_Update( &g_movement );
+		trap_Cvar_Set( "g_gameplay", va( "%i", gp ) );
+		trap_Cvar_Update( &g_gameplay );
 	}
 
 	// Signal to engine that this game supports server lifecycle events

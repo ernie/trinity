@@ -1236,6 +1236,7 @@ typedef struct {
 
 	qboolean		pmove_fixed;
 	int				pmove_msec;
+	int				mode;			// g_mode (0..3); pmove_movement/gameplay derive from it
 	int				pmove_movement;
 	int				gameplay;
 
