@@ -1,7 +1,7 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "g_local.h"
-#include "bg_gameplay.h"
+#include "bg_mode.h"
 
 // g_client.c -- client functions that don't happen every frame
 
@@ -1154,7 +1154,7 @@ void ClientSpawn(gentity_t *ent) {
 
 	client->ps.stats[STAT_WEAPONS] = ( 1 << WP_MACHINEGUN );
 	{
-		const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
+		const modeConfig_t *gp = Mode_GetConfig( g_mode.integer );
 		client->ps.ammo[WP_MACHINEGUN] = gp->weapons[WP_MACHINEGUN].initialAmmo;
 	}
 
@@ -1164,7 +1164,7 @@ void ClientSpawn(gentity_t *ent) {
 
 	// health will count down towards max_health
 	{
-		const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
+		const modeConfig_t *gp = Mode_GetConfig( g_mode.integer );
 		ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + gp->spawnHealthBonus;
 	}
 

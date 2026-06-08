@@ -2,7 +2,7 @@
 //
 // cg_weapons.c -- events and effects dealing with weapons
 #include "cg_local.h"
-#include "../game/bg_gameplay.h"
+#include "../game/bg_mode.h"
 
 /*
 ==========================
@@ -1056,7 +1056,7 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 	VectorMA( muzzlePoint, 14, forward, muzzlePoint );
 
 	// project forward by the lightning range
-	VectorMA( muzzlePoint, GP_GetConfig( cgs.gameplay )->weapons[WP_LIGHTNING].range, forward, endPoint );
+	VectorMA( muzzlePoint, Mode_GetConfig( cgs.mode )->weapons[WP_LIGHTNING].range, forward, endPoint );
 
 	// see if it hit a wall
 	CG_Trace( &trace, muzzlePoint, vec3_origin, vec3_origin, endPoint,
@@ -2213,7 +2213,7 @@ static void CG_ShotgunPattern( vec3_t origin, vec3_t origin2, int seed, int othe
 	CrossProduct( forward, right, up );
 
 	{
-		const gameplayConfig_t *gp = GP_GetConfig( cgs.gameplay );
+		const modeConfig_t *gp = Mode_GetConfig( cgs.mode );
 		float angle, radius;
 		int ring, ringIndex;
 		int trueSG = cg_trueShotgun.integer;

@@ -538,22 +538,12 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	G_RegisterCvars();
 
-	// derive the two axis cvars from the unified g_mode profile
+	// derive the two internal axis cvars from the authoritative g_mode profile.
+	// g_mode is the single source of truth (0 = Quake 3 is a real value, not
+	// "unset"), so it is never overridden here.
 	{
-		int mode = g_mode.integer;
 		int mv, gp;
-
-		// local games: adopt the player's menu preference when g_mode is unset
-		if ( mode == 0 ) {
-			trap_Cvar_VariableStringBuffer( "ui_mode", value, sizeof( value ) );
-			if ( value[0] && atoi( value ) != 0 ) {
-				mode = atoi( value );
-				trap_Cvar_Set( "g_mode", value );
-				trap_Cvar_Update( &g_mode );
-			}
-		}
-
-		BG_ModeToAxes( mode, &mv, &gp );
+		BG_ModeToAxes( g_mode.integer, &mv, &gp );
 		trap_Cvar_Set( "g_movement", va( "%i", mv ) );
 		trap_Cvar_Update( &g_movement );
 		trap_Cvar_Set( "g_gameplay", va( "%i", gp ) );

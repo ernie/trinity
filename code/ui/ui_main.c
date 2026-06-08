@@ -625,12 +625,6 @@ void _UI_Refresh( int realtime )
 
 	UI_UpdateCvars();
 
-	// sync ui_mode to g_mode for local games
-	if ( ui_mode.modificationCount != uiInfo.lastModeModCount ) {
-		uiInfo.lastModeModCount = ui_mode.modificationCount;
-		trap_Cvar_SetValue( "g_mode", ui_mode.integer );
-	}
-
 	// Poll trinity login status — switch views on success
 	{
 		static char lastLoginStatus[32] = "";

@@ -6,7 +6,7 @@
 #include "q_shared.h"
 #include "bg_public.h"
 #include "bg_local.h"
-#include "bg_gameplay.h"
+#include "bg_mode.h"
 
 pmove_t		*pm;
 pml_t		pml;
@@ -32,6 +32,9 @@ static float	cpm_pm_airstopaccelerate = 2.5f;
 static float	cpm_pm_aircontrol = 150.0f;
 static float	cpm_pm_strafeaccelerate = 70.0f;
 static float	cpm_pm_wishspeed = 30.0f;
+
+// per-frame mode tuning, set in PmoveSingle from Mode_GetConfig
+static const modeConfig_t	*pm_mode;
 
 int		c_pmove = 0;
 
@@ -371,32 +374,24 @@ static qboolean PM_CheckJump( void ) {
 	pml.walking = qfalse;
 
 	// QL/PQL: auto-hop (skip PMF_JUMP_HELD so holding jump re-jumps on landing)
-	if ( pm->pmove_movement != PM_MOVEMENT_QL && pm->pmove_movement != PM_MOVEMENT_QLT ) {
+	if ( !pm_mode->autoHop ) {
 		pm->ps->pm_flags |= PMF_JUMP_HELD;
 	}
 
 	pm->ps->groundEntityNum = ENTITYNUM_NONE;
 
-	if ( pm->pmove_movement == PM_MOVEMENT_CPM ) {
-		// ramp jump: additive when moving up, hard set otherwise
-		if ( pm->ps->velocity[2] > 0 ) {
-			pm->ps->velocity[2] += JUMP_VELOCITY;
-		} else {
-			pm->ps->velocity[2] = JUMP_VELOCITY;
-		}
-		// double-jump: +100 bonus if jumping within 400ms of last jump
+	// ramp jump: additive z-velocity when already rising, hard set otherwise
+	if ( pm_mode->rampJump && pm->ps->velocity[2] > 0 ) {
+		pm->ps->velocity[2] += pm_mode->jumpVelocity;
+	} else {
+		pm->ps->velocity[2] = pm_mode->jumpVelocity;
+	}
+	// CPM double-jump: bonus z-velocity when jumping within 400ms of the last jump
+	if ( pm_mode->doubleJumpBonus ) {
 		if ( pm->ps->stats[STAT_JUMPTIME] > 0 ) {
-			pm->ps->velocity[2] += 100;
+			pm->ps->velocity[2] += pm_mode->doubleJumpBonus;
 		}
 		pm->ps->stats[STAT_JUMPTIME] = 400;
-	} else if ( pm->pmove_movement == PM_MOVEMENT_QL || pm->pmove_movement == PM_MOVEMENT_QLT ) {
-		if ( pm->pmove_movement == PM_MOVEMENT_QLT && pm->ps->velocity[2] > 0 ) {
-			pm->ps->velocity[2] += 275;	// PQL ramp jump: additive when moving up
-		} else {
-			pm->ps->velocity[2] = 275;		// QL/PQL jump velocity
-		}
-	} else {
-		pm->ps->velocity[2] = JUMP_VELOCITY;
 	}
 	PM_AddEvent( EV_JUMP );
 
@@ -624,6 +619,9 @@ static void PM_AirControl( vec3_t wishdir, float wishspeed ) {
 	float	forwardScale;
 	int		i;
 
+	if ( cpm_pm_aircontrol == 0.0f )
+		return;	// VQ3/QL: no air control, skip the normalize round-trips
+
 	if ( wishspeed == 0.0f )
 		return;
 
@@ -698,8 +696,10 @@ static void PM_AirMove( void ) {
 	wishspeed = VectorNormalize(wishdir);
 	wishspeed *= scale;
 
-	// not on ground, so little effect on velocity
-	if ( pm->pmove_movement == PM_MOVEMENT_CPM || pm->pmove_movement == PM_MOVEMENT_QLT ) {
+	// not on ground, so little effect on velocity. All modes share this path;
+	// VQ3/QL carry degenerate tuning (airControl 0, strafeAccel == airaccel, no
+	// cap) so it reduces to plain air acceleration, bit-for-bit.
+	{
 		float wishspeed2 = wishspeed;
 		float accel;
 
@@ -724,8 +724,6 @@ static void PM_AirMove( void ) {
 
 		PM_Accelerate( wishdir, wishspeed, accel );
 		PM_AirControl( wishdir, wishspeed2 );
-	} else {
-		PM_Accelerate( wishdir, wishspeed, pm_airaccelerate );
 	}
 
 	// we may have a ground plane that is very steep, even
@@ -1583,7 +1581,7 @@ static void PM_BeginWeaponChange( int weapon ) {
 
 	PM_AddEvent( EV_CHANGE_WEAPON );
 	pm->ps->weaponstate = WEAPON_DROPPING;
-	pm->ps->weaponTime += GP_GetConfig( pm->pmove_gameplay )->weaponDropTime;
+	pm->ps->weaponTime += Mode_GetConfig( pm->pmove_movement )->weaponDropTime;
 	PM_StartTorsoAnim( TORSO_DROP );
 }
 
@@ -1608,7 +1606,7 @@ static void PM_FinishWeaponChange( void ) {
 	pm->ps->weapon = weapon;
 	pm->ps->weaponstate = WEAPON_RAISING;
 	pm->ps->eFlags &= ~EF_FIRING;
-	pm->ps->weaponTime += GP_GetConfig( pm->pmove_gameplay )->weaponRaiseTime;
+	pm->ps->weaponTime += Mode_GetConfig( pm->pmove_movement )->weaponRaiseTime;
 	PM_StartTorsoAnim( TORSO_RAISE );
 }
 
@@ -1734,7 +1732,7 @@ static void PM_Weapon( void ) {
 	// check for out of ammo
 	if ( ! pm->ps->ammo[ pm->ps->weapon ] ) {
 		PM_AddEvent( EV_NOAMMO );
-		pm->ps->weaponTime += GP_GetConfig( pm->pmove_gameplay )->noAmmoTime;
+		pm->ps->weaponTime += Mode_GetConfig( pm->pmove_movement )->noAmmoTime;
 		return;
 	}
 
@@ -1747,7 +1745,7 @@ static void PM_Weapon( void ) {
 	PM_AddEvent( EV_FIRE_WEAPON );
 
 	{
-		const gameplayConfig_t *gp = GP_GetConfig( pm->pmove_gameplay );
+		const modeConfig_t *gp = Mode_GetConfig( pm->pmove_movement );
 		if ( pm->ps->weapon > WP_NONE && pm->ps->weapon < WP_NUM_WEAPONS ) {
 			addTime = gp->weapons[pm->ps->weapon].fireTime;
 		} else {
@@ -1911,19 +1909,14 @@ void trap_SnapVector( float *v );
 void PmoveSingle (pmove_t *pmove) {
 	pm = pmove;
 
-	// set physics parameters based on mode
-	switch ( pm->pmove_movement ) {
-	case PM_MOVEMENT_CPM:
-		pm_accelerate = 15.0f;
-		pm_friction = 8.0f;
-		break;
-	case PM_MOVEMENT_QL:
-	case PM_MOVEMENT_QLT:
-	default:	// PM_MOVEMENT_VQ3
-		pm_accelerate = 10.0f;
-		pm_friction = 6.0f;
-		break;
-	}
+	// pull this frame's tuning from the unified mode table
+	pm_mode = Mode_GetConfig( pm->pmove_movement );
+	pm_accelerate = pm_mode->groundAccelerate;
+	pm_friction = pm_mode->friction;
+	cpm_pm_airstopaccelerate = pm_mode->airStopAccel;
+	cpm_pm_aircontrol = pm_mode->airControl;
+	cpm_pm_strafeaccelerate = pm_mode->strafeAccel;
+	cpm_pm_wishspeed = pm_mode->airWishspeedCap;
 
 	// this counter lets us debug movement problems with a journal
 	// by setting a conditional breakpoint fot the previous frame

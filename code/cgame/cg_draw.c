@@ -4,7 +4,6 @@
 // active (after loading) gameplay
 
 #include "cg_local.h"
-#include "../game/bg_gameplay.h"
 #include "../game/bg_mode.h"
 
 #ifdef MISSIONPACK

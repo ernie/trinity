@@ -6,7 +6,7 @@
 // It also handles local physics interaction, like fragments bouncing off walls
 
 #include "cg_local.h"
-#include "../game/bg_gameplay.h"
+#include "../game/bg_mode.h"
 
 static	pmove_t		cg_pmove;
 
@@ -321,7 +321,7 @@ void CG_PlayDroppedEvents( playerState_t *ps, playerState_t *ops ) {
 
 
 static void CG_AddArmor( const gitem_t *item, int quantity ) {
-	const gameplayConfig_t *gp = GP_GetConfig( cgs.gameplay );
+	const modeConfig_t *gp = Mode_GetConfig( cgs.mode );
 	playerState_t *ps = &cg.predictedPlayerState;
 
 	if ( gp->armorTiered ) {
@@ -347,14 +347,14 @@ static void CG_AddArmor( const gitem_t *item, int quantity ) {
 				ps->stats[STAT_ARMORTYPE] = ARMORTYPE_GA;
 			}
 			ps->stats[STAT_ARMOR] = curArmor + gp->armorShardValue;
-			maxArmor = GP_ArmorMax( gp, ps->stats[STAT_ARMORTYPE] );
+			maxArmor = Mode_ArmorMax( gp, ps->stats[STAT_ARMORTYPE] );
 			if ( ps->stats[STAT_ARMOR] > maxArmor ) {
 				ps->stats[STAT_ARMOR] = maxArmor;
 			}
 			return;
 		}
 
-		converted = GP_ConvertArmor( gp, curArmor, curType, newType );
+		converted = Mode_ConvertArmor( gp, curArmor, curType, newType );
 		converted += pickupValue;
 		if ( converted > maxArmor ) {
 			converted = maxArmor;
@@ -376,7 +376,7 @@ static void CG_AddAmmo( int weapon, int count )
 	} else {
 		cg.predictedPlayerState.ammo[weapon] += count;
 		if ( weapon >= WP_MACHINEGUN && weapon <= WP_BFG ) {
-			int max = GP_GetAmmoMax( GP_GetConfig( cgs.gameplay ), weapon );
+			int max = Mode_GetAmmoMax( Mode_GetConfig( cgs.mode ), weapon );
 			if ( cg.predictedPlayerState.ammo[weapon] > max ) {
 				cg.predictedPlayerState.ammo[weapon] = max;
 			}
@@ -538,7 +538,7 @@ static void CG_TouchItem( centity_t *cent ) {
 		return;
 	}
 
-	if ( !BG_CanItemBeGrabbed( cgs.gametype, cgs.gameplay, &cent->currentState, &cg.predictedPlayerState ) ) {
+	if ( !BG_CanItemBeGrabbed( cgs.gametype, cgs.mode, &cent->currentState, &cg.predictedPlayerState ) ) {
 		return;	// can't hold it
 	}
 
@@ -1019,7 +1019,6 @@ void CG_PredictPlayerState( void ) {
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
 	cg_pmove.pmove_movement = cgs.pmove_movement;
-	cg_pmove.pmove_gameplay = cgs.gameplay;
 
 	// clean event stack
 	eventStack = 0;
@@ -1030,7 +1029,6 @@ void CG_PredictPlayerState( void ) {
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
 	cg_pmove.pmove_movement = cgs.pmove_movement;
-	cg_pmove.pmove_gameplay = cgs.gameplay;
 
 	// Like the comments described above, a player's state is entirely
 	// re-predicted from the last valid snapshot every client frame, which

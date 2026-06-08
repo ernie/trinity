@@ -902,7 +902,6 @@ void ClientThink_real( gentity_t *ent ) {
 	pm.pmove_fixed = pmove_fixed.integer;
 	pm.pmove_msec = pmove_msec.integer;
 	pm.pmove_movement = g_movement.integer;
-	pm.pmove_gameplay = g_gameplay.integer;
 
 	VectorCopy( client->ps.origin, client->oldOrigin );
 

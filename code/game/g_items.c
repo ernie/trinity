@@ -1,7 +1,7 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "g_local.h"
-#include "bg_gameplay.h"
+#include "bg_mode.h"
 
 /*
 
@@ -40,12 +40,12 @@
 
 int SpawnTime( gentity_t *ent, qboolean firstSpawn )
 {
-	const gameplayConfig_t *gp;
+	const modeConfig_t *gp;
 
 	if ( !ent->item )
 		return 0;
 
-	gp = GP_GetConfig( g_gameplay.integer );
+	gp = Mode_GetConfig( g_mode.integer );
 
 	switch( ent->item->giType ) {
 	case IT_WEAPON:
@@ -261,7 +261,7 @@ static void Add_Ammo( gentity_t *ent, int weapon, int count )
 {
 	ent->client->ps.ammo[weapon] += count;
 	{
-		int max = GP_GetAmmoMax( GP_GetConfig( g_gameplay.integer ), weapon );
+		int max = Mode_GetAmmoMax( Mode_GetConfig( g_mode.integer ), weapon );
 		if ( ent->client->ps.ammo[weapon] > max ) {
 			ent->client->ps.ammo[weapon] = max;
 		}
@@ -276,7 +276,7 @@ static int Pickup_Ammo( gentity_t *ent, gentity_t *other )
 	if ( ent->count ) {
 		quantity = ent->count;
 	} else {
-		int boxQty = GP_GetAmmoBoxQuantity( GP_GetConfig( g_gameplay.integer ), ent->item->giTag );
+		int boxQty = Mode_GetAmmoBoxQuantity( Mode_GetConfig( g_mode.integer ), ent->item->giTag );
 		quantity = boxQty ? boxQty : ent->item->quantity;
 	}
 
@@ -298,7 +298,7 @@ static int Pickup_Weapon( gentity_t *ent, gentity_t *other ) {
 			quantity = ent->count;
 		} else {
 			qboolean isDuel = ( g_gametype.integer == GT_TOURNAMENT );
-			int initAmmo = GP_GetInitialAmmo( GP_GetConfig( g_gameplay.integer ), ent->item->giTag, isDuel );
+			int initAmmo = Mode_GetInitialAmmo( Mode_GetConfig( g_mode.integer ), ent->item->giTag, isDuel );
 			quantity = initAmmo ? initAmmo : ent->item->quantity;
 		}
 
@@ -380,7 +380,7 @@ static int Pickup_Health( gentity_t *ent, gentity_t *other ) {
 	other->client->ps.stats[STAT_HEALTH] = other->health;
 
 	// CPM megahealth: respawns 20s after holder drops below 100hp
-	if ( ent->item->quantity == 100 && GP_GetConfig( g_gameplay.integer )->megaStyle ) {
+	if ( ent->item->quantity == 100 && Mode_GetConfig( g_mode.integer )->megaStyle ) {
 		if ( g_gametype.integer >= GT_TEAM ) {
 			// team modes use standard timer even in CPM
 			return SpawnTime( ent, qfalse );
@@ -397,7 +397,7 @@ static int Pickup_Health( gentity_t *ent, gentity_t *other ) {
 //======================================================================
 
 int Pickup_Armor( gentity_t *ent, gentity_t *other ) {
-	const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
+	const modeConfig_t *gp = Mode_GetConfig( g_mode.integer );
 
 	if ( gp->armorTiered ) {
 		// CPM tiered armor system
@@ -432,7 +432,7 @@ int Pickup_Armor( gentity_t *ent, gentity_t *other ) {
 		}
 
 		// convert existing armor to new tier's rate, add pickup, cap
-		converted = GP_ConvertArmor( gp, curArmor, curType, newType );
+		converted = Mode_ConvertArmor( gp, curArmor, curType, newType );
 		converted += pickupValue;
 		if ( converted > maxArmor ) {
 			converted = maxArmor;
@@ -557,7 +557,7 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace) {
 		return;		// dead people can't pickup
 
 	// the same pickup rules are used for client side and server side
-	if ( !BG_CanItemBeGrabbed( g_gametype.integer, g_gameplay.integer, &ent->s, &other->client->ps ) ) {
+	if ( !BG_CanItemBeGrabbed( g_gametype.integer, g_mode.integer, &ent->s, &other->client->ps ) ) {
 		return;
 	}
 
@@ -1042,7 +1042,7 @@ void G_SpawnItem( gentity_t *ent, gitem_t *item ) {
 
 	// green armor is CPM-only
 	if ( item->giType == IT_ARMOR && item->quantity == 25
-		&& !GP_GetConfig( g_gameplay.integer )->armorTiered ) {
+		&& !Mode_GetConfig( g_mode.integer )->armorTiered ) {
 		ent->tag = TAG_DONTSPAWN;
 		return;
 	}

@@ -3,7 +3,7 @@
 // g_combat.c
 
 #include "g_local.h"
-#include "bg_gameplay.h"
+#include "bg_mode.h"
 
 
 /*
@@ -717,13 +717,13 @@ int CheckArmor (gentity_t *ent, int damage, int dflags, qboolean selfDamage)
 	// armor
 	count = client->ps.stats[STAT_ARMOR];
 	{
-		const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
+		const modeConfig_t *gp = Mode_GetConfig( g_mode.integer );
 		float protection;
 		if ( gp->armorTiered ) {
 			if ( selfDamage ) {
 				protection = gp->armorSelfProtection;
 			} else {
-				protection = GP_ArmorProtection( gp, client->ps.stats[STAT_ARMORTYPE] );
+				protection = Mode_ArmorProtection( gp, client->ps.stats[STAT_ARMORTYPE] );
 			}
 		} else {
 			protection = gp->armorProtection;
@@ -948,7 +948,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
 	knockback = damage;
 	{
-		const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
+		const modeConfig_t *gp = Mode_GetConfig( g_mode.integer );
 		float kbMul = 1.0f;
 		qboolean isSelf = ( targ == attacker );
 
@@ -1051,7 +1051,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		if ( ( dflags & DAMAGE_RADIUS ) || ( mod == MOD_FALLING ) ) {
 			return;
 		}
-		damage *= GP_GetConfig( g_gameplay.integer )->battleSuitProtection;
+		damage *= Mode_GetConfig( g_mode.integer )->battleSuitProtection;
 	}
 
 	// always give half damage if hurting self
@@ -1330,7 +1330,7 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 			// push the center of mass higher than the origin so players
 			// get knocked into the air more
 			{
-				const gameplayConfig_t *gp = GP_GetConfig( g_gameplay.integer );
+				const modeConfig_t *gp = Mode_GetConfig( g_mode.integer );
 				dir[2] += gp->splashZKnockback;
 			}
 			G_Damage (ent, NULL, attacker, dir, origin, (int)points, DAMAGE_RADIUS, mod);

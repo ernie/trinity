@@ -956,7 +956,7 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.armorModel = trap_R_RegisterModel( "models/powerups/armor/armor_yel.md3" );
 	cgs.media.armorIcon  = trap_R_RegisterShaderNoMip( "icons/iconr_yellow" );
 
-	// per-tier armor media for CPM HUD (always register — g_gameplay can change mid-match)
+	// per-tier armor media for the CPM HUD (registered unconditionally; the mode is fixed at map load)
 	cgs.media.armorModelGA = trap_R_RegisterModel( "models/powerups/armor/armor_grn.md3" );
 	cgs.media.armorModelRA = trap_R_RegisterModel( "models/powerups/armor/armor_red.md3" );
 	cgs.media.armorIconGA  = trap_R_RegisterShaderNoMip( "icons/iconr_green" );

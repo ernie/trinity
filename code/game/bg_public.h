@@ -186,8 +186,7 @@ typedef struct {
 	int			pmove_fixed;
 	int			pmove_msec;
 
-	int			pmove_movement;		// pmMovement_t
-	int			pmove_gameplay;	// gameplay_t
+	int			pmove_movement;		// pmMovement_t (== mode; combat & movement both index from it)
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame
@@ -547,7 +546,7 @@ gitem_t	*BG_FindItemForPowerup( powerup_t pw );
 gitem_t	*BG_FindItemForHoldable( holdable_t pw );
 #define	ITEM_INDEX(x) ((x)-bg_itemlist)
 
-qboolean	BG_CanItemBeGrabbed( int gametype, int gameplay, const entityState_t *ent, const playerState_t *ps );
+qboolean	BG_CanItemBeGrabbed( int gametype, int mode, const entityState_t *ent, const playerState_t *ps );
 
 
 // g_dmflags->integer flags
