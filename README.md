@@ -78,18 +78,14 @@ bind downarrow tv_prev       # previous player
 **Server**
 
 - Support for clients with `cg_damagePlums`
-- `g_movement`: Selectable movement mode, synchronized to clients for prediction. Voteable (can use `vq3` / `cpm` / `ql` / `qlt` there). Accepts numeric or string values:
+- `g_mode`: Selectable game mode — a single latched profile that picks both the movement physics and the combat ruleset, synchronized to clients for prediction. Voteable (can use `vq3` / `cpm` / `ql` / `qlt` there). Accepts numeric or string values:
   - `0` — Vanilla Quake 3 (default)
-  - `1` — CPMA/promode (higher ground accel/friction, strafe air control, double-jump)
-  - `2` — Quake Live (auto-hop, jump velocity 275)
-  - `3` — Quake Live Turbo (QL + strafe air control + ramp jump)
-- `g_gameplay`: Selectable gameplay mode, synchronized to clients for prediction. Voteable (can use `vq3` / `cpm` / `ql` there). Accepts numeric or string values:
-  - `0` — Vanilla Quake 3 (default)
-  - `1` — CPMA (3-tiered armor, instant weapon switch, damage adjustments, etc)
-  - `2` — Quake Live (damage adjustments, cg_trueShotgun, etc)
+  - `1` — CPMA/promode (higher ground accel/friction, strafe air control, double-jump; 3-tiered armor, instant weapon switch, damage adjustments)
+  - `2` — Quake Live (auto-hop, jump velocity 275; damage adjustments, cg_trueShotgun)
+  - `3` — Quake Live Turbo (Quake Live combat with CPMA-style strafe air control + ramp jump)
 - `g_teamDMSpawnThreshold`: Set > 0 to include Team (CTF) spawns in maps with fewer deathmatch spawns than the value. Allows use of maps that are otherwise a telefrag-fest in Team DM.
 
-In both `g_movement` and `g_gameplay` cases, values were determined by dumping cvars where possible, followed by community resources, then trial and error until things felt right. Bug reports of differences in behavior from the _default_ settings for CPMA/Quake Live are greatly appreciated.
+The per-mode movement and combat values were determined by dumping cvars where possible, followed by community resources, then trial and error until things felt right. Bug reports of differences in behavior from the _default_ settings for CPMA/Quake Live are greatly appreciated.
 
 ## Prerequisites
 

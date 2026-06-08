@@ -841,10 +841,10 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.scoreboardScore = trap_R_RegisterShaderNoMip( "menu/tab/score.tga" );
 	cgs.media.scoreboardTime = trap_R_RegisterShaderNoMip( "menu/tab/time.tga" );
 
-	cgs.media.modeIcons[PM_MOVEMENT_VQ3] = trap_R_RegisterShaderNoMip( "gfx/2d/mode_vq3" );
-	cgs.media.modeIcons[PM_MOVEMENT_CPM] = trap_R_RegisterShaderNoMip( "gfx/2d/mode_cpm" );
-	cgs.media.modeIcons[PM_MOVEMENT_QL]  = trap_R_RegisterShaderNoMip( "gfx/2d/mode_ql" );
-	cgs.media.modeIcons[PM_MOVEMENT_QLT] = trap_R_RegisterShaderNoMip( "gfx/2d/mode_qlt" );
+	cgs.media.modeIcons[MODE_VQ3] = trap_R_RegisterShaderNoMip( "gfx/2d/mode_vq3" );
+	cgs.media.modeIcons[MODE_CPM] = trap_R_RegisterShaderNoMip( "gfx/2d/mode_cpm" );
+	cgs.media.modeIcons[MODE_QL]  = trap_R_RegisterShaderNoMip( "gfx/2d/mode_ql" );
+	cgs.media.modeIcons[MODE_QLT] = trap_R_RegisterShaderNoMip( "gfx/2d/mode_qlt" );
 
 	cgs.media.smokePuffShader = trap_R_RegisterShader( "smokePuff" );
 	cgs.media.smokePuffRageProShader = trap_R_RegisterShader( "smokePuffRagePro" );

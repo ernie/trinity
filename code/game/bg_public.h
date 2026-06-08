@@ -143,21 +143,6 @@ typedef enum {
 
 #define	PMF_ALL_TIMES	(PMF_TIME_WATERJUMP|PMF_TIME_LAND|PMF_TIME_KNOCKBACK)
 
-// movement modes (synced via g_movement CVAR_SYSTEMINFO)
-typedef enum {
-	PM_MOVEMENT_VQ3,	// 0 - vanilla Quake 3
-	PM_MOVEMENT_CPM,	// 1 - CPMA
-	PM_MOVEMENT_QL,		// 2 - vanilla Quake Live
-	PM_MOVEMENT_QLT		// 3 - Quake Live Turbo
-} pmMovement_t;
-
-// gameplay modes (synced via g_gameplay CVAR_SYSTEMINFO)
-typedef enum {
-	GP_VQ3,			// 0 - vanilla Quake 3
-	GP_CPM,			// 1 - CPMA
-	GP_QL			// 2 - Quake Live
-} gameplay_t;
-
 #define	MAXTOUCH	32
 typedef struct {
 	// state (in / out)
@@ -186,7 +171,7 @@ typedef struct {
 	int			pmove_fixed;
 	int			pmove_msec;
 
-	int			pmove_movement;		// pmMovement_t (== mode; combat & movement both index from it)
+	int			pmove_mode;			// mode_t; combat & movement both index from it
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame

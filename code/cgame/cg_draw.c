@@ -565,7 +565,7 @@ Returns the appropriate armor icon/model for the current armor type in CPM mode.
 ================
 */
 qhandle_t CG_GetArmorIcon( void ) {
-	if ( cgs.gameplay == GP_CPM ) {
+	if ( Mode_GetConfig( cgs.mode )->armorTiered ) {
 		switch ( cg.snap->ps.stats[STAT_ARMORTYPE] ) {
 		case ARMORTYPE_RA: return cgs.media.armorIconRA;
 		case ARMORTYPE_YA: return cgs.media.armorIcon;
@@ -577,7 +577,7 @@ qhandle_t CG_GetArmorIcon( void ) {
 }
 
 qhandle_t CG_GetArmorModel( void ) {
-	if ( cgs.gameplay == GP_CPM ) {
+	if ( Mode_GetConfig( cgs.mode )->armorTiered ) {
 		switch ( cg.snap->ps.stats[STAT_ARMORTYPE] ) {
 		case ARMORTYPE_RA: return cgs.media.armorModelRA;
 		case ARMORTYPE_YA: return cgs.media.armorModel;
@@ -1297,7 +1297,7 @@ static float CG_DrawVRFollowIcon( float y ) {
 =================
 CG_DrawModeIndicators
 
-Shows movement and gameplay mode icons in the upper-right when the scoreboard is visible.
+Shows the g_mode profile icon in the upper-right when the scoreboard is visible.
 =================
 */
 static float CG_DrawModeIndicators( float y ) {
@@ -1309,7 +1309,7 @@ static float CG_DrawModeIndicators( float y ) {
 		return y;
 	}
 
-	// single profile icon (g_mode), upper-right
+	// g_mode profile icon, upper-right
 	x = cgs.screenXmax - pad - iconSize;
 	if ( cgs.mode >= MODE_VQ3 && cgs.mode < MODE_COUNT ) {
 		CG_DrawPic( x, y, iconSize, iconSize, cgs.media.modeIcons[cgs.mode] );

@@ -3,9 +3,8 @@
 #ifndef BG_MODE_H
 #define BG_MODE_H
 
-// A "mode" is the single player-facing profile that selects both a movement
-// physics model and a combat ruleset. g_mode is the only latched serverinfo
-// cvar; g_movement / g_gameplay are derived from it (see BG_ModeToAxes).
+// A mode pairs a movement physics model with a combat ruleset. g_mode
+// (latched, serverinfo) indexes the per-mode tables below.
 typedef enum {
 	MODE_VQ3,	// 0 - Quake 3
 	MODE_CPM,	// 1 - CPMA
@@ -17,9 +16,6 @@ typedef enum {
 
 // sentinel "no cap" for airWishspeedCap (never exceeded; disables the strafe clamp)
 #define MODE_NO_WISHSPEED_CAP 99999.0f
-
-// mode -> the movement/gameplay axis values the existing tables are indexed by
-void BG_ModeToAxes( int mode, int *movement, int *gameplay );
 
 // human-readable profile label, e.g. "Quake 3" or "QL Turbo"
 const char *BG_ModeName( int mode );
@@ -51,9 +47,9 @@ typedef struct {
 	int		initialAmmo;		// ammo on weapon pickup (MG: also used as spawn ammo)
 } weaponConfig_t;
 
-// The unified per-mode configuration: movement physics and combat/weapon
-// balance, one struct per mode. Built once from the column-major source tables
-// in bg_mode.c (Mode_GetConfig transposes lazily on first use).
+// Per-mode configuration: movement physics plus combat/weapon balance, one
+// struct per mode. Built once from the column-major source tables in bg_mode.c
+// (Mode_GetConfig transposes lazily on first use).
 typedef struct {
 	// movement physics (extracted from bg_pmove.c)
 	float		groundAccelerate;

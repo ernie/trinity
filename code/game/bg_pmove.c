@@ -1581,7 +1581,7 @@ static void PM_BeginWeaponChange( int weapon ) {
 
 	PM_AddEvent( EV_CHANGE_WEAPON );
 	pm->ps->weaponstate = WEAPON_DROPPING;
-	pm->ps->weaponTime += Mode_GetConfig( pm->pmove_movement )->weaponDropTime;
+	pm->ps->weaponTime += Mode_GetConfig( pm->pmove_mode )->weaponDropTime;
 	PM_StartTorsoAnim( TORSO_DROP );
 }
 
@@ -1606,7 +1606,7 @@ static void PM_FinishWeaponChange( void ) {
 	pm->ps->weapon = weapon;
 	pm->ps->weaponstate = WEAPON_RAISING;
 	pm->ps->eFlags &= ~EF_FIRING;
-	pm->ps->weaponTime += Mode_GetConfig( pm->pmove_movement )->weaponRaiseTime;
+	pm->ps->weaponTime += Mode_GetConfig( pm->pmove_mode )->weaponRaiseTime;
 	PM_StartTorsoAnim( TORSO_RAISE );
 }
 
@@ -1732,7 +1732,7 @@ static void PM_Weapon( void ) {
 	// check for out of ammo
 	if ( ! pm->ps->ammo[ pm->ps->weapon ] ) {
 		PM_AddEvent( EV_NOAMMO );
-		pm->ps->weaponTime += Mode_GetConfig( pm->pmove_movement )->noAmmoTime;
+		pm->ps->weaponTime += Mode_GetConfig( pm->pmove_mode )->noAmmoTime;
 		return;
 	}
 
@@ -1745,7 +1745,7 @@ static void PM_Weapon( void ) {
 	PM_AddEvent( EV_FIRE_WEAPON );
 
 	{
-		const modeConfig_t *gp = Mode_GetConfig( pm->pmove_movement );
+		const modeConfig_t *gp = Mode_GetConfig( pm->pmove_mode );
 		if ( pm->ps->weapon > WP_NONE && pm->ps->weapon < WP_NUM_WEAPONS ) {
 			addTime = gp->weapons[pm->ps->weapon].fireTime;
 		} else {
@@ -1909,8 +1909,8 @@ void trap_SnapVector( float *v );
 void PmoveSingle (pmove_t *pmove) {
 	pm = pmove;
 
-	// pull this frame's tuning from the unified mode table
-	pm_mode = Mode_GetConfig( pm->pmove_movement );
+	// pull this frame's tuning from the mode table
+	pm_mode = Mode_GetConfig( pm->pmove_mode );
 	pm_accelerate = pm_mode->groundAccelerate;
 	pm_friction = pm_mode->friction;
 	cpm_pm_airstopaccelerate = pm_mode->airStopAccel;

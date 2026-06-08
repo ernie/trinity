@@ -1,89 +1,69 @@
-// bg_mode.c -- game mode -> movement/gameplay axis mapping and labels
+// bg_mode.c -- game mode tables and labels
 // shared between game, cgame, and ui
 
 #include "q_shared.h"
 #include "bg_public.h"
 #include "bg_mode.h"
 
-// The one seam between the unified g_mode knob and the two axis-indexed tables.
-// Only QL Turbo is asymmetric: QLT movement, QL gameplay.
-static const struct {
-	int			movement;	// pmMovement_t
-	int			gameplay;	// gameplay_t
-	const char	*name;
-} mode_axes[MODE_COUNT] = {
-	{ PM_MOVEMENT_VQ3, GP_VQ3, "Quake 3"    },
-	{ PM_MOVEMENT_CPM, GP_CPM, "CPMA"       },
-	{ PM_MOVEMENT_QL,  GP_QL,  "Quake Live" },
-	{ PM_MOVEMENT_QLT, GP_QL,  "QL Turbo"   },
+static const char *mode_names[MODE_COUNT] = {
+	"Quake 3",
+	"CPMA",
+	"Quake Live",
+	"QL Turbo",
 };
-
-void BG_ModeToAxes( int mode, int *movement, int *gameplay ) {
-	if ( mode < MODE_VQ3 || mode >= MODE_COUNT )
-		mode = MODE_VQ3;
-	if ( movement )
-		*movement = mode_axes[mode].movement;
-	if ( gameplay )
-		*gameplay = mode_axes[mode].gameplay;
-}
 
 const char *BG_ModeName( int mode ) {
 	if ( mode < MODE_VQ3 || mode >= MODE_COUNT )
 		mode = MODE_VQ3;
-	return mode_axes[mode].name;
+	return mode_names[mode];
 }
 
-// ===========================================================================
-// Per-mode tuning tables. Column-major so they scan like the audit tables:
-// one parameter per line, modes as aligned columns. Mode_GetConfig transposes
-// these into modeConfig_t on first use. VQ3/QL air values are degenerate on
-// purpose (airControl 0, strafeAccel == airaccel, no cap) so the single air
-// path in bg_pmove reduces to plain air acceleration bit-for-bit.
-// ===========================================================================
+// Per-mode tuning tables, column-major: one parameter per line, four mode
+// columns. Mode_GetConfig transposes them into modeConfig_t on first use.
 
-//                                                  VQ3      CPM      QL       QLT
-static const float		md_groundAccelerate[MODE_COUNT] = { 10.0f,   15.0f,   10.0f,   10.0f   };
-static const float		md_friction[MODE_COUNT]         = { 6.0f,    8.0f,    6.0f,    6.0f    };
-static const int		md_jumpVelocity[MODE_COUNT]     = { 270,     270,     275,     275     };
-static const qboolean	md_autoHop[MODE_COUNT]          = { qfalse,  qfalse,  qtrue,   qtrue   };
-static const qboolean	md_rampJump[MODE_COUNT]         = { qfalse,  qtrue,   qfalse,  qtrue   };
-static const int		md_doubleJumpBonus[MODE_COUNT]  = { 0,       100,     0,       0       };
-static const float		md_airStopAccel[MODE_COUNT]     = { 1.0f,    2.5f,    1.0f,    2.5f    };
-static const float		md_airControl[MODE_COUNT]       = { 0.0f,    150.0f,  0.0f,    150.0f  };
-static const float		md_strafeAccel[MODE_COUNT]      = { 1.0f,    70.0f,   1.0f,    70.0f   };
-static const float		md_airWishspeedCap[MODE_COUNT]  = { MODE_NO_WISHSPEED_CAP, 30.0f, MODE_NO_WISHSPEED_CAP, 30.0f };
+// movement physics                                                VQ3     CPM      QL     QLT
+static const float	md_groundAccelerate[MODE_COUNT]     = {  10.0f,  15.0f,  10.0f,  10.0f };
+static const float	md_friction[MODE_COUNT]             = {   6.0f,   8.0f,   6.0f,   6.0f };
+static const int	md_jumpVelocity[MODE_COUNT]         = {    270,    270,    275,    275 };
+static const qboolean	md_autoHop[MODE_COUNT]              = { qfalse, qfalse,  qtrue,  qtrue };
+static const qboolean	md_rampJump[MODE_COUNT]             = { qfalse,  qtrue, qfalse,  qtrue };
+static const int	md_doubleJumpBonus[MODE_COUNT]      = {      0,    100,      0,      0 };
+static const float	md_airStopAccel[MODE_COUNT]         = {   1.0f,   2.5f,   1.0f,   2.5f };
+static const float	md_airControl[MODE_COUNT]           = {   0.0f, 150.0f,   0.0f, 150.0f };
+static const float	md_strafeAccel[MODE_COUNT]          = {   1.0f,  70.0f,   1.0f,  70.0f };
+static const float	md_airWishspeedCap[MODE_COUNT]      = { MODE_NO_WISHSPEED_CAP, 30.0f, MODE_NO_WISHSPEED_CAP, 30.0f };
 
-// ---- combat globals (column-major: VQ3 CPM QL QLT) ----
-static const int	md_sgPatternType[MODE_COUNT] = {        0,        2,        1,        1 };
-static const int	md_weaponDropTime[MODE_COUNT] = {      200,        0,      200,      200 };
-static const int	md_weaponRaiseTime[MODE_COUNT] = {      250,        0,      200,      200 };
-static const int	md_noAmmoTime[MODE_COUNT] = {      500,      100,      500,      500 };
-static const int	md_splashZKnockback[MODE_COUNT] = {       24,       36,       24,       24 };
-static const int	md_maxKnockback[MODE_COUNT] = {      200,      200,      120,      120 };
-static const int	md_duelInitialAmmoHalve[MODE_COUNT] = {        0, (1<<WP_GRENADE_LAUNCHER)|(1<<WP_LIGHTNING)|(1<<WP_RAILGUN),        0,        0 };
-static const int	md_armorTiered[MODE_COUNT] = {        0,        1,        0,        0 };
-static const float	md_armorProtection[MODE_COUNT] = {    0.66f,    0.66f,    0.66f,    0.66f };
-static const float	md_armorGAProtection[MODE_COUNT] = {    0.66f,    0.50f,    0.66f,    0.66f };
-static const float	md_armorYAProtection[MODE_COUNT] = {    0.66f,    0.66f,    0.66f,    0.66f };
-static const float	md_armorRAProtection[MODE_COUNT] = {    0.66f,    0.75f,    0.66f,    0.66f };
-static const float	md_armorSelfProtection[MODE_COUNT] = {    0.66f,    0.50f,    0.66f,    0.66f };
-static const int	md_armorGAMax[MODE_COUNT] = {      100,      100,      100,      100 };
-static const int	md_armorYAMax[MODE_COUNT] = {      150,      150,      150,      150 };
-static const int	md_armorRAMax[MODE_COUNT] = {      200,      200,      200,      200 };
-static const int	md_armorShardValue[MODE_COUNT] = {        5,        5,        5,        5 };
-static const int	md_armorGAPickupValue[MODE_COUNT] = {       50,       50,       50,       50 };
-static const int	md_armorYAPickupValue[MODE_COUNT] = {       50,      100,       50,       50 };
-static const int	md_armorRAPickupValue[MODE_COUNT] = {      100,      150,      100,      100 };
-static const float	md_battleSuitProtection[MODE_COUNT] = {     0.5f,    0.25f,    0.25f,    0.25f };
-static const int	md_spawnHealthBonus[MODE_COUNT] = {       25,        0,       25,       25 };
-static const int	md_respawnArmor[MODE_COUNT] = {       25,       25,       25,       25 };
-static const int	md_respawnHealth[MODE_COUNT] = {       35,       30,       35,       35 };
-static const int	md_respawnAmmo[MODE_COUNT] = {       40,       30,       40,       40 };
-static const int	md_respawnPowerup[MODE_COUNT] = {      120,       90,      120,      120 };
-static const int	md_respawnBattleSuit[MODE_COUNT] = {      120,      120,      120,      120 };
-static const int	md_respawnMegahealth[MODE_COUNT] = {       35,       35,       35,       35 };
-static const int	md_megaStyle[MODE_COUNT] = {        0,        1,        0,        0 };
-static const int	md_startPowerups[MODE_COUNT] = {        0,        1,        0,        0 };
+// combat globals                                                  VQ3     CPM      QL     QLT
+static const int	md_sgPatternType[MODE_COUNT]        = {      0,      2,      1,      1 };
+static const int	md_weaponDropTime[MODE_COUNT]       = {    200,      0,    200,    200 };
+static const int	md_weaponRaiseTime[MODE_COUNT]      = {    250,      0,    200,    200 };
+static const int	md_noAmmoTime[MODE_COUNT]           = {    500,    100,    500,    500 };
+static const int	md_splashZKnockback[MODE_COUNT]     = {     24,     36,     24,     24 };
+static const int	md_maxKnockback[MODE_COUNT]         = {    200,    200,    120,    120 };
+static const int	md_duelInitialAmmoHalve[MODE_COUNT] = { 0, (1<<WP_GRENADE_LAUNCHER)|(1<<WP_LIGHTNING)|(1<<WP_RAILGUN), 0, 0 };
+static const int	md_armorTiered[MODE_COUNT]          = {      0,      1,      0,      0 };
+static const float	md_armorProtection[MODE_COUNT]      = {  0.66f,  0.66f,  0.66f,  0.66f };
+static const float	md_armorGAProtection[MODE_COUNT]    = {  0.66f,  0.50f,  0.66f,  0.66f };
+static const float	md_armorYAProtection[MODE_COUNT]    = {  0.66f,  0.66f,  0.66f,  0.66f };
+static const float	md_armorRAProtection[MODE_COUNT]    = {  0.66f,  0.75f,  0.66f,  0.66f };
+static const float	md_armorSelfProtection[MODE_COUNT]  = {  0.66f,  0.50f,  0.66f,  0.66f };
+static const int	md_armorGAMax[MODE_COUNT]           = {    100,    100,    100,    100 };
+static const int	md_armorYAMax[MODE_COUNT]           = {    150,    150,    150,    150 };
+static const int	md_armorRAMax[MODE_COUNT]           = {    200,    200,    200,    200 };
+static const int	md_armorShardValue[MODE_COUNT]      = {      5,      5,      5,      5 };
+static const int	md_armorGAPickupValue[MODE_COUNT]   = {     50,     50,     50,     50 };
+static const int	md_armorYAPickupValue[MODE_COUNT]   = {     50,    100,     50,     50 };
+static const int	md_armorRAPickupValue[MODE_COUNT]   = {    100,    150,    100,    100 };
+static const float	md_battleSuitProtection[MODE_COUNT] = {   0.5f,  0.25f,  0.25f,  0.25f };
+static const int	md_spawnHealthBonus[MODE_COUNT]     = {     25,      0,     25,     25 };
+static const int	md_respawnArmor[MODE_COUNT]         = {     25,     25,     25,     25 };
+static const int	md_respawnHealth[MODE_COUNT]        = {     35,     30,     35,     35 };
+static const int	md_respawnAmmo[MODE_COUNT]          = {     40,     30,     40,     40 };
+static const int	md_respawnPowerup[MODE_COUNT]       = {    120,     90,    120,    120 };
+static const int	md_respawnBattleSuit[MODE_COUNT]    = {    120,    120,    120,    120 };
+static const int	md_respawnMegahealth[MODE_COUNT]    = {     35,     35,     35,     35 };
+static const int	md_megaStyle[MODE_COUNT]            = {      0,      1,      0,      0 };
+static const int	md_startPowerups[MODE_COUNT]        = {      0,      1,      0,      0 };
 
 // ---- per-weapon, per-field (rows = weapon, cols = VQ3 CPM QL QLT) ----
 static const int	wp_damage[WP_NUM_WEAPONS][MODE_COUNT] = {

@@ -205,7 +205,6 @@ void CG_ParseSysteminfo( void ) {
 	if ( cgs.mode < MODE_VQ3 || cgs.mode >= MODE_COUNT ) {
 		cgs.mode = MODE_VQ3;
 	}
-	BG_ModeToAxes( cgs.mode, &cgs.pmove_movement, &cgs.gameplay );
 
 	cgs.synchronousClients = ( atoi( Info_ValueForKey( info, "g_synchronousClients" ) ) ) ? qtrue : qfalse;
 }

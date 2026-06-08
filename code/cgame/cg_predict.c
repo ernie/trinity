@@ -691,8 +691,8 @@ static void CG_CheckTimers( void ) {
 				cg.predictedPlayerState.stats[ STAT_HEALTH ]--;
 			}
 		}
-		// count down armor when over max (CPM: armor never decays)
-		if ( cgs.gameplay != GP_CPM
+		// count down armor when over max (CPM: tiered armor never decays)
+		if ( !Mode_GetConfig( cgs.mode )->armorTiered
 			&& cg.predictedPlayerState.stats[ STAT_ARMOR ] > cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ] ) {
 			cg.predictedPlayerState.stats[ STAT_ARMOR ]--;
 		}
@@ -842,8 +842,8 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 		}
 
 	}
-	// armor countdown? (CPM: armor never decays)
-	if ( cgs.gameplay != GP_CPM
+	// armor countdown? (CPM: tiered armor never decays)
+	if ( !Mode_GetConfig( cgs.mode )->armorTiered
 		&& pps->stats[ STAT_ARMOR ] == ps->stats[ STAT_ARMOR ] - 1
 		&& ps->stats[ STAT_ARMOR ] >= ps->stats[ STAT_MAX_HEALTH ] ) {
 		// we may need few frames to sync with client->timeResidual on server side
@@ -1018,7 +1018,7 @@ void CG_PredictPlayerState( void ) {
 
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
-	cg_pmove.pmove_movement = cgs.pmove_movement;
+	cg_pmove.pmove_mode = cgs.mode;
 
 	// clean event stack
 	eventStack = 0;
@@ -1028,7 +1028,7 @@ void CG_PredictPlayerState( void ) {
 
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
-	cg_pmove.pmove_movement = cgs.pmove_movement;
+	cg_pmove.pmove_mode = cgs.mode;
 
 	// Like the comments described above, a player's state is entirely
 	// re-predicted from the last valid snapshot every client frame, which

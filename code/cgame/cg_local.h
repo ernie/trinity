@@ -3,6 +3,7 @@
 #include "../game/q_shared.h"
 #include "tr_types.h"
 #include "../game/bg_public.h"
+#include "../game/bg_mode.h"
 #include "cg_public.h"
 
 // VOIP channel flags (must match engine q_shared.h)
@@ -944,8 +945,8 @@ typedef struct {
 	qhandle_t	scoreboardScore;
 	qhandle_t	scoreboardTime;
 
-	// mode icons for movement/gameplay display (indexed by pmMovement_t / gameplay_t)
-	qhandle_t	modeIcons[4];
+	// profile icons for the HUD mode indicator (indexed by mode_t)
+	qhandle_t	modeIcons[MODE_COUNT];
 
 	// medals shown during gameplay
 	qhandle_t	medalImpressive;
@@ -1236,9 +1237,7 @@ typedef struct {
 
 	qboolean		pmove_fixed;
 	int				pmove_msec;
-	int				mode;			// g_mode (0..3); pmove_movement/gameplay derive from it
-	int				pmove_movement;
-	int				gameplay;
+	int				mode;			// g_mode (0..3); controls movement + combat
 
 	qboolean		synchronousClients;
 

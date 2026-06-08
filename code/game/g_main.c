@@ -538,18 +538,6 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	G_RegisterCvars();
 
-	// derive the two internal axis cvars from the authoritative g_mode profile.
-	// g_mode is the single source of truth (0 = Quake 3 is a real value, not
-	// "unset"), so it is never overridden here.
-	{
-		int mv, gp;
-		BG_ModeToAxes( g_mode.integer, &mv, &gp );
-		trap_Cvar_Set( "g_movement", va( "%i", mv ) );
-		trap_Cvar_Update( &g_movement );
-		trap_Cvar_Set( "g_gameplay", va( "%i", gp ) );
-		trap_Cvar_Update( &g_gameplay );
-	}
-
 	// Signal to engine that this game supports server lifecycle events
 	trap_Cvar_Set( "g_serverEvents", "1" );
 
