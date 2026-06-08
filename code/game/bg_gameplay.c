@@ -201,7 +201,7 @@ static const gameplayConfig_t gp_configs[] = {
 		/* WP_SHOTGUN */ {
 			/* damage */		6,		/* teamDamage */	6,
 			/* splashDamage */	0,		/* splashRadius */	0,
-			/* speed */			0,		/* fireTime */		950,
+			/* speed */			0,		/* fireTime */		1000,
 			/* count */			16,		/* spread */		750,	/* range */			0,
 			/* knockback */		0.33f,	/* selfKnockback */	0.33f,
 			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
@@ -217,9 +217,9 @@ static const gameplayConfig_t gp_configs[] = {
 		/* WP_ROCKET_LAUNCHER */ {
 			/* damage */		100,	/* teamDamage */	100,
 			/* splashDamage */	100,	/* splashRadius */	120,
-			/* speed */			1000,	/* fireTime */		800,
+			/* speed */			900,	/* fireTime */		800,
 			/* count */			0,		/* spread */		0,		/* range */			0,
-			/* knockback */		1.2f,	/* selfKnockback */	1.2f,
+			/* knockback */		1.125f,	/* selfKnockback */	1.125f,
 			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	10,
 		},
 		/* WP_LIGHTNING */ {
@@ -248,8 +248,8 @@ static const gameplayConfig_t gp_configs[] = {
 		},
 		/* WP_BFG */ {
 			/* damage */		100,	/* teamDamage */	100,
-			/* splashDamage */	100,	/* splashRadius */	120,
-			/* speed */			1800,	/* fireTime */		1250,
+			/* splashDamage */	0,		/* splashRadius */	0,
+			/* speed */			2000,	/* fireTime */		1000,
 			/* count */			0,		/* spread */		0,		/* range */			0,
 			/* knockback */		1.0f,	/* selfKnockback */	1.0f,
 			/* ammoMax */		25,		/* ammoBox */		5,		/* initialAmmo */	5,
