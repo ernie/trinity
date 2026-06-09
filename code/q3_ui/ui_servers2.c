@@ -908,10 +908,11 @@ static void ArenaServers_Insert( const char *adrstr, const char *info, int pingt
 	else
 		Q_strncpyz( servernodeptr->gamename, "unknown", sizeof( servernodeptr->gamename ) );
 
-	// Trinity mode profile: only trust g_mode when the server advertises the
-	// Trinity engine marker, so non-Trinity servers never get a mode icon.
+	// Trinity mode profile: only trust g_mode when the server advertises a
+	// Trinity-family engine marker (trinity-engine/-vr/-quest), so non-Trinity
+	// servers never get a mode icon.
 	servernodeptr->mode = -1;
-	if ( !Q_strncmp( Info_ValueForKey( info, "engine" ), "trinity-engine", 14 ) ) {
+	if ( !Q_strncmp( Info_ValueForKey( info, "engine" ), "trinity-", 8 ) ) {
 		s = Info_ValueForKey( info, "g_mode" );
 		if ( *s ) {
 			i = atoi( s );
