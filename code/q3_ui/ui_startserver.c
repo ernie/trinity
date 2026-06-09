@@ -10,6 +10,7 @@ START SERVER MENU *****
 
 
 #include "ui_local.h"
+#include "../game/bg_mode.h"
 
 
 #define GAMESERVER_BACK0		"menu/art/back_0"
@@ -608,6 +609,7 @@ typedef struct {
 	menubitmap_s		mappic;
 	menubitmap_s		picframe;
 
+	menulist_s			mode;
 	menulist_s			dedicated;
 	menufield_s			timelimit;
 	menufield_s			fraglimit;
@@ -659,6 +661,9 @@ static const char *playerTeam_list[] = {
 	"Red",
 	NULL
 };
+
+// filled from BG_ModeName at menu init, NULL-terminated
+static const char *mode_list[MODE_COUNT + 1];
 
 static const char *botSkill_list[] = {
 	"I Can Win",
@@ -764,6 +769,7 @@ static void ServerOptions_Start( void ) {
 	trap_Cvar_SetValue ("capturelimit", Com_Clamp( 0, flaglimit, flaglimit ) );
 	trap_Cvar_SetValue( "g_friendlyfire", friendlyfire );
 	trap_Cvar_SetValue( "sv_pure", pure );
+	trap_Cvar_SetValue( "g_mode", s_serveroptions.mode.curvalue );
 	trap_Cvar_Set("sv_hostname", s_serveroptions.hostname.field.buffer );
 	
 	trap_Cvar_SetValue( "sv_punkbuster", s_serveroptions.punkbuster.curvalue );
@@ -1135,6 +1141,7 @@ static void ServerOptions_SetMenuItems( void ) {
 
 	Q_strncpyz( s_serveroptions.hostname.field.buffer, UI_Cvar_VariableString( "sv_hostname" ), sizeof( s_serveroptions.hostname.field.buffer ) );
 	s_serveroptions.pure.curvalue = Com_Clamp( 0, 1, trap_Cvar_VariableValue( "sv_pure" ) );
+	s_serveroptions.mode.curvalue = (int)Com_Clamp( 0, MODE_COUNT - 1, trap_Cvar_VariableValue( "g_mode" ) );
 
 	// set the map pic
 	info = UI_GetArenaInfoByNumber( s_startserver.maplist[ s_startserver.currentmap ]);
@@ -1248,7 +1255,20 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 	s_serveroptions.picframe.height  			= 320;
 	s_serveroptions.picframe.focuspic			= GAMESERVER_SELECT;
 
-	y = 272;
+	for( n = 0; n < MODE_COUNT; n++ ) {
+		mode_list[n] = BG_ModeName( n );
+	}
+	mode_list[MODE_COUNT] = NULL;
+
+	y = 254;
+	s_serveroptions.mode.generic.type			= MTYPE_SPINCONTROL;
+	s_serveroptions.mode.generic.name			= "Mode:";
+	s_serveroptions.mode.generic.flags			= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_serveroptions.mode.generic.x				= OPTIONS_X;
+	s_serveroptions.mode.generic.y				= y;
+	s_serveroptions.mode.itemnames				= mode_list;
+
+	y += BIGCHAR_HEIGHT+2;
 	if( s_serveroptions.gametype != GT_CTF ) {
 		s_serveroptions.fraglimit.generic.type       = MTYPE_FIELD;
 		s_serveroptions.fraglimit.generic.name       = "Frag Limit:";
@@ -1429,6 +1449,7 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 		}
 	}
 
+	Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.mode );
 	if( s_serveroptions.gametype != GT_CTF ) {
 		Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.fraglimit );
 	}

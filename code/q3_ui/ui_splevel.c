@@ -9,6 +9,7 @@ SINGLE PLAYER LEVEL SELECT MENU
 */
 
 #include "ui_local.h"
+#include "../game/bg_mode.h"
 
 
 #define ART_LEVELFRAME_FOCUS		"menu/art/maps_select"
@@ -47,6 +48,7 @@ SINGLE PLAYER LEVEL SELECT MENU
 #define ID_RESET			24
 #define ID_CUSTOM			25
 #define ID_NEXT				26
+#define ID_MODE				27
 
 #define PLAYER_Y			314
 #define AWARDS_Y			(PLAYER_Y + 26)
@@ -64,6 +66,7 @@ typedef struct {
 	menubitmap_s	item_reset;
 	menubitmap_s	item_custom;
 	menubitmap_s	item_next;
+	menulist_s		item_mode;
 	menubitmap_s	item_null;
 
 	qboolean		reinit;
@@ -89,6 +92,9 @@ typedef struct {
 } levelMenuInfo_t;
 
 static levelMenuInfo_t	levelMenuInfo;
+
+// filled from BG_ModeName at menu init, NULL-terminated
+static const char *mode_list[MODE_COUNT + 1];
 
 static int	selectedArenaSet;
 static int	selectedArena;
@@ -507,6 +513,20 @@ static void UI_SPLevelMenu_CustomEvent( void* ptr, int notification ) {
 
 /*
 =================
+UI_SPLevelMenu_ModeEvent
+=================
+*/
+static void UI_SPLevelMenu_ModeEvent( void* ptr, int notification ) {
+	if (notification != QM_ACTIVATED) {
+		return;
+	}
+
+	trap_Cvar_SetValue( "g_mode", levelMenuInfo.item_mode.curvalue );
+}
+
+
+/*
+=================
 UI_SPLevelMenu_MenuDraw
 =================
 */
@@ -863,6 +883,21 @@ static void UI_SPLevelMenu_Init( void ) {
 	levelMenuInfo.item_next.height					= 64;
 	levelMenuInfo.item_next.focuspic				= ART_FIGHT1;
 
+	for( n = 0; n < MODE_COUNT; n++ ) {
+		mode_list[n] = BG_ModeName( n );
+	}
+	mode_list[MODE_COUNT] = NULL;
+
+	levelMenuInfo.item_mode.generic.type			= MTYPE_SPINCONTROL;
+	levelMenuInfo.item_mode.generic.name			= "Mode:";
+	levelMenuInfo.item_mode.generic.flags			= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	levelMenuInfo.item_mode.generic.callback		= UI_SPLevelMenu_ModeEvent;
+	levelMenuInfo.item_mode.generic.id				= ID_MODE;
+	levelMenuInfo.item_mode.generic.x				= 552;
+	levelMenuInfo.item_mode.generic.y				= 38;
+	levelMenuInfo.item_mode.itemnames				= mode_list;
+	levelMenuInfo.item_mode.curvalue				= (int)Com_Clamp( 0, MODE_COUNT - 1, trap_Cvar_VariableValue( "g_mode" ) );
+
 	levelMenuInfo.item_null.generic.type			= MTYPE_BITMAP;
 	levelMenuInfo.item_null.generic.flags			= QMF_LEFT_JUSTIFY|QMF_MOUSEONLY|QMF_SILENT;
 	levelMenuInfo.item_null.generic.x				= 0;
@@ -892,6 +927,7 @@ static void UI_SPLevelMenu_Init( void ) {
 	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_reset );
 	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_custom );
 	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_next );
+	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_mode );
 	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_null );
 
 	trap_Cvar_VariableStringBuffer( "ui_spSelection", buf, sizeof(buf) );
