@@ -934,7 +934,7 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 	}
 
 	distance = sqrt(len);
-	re->radius = (NUMBER_SIZE / 1280.0f) * distance * tan(cg.refdef.fov_x * M_PI / 360.0f);
+	re->radius = cg_damagePlumScale.value * (NUMBER_SIZE / 1280.0f) * distance * tan(cg.refdef.fov_x * M_PI / 360.0f);
 
 	// Horizontal spread
 	spread_x = le->pos.trDelta[0] * 20.0 * re->radius * progress;

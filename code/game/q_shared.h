@@ -698,6 +698,10 @@ default values.
 #define CVAR_CHEAT			512	// can not be changed if cheats are disabled
 #define CVAR_NORESTART		1024	// do not clear when a cvar_restart is issued
 
+#define CVAR_NODEFAULT		0x4000	// do not write to config if matching with default value
+
+#define CVAR_ARCHIVE_ND		(CVAR_ARCHIVE | CVAR_NODEFAULT)
+
 #define	MAX_CVAR_VALUE_STRING	256
 
 typedef int	cvarHandle_t;
