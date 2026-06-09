@@ -110,6 +110,7 @@ static char quake3worldMessage[] = "Visit www.quake3world.com - News, Community,
 #endif
 
 static void UI_StartServerRefresh(qboolean full);
+static void UI_DrawTrinitySigil( rectDef_t *rect );
 static void UI_StopServerRefresh( void );
 static void UI_DoServerRefresh( void );
 static void UI_FeederSelection(float feederID, int index);

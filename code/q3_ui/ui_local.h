@@ -44,27 +44,27 @@ typedef void (*voidfunc_f)(void);
 #define MTYPE_PTEXT				9
 #define MTYPE_BTEXT				10
 
-#define QMF_BLINK				0x00000001
-#define QMF_SMALLFONT			0x00000002
-#define QMF_LEFT_JUSTIFY		0x00000004
-#define QMF_CENTER_JUSTIFY		0x00000008
-#define QMF_RIGHT_JUSTIFY		0x00000010
-#define QMF_NUMBERSONLY			0x00000020	// edit field is only numbers
-#define QMF_HIGHLIGHT			0x00000040
-#define QMF_HIGHLIGHT_IF_FOCUS	0x00000080	// steady focus
-#define QMF_PULSEIFFOCUS		0x00000100	// pulse if focus
-#define QMF_HASMOUSEFOCUS		0x00000200
-#define QMF_NOONOFFTEXT			0x00000400
-#define QMF_MOUSEONLY			0x00000800	// only mouse input allowed
-#define QMF_HIDDEN				0x00001000	// skips drawing
-#define QMF_GRAYED				0x00002000	// grays and disables
-#define QMF_INACTIVE			0x00004000	// disables any input
-#define QMF_NODEFAULTINIT		0x00008000	// skip default initialization
-#define QMF_OWNERDRAW			0x00010000
-#define QMF_PULSE				0x00020000
-#define QMF_LOWERCASE			0x00040000	// edit field is all lower case
-#define QMF_UPPERCASE			0x00080000	// edit field is all upper case
-#define QMF_SILENT				0x00100000
+#define QMF_BLINK				0x00000001u
+#define QMF_SMALLFONT			0x00000002u
+#define QMF_LEFT_JUSTIFY		0x00000004u
+#define QMF_CENTER_JUSTIFY		0x00000008u
+#define QMF_RIGHT_JUSTIFY		0x00000010u
+#define QMF_NUMBERSONLY			0x00000020u	// edit field is only numbers
+#define QMF_HIGHLIGHT			0x00000040u
+#define QMF_HIGHLIGHT_IF_FOCUS	0x00000080u	// steady focus
+#define QMF_PULSEIFFOCUS		0x00000100u	// pulse if focus
+#define QMF_HASMOUSEFOCUS		0x00000200u
+#define QMF_NOONOFFTEXT			0x00000400u
+#define QMF_MOUSEONLY			0x00000800u	// only mouse input allowed
+#define QMF_HIDDEN				0x00001000u	// skips drawing
+#define QMF_GRAYED				0x00002000u	// grays and disables
+#define QMF_INACTIVE			0x00004000u	// disables any input
+#define QMF_NODEFAULTINIT		0x00008000u	// skip default initialization
+#define QMF_OWNERDRAW			0x00010000u
+#define QMF_PULSE				0x00020000u
+#define QMF_LOWERCASE			0x00040000u	// edit field is all lower case
+#define QMF_UPPERCASE			0x00080000u	// edit field is all upper case
+#define QMF_SILENT				0x00100000u
 
 // callback notifications
 #define QM_GOTFOCUS				1
