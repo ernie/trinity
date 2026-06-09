@@ -1296,6 +1296,11 @@ void ScrollList_Draw( menulist_s *l )
 				style |= UI_CENTER;
 			}
 
+			// optional per-row icon, drawn in the left margin (e.g. server mode icons)
+			if( column == 0 && l->itemicons && l->itemicons[i] ) {
+				UI_DrawHandlePic( x - SMALLCHAR_HEIGHT - 2, y, SMALLCHAR_HEIGHT, SMALLCHAR_HEIGHT, l->itemicons[i] );
+			}
+
 			UI_DrawString(
 				x,
 				y,

@@ -145,6 +145,7 @@ typedef struct
 	int mouse1time;
 		
 	const char **itemnames;
+	const qhandle_t *itemicons;	// optional, parallel to itemnames; 0 = no icon (drawn in left margin)
 
 	int width;
 	int height;

@@ -132,6 +132,7 @@ typedef enum {
 #define SORT_GAME			3
 #define SORT_PING			4
 #define SORT_PUNKBUSTER		5
+#define SORT_MODE			6	// Trinity mode icon column (display-only, not sortable)
 
 typedef enum {
 	UI_GETAPIVERSION = 0,	// system reserved
