@@ -671,6 +671,10 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 			trap_Cvar_Set( SV_ROTATION, "1" );
 			level.denyMapRestart = qtrue;
 			ParseMapRotation();
+			// only guards the parse above; left set, it turns the first
+			// map's ExitLevel fallback (G_LoadMap(NULL)) into a no-op and
+			// wedges the level at intermission
+			level.denyMapRestart = qfalse;
 		}
 	}
 }
