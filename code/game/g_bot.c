@@ -710,6 +710,91 @@ static qboolean G_IsClanBaseCharacter( const char *name ) {
 
 /*
 ===============
+G_ClanMemberIndex
+
+Roster slot of a (color-clean) name in the given clan, -1 if none.
+===============
+*/
+static int G_ClanMemberIndex( int clanIdx, const char *name ) {
+	int		m;
+
+	for ( m = 0; m < MAX_CLAN_MEMBERS; m++ ) {
+		if ( !Q_stricmp( name, g_clans[clanIdx].members[m].alias ) ) {
+			return m;
+		}
+	}
+	return -1;
+}
+
+
+/*
+===============
+G_RotateClanBots
+
+Same-map cycles go through map_restart, which keeps bots — swap the
+outgoing clan's bots for the incoming roster so rotation turns the
+roster over, not just the team name. Queued ahead of ExitLevel's map
+command, so the kicks and adds land before the restart.
+===============
+*/
+static void G_RotateClanBots( team_t team, int oldIdx, int newIdx ) {
+	int			i, m;
+	float		skill;
+	gclient_t	*cl;
+	char		clean[MAX_NETNAME];
+	char		userinfo[MAX_INFO_STRING];
+	char		*skillstr;
+	const char	*replacement;
+
+	for ( i = 0; i < level.maxclients; i++ ) {
+		cl = level.clients + i;
+		if ( cl->pers.connected == CON_DISCONNECTED ) {
+			continue;
+		}
+		if ( !( g_entities[i].r.svFlags & SVF_BOT ) ) {
+			continue;
+		}
+		if ( cl->sess.sessionTeam != team ) {
+			continue;
+		}
+
+		Q_strncpyz( clean, cl->pers.netname, sizeof( clean ) );
+		Q_CleanStr( clean );
+
+		// already fits the incoming clan
+		if ( G_ClanMemberIndex( newIdx, clean ) >= 0 ) {
+			continue;
+		}
+		// wildcards stay; only the old roster and stray base characters go
+		if ( G_ClanMemberIndex( oldIdx, clean ) < 0 && !G_IsClanBaseCharacter( clean ) ) {
+			continue;
+		}
+
+		replacement = NULL;
+		for ( m = 0; m < MAX_CLAN_MEMBERS; m++ ) {
+			const char *alias = g_clans[newIdx].members[m].alias;
+			if ( !G_IsBotInUse( alias ) && G_GetBotInfoByName( alias ) ) {
+				replacement = alias;
+				break;
+			}
+		}
+
+		trap_GetUserinfo( i, userinfo, sizeof( userinfo ) );
+		skillstr = Info_ValueForKey( userinfo, "skill" );
+		skill = skillstr[0] ? atof( skillstr ) : trap_Cvar_VariableValue( "g_spSkill" );
+
+		trap_SendConsoleCommand( EXEC_APPEND, va( "clientkick %i\n", i ) );
+		if ( replacement ) {
+			G_MarkBotPending( replacement );
+			trap_SendConsoleCommand( EXEC_APPEND, va( "addbot %s %1.2f %s 0\n",
+				replacement, skill, team == TEAM_RED ? "red" : "blue" ) );
+		}
+	}
+}
+
+
+/*
+===============
 G_RotateLosingClan
 
 Winner stays: the loser's clan advances to the next in teaminfo order,
@@ -760,6 +845,7 @@ void G_RotateLosingClan( void ) {
 		loserTeam == TEAM_RED ? "red" : "blue",
 		g_clans[loserIdx].name, g_clans[next].name );
 	trap_Cvar_Set( loserCvar, g_clans[next].name );
+	G_RotateClanBots( loserTeam, loserIdx, next );
 }
 
 #endif	// MISSIONPACK
