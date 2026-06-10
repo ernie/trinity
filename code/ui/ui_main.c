@@ -3282,6 +3282,7 @@ static void UI_StartSkirmish(qboolean next) {
 
 	g = uiInfo.gameTypes[ui_gameType.integer].gtEnum;
 	trap_Cvar_SetValue( "g_gametype", g );
+	trap_Cvar_SetValue( "g_mode", Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer ) );
 	trap_Cmd_ExecuteText( EXEC_APPEND, va( "wait ; wait ; map %s\n", uiInfo.mapList[ui_currentMap.integer].mapLoadName) );
 	skill = trap_Cvar_VariableValue( "g_spSkill" );
 	trap_Cvar_Set("ui_scoreMap", uiInfo.mapList[ui_currentMap.integer].mapName);
@@ -3486,6 +3487,7 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cvar_Set("ui_singlePlayerActive", "0");
 			trap_Cvar_SetValue( "dedicated", Com_Clamp( 0, 2, ui_dedicated.integer ) );
 			trap_Cvar_SetValue( "g_gametype", Com_Clamp( 0, 8, uiInfo.gameTypes[ui_netGameType.integer].gtEnum ) );
+			trap_Cvar_SetValue( "g_mode", Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer ) );
 			trap_Cvar_Set("g_redTeam", UI_Cvar_VariableString("ui_teamName"));
 			trap_Cvar_Set("g_blueTeam", UI_Cvar_VariableString("ui_opponentName"));
 			trap_Cmd_ExecuteText( EXEC_APPEND, va( "wait ; wait ; map %s\n", uiInfo.mapList[ui_currentNetMap.integer].mapLoadName ) );

@@ -1,6 +1,7 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "ui_local.h"
+#include "../game/bg_mode.h"
 
 void UI_SPArena_Start( const char *arenaInfo ) {
 	char	*map;
@@ -12,6 +13,8 @@ void UI_SPArena_Start( const char *arenaInfo ) {
 	if ( n < 8 ) {
 		trap_Cvar_SetValue( "sv_maxclients", 8 );
 	}
+
+	trap_Cvar_SetValue( "g_mode", Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer ) );
 
 	level = atoi( Info_ValueForKey( arenaInfo, "num" ) );
 	txt = Info_ValueForKey( arenaInfo, "special" );

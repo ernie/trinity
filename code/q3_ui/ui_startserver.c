@@ -597,6 +597,7 @@ SERVER OPTIONS MENU *****
 #define ID_DEDICATED			22
 #define ID_GO					23
 #define ID_BACK					24
+#define ID_MODE					25
 
 #define PLAYER_SLOTS			12
 
@@ -933,6 +934,13 @@ static void ServerOptions_Event( void* ptr, int event ) {
 	case ID_DEDICATED:
 		ServerOptions_SetPlayerItems();
 		break;
+
+	case ID_MODE:
+		if( event != QM_ACTIVATED ) {
+			break;
+		}
+		trap_Cvar_SetValue( "ui_mode", s_serveroptions.mode.curvalue );
+		break;
 	case ID_GO:
 		if( event != QM_ACTIVATED ) {
 			break;
@@ -1141,7 +1149,7 @@ static void ServerOptions_SetMenuItems( void ) {
 
 	Q_strncpyz( s_serveroptions.hostname.field.buffer, UI_Cvar_VariableString( "sv_hostname" ), sizeof( s_serveroptions.hostname.field.buffer ) );
 	s_serveroptions.pure.curvalue = Com_Clamp( 0, 1, trap_Cvar_VariableValue( "sv_pure" ) );
-	s_serveroptions.mode.curvalue = (int)Com_Clamp( 0, MODE_COUNT - 1, trap_Cvar_VariableValue( "g_mode" ) );
+	s_serveroptions.mode.curvalue = (int)Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer );
 
 	// set the map pic
 	info = UI_GetArenaInfoByNumber( s_startserver.maplist[ s_startserver.currentmap ]);
@@ -1264,6 +1272,8 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 	s_serveroptions.mode.generic.type			= MTYPE_SPINCONTROL;
 	s_serveroptions.mode.generic.name			= "Mode:";
 	s_serveroptions.mode.generic.flags			= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_serveroptions.mode.generic.id				= ID_MODE;
+	s_serveroptions.mode.generic.callback		= ServerOptions_Event;
 	s_serveroptions.mode.generic.x				= OPTIONS_X;
 	s_serveroptions.mode.generic.y				= y;
 	s_serveroptions.mode.itemnames				= mode_list;

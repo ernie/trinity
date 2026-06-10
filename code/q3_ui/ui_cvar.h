@@ -24,6 +24,10 @@ UI_CVAR( ui_ctf_capturelimit, "ui_ctf_capturelimit", "8", CVAR_ARCHIVE )
 UI_CVAR( ui_ctf_timelimit, "ui_ctf_timelimit", "30", CVAR_ARCHIVE )
 UI_CVAR( ui_ctf_friendly, "ui_ctf_friendly",  "0", CVAR_ARCHIVE )
 
+// g_mode is systeminfo (servers push it onto clients), so the archived
+// preference lives here and is applied to g_mode at launch
+UI_CVAR( ui_mode, "ui_mode", "0", CVAR_ARCHIVE )
+
 UI_CVAR( ui_arenasFile, "g_arenasFile", "", CVAR_INIT|CVAR_ROM )
 UI_CVAR( ui_botsFile, "g_botsFile", "", CVAR_ARCHIVE|CVAR_LATCH )
 UI_CVAR( ui_spScores1, "g_spScores1", "", CVAR_ARCHIVE )

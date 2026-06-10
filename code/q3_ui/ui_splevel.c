@@ -521,7 +521,7 @@ static void UI_SPLevelMenu_ModeEvent( void* ptr, int notification ) {
 		return;
 	}
 
-	trap_Cvar_SetValue( "g_mode", levelMenuInfo.item_mode.curvalue );
+	trap_Cvar_SetValue( "ui_mode", levelMenuInfo.item_mode.curvalue );
 }
 
 
@@ -896,7 +896,7 @@ static void UI_SPLevelMenu_Init( void ) {
 	levelMenuInfo.item_mode.generic.x				= 552;
 	levelMenuInfo.item_mode.generic.y				= 38;
 	levelMenuInfo.item_mode.itemnames				= mode_list;
-	levelMenuInfo.item_mode.curvalue				= (int)Com_Clamp( 0, MODE_COUNT - 1, trap_Cvar_VariableValue( "g_mode" ) );
+	levelMenuInfo.item_mode.curvalue				= (int)Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer );
 
 	levelMenuInfo.item_null.generic.type			= MTYPE_BITMAP;
 	levelMenuInfo.item_null.generic.flags			= QMF_LEFT_JUSTIFY|QMF_MOUSEONLY|QMF_SILENT;
