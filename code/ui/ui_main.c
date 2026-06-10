@@ -3488,8 +3488,10 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cvar_SetValue( "dedicated", Com_Clamp( 0, 2, ui_dedicated.integer ) );
 			trap_Cvar_SetValue( "g_gametype", Com_Clamp( 0, 8, uiInfo.gameTypes[ui_netGameType.integer].gtEnum ) );
 			trap_Cvar_SetValue( "g_mode", Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer ) );
-			trap_Cvar_Set("g_redTeam", UI_Cvar_VariableString("ui_teamName"));
-			trap_Cvar_Set("g_blueTeam", UI_Cvar_VariableString("ui_opponentName"));
+			// ui_redTeam/ui_blueTeam are what the createserver selectors edit;
+			// ui_teamName/ui_opponentName (vanilla read those) are SP-skirmish-only
+			trap_Cvar_Set("g_redTeam", UI_Cvar_VariableString("ui_redTeam"));
+			trap_Cvar_Set("g_blueTeam", UI_Cvar_VariableString("ui_blueTeam"));
 			trap_Cmd_ExecuteText( EXEC_APPEND, va( "wait ; wait ; map %s\n", uiInfo.mapList[ui_currentNetMap.integer].mapLoadName ) );
 			skill = trap_Cvar_VariableValue( "g_spSkill" );
 			// set max clients based on spots
