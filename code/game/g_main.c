@@ -649,6 +649,11 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 		G_ModelIndex( SP_PODIUM_MODEL );
 	}
 
+#ifdef MISSIONPACK
+	G_InitClans();
+	level.singlePlayer = ( g_singlePlayer.integer != 0 );
+#endif
+
 	if ( trap_Cvar_VariableIntegerValue( "bot_enable" ) ) {
 		BotAISetup( restart );
 		BotAILoadMap( restart );
@@ -1233,6 +1238,11 @@ void ExitLevel( void ) {
 	}
 
 	level.intermissiontime = 0;
+
+#ifdef MISSIONPACK
+	// must run before the team scores are reset below
+	G_RotateLosingClan();
+#endif
 
 	// reset all the scores so we don't enter the intermission again
 	level.teamScores[TEAM_RED] = 0;

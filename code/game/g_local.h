@@ -496,6 +496,9 @@ typedef struct {
 	gentity_t	*bodyQue[BODY_QUEUE_SIZE];
 #ifdef MISSIONPACK
 	int			portalSequence;
+	// sampled at G_InitGame; intermission clears ui_singlePlayerActive
+	// before ExitLevel could read it live
+	qboolean	singlePlayer;
 #endif
 
 	// spawn spots
@@ -815,6 +818,10 @@ qboolean G_BotConnect( int clientNum, qboolean restart );
 void Svcmd_AddBot_f( void );
 void Svcmd_BotList_f( void );
 void BotInterbreedEndMatch( void );
+#ifdef MISSIONPACK
+void G_InitClans( void );
+void G_RotateLosingClan( void );
+#endif
 
 // ai_main.c
 #define MAX_FILEPATH			144

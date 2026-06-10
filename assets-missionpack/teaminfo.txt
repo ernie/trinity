@@ -1,0 +1,70 @@
+//
+// Team definition is as follows
+// 
+// English name
+// asset name
+// 5 team member names ( can be character or aliases or if non-existant, assumed to be human
+// 
+// Three assets are loaded based on the above asset name
+// "asset name" - general branding logo used in the ui and to brand levels
+// "asset name_metal" - metal logo for ui
+// "asset name_name" - graphic represenation of the name
+//
+// Trinity: pak1's copy with one fix in aliases — Whyrlwynd's base was "Ursla"
+// (typo for Ursula), so the skirmish addbot never resolved and Whyrlwynd
+// never spawned for the Intruders.
+//
+teams {
+  { "Crusaders" "ui/assets/crusaders"  "Darkangel" "Lionheart" "Bradamante" "Furioso" "Aria"  }
+  { "Intruders" "ui/assets/intruders" "Morgan" "Punisher" "Gaunt" "November" "Whyrlwynd" }
+  { "Pagans"  "ui/assets/pagans" "Khan" "Deadeye" "WarLokk" "Callisto" "Gargouille" }
+  { "Stroggs" "ui/assets/stroggs" "Enforcer" "Icarus" "Gammy" "Gladiator" "Paracyte" }
+  { "The Fallen" "ui/assets/thefallen" "Neptune" "Stalker" "Ursula" "Abominator" "Sinister" }
+}
+
+
+// character name ( used for display and head derivation ), sex
+characters {
+  { "James"  "male" }
+  { "Janet"  "female" }
+  { "Callisto"  "female" }
+  { "Gammy"  "female" }
+  { "Gaunt"  "male" }
+  { "Khan"  "male" }
+  { "Megan"  "female" }
+  { "Morgan"  "male" }
+  { "Neptune"  "male" }
+  { "Ursula"  "female" }
+  { "Flayer"  "male" }
+}
+
+aliases {
+	{ "Darkangel"			"Janet"		"a"			}
+	{ "Bradamante"			"Megan"		"d"			}
+	{ "Lionheart"			"Morgan" 	"o"		  	}
+	{ "Furioso"			"Neptune"	"a"				}
+	{ "Aria"			"Ursula" 	"o"			  	}
+	{ "Callisto"			"Callisto"	"d"			}
+	{ "Deadeye"			"Gaunt"		"d"				}
+	{ "WarLokk"			"James"		"o"				}
+	{ "Khan"			"Khan"		"o"				}
+	{ "Gargouille"			"Gammy"		"a"			}
+	{ "Enforcer"			"Callisto"	"d"			}
+	{ "Icarus"			"Flayer"		"o"		}
+	{ "Gammy"			"Gammy"		"a"			}
+	{ "Gladiator"			"Megan"		"d"				}
+	{ "Paracyte"			"Neptune"	"a"			}
+	{ "Gaunt"			"Gaunt"		"d"				}
+	{ "Punisher"		"Khan"		"o"			}
+	{ "November"			"Janet"		"a"				}
+	{ "Morgan"			"Morgan" 	"o"				}
+	{ "Whyrlwynd"			"Ursula"		"o"				}
+	{ "Sinister"			"Callisto"	"d"	}
+	{ "Ursula"			"Ursula"		"o"				}
+	{ "Abominator"			"James"		"o"		}
+	{ "Stalker"		"Morgan" 	"o"			}
+	{ "Neptune"			"Neptune"	"a"				}
+}
+
+
+		   
