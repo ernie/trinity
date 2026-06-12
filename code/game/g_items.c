@@ -775,6 +775,9 @@ gentity_t *Drop_Item( gentity_t *ent, gitem_t *item, float angle ) {
 		} else if ( item->giTag == PW_BLUEFLAG ) {
 			team = TEAM_BLUE;
 		}
+		if ( item->giTag == PW_NEUTRALFLAG ) {
+			ent->client->pers.teamState.lastNeutralFlagDrop = level.time;
+		}
 		G_LogPrintf( "FlagDrop: %d %d: %s\n",
 			ent->client->ps.clientNum, team, ent->client->pers.netname );
 	}

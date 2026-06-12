@@ -847,6 +847,7 @@ const char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 
 //	areabits = client->areabits;
 	memset( client, 0, sizeof( *client ) );
+	client->pers.connectionGen = ++level.connectionGen;
 
 	client->ps.clientNum = clientNum;
 
@@ -1291,7 +1292,7 @@ void ClientDisconnect( int clientNum ) {
 #ifdef MISSIONPACK
 		TossClientPersistantPowerups( ent );
 		if( g_gametype.integer == GT_HARVESTER ) {
-			TossClientCubes( ent );
+			TossClientCubes( ent, NULL );
 		}
 #endif
 

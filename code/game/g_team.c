@@ -789,6 +789,25 @@ void Team_DroppedFlagThink(gentity_t *ent) {
 }
 
 
+void Team_AwardAssist( gentity_t *ent, const char *type, int bonus, vec3_t origin ) {
+	gclient_t *cl = ent->client;
+
+	if ( !cl || cl->pers.connected != CON_CONNECTED ) {
+		return;
+	}
+	if ( bonus ) {
+		AddScore( ent, origin, bonus );
+	}
+	cl->ps.persistant[PERS_ASSIST_COUNT]++;
+	cl->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP );
+	cl->ps.eFlags |= EF_AWARD_ASSIST;
+	cl->rewardTime = level.time + REWARD_SPRITE_TIME;
+
+	G_LogPrintf( "Assist: %d %d %s: %s\n",
+		cl->ps.clientNum, cl->sess.sessionTeam, type, cl->pers.netname );
+}
+
+
 /*
 ==============
 Team_DroppedFlagThink
@@ -852,6 +871,39 @@ static int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, team_t team ) {
 
 	teamgame.last_flag_capture = level.time;
 	teamgame.last_capture_team = team;
+
+#ifdef MISSIONPACK
+	if ( g_gametype.integer == GT_1FCTF && cl->pers.teamState.neutralFlagFromGround ) {
+		gentity_t *best = NULL;
+		int bestDrop = 0;
+		int dropTime;
+
+		for ( i = 0 ; i < level.maxclients ; i++ ) {
+			player = &g_entities[i];
+			if ( !player->inuse || player == other || !player->client ) continue;
+			if ( player->client->pers.connected != CON_CONNECTED ) continue;
+			if ( player->client->sess.sessionTeam != cl->sess.sessionTeam ) continue;
+			dropTime = player->client->pers.teamState.lastNeutralFlagDrop;
+			if ( dropTime <= 0 ) continue;
+			if ( dropTime > cl->pers.teamState.neutralFlagPickupTime ) continue;
+			if ( dropTime + CTF_RETURN_FLAG_ASSIST_TIMEOUT <= cl->pers.teamState.neutralFlagPickupTime ) continue;
+			if ( !best || dropTime > bestDrop ) {
+				best = player;
+				bestDrop = dropTime;
+			}
+		}
+		// one chain link: the latest qualifying drop wins, and when that
+		// drop was the capturer's own, the chain is self and pays nobody
+		if ( best ) {
+			dropTime = cl->pers.teamState.lastNeutralFlagDrop;
+			if ( dropTime <= bestDrop ||
+					dropTime > cl->pers.teamState.neutralFlagPickupTime ||
+					dropTime + CTF_RETURN_FLAG_ASSIST_TIMEOUT <= cl->pers.teamState.neutralFlagPickupTime ) {
+				Team_AwardAssist( best, "carry", CARRY_ASSIST_BONUS, ent->r.currentOrigin );
+			}
+		}
+	}
+#endif
 
 	// Increase the team's score
 	AddTeamScore(ent->s.pos.trBase, other->client->sess.sessionTeam, 1);
@@ -932,6 +984,9 @@ static int Team_TouchEnemyFlag( gentity_t *ent, gentity_t *other, team_t team ) 
 			other->client->ps.clientNum, TEAM_FREE, cl->pers.netname );
 
 		cl->ps.powerups[PW_NEUTRALFLAG] = INT_MAX; // flags never expire
+		// every pickup re-stamps, so the capture-time read is never stale
+		cl->pers.teamState.neutralFlagPickupTime = level.time;
+		cl->pers.teamState.neutralFlagFromGround = ( ent->flags & FL_DROPPED_ITEM ) != 0;
 
 		if( team == TEAM_RED ) {
 			Team_SetFlagStatus( TEAM_FREE, FLAG_TAKEN_RED );
@@ -984,6 +1039,14 @@ int Pickup_Team( gentity_t *ent, gentity_t *other ) {
 				cl->ps.clientNum, cl->sess.sessionTeam, cl->ps.generic1,
 				cl->pers.netname );
 			SetHarvesterStatus();
+			if ( ent->skullFraggerGen > 0 && ent->skullFraggerNum != cl->ps.clientNum &&
+					ent->skullFraggerNum >= 0 && ent->skullFraggerNum < MAX_CLIENTS ) {
+				if ( cl->skullContributorGen[ ent->skullFraggerNum ] != ent->skullFraggerGen ) {
+					cl->skullContributorGen[ ent->skullFraggerNum ] = ent->skullFraggerGen;
+					cl->skullContributorCount[ ent->skullFraggerNum ] = 0;
+				}
+				cl->skullContributorCount[ ent->skullFraggerNum ]++;
+			}
 		}
 		G_FreeEntity( ent );
 		return 0;
@@ -1466,15 +1529,35 @@ void SetObeliskStatus( void ) {
 }
 
 static void ObeliskRegen( gentity_t *self ) {
+	int deficitBefore, healed, i;
+	gclient_t *cl;
+	int tally;
+
 	self->nextthink = level.time + g_obeliskRegenPeriod.integer * 1000;
 	if( self->health >= g_obeliskHealth.integer ) {
 		return;
 	}
+	deficitBefore = g_obeliskHealth.integer - self->health;
 
 	G_AddEvent( self, EV_POWERUP_REGEN, 0 );
 	self->health += g_obeliskRegenAmount.integer;
 	if ( self->health > g_obeliskHealth.integer ) {
 		self->health = g_obeliskHealth.integer;
+	}
+	healed = deficitBefore - ( g_obeliskHealth.integer - self->health );
+
+	// subtract form: tally * healed stays within int32 (QVM has no 64-bit math).
+	// Integer floor leaves residue up to g_obeliskHealth/g_obeliskRegenAmount,
+	// under the 25% assist bar only while regenAmount stays above ~4.
+	for ( i = 0 ; i < level.maxclients ; i++ ) {
+		cl = &level.clients[i];
+		tally = cl->pers.teamState.obeliskDamage;
+		if ( tally <= 0 ) continue;
+		if ( cl->pers.connected != CON_CONNECTED ) continue;
+		if ( cl->sess.sessionTeam != OtherTeam( self->spawnflags ) ) continue;
+		tally -= tally * healed / deficitBefore;
+		if ( tally < 0 ) tally = 0;
+		cl->pers.teamState.obeliskDamage = tally;
 	}
 
 	self->activator->s.modelindex2 = self->health * 0xff / g_obeliskHealth.integer;
@@ -1486,6 +1569,14 @@ static void ObeliskRegen( gentity_t *self ) {
 static void ObeliskRespawn( gentity_t *self ) {
 	self->takedamage = qtrue;
 	self->health = g_obeliskHealth.integer;
+	{
+		int i;
+		for ( i = 0 ; i < level.maxclients ; i++ ) {
+			if ( level.clients[i].sess.sessionTeam == OtherTeam( self->spawnflags ) ) {
+				level.clients[i].pers.teamState.obeliskDamage = 0;
+			}
+		}
+	}
 
 	self->think = ObeliskRegen;
 	self->nextthink = level.time + g_obeliskRegenPeriod.integer * 1000;
@@ -1510,6 +1601,26 @@ static void ObeliskDie( gentity_t *self, gentity_t *inflictor, gentity_t *attack
 	// Credit only player kills (excludes world / -1).
 	if ( attackerClientNum >= 0 && attackerClientNum < MAX_CLIENTS ) {
 		teamgame.obeliskDestroysPerClient[attackerClientNum]++;
+	}
+
+	{
+		int i;
+		int threshold = g_obeliskHealth.integer / OBELISK_ASSIST_THRESHOLD_DIVISOR;
+		gentity_t *p;
+
+		for ( i = 0 ; i < level.maxclients ; i++ ) {
+			p = &g_entities[i];
+			if ( i == attackerClientNum ) continue;
+			if ( !p->inuse || !p->client || p->client->pers.connected != CON_CONNECTED ) continue;
+			if ( p->client->sess.sessionTeam != otherTeam ) continue;
+			if ( p->client->pers.teamState.obeliskDamage < threshold ) continue;
+			Team_AwardAssist( p, "obelisk", OBELISK_ASSIST_BONUS, self->r.currentOrigin );
+		}
+		for ( i = 0 ; i < level.maxclients ; i++ ) {
+			if ( level.clients[i].sess.sessionTeam == otherTeam ) {
+				level.clients[i].pers.teamState.obeliskDamage = 0;
+			}
+		}
 	}
 
 	CalculateRanks();
@@ -1585,6 +1696,22 @@ static void ObeliskTouch( gentity_t *self, gentity_t *other, trace_t *trace ) {
 	other->client->rewardTime = level.time + REWARD_SPRITE_TIME;
 	other->client->ps.persistant[PERS_CAPTURES] += tokens;
 	
+	{
+		int i;
+		gentity_t *p;
+		for ( i = 0 ; i < level.maxclients ; i++ ) {
+			p = &g_entities[i];
+			if ( other->client->skullContributorGen[i] == 0 ) continue;
+			if ( i == other->client->ps.clientNum ) continue;
+			if ( !p->inuse || !p->client || p->client->pers.connected != CON_CONNECTED ) continue;
+			if ( p->client->pers.connectionGen != other->client->skullContributorGen[i] ) continue;
+			if ( p->client->sess.sessionTeam != other->client->sess.sessionTeam ) continue;
+			Team_AwardAssist( p, "skull", SKULL_ASSIST_BONUS * other->client->skullContributorCount[i], self->r.currentOrigin );
+		}
+		memset( other->client->skullContributorGen, 0, sizeof( other->client->skullContributorGen ) );
+		memset( other->client->skullContributorCount, 0, sizeof( other->client->skullContributorCount ) );
+	}
+
 	other->client->ps.generic1 = 0;
 	SetHarvesterStatus();
 	CalculateRanks();
@@ -1603,6 +1730,10 @@ static void ObeliskPain( gentity_t *self, gentity_t *attacker, int damage ) {
 	}
 	self->activator->s.frame = 1;
 	AddScore(attacker, self->r.currentOrigin, actualDamage);
+	if ( attacker->client &&
+			attacker->client->sess.sessionTeam == OtherTeam( self->spawnflags ) ) {
+		attacker->client->pers.teamState.obeliskDamage += damage;
+	}
 
 	// Per-attacker coalescing: emit Start on the off→on transition and
 	// when the target obelisk changes; Team_CheckObeliskAttacks (called

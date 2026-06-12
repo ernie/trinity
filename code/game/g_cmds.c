@@ -618,6 +618,10 @@ qboolean SetTeam( gentity_t *ent, const char *s ) {
 	// No-op if not actually changing teams (the same-team branch below).
 	if ( team != oldTeam ) {
 		Team_ClearObeliskAttacker( clientNum );
+		client->pers.teamState.obeliskDamage = 0;
+		client->pers.teamState.lastNeutralFlagDrop = 0;
+		client->pers.teamState.neutralFlagPickupTime = 0;
+		client->pers.teamState.neutralFlagFromGround = qfalse;
 	}
 #endif
 

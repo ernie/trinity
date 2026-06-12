@@ -36,6 +36,11 @@
 #define CTF_TARGET_PROTECT_RADIUS			1000	// the radius around an object being defended where a target will be worth extra frags
 #define CTF_ATTACKER_PROTECT_RADIUS			1000	// the radius around an object being defended where an attacker will get extra frags when making kills
 
+#define SKULL_ASSIST_BONUS				CTF_RETURN_FLAG_ASSIST_BONUS
+#define OBELISK_ASSIST_BONUS			CTF_FRAG_CARRIER_ASSIST_BONUS
+#define CARRY_ASSIST_BONUS				CTF_RETURN_FLAG_ASSIST_BONUS
+#define OBELISK_ASSIST_THRESHOLD_DIVISOR	4	// assist needs >= 1/4 of g_obeliskHealth standing
+
 #define CTF_CARRIER_DANGER_PROTECT_TIMEOUT	8000
 #define CTF_FRAG_CARRIER_ASSIST_TIMEOUT		10000
 #define CTF_RETURN_FLAG_ASSIST_TIMEOUT		10000
@@ -52,6 +57,7 @@ const char *TeamName( team_t team );
 const char *OtherTeamName( team_t team );
 const char *TeamColorString( team_t team );
 
+void Team_AwardAssist(gentity_t *ent, const char *type, int bonus, vec3_t origin);
 void Team_DroppedFlagThink(gentity_t *ent);
 void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker);
 void Team_CheckHurtCarrier(gentity_t *targ, gentity_t *attacker);
