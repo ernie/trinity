@@ -497,24 +497,6 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	ent->s.otherEntityNum2 = killer;
 	ent->r.svFlags = SVF_BROADCAST;	// send to everyone
 
-	// team kills pay no assists: softening a teammate is not a play
-	if ( g_gametype.integer == GT_TEAM && attacker && attacker->client && attacker != self &&
-			!OnSameTeam( self, attacker ) ) {
-		gentity_t *p;
-
-		for ( i = 0 ; i < level.maxclients ; i++ ) {
-			p = &g_entities[i];
-			if ( i == attacker->s.number ) continue;
-			if ( !p->inuse || !p->client || p == self ) continue;
-			if ( p->client->pers.connected != CON_CONNECTED ) continue;
-			if ( p->client->sess.sessionTeam != attacker->client->sess.sessionTeam ) continue;
-			if ( self->client->assistDamageFrom[i].gen != p->client->pers.connectionGen ) continue;
-			if ( self->client->assistDamageFrom[i].time + TDM_ASSIST_WINDOW <= level.time ) continue;
-			if ( self->client->assistDamageFrom[i].amount < TDM_ASSIST_DAMAGE ) continue;
-			Team_AwardAssist( p, "damage", 0, self->r.currentOrigin );
-		}
-	}
-
 	self->enemy = attacker;
 
 	self->client->ps.persistant[PERS_KILLED]++;
@@ -1179,20 +1161,6 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		// set the last client who damaged the target
 		targ->client->lasthurt_client = attacker->s.number;
 		targ->client->lasthurt_mod = mod;
-	}
-
-	if ( g_gametype.integer == GT_TEAM && targ->client && take > 0 &&
-			attacker && attacker->client && attacker != targ &&
-			attacker->s.number >= 0 && attacker->s.number < MAX_CLIENTS ) {
-		int an = attacker->s.number;
-		// stale or reused-slot entries restart the burst rather than accumulate
-		if ( targ->client->assistDamageFrom[an].gen != attacker->client->pers.connectionGen ||
-				targ->client->assistDamageFrom[an].time + TDM_ASSIST_WINDOW <= level.time ) {
-			targ->client->assistDamageFrom[an].amount = 0;
-		}
-		targ->client->assistDamageFrom[an].gen = attacker->client->pers.connectionGen;
-		targ->client->assistDamageFrom[an].amount += take;
-		targ->client->assistDamageFrom[an].time = level.time;
 	}
 
 	// do the damage

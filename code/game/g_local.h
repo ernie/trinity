@@ -50,9 +50,6 @@ void Team_ClearObeliskAttacker( int clientNum );
 #define	CARNAGE_REWARD_TIME	3000
 #define REWARD_SPRITE_TIME	2000
 
-#define TDM_ASSIST_DAMAGE		75		// min health damage inside the window
-#define TDM_ASSIST_WINDOW		2000	// ms
-
 #define	INTERMISSION_DELAY_TIME	1000
 #define	SP_INTERMISSION_DELAY_TIME	5000
 
@@ -417,11 +414,6 @@ struct gclient_s {
 
 	int			skullContributorGen[MAX_CLIENTS];	// gen of each skull-feeder this carry, 0 = absent
 	int			skullContributorCount[MAX_CLIENTS];	// skulls fed per contributor; bonus scales per skull
-	struct {
-		int		amount;
-		int		time;
-		int		gen;
-	} assistDamageFrom[MAX_CLIENTS];
 
 };
 
