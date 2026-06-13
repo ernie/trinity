@@ -42,6 +42,7 @@ UI_CVAR( ui_browserGameType, "ui_browserGameType", "0", CVAR_ARCHIVE )
 UI_CVAR( ui_browserSortKey, "ui_browserSortKey", "4", CVAR_ARCHIVE )
 UI_CVAR( ui_browserShowFull, "ui_browserShowFull", "1", CVAR_ARCHIVE )
 UI_CVAR( ui_browserShowEmpty, "ui_browserShowEmpty", "1", CVAR_ARCHIVE )
+UI_CVAR( ui_browserExcludeBots, "ui_browserExcludeBots", "0", CVAR_ARCHIVE )
 
 UI_CVAR( ui_brassTime, "cg_brassTime", "2500", CVAR_ARCHIVE )
 UI_CVAR( ui_drawCrosshair, "cg_drawCrosshair", "4", CVAR_ARCHIVE )

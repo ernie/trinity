@@ -4086,6 +4086,21 @@ static void UI_RemoveServerFromDisplayList(int num) {
 
 /*
 ==================
+UI_EffectivePlayerCount
+==================
+*/
+static int UI_EffectivePlayerCount(const char *info) {
+	if (ui_browserExcludeBots.integer) {
+		const char *humans = Info_ValueForKey(info, "g_humanplayers");
+		if (humans[0]) {
+			return atoi(humans);
+		}
+	}
+	return atoi(Info_ValueForKey(info, "clients"));
+}
+
+/*
+==================
 UI_BinaryServerInsertion
 ==================
 */
@@ -4129,7 +4144,7 @@ UI_BuildServerDisplayList
 ==================
 */
 static void UI_BuildServerDisplayList(qboolean force) {
-	int i, count, clients, maxClients, ping, game, len, visible;
+	int i, count, clients, maxClients, ping, game, len, visible, effClients;
 	char info[MAX_STRING_CHARS];
 //	qboolean startRefresh = qtrue; TTimo: unused
 	static int numinvisible;
@@ -4189,9 +4204,10 @@ static void UI_BuildServerDisplayList(qboolean force) {
 			trap_LAN_GetServerInfo(ui_netSource.integer, i, info, MAX_STRING_CHARS);
 
 			clients = atoi(Info_ValueForKey(info, "clients"));
+			effClients = UI_EffectivePlayerCount(info);
 
 			if (ui_browserShowEmpty.integer == 0) {
-				if (clients == 0) {
+				if (effClients == 0) {
 					if (ping > 0) {
 						trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
 					}
@@ -4237,7 +4253,7 @@ static void UI_BuildServerDisplayList(qboolean force) {
 			if (ping > 0) {
 				trap_LAN_MarkServerVisible(ui_netSource.integer, i, qfalse);
 				numinvisible++;
-				uiInfo.serverStatus.numPlayersOnServers += clients;
+				uiInfo.serverStatus.numPlayersOnServers += effClients;
 			}
 		}
 	}
@@ -4738,8 +4754,8 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 						}
 					}
 				case SORT_MAP : return Info_ValueForKey(info, "mapname");
-				case SORT_CLIENTS : 
-					Com_sprintf( clientBuff, sizeof(clientBuff), "%s (%s)", Info_ValueForKey(info, "clients"), Info_ValueForKey(info, "sv_maxclients"));
+				case SORT_CLIENTS :
+					Com_sprintf( clientBuff, sizeof(clientBuff), "%i (%s)", UI_EffectivePlayerCount(info), Info_ValueForKey(info, "sv_maxclients"));
 					return clientBuff;
 				case SORT_GAME : 
 					game = atoi(Info_ValueForKey(info, "gametype"));
