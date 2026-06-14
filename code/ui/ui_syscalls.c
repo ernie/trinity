@@ -375,7 +375,3 @@ void	trap_R_RemapShader( const char *oldShader, const char *newShader, const cha
 qboolean trap_VerifyCDKey( const char *key, const char *chksum) {
 	return syscall( UI_VERIFY_CDKEY, key, chksum);
 }
-
-void trap_SetPbClStatus( int status ) {
-	syscall( UI_SET_PBCLSTATUS, status );
-}

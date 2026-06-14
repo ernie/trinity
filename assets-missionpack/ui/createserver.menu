@@ -320,7 +320,6 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		text "Mode:"
 		// Trinity movement+combat ruleset; labels match BG_ModeName in bg_mode.c
-		// (occupies the slot 1.32 used for the now-defunct Punkbuster option)
 		cvar "ui_mode"
 		cvarFloatList { "Quake 3" 0 "CPMA" 1 "Quake Live" 2 "QL Turbo" 3 }
 		rect 260 145 128 12

@@ -127,20 +127,6 @@ static const char *gametype_names[] = {
 
 static char quake3worldMessage[] = "Visit www.quake3world.com - News, Community, Events, Files";
 
-const char* punkbuster_items[] = {
-	"Disabled",
-	"Enabled",
-	NULL
-};
-
-const char* punkbuster_msg[] = {
-	"PunkBuster will be",
-	"disabled the next time",
-	"Quake III Arena",
-	"is started.",
-	NULL
-};
-
 typedef struct {
 	char	adrstr[MAX_ADDRESSLENGTH];
 	int		start;
@@ -566,7 +552,6 @@ static void ArenaServers_UpdateMenu( void ) {
 			g_arenaservers.list.generic.flags		&= ~QMF_GRAYED;
 			g_arenaservers.refresh.generic.flags	&= ~QMF_GRAYED;
 			g_arenaservers.go.generic.flags			&= ~QMF_GRAYED;
-			//g_arenaservers.punkbuster.generic.flags &= ~QMF_GRAYED;
 
 			// update status bar
 			if ( g_servertype == AS_GLOBAL ) {
@@ -816,11 +801,6 @@ static void ArenaServers_Insert( const char *adrstr, const char *info, int pingt
 	if ( !Q_stricmp( s, "q3ut4" ) ) 
 	{
 		return; // filter urbanterror servers
-	}
-
-	if ( atoi( Info_ValueForKey( info, "punkbuster" ) ) ) 
-	{
-		return; // filter PunkBuster servers
 	}
 
 	if ((pingtime >= ArenaServers_MaxPing()) && (g_servertype != AS_FAVORITES))

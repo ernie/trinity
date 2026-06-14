@@ -23,7 +23,7 @@ const char *BG_ModeName( int mode ) {
 
 // movement physics                                                VQ3     CPM      QL     QLT
 static const float	md_groundAccelerate[MODE_COUNT]     = {  10.0f,  15.0f,  10.0f,  10.0f };
-static const float	md_friction[MODE_COUNT]             = {   6.0f,   8.0f,   6.0f,   6.0f };
+static const float	md_friction[MODE_COUNT]             = {   6.0f,   6.0f,   6.0f,   6.0f };
 static const int	md_jumpVelocity[MODE_COUNT]         = {    270,    270,    275,    275 };
 static const qboolean	md_autoHop[MODE_COUNT]              = { qfalse, qfalse,  qtrue,  qtrue };
 static const qboolean	md_rampJump[MODE_COUNT]             = { qfalse,  qtrue, qfalse,  qtrue };
