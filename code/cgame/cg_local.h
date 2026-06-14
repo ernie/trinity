@@ -727,6 +727,11 @@ typedef struct {
 	float			vrViewYaw;				// smoothed head absolute yaw
 	qboolean		vrViewInitialized;		// set once first valid target is computed
 
+	// VR HUD portrait head smoothing (independent of the first-person view above)
+	float			vrPortraitPitch;		// smoothed portrait head pitch (absolute world)
+	float			vrPortraitYaw;			// smoothed portrait-space head yaw (180 = facing viewer, plus head offset off weapon aim)
+	qboolean		vrPortraitInitialized;	// set once first valid target is computed
+
 	// Follow camera orbit state
 	vec3_t			orbitAngles;			// yaw, pitch for orbit camera
 	float			orbitDistance;			// current distance from player
@@ -1401,6 +1406,7 @@ void CG_CenterPrint( const char *str, int y, int charWidth );
 qhandle_t CG_GetArmorIcon( void );
 qhandle_t CG_GetArmorModel( void );
 void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles );
+qboolean CG_VRPortraitHeadAngles( vec3_t angles );
 void CG_DrawActive( stereoFrame_t stereoView );
 void CG_DrawFlagModel( float x, float y, float w, float h, int team, qboolean force2D );
 void CG_DrawTeamBackground( int x, int y, int w, int h, float alpha, int team );

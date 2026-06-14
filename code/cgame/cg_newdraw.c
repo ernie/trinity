@@ -251,8 +251,13 @@ static void CG_DrawPlayerHead(rectDef_t *rect, qboolean draw2D) {
 	float		size, stretch;
 	float		frac;
 	float		x = rect->x;
+	qboolean	vr;
 
 	VectorClear( angles );
+
+	// VR players: portrait reflects the real head orientation (current player,
+	// followed player, or demo). Falls back to the random idle-bob otherwise.
+	vr = CG_VRPortraitHeadAngles( angles );
 
 	if ( cg.damageTime && cg.time - cg.damageTime < DAMAGE_TIME ) {
 		frac = (float)(cg.time - cg.damageTime ) / DAMAGE_TIME;
@@ -262,15 +267,20 @@ static void CG_DrawPlayerHead(rectDef_t *rect, qboolean draw2D) {
 		// kick in the direction of damage
 		x -= stretch * 0.5 + cg.damageX * stretch * 0.5;
 
-		cg.headStartYaw = 180 + cg.damageX * 45;
+		if ( vr ) {
+			// additive damage kick on top of the real head orientation
+			angles[YAW] += cg.damageX * 45;
+		} else {
+			cg.headStartYaw = 180 + cg.damageX * 45;
 
-		cg.headEndYaw = 180 + 20 * cos( crandom()*M_PI );
-		cg.headEndPitch = 5 * cos( crandom()*M_PI );
+			cg.headEndYaw = 180 + 20 * cos( crandom()*M_PI );
+			cg.headEndPitch = 5 * cos( crandom()*M_PI );
 
-		cg.headStartTime = cg.time;
-		cg.headEndTime = cg.time + 100 + random() * 2000;
+			cg.headStartTime = cg.time;
+			cg.headEndTime = cg.time + 100 + random() * 2000;
+		}
 	} else {
-		if ( cg.time >= cg.headEndTime ) {
+		if ( !vr && cg.time >= cg.headEndTime ) {
 			// select a new head angle
 			cg.headStartYaw = cg.headEndYaw;
 			cg.headStartPitch = cg.headEndPitch;
@@ -284,15 +294,17 @@ static void CG_DrawPlayerHead(rectDef_t *rect, qboolean draw2D) {
 		size = rect->w * 1.25;
 	}
 
-	// if the server was frozen for a while we may have a bad head start time
-	if ( cg.headStartTime > cg.time ) {
-		cg.headStartTime = cg.time;
-	}
+	if ( !vr ) {
+		// if the server was frozen for a while we may have a bad head start time
+		if ( cg.headStartTime > cg.time ) {
+			cg.headStartTime = cg.time;
+		}
 
-	frac = ( cg.time - cg.headStartTime ) / (float)( cg.headEndTime - cg.headStartTime );
-	frac = frac * frac * ( 3 - 2 * frac );
-	angles[YAW] = cg.headStartYaw + ( cg.headEndYaw - cg.headStartYaw ) * frac;
-	angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
+		frac = ( cg.time - cg.headStartTime ) / (float)( cg.headEndTime - cg.headStartTime );
+		frac = frac * frac * ( 3 - 2 * frac );
+		angles[YAW] = cg.headStartYaw + ( cg.headEndYaw - cg.headStartYaw ) * frac;
+		angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
+	}
 
 	CG_DrawHead( x, rect->y, rect->w, rect->h, cg.snap->ps.clientNum, angles );
 }

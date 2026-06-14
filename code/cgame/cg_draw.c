@@ -459,6 +459,48 @@ void CG_DrawFlagModel( float x, float y, float w, float h, int team, qboolean fo
 
 /*
 ================
+CG_VRPortraitHeadAngles
+
+Fills 'angles' with the viewed player's real VR head orientation for the HUD
+portrait, EMA-smoothing pitch and yaw to hide the ~1.42 degree steps from the
+7-bit usercmd packing. Yaw is weapon-relative (added to the viewer-facing 180);
+pitch is absolute world look pitch; roll comes straight from viewangles (full
+precision, already interpolated). Returns qtrue when VR head data is present
+(current player, followed player, or demo), qfalse otherwise so callers fall
+back to the legacy idle-bob.
+================
+*/
+qboolean CG_VRPortraitHeadAngles( vec3_t angles ) {
+	playerState_t	*ps = &cg.snap->ps;
+	float			targetPitch, targetYaw, alpha;
+
+	if ( !( ps->eFlags & EF_VR_PLAYER ) ) {
+		cg.vrPortraitInitialized = qfalse;
+		return qfalse;
+	}
+
+	targetYaw   = 180.0f + (float)ps->stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f;
+	targetPitch = (float)ps->stats[STAT_VR_HEAD_PITCH] / 182.04f;
+
+	if ( !cg.vrPortraitInitialized || cg.nextFrameTeleport ) {
+		cg.vrPortraitYaw   = targetYaw;
+		cg.vrPortraitPitch = targetPitch;
+		cg.vrPortraitInitialized = qtrue;
+	} else {
+		// tau ~30ms: smooths quantization steps without perceptible lag
+		alpha = (float)cg.frametime / ( (float)cg.frametime + 30.0f );
+		cg.vrPortraitYaw   += alpha * AngleSubtract( targetYaw,   cg.vrPortraitYaw );
+		cg.vrPortraitPitch += alpha * AngleSubtract( targetPitch, cg.vrPortraitPitch );
+	}
+
+	angles[PITCH] = cg.vrPortraitPitch;
+	angles[YAW]   = cg.vrPortraitYaw;
+	angles[ROLL]  = ps->viewangles[ROLL];	// full precision, applied directly
+	return qtrue;
+}
+
+/*
+================
 CG_DrawStatusBarHead
 
 ================
@@ -469,8 +511,13 @@ static void CG_DrawStatusBarHead( float x ) {
 	vec3_t		angles;
 	float		size, stretch;
 	float		frac;
+	qboolean	vr;
 
 	VectorClear( angles );
+
+	// VR players: portrait reflects the real head orientation (current player,
+	// followed player, or demo). Falls back to the random idle-bob otherwise.
+	vr = CG_VRPortraitHeadAngles( angles );
 
 	if ( cg.damageTime && cg.time - cg.damageTime < DAMAGE_TIME ) {
 		frac = (float)(cg.time - cg.damageTime ) / DAMAGE_TIME;
@@ -480,15 +527,20 @@ static void CG_DrawStatusBarHead( float x ) {
 		// kick in the direction of damage
 		x -= stretch * 0.5 + cg.damageX * stretch * 0.5;
 
-		cg.headStartYaw = 180 + cg.damageX * 45;
+		if ( vr ) {
+			// additive damage kick on top of the real head orientation
+			angles[YAW] += cg.damageX * 45;
+		} else {
+			cg.headStartYaw = 180 + cg.damageX * 45;
 
-		cg.headEndYaw = 180 + 20 * cos( crandom()*M_PI );
-		cg.headEndPitch = 5 * cos( crandom()*M_PI );
+			cg.headEndYaw = 180 + 20 * cos( crandom()*M_PI );
+			cg.headEndPitch = 5 * cos( crandom()*M_PI );
 
-		cg.headStartTime = cg.time;
-		cg.headEndTime = cg.time + 100 + random() * 2000;
+			cg.headStartTime = cg.time;
+			cg.headEndTime = cg.time + 100 + random() * 2000;
+		}
 	} else {
-		if ( cg.time >= cg.headEndTime ) {
+		if ( !vr && cg.time >= cg.headEndTime ) {
 			// select a new head angle
 			cg.headStartYaw = cg.headEndYaw;
 			cg.headStartPitch = cg.headEndPitch;
@@ -502,15 +554,17 @@ static void CG_DrawStatusBarHead( float x ) {
 		size = ICON_SIZE * 1.25;
 	}
 
-	// if the server was frozen for a while we may have a bad head start time
-	if ( cg.headStartTime > cg.time ) {
-		cg.headStartTime = cg.time;
-	}
+	if ( !vr ) {
+		// if the server was frozen for a while we may have a bad head start time
+		if ( cg.headStartTime > cg.time ) {
+			cg.headStartTime = cg.time;
+		}
 
-	frac = ( cg.time - cg.headStartTime ) / (float)( cg.headEndTime - cg.headStartTime );
-	frac = frac * frac * ( 3 - 2 * frac );
-	angles[YAW] = cg.headStartYaw + ( cg.headEndYaw - cg.headStartYaw ) * frac;
-	angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
+		frac = ( cg.time - cg.headStartTime ) / (float)( cg.headEndTime - cg.headStartTime );
+		frac = frac * frac * ( 3 - 2 * frac );
+		angles[YAW] = cg.headStartYaw + ( cg.headEndYaw - cg.headStartYaw ) * frac;
+		angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
+	}
 
 	CG_DrawHead( x, cgs.screenYmax + 1 - size, size, size, cg.snap->ps.clientNum, angles );
 }
