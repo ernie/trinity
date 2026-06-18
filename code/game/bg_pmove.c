@@ -15,23 +15,14 @@ pml_t		pml;
 float	pm_stopspeed = 100.0f;
 float	pm_duckScale = 0.25f;
 float	pm_swimScale = 0.50f;
-float	pm_wadeScale = 0.70f;
 
-float	pm_accelerate = 10.0f;
 float	pm_airaccelerate = 1.0f;
 float	pm_wateraccelerate = 4.0f;
 float	pm_flyaccelerate = 8.0f;
 
-float	pm_friction = 6.0f;
 float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
-
-// CPM/PQL air control constants
-static float	cpm_pm_airstopaccelerate = 2.5f;
-static float	cpm_pm_aircontrol = 150.0f;
-static float	cpm_pm_strafeaccelerate = 70.0f;
-static float	cpm_pm_wishspeed = 30.0f;
 
 // per-frame mode tuning, set in PmoveSingle from Mode_GetConfig
 static const modeConfig_t	*pm_mode;
@@ -195,7 +186,7 @@ static void PM_Friction( void ) {
 			// if getting knocked back, no friction
 			if ( ! (pm->ps->pm_flags & PMF_TIME_KNOCKBACK) ) {
 				control = speed < pm_stopspeed ? pm_stopspeed : speed;
-				drop += control*pm_friction*pml.frametime;
+				drop += control*pm_mode->friction*pml.frametime;
 			}
 		}
 	}
@@ -619,7 +610,7 @@ static void PM_AirControl( vec3_t wishdir, float wishspeed ) {
 	float	forwardScale;
 	int		i;
 
-	if ( cpm_pm_aircontrol == 0.0f )
+	if ( pm_mode->airControl == 0.0f )
 		return;	// VQ3/QL: no air control, skip the normalize round-trips
 
 	if ( wishspeed == 0.0f )
@@ -642,7 +633,7 @@ static void PM_AirControl( vec3_t wishdir, float wishspeed ) {
 
 	dot = DotProduct( pm->ps->velocity, wishdir );
 	k = 32 * forwardScale;
-	k *= cpm_pm_aircontrol * dot * dot * pml.frametime;
+	k *= pm_mode->airControl * dot * dot * pml.frametime;
 
 	if ( dot > 0 ) {
 		for ( i = 0; i < 2; i++ )
@@ -705,7 +696,7 @@ static void PM_AirMove( void ) {
 
 		// air stop: moving against current velocity
 		if ( DotProduct( pm->ps->velocity, wishdir ) < 0 )
-			accel = cpm_pm_airstopaccelerate;
+			accel = pm_mode->airStopAccel;
 		else
 			accel = pm_airaccelerate;
 
@@ -716,10 +707,10 @@ static void PM_AirMove( void ) {
 			&& abs( pm->cmd.forwardmove ) <= 54 ) {
 			float strafeScale = ( abs( pm->cmd.rightmove ) - 10 ) / ( 120.0f - 10 );
 			strafeScale = Com_Clamp( 0.0f, 1.0f, strafeScale );
-			if ( wishspeed > cpm_pm_wishspeed ) {
-				wishspeed = wishspeed + ( cpm_pm_wishspeed - wishspeed ) * strafeScale;
+			if ( wishspeed > pm_mode->airWishspeedCap ) {
+				wishspeed = wishspeed + ( pm_mode->airWishspeedCap - wishspeed ) * strafeScale;
 			}
-			accel = accel + ( cpm_pm_strafeaccelerate - accel ) * strafeScale;
+			accel = accel + ( pm_mode->strafeAccel - accel ) * strafeScale;
 		}
 
 		PM_Accelerate( wishdir, wishspeed, accel );
@@ -862,7 +853,7 @@ static void PM_WalkMove( void ) {
 	if ( ( pml.groundTrace.surfaceFlags & SURF_SLICK ) || pm->ps->pm_flags & PMF_TIME_KNOCKBACK ) {
 		accelerate = pm_airaccelerate;
 	} else {
-		accelerate = pm_accelerate;
+		accelerate = pm_mode->groundAccelerate;
 	}
 
 	PM_Accelerate (wishdir, wishspeed, accelerate);
@@ -957,7 +948,7 @@ static void PM_NoclipMove( void ) {
 	{
 		drop = 0;
 
-		friction = pm_friction*1.5;	// extra friction
+		friction = pm_mode->friction*1.5;	// extra friction
 		control = speed < pm_stopspeed ? pm_stopspeed : speed;
 		drop += control*friction*pml.frametime;
 
@@ -984,7 +975,7 @@ static void PM_NoclipMove( void ) {
 	wishspeed = VectorNormalize(wishdir);
 	wishspeed *= scale;
 
-	PM_Accelerate( wishdir, wishspeed, pm_accelerate );
+	PM_Accelerate( wishdir, wishspeed, pm_mode->groundAccelerate );
 
 	// move
 	VectorMA (pm->ps->origin, pml.frametime, pm->ps->velocity, pm->ps->origin);
@@ -1911,12 +1902,6 @@ void PmoveSingle (pmove_t *pmove) {
 
 	// pull this frame's tuning from the mode table
 	pm_mode = Mode_GetConfig( pm->pmove_mode );
-	pm_accelerate = pm_mode->groundAccelerate;
-	pm_friction = pm_mode->friction;
-	cpm_pm_airstopaccelerate = pm_mode->airStopAccel;
-	cpm_pm_aircontrol = pm_mode->airControl;
-	cpm_pm_strafeaccelerate = pm_mode->strafeAccel;
-	cpm_pm_wishspeed = pm_mode->airWishspeedCap;
 
 	// this counter lets us debug movement problems with a journal
 	// by setting a conditional breakpoint fot the previous frame
