@@ -447,6 +447,15 @@ float Mode_ArmorProtection( const modeConfig_t *mc, int armorType ) {
 	return mc->armorGAProtection;
 }
 
+// shared flat/tier/self selection so server and client absorb identically
+float Mode_DamageArmorProtection( const modeConfig_t *mc, int armorType, qboolean selfDamage ) {
+	if ( !mc->armorTiered )
+		return mc->armorProtection;
+	if ( selfDamage )
+		return mc->armorSelfProtection;
+	return Mode_ArmorProtection( mc, armorType );
+}
+
 // returns the max armor for a given armor tier
 int Mode_ArmorMax( const modeConfig_t *mc, int armorType ) {
 	if ( armorType >= ARMORTYPE_RA ) return mc->armorRAMax;

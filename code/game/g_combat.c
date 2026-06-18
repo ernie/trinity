@@ -728,16 +728,7 @@ int CheckArmor (gentity_t *ent, int damage, int dflags, qboolean selfDamage)
 	count = client->ps.stats[STAT_ARMOR];
 	{
 		const modeConfig_t *gp = Mode_GetConfig( g_mode.integer );
-		float protection;
-		if ( gp->armorTiered ) {
-			if ( selfDamage ) {
-				protection = gp->armorSelfProtection;
-			} else {
-				protection = Mode_ArmorProtection( gp, client->ps.stats[STAT_ARMORTYPE] );
-			}
-		} else {
-			protection = gp->armorProtection;
-		}
+		float protection = Mode_DamageArmorProtection( gp, client->ps.stats[STAT_ARMORTYPE], selfDamage );
 		save = ceil( damage * protection );
 	}
 	if (save >= count)

@@ -410,18 +410,27 @@ static void CG_AddWeapon( int weapon, int quantity, qboolean dropped )
 static int CG_CheckArmor( int damage ) {
 	int				save;
 	int				count;
+	float			protection;
 
 	count = cg.predictedPlayerState.stats[STAT_ARMOR];
 
-	save = ceil( damage * ARMOR_PROTECTION );
+	// fall damage has no attacker, so it is never self-damage
+	protection = Mode_DamageArmorProtection( Mode_GetConfig( cgs.mode ),
+		cg.predictedPlayerState.stats[STAT_ARMORTYPE], qfalse );
+	save = ceil( damage * protection );
 
 	if (save >= count)
 		save = count;
 
 	if ( !save )
 		return 0;
-	
+
 	cg.predictedPlayerState.stats[STAT_ARMOR] -= save;
+
+	// mirror server
+	if ( cg.predictedPlayerState.stats[STAT_ARMOR] <= 0 ) {
+		cg.predictedPlayerState.stats[STAT_ARMORTYPE] = ARMORTYPE_NONE;
+	}
 
 	return save;
 }

@@ -896,6 +896,7 @@ CG_GetColorForHealth
 void CG_GetColorForHealth( int health, int armor, vec4_t hcolor ) {
 	int		count;
 	int		max;
+	float	prot;
 
 	// calculate the total points of damage that can
 	// be sustained at the current health / armor level
@@ -905,7 +906,8 @@ void CG_GetColorForHealth( int health, int armor, vec4_t hcolor ) {
 		return;
 	}
 	count = armor;
-	max = health * ARMOR_PROTECTION / ( 1.0 - ARMOR_PROTECTION );
+	prot = Mode_GetConfig( cgs.mode )->armorProtection;
+	max = health * prot / ( 1.0 - prot );
 	if ( max < count ) {
 		count = max;
 	}

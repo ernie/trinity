@@ -24,7 +24,7 @@ float	pm_waterfriction = 1.0f;
 float	pm_flightfriction = 3.0f;
 float	pm_spectatorfriction = 5.0f;
 
-// per-frame mode tuning, set in PmoveSingle from Mode_GetConfig
+// per-frame mode tuning
 static const modeConfig_t	*pm_mode;
 
 int		c_pmove = 0;
@@ -611,7 +611,7 @@ static void PM_AirControl( vec3_t wishdir, float wishspeed ) {
 	int		i;
 
 	if ( pm_mode->airControl == 0.0f )
-		return;	// VQ3/QL: no air control, skip the normalize round-trips
+		return;	// skip the normalize round-trips
 
 	if ( wishspeed == 0.0f )
 		return;

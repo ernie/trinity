@@ -1282,7 +1282,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		if ( cg.predictedPlayerState.weapon == WP_RAILGUN 
 			&& cg.predictedPlayerState.weaponstate == WEAPON_FIRING ) {
 			float	f;
-			f = (1.0f - ((float)cg.predictedPlayerState.weaponTime / 1500.0f) );
+			f = (1.0f - ((float)cg.predictedPlayerState.weaponTime / (float)Mode_GetConfig( cgs.mode )->weapons[WP_RAILGUN].fireTime) );
 			gun.shaderRGBA.rgba[0] = 255 * ci->color1[0] * f;
 			gun.shaderRGBA.rgba[1] = 255 * ci->color1[1] * f;
 			gun.shaderRGBA.rgba[2] = 255 * ci->color1[2] * f;

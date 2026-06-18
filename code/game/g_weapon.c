@@ -989,7 +989,7 @@ static void KamikazeRadiusDamage( vec3_t origin, gentity_t *attacker, float dama
 			VectorSubtract (ent->r.currentOrigin, origin, dir);
 			// push the center of mass higher than the origin so players
 			// get knocked into the air more
-			dir[2] += 24;
+			dir[2] += Mode_GetConfig( g_mode.integer )->splashZKnockback;
 			G_Damage( ent, NULL, attacker, dir, origin, damage, DAMAGE_RADIUS|DAMAGE_NO_TEAM_PROTECTION, MOD_KAMIKAZE );
 			ent->kamikazeTime = level.time + 3000;
 //		}
@@ -1047,7 +1047,7 @@ static void KamikazeShockWave( vec3_t origin, gentity_t *attacker, float damage,
 
 //		if( CanDamage (ent, origin) ) {
 			VectorSubtract (ent->r.currentOrigin, origin, dir);
-			dir[2] += 24;
+			dir[2] += Mode_GetConfig( g_mode.integer )->splashZKnockback;
 			G_Damage( ent, NULL, attacker, dir, origin, damage, DAMAGE_RADIUS|DAMAGE_NO_TEAM_PROTECTION, MOD_KAMIKAZE );
 			//
 			dir[2] = 0;
