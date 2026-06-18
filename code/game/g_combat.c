@@ -958,6 +958,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			weapon_t wp = WP_NONE;
 			switch ( mod ) {
 			case MOD_GAUNTLET:       wp = WP_GAUNTLET; break;
+			case MOD_MACHINEGUN:     wp = WP_MACHINEGUN; break;
 			case MOD_SHOTGUN:        wp = WP_SHOTGUN; break;
 			case MOD_GRENADE:
 			case MOD_GRENADE_SPLASH: wp = WP_GRENADE_LAUNCHER; break;
@@ -967,7 +968,14 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			case MOD_RAILGUN:        wp = WP_RAILGUN; break;
 			case MOD_PLASMA:
 			case MOD_PLASMA_SPLASH:  wp = WP_PLASMAGUN; break;
+			case MOD_BFG:
+			case MOD_BFG_SPLASH:     wp = WP_BFG; break;
 			case MOD_GRAPPLE:        wp = WP_GRAPPLING_HOOK; break;
+#ifdef MISSIONPACK
+			case MOD_NAIL:           wp = WP_NAILGUN; break;
+			case MOD_CHAINGUN:       wp = WP_CHAINGUN; break;
+			case MOD_PROXIMITY_MINE: wp = WP_PROX_LAUNCHER; break;
+#endif
 			default: break;
 			}
 			if ( wp != WP_NONE ) {
