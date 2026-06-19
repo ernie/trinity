@@ -855,6 +855,11 @@ static void CG_RegisterGraphics( void ) {
 #endif
 	cgs.media.plasmaBallShader = trap_R_RegisterShader( "sprites/plasma1" );
 	cgs.media.bloodTrailShader = trap_R_RegisterShader( "bloodTrail" );
+	cgs.media.bloodGoutShader = trap_R_RegisterShader( "bloodGout" );
+	cgs.media.bloodSplatShader[0] = trap_R_RegisterShader( "bloodSplat0" );
+	cgs.media.bloodSplatShader[1] = trap_R_RegisterShader( "bloodSplat1" );
+	cgs.media.bloodSplatShader[2] = trap_R_RegisterShader( "bloodSplat2" );
+	cgs.media.bloodSplatShader[3] = trap_R_RegisterShader( "bloodSplat3" );
 	cgs.media.lagometerShader = trap_R_RegisterShader("lagometer" );
 	cgs.media.connectionShader = trap_R_RegisterShader( "disconnected" );
 

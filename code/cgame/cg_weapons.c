@@ -2111,7 +2111,11 @@ CG_MissileHitPlayer
 =================
 */
 void CG_MissileHitPlayer( int weapon, vec3_t origin, vec3_t dir, int entityNum ) {
-	CG_Bleed( origin, dir, entityNum, weapon );
+	// Trinity servers send aggregated, damage-scaled blood via EV_BLOOD; bleed
+	// per-hit only as the vanilla-server fallback (no real damage here).
+	if ( !cgs.trinityServer ) {
+		CG_Bleed( origin, dir, entityNum, 30 );
+	}
 
 	// some weapons will make an explosion with the blood, while
 	// others will just make the blood
@@ -2470,7 +2474,9 @@ void CG_Bullet( vec3_t end, int sourceEntityNum, vec3_t normal, qboolean flesh, 
 			// No valid shooter position, use zero vector for omnidirectional spray
 			VectorClear( dir );
 		}
-		CG_Bleed( end, dir, fleshEntityNum, WP_MACHINEGUN );
+		if ( !cgs.trinityServer ) {
+			CG_Bleed( end, dir, fleshEntityNum, 3 );	// vanilla fallback (no real damage)
+		}
 	} else {
 		CG_MissileHitWall( WP_MACHINEGUN, 0, end, normal, IMPACTSOUND_DEFAULT );
 	}

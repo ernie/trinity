@@ -48,7 +48,7 @@
 #define	MAX_STEP_CHANGE		32
 
 #define	MAX_VERTS_ON_POLY	10
-#define	MAX_MARK_POLYS		256
+#define	MAX_MARK_POLYS		2048
 
 #define STAT_MINUS			10	// num frame for '-' stats digit
 
@@ -256,7 +256,8 @@ typedef enum {
 	LEF_PUFF_DONT_SCALE  = 0x0001,			// do not scale size over time
 	LEF_TUMBLE			 = 0x0002,			// tumble over time, used for ejecting shells
 	LEF_SOUND1			 = 0x0004,			// sound 1 for kamikaze
-	LEF_SOUND2			 = 0x0008			// sound 2 for kamikaze
+	LEF_SOUND2			 = 0x0008,			// sound 2 for kamikaze
+	LEF_NO_MARK			 = 0x0010			// blood particle: do not leave a mark on impact
 } leFlag_t;
 
 typedef enum {
@@ -870,6 +871,8 @@ typedef struct {
 	qhandle_t	plasmaBallShader;
 	qhandle_t	waterBubbleShader;
 	qhandle_t	bloodTrailShader;
+	qhandle_t	bloodGoutShader;
+	qhandle_t	bloodSplatShader[4];
 #ifdef MISSIONPACK
 	qhandle_t	nailPuffShader;
 	qhandle_t	blueProxMine;
@@ -1140,6 +1143,7 @@ typedef struct {
 // all clients to begin playing instantly
 typedef struct {
 	gameState_t		gameState;			// gamestate from server
+	qboolean		trinityServer;		// qtrue once the trinity handshake is seen (server supports EV_BLOOD etc.)
 	glconfig_t		glconfig;			// rendering configuration
 	float			screenXScale;		// derived from glconfig
 	float			screenYScale;
@@ -1554,7 +1558,7 @@ void CG_DamagePlum( vec3_t org, int damage );
 void CG_GibPlayer( const vec3_t playerOrigin );
 void CG_BigExplode( vec3_t playerOrigin );
 
-void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int weapon );
+void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage );
 
 localEntity_t *CG_MakeExplosion( const vec3_t origin, const vec3_t dir,
 								qhandle_t hModel, qhandle_t shader, int msec,

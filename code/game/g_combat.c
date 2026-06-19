@@ -1106,23 +1106,35 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			attacker->client->damage.amount += take + asave;
 		}
 #endif
-		if ( !OnSameTeam( targ, attacker ) ) {
-			// accumulate damage per target for damage plums
-			found = qfalse;
-			for ( i = 0; i < attacker->client->damagePlumCount; i++ ) {
-				if ( attacker->client->damagePlums[i].clientNum == targ->s.number ) {
-					attacker->client->damagePlums[i].damage += take + asave;
-					found = qtrue;
-					break;
-				}
+		// accumulate damage per target this frame. Collected unconditionally;
+		// the team/cvar filters are applied at flush (g_active.c) so blood
+		// (always) and damage plums (non-team, when enabled) share one tally.
+		found = qfalse;
+		for ( i = 0; i < attacker->client->damagePlumCount; i++ ) {
+			if ( attacker->client->damagePlums[i].clientNum == targ->s.number ) {
+				attacker->client->damagePlums[i].damage += take + asave;
+				found = qtrue;
+				break;
 			}
-			if ( !found && attacker->client->damagePlumCount < MAX_CLIENTS ) {
-				attacker->client->damagePlums[attacker->client->damagePlumCount].clientNum = targ->s.number;
-				attacker->client->damagePlums[attacker->client->damagePlumCount].damage = take + asave;
-				VectorCopy( targ->r.currentOrigin, attacker->client->damagePlums[attacker->client->damagePlumCount].origin );
-				attacker->client->damagePlums[attacker->client->damagePlumCount].origin[2] += 24;
-				attacker->client->damagePlumCount++;
+		}
+		if ( !found && attacker->client->damagePlumCount < MAX_CLIENTS ) {
+			int p = attacker->client->damagePlumCount;
+			attacker->client->damagePlums[p].clientNum = targ->s.number;
+			attacker->client->damagePlums[p].damage = take + asave;
+			VectorCopy( targ->r.currentOrigin, attacker->client->damagePlums[p].origin );
+			attacker->client->damagePlums[p].origin[2] += 24;
+			if ( point ) {
+				VectorCopy( point, attacker->client->damagePlums[p].woundPos );
+			} else {
+				VectorCopy( targ->r.currentOrigin, attacker->client->damagePlums[p].woundPos );
 			}
+			if ( dir ) {
+				VectorCopy( dir, attacker->client->damagePlums[p].dir );
+			} else {
+				VectorSet( attacker->client->damagePlums[p].dir, 0, 0, 1 );
+			}
+			attacker->client->damagePlums[p].sameTeam = OnSameTeam( targ, attacker );
+			attacker->client->damagePlumCount++;
 		}
 	}
 

@@ -1,0 +1,17 @@
+// Extended blood gout — full 10-frame animMap. The legacy .shader parser caps
+// animMap at 8 frames (MAX_IMAGE_ANIMATIONS_VQ3); a .shaderx is parsed as an
+// extended shader, so the full MAX_IMAGE_ANIMATIONS (24) applies.
+// NOTE: .shaderx is only scanned on a programmable renderer (GL_ProgramAvailable);
+// VR uses one. If blood renders white, the renderer fell back to non-extended.
+// Rate: one 10-frame cycle (~1.0s) outlives the sprites (<1.0s) so it never
+// loops/re-fires mid-life. Source art is red; rgbGen const darkens toward stock.
+bloodGout
+{
+	cull none
+	{
+		animMap 10 gfx/blood/gout01.tga gfx/blood/gout02.tga gfx/blood/gout03.tga gfx/blood/gout04.tga gfx/blood/gout05.tga gfx/blood/gout06.tga gfx/blood/gout07.tga gfx/blood/gout08.tga gfx/blood/gout09.tga gfx/blood/gout10.tga
+		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbGen const ( 0.32 0.0 0.04 )
+		alphaGen vertex
+	}
+}

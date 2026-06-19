@@ -92,7 +92,7 @@ CG_CVAR( cg_noVoiceText, "cg_noVoiceText", "0", CVAR_ARCHIVE )
 // but we also reference them here
 CG_CVAR( cg_buildScript, "com_buildScript", "0", 0 )	// force loading of all possible data amd error on failures
 CG_CVAR( cg_paused, "cl_paused", "0", CVAR_ROM )
-CG_CVAR( cg_blood, "com_blood", "1", CVAR_ARCHIVE )
+CG_CVAR( cg_blood, "com_blood", "2", CVAR_ARCHIVE_ND )	// 0 off, 1 classic, 2 enhanced
 #ifdef MISSIONPACK
 CG_CVAR( cg_currentSelectedPlayer, "cg_currentSelectedPlayer", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_currentSelectedPlayerName, "cg_currentSelectedPlayerName", "", CVAR_ARCHIVE )
@@ -133,7 +133,6 @@ CG_CVAR( cg_fovAdjust, "cg_fovAdjust", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_followKiller, "cg_followKiller", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_damageEffect, "cg_damageEffect", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_crosshairColor, "cg_crosshairColor", "0", CVAR_ARCHIVE )
-CG_CVAR( cg_bloodParticles, "cg_bloodParticles", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_followMode, "cg_followMode", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_tvTimeline, "cg_tvTimeline", "1", CVAR_ARCHIVE )
 CG_CVAR( cg_tvTime, "cl_tvTime", "0", CVAR_ROM )

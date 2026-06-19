@@ -1018,6 +1018,12 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		CG_Bullet( es->pos.trBase, es->otherEntityNum, dir, qtrue, es->eventParm );
 		break;
 
+	case EV_BLOOD:
+		// aggregated per-victim blood from a Trinity server (damage in generic1)
+		ByteToDir( es->eventParm, dir );
+		CG_Bleed( es->pos.trBase, dir, es->otherEntityNum, es->generic1 );
+		break;
+
 	case EV_SHOTGUN:
 		CG_ShotgunFire( es );
 		break;

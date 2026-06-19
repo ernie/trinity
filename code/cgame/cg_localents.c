@@ -103,27 +103,46 @@ void CG_BloodTrail( localEntity_t *le ) {
 	int		t2;
 	int		step;
 	vec3_t	newOrigin;
+	vec3_t	end;
+	trace_t	trace;
 	localEntity_t	*blood;
 
-	step = 150;
+	// Dense trail of animated blood gouts along the gib's path.
+	// Time-based step ~40ms ≈ one gout every ~10 units at gib speed, so fast
+	// gibs lay down a continuous ribbon instead of sparse dots.
+	step = 40;
 	t = step * ( (cg.time - cg.frametime + step ) / step );
 	t2 = step * ( cg.time / step );
 
 	for ( ; t <= t2; t += step ) {
 		BG_EvaluateTrajectory( &le->pos, t, newOrigin );
 
-		blood = CG_SmokePuff( newOrigin, vec3_origin, 
-					  20,		// radius
-					  1, 1, 1, 1,	// color
-					  2000,		// trailTime
-					  t,		// startTime
-					  0,		// fadeInTime
-					  0,		// flags
-					  cgs.media.bloodTrailShader );
-		// use the optimized version
-		blood->leType = LE_FALL_SCALE_FADE;
-		// drop a total of 40 units over its lifetime
-		blood->pos.trDelta[2] = 40;
+		blood = CG_SmokePuff( newOrigin, vec3_origin,
+					  24 + random() * 16,		// radius 24-40
+					  1, 1, 1, 1,			// color (shader supplies red)
+					  700 + random() * 300,		// duration <= gout cycle (~1s) so anim plays once
+					  t,				// startTime — per-sprite animMap anchor
+					  0,				// fadeInTime
+					  LEF_PUFF_DONT_SCALE,		// constant size; the animMap does the visual change
+					  cgs.media.bloodGoutShader );
+		// Keep the default LE_MOVE_SCALE_FADE: it draws as a sprite refEntity, so the
+		// animMap is anchored to THIS puff's shaderTime. LE_FALL_SCALE_FADE draws via
+		// a poly (trap_R_AddPolyToScene), which carries no per-entity time, so the
+		// animation would run on the global clock and visibly restart mid-life.
+		blood->pos.trDelta[2] = -10;	// gentle settle
+
+		// streak blood on a nearby surface beneath the path: trace a short way
+		// down and splat where it meets geometry. A high-arcing gib finds no
+		// surface and leaves nothing under its apex; a low/sliding one paints a
+		// continuous streak (a per-step trail of decals).
+		VectorCopy( newOrigin, end );
+		end[2] -= 64;
+		CG_Trace( &trace, newOrigin, NULL, NULL, end, -1, CONTENTS_SOLID );
+		if ( trace.fraction < 1.0f ) {
+			CG_ImpactMark( cgs.media.bloodSplatShader[ rand() & 3 ], trace.endpos,
+				trace.plane.normal, random() * 360, 1, 1, 1, 1, qtrue,
+				12 + random() * 20, qfalse );	// 12-32, denser trail streak
+		}
 	}
 }
 
@@ -139,7 +158,7 @@ void CG_FragmentBounceMark( localEntity_t *le, trace_t *trace ) {
 	if ( le->leMarkType == LEMT_BLOOD ) {
 
 		radius = 16 + (rand()&31);
-		CG_ImpactMark( cgs.media.bloodMarkShader, trace->endpos, trace->plane.normal, random()*360,
+		CG_ImpactMark( cgs.media.bloodSplatShader[ rand() & 3 ], trace->endpos, trace->plane.normal, random()*360,
 			1,1,1,1, qtrue, radius, qfalse );
 	} else if ( le->leMarkType == LEMT_BURN ) {
 
@@ -1047,9 +1066,12 @@ static void CG_AddBloodParticle( localEntity_t *le ) {
 	CG_Trace( &trace, re->origin, NULL, NULL, newOrigin, -1, CONTENTS_SOLID );
 
 	if ( trace.fraction < 1.0f ) {
-		// Hit a surface - leave a matching mark
-		CG_ImpactMark( cgs.media.bloodMarkShader, trace.endpos, trace.plane.normal,
-			random() * 360, 1, 1, 1, 1, qtrue, le->radius, qfalse );
+		// Hit a surface. Gouts/spray (LEF_NO_MARK) splat via their own dedicated
+		// decals, so they just disappear here; small droplets leave a mark.
+		if ( !( le->leFlags & LEF_NO_MARK ) ) {
+			CG_ImpactMark( cgs.media.bloodSplatShader[ rand() & 3 ], trace.endpos, trace.plane.normal,
+				random() * 360, 1, 1, 1, 1, qtrue, le->radius, qfalse );
+		}
 		CG_FreeLocalEntity( le );
 		return;
 	} else {

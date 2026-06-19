@@ -544,49 +544,27 @@ localEntity_t *CG_MakeExplosion( const vec3_t origin, const vec3_t dir,
 CG_Bleed
 
 This is the spurt of blood when a character gets hit.
-Spawns multiple blood droplet particles that spray along the impact direction.
-dir = direction the projectile was traveling (NULL for omnidirectional spray)
-weapon = weapon type for determining particle count
+Spawns cosmetic floating gouts (which never mark) plus instant surface decals,
+both counts scaled by damage. dir = damage direction. damage = the hit's damage
+(supplied per victim per frame by the server via EV_BLOOD).
 =================
 */
-#define BLOOD_PARTICLE_SPEED_EXIT	600
-#define BLOOD_PARTICLE_SPEED_ENTRY	50
+// Splat count scales with damage (~damage/3), capped.
+#define BLOOD_DMG_PER_SPLAT	3
+#define BLOOD_SPLAT_CAP		8
 
-static int CG_BloodParticleCount( int weapon ) {
-	// Returns droplet count (reduced by 1 since we also spawn a puff)
-	switch ( weapon ) {
-		case WP_PLASMAGUN:
-			return 4;
-		case WP_BFG:
-			return 7;
-		case WP_ROCKET_LAUNCHER:
-		case WP_GRENADE_LAUNCHER:
-			return 9;
-		// Weapons that trigger CG_Bleed via EV_MISSILE_HIT or EV_BULLET_HIT_FLESH:
-		// Gauntlet, machine gun, shotgun, lightning gun, or even grappling hook
-		// Railgun doesn't trigger a blood event.
-		default:
-			return 2;
-	}
-}
-
-void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int weapon ) {
+void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage ) {
 	localEntity_t	*le;
 	refEntity_t		*re;
 	int				i;
-	int				particleCount;
-	vec3_t			velocity;
+	int				count;
 	vec3_t			baseDir;
-	vec3_t			perpA, perpB;
-	float			spread, forwardBias;
-	float			speed;
+	vec3_t			traceDir, splatEnd;
+	trace_t			trace;
 	qboolean		isPlayer;
-	qboolean		inLiquid;
-	qboolean		isExitWound;
-	float			angle;
-	float			perpSpeed;
 	float			puffRadius;
 	int				puffDuration;
+	float			pick;
 
 	if ( !cg_blood.integer ) {
 		return;
@@ -594,8 +572,8 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int weapon ) {
 
 	isPlayer = ( entityNum == cg.snap->ps.clientNum );
 
-	// If particles disabled, use original sprite-based blood effect
-	if ( !cg_bloodParticles.integer ) {
+	// com_blood 1 = classic (legacy sprite); 2+ = enhanced (gouts + decals below)
+	if ( cg_blood.integer < 2 ) {
 		le = CG_AllocLocalEntity();
 		le->leType = LE_EXPLOSION;
 		le->startTime = cg.time;
@@ -607,136 +585,112 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int weapon ) {
 		le->refEntity.radius = 24;
 		le->refEntity.customShader = cgs.media.bloodExplosionShader;
 
-		// don't show player's own blood in view
 		if ( isPlayer ) {
 			le->refEntity.renderfx |= RF_THIRD_PERSON;
 		}
 		return;
 	}
 
-	inLiquid = ( CG_PointContents( origin, -1 ) & MASK_WATER ) != 0;
-
-	if ( inLiquid ) {
-		// Single puff underwater
-		puffRadius = 2 + random() * 3;  // 2-5 units
-		puffDuration = 300 + random() * 200;  // 300-500ms
-
-		le = CG_SmokePuff( origin, vec3_origin,
-			puffRadius,
-			1, 1, 1, 1,
-			puffDuration,
-			cg.time, 0, 0,
-			cgs.media.bloodTrailShader );
-		le->leType = LE_FALL_SCALE_FADE;
-		le->pos.trDelta[2] = -2;  // Slow rise
-
-		if ( isPlayer ) {
-			le->refEntity.renderfx |= RF_THIRD_PERSON;
-		}
-		return;
-	}
-
-	particleCount = CG_BloodParticleCount( weapon );
-
-	// Set up directional basis if we have a direction
+	// direction basis (fall back to up)
 	if ( dir && ( dir[0] != 0 || dir[1] != 0 || dir[2] != 0 ) ) {
 		VectorNormalize2( dir, baseDir );
-		// Create perpendicular vectors for spray spread
-		PerpendicularVector( perpA, baseDir );
-		CrossProduct( baseDir, perpA, perpB );
 	} else {
-		// No direction - use upward as default
 		VectorSet( baseDir, 0, 0, 1 );
-		VectorSet( perpA, 1, 0, 0 );
-		VectorSet( perpB, 0, 1, 0 );
 	}
 
-	// Spawn the blood droplet particles
-	for ( i = 0; i < particleCount; i++ ) {
+	// underwater: a single rising puff, no spray/decals
+	if ( CG_PointContents( origin, -1 ) & MASK_WATER ) {
+		le = CG_SmokePuff( origin, vec3_origin,
+			2 + random() * 3, 1, 1, 1, 1,
+			300 + random() * 200, cg.time, 0, 0,
+			cgs.media.bloodTrailShader );
+		le->leType = LE_FALL_SCALE_FADE;
+		le->pos.trDelta[2] = -2;
+		if ( isPlayer ) {
+			le->refEntity.renderfx |= RF_THIRD_PERSON;
+		}
+		return;
+	}
+
+	// damage -> splat count (~damage/3, capped)
+	count = ( damage + BLOOD_DMG_PER_SPLAT - 1 ) / BLOOD_DMG_PER_SPLAT;
+	if ( count < 1 ) {
+		count = 1;
+	}
+	if ( count > BLOOD_SPLAT_CAP ) {
+		count = BLOOD_SPLAT_CAP;
+	}
+
+	// Cosmetic floating gouts (never mark; the decals below are the surface blood).
+	for ( i = 0; i < count; i++ ) {
 		le = CG_AllocLocalEntity();
 		re = &le->refEntity;
 
-		le->leFlags = LEF_PUFF_DONT_SCALE;
+		le->leFlags = LEF_PUFF_DONT_SCALE | LEF_NO_MARK;
 		le->leType = LE_BLOOD_PARTICLE;
 		le->startTime = cg.time;
-		le->endTime = cg.time + 800 + random() * 400;
+		le->endTime = cg.time + 700 + random() * 300;
 		le->lifeRate = 1.0f / ( le->endTime - le->startTime );
-
-		// Directional spray along bullet path
-		// 80% exit wound (away from shooter), 20% entry (random horizontal splash)
-		isExitWound = ( random() < 0.8f );
-		if ( isExitWound ) {
-			speed = BLOOD_PARTICLE_SPEED_EXIT * (0.4f + random() * 0.6f);
-			forwardBias = 0.8f + random() * 0.4f;
-			spread = (random() - 0.5f) * 0.4f;      // Tight perpendicular spread
-
-			velocity[0] = baseDir[0] * speed * forwardBias
-						+ perpA[0] * speed * spread
-						+ perpB[0] * speed * (random() - 0.5f) * 0.6f;
-			velocity[1] = baseDir[1] * speed * forwardBias
-						+ perpA[1] * speed * spread
-						+ perpB[1] * speed * (random() - 0.5f) * 0.6f;
-			velocity[2] = baseDir[2] * speed * forwardBias
-						+ perpA[2] * speed * spread
-						+ perpB[2] * speed * (random() - 0.5f) * 0.6f
-						+ speed * 0.2f;  // Slight upward bias
-		} else {
-			// Entry wound - spray in the plane perpendicular to projectile direction
-			angle = random() * M_PI * 2;
-			speed = BLOOD_PARTICLE_SPEED_ENTRY * (0.4f + random() * 0.6f);
-			perpSpeed = speed * (0.8f + random() * 0.4f);
-
-			velocity[0] = perpA[0] * cos( angle ) * perpSpeed + perpB[0] * sin( angle ) * perpSpeed;
-			velocity[1] = perpA[1] * cos( angle ) * perpSpeed + perpB[1] * sin( angle ) * perpSpeed;
-			velocity[2] = perpA[2] * cos( angle ) * perpSpeed + perpB[2] * sin( angle ) * perpSpeed;
-		}
 
 		le->pos.trType = TR_GRAVITY;
 		le->pos.trTime = cg.time;
-		VectorCopy( origin, le->pos.trBase );
-		VectorCopy( velocity, le->pos.trDelta );
-
-		// Use bloodTrail shader for particles
-		re->reType = RT_SPRITE;
-		re->rotation = rand() % 360;
-		re->radius = 3 + random() * 5;  // Varied sizes 3-8
-		re->customShader = cgs.media.bloodTrailShader;
-		re->u.shaderTime = cg.time / 1000.0f;
+		VectorMA( origin, random() * 24, baseDir, le->pos.trBase );
+		VectorScale( baseDir, 60 + random() * 80, le->pos.trDelta );
+		le->pos.trDelta[0] += crandom() * 40;
+		le->pos.trDelta[1] += crandom() * 40;
+		le->pos.trDelta[2] += 40 + random() * 50;
 
 		VectorCopy( le->pos.trBase, re->origin );
-
-		// Set color (shader handles actual blood color)
-		le->color[0] = 1.0f;
-		le->color[1] = 1.0f;
-		le->color[2] = 1.0f;
-		le->color[3] = 1.0f;
-
+		re->reType = RT_SPRITE;
+		re->rotation = rand() % 360;
+		re->radius = 18 + random() * 18;
+		re->customShader = cgs.media.bloodGoutShader;
+		re->u.shaderTime = cg.time / 1000.0f;
 		re->shaderRGBA.rgba[0] = 0xff;
 		re->shaderRGBA.rgba[1] = 0xff;
 		re->shaderRGBA.rgba[2] = 0xff;
 		re->shaderRGBA.rgba[3] = 0xff;
 
+		le->color[0] = le->color[1] = le->color[2] = le->color[3] = 1.0f;
 		le->radius = re->radius;
 
-		// don't show player's own blood in view
 		if ( isPlayer ) {
 			re->renderfx |= RF_THIRD_PERSON;
 		}
 	}
 
-	// Add a blood mist at entry or exit wound
-	puffRadius = 2 + random() * 3;  // 2-5 units
-	puffDuration = 300 + random() * 200;  // 300-500ms
+	// Instant surface decals: per decal pick a weighted-random direction
+	// (down > along-shot > lateral), trace a short way, stamp where it hits.
+	// Approximates an omnidirectional decal clip with damage-scaled count.
+	for ( i = 0; i < count; i++ ) {
+		pick = random();
+		if ( pick < 0.5f ) {				// floor pooling
+			VectorSet( traceDir, crandom() * 0.3f, crandom() * 0.3f, -1.0f );
+		} else if ( pick < 0.8f ) {			// wall behind (along shot)
+			traceDir[0] = baseDir[0] + crandom() * 0.3f;
+			traceDir[1] = baseDir[1] + crandom() * 0.3f;
+			traceDir[2] = baseDir[2] + crandom() * 0.3f;
+		} else {							// lateral
+			VectorSet( traceDir, crandom(), crandom(), crandom() * 0.3f );
+		}
+		VectorNormalize( traceDir );
+		VectorMA( origin, 64, traceDir, splatEnd );
+		CG_Trace( &trace, origin, NULL, NULL, splatEnd, -1, CONTENTS_SOLID );
+		if ( trace.fraction < 1.0f ) {
+			CG_ImpactMark( cgs.media.bloodSplatShader[ rand() & 3 ], trace.endpos,
+				trace.plane.normal, random() * 360, 1, 1, 1, 1, qtrue,
+				30 + random() * 30, qfalse );
+		}
+	}
 
+	// small blood mist at the wound
+	puffRadius = 2 + random() * 3;
+	puffDuration = 300 + random() * 200;
 	le = CG_SmokePuff( origin, vec3_origin,
-		puffRadius,
-		1, 1, 1, 1,
-		puffDuration,
-		cg.time, 0, 0,
-		cgs.media.bloodTrailShader );
+		puffRadius, 1, 1, 1, 1, puffDuration,
+		cg.time, 0, 0, cgs.media.bloodTrailShader );
 	le->leType = LE_FALL_SCALE_FADE;
-	le->pos.trDelta[2] = 4;  // Slow fall
-
+	le->pos.trDelta[2] = 4;
 	if ( isPlayer ) {
 		le->refEntity.renderfx |= RF_THIRD_PERSON;
 	}
@@ -771,8 +725,101 @@ static void CG_LaunchGib( const vec3_t origin, const vec3_t velocity, qhandle_t 
 
 	le->bounceFactor = 0.6f;
 
+	// tumble in flight; CG_AddFragment evaluates le->angles
+	le->leFlags |= LEF_TUMBLE;
+	le->angles.trType = TR_LINEAR;
+	le->angles.trTime = cg.time;
+	le->angles.trBase[0] = rand() % 360;
+	le->angles.trBase[1] = rand() % 360;
+	le->angles.trBase[2] = rand() % 360;
+	le->angles.trDelta[0] = crandom() * 400;
+	le->angles.trDelta[1] = crandom() * 400;
+	le->angles.trDelta[2] = crandom() * 400;
+
 	le->leBounceSoundType = LEBS_BLOOD;
 	le->leMarkType = LEMT_BLOOD;
+}
+
+/*
+===================
+CG_GibBloodSpray
+
+Enhanced gib blood: several streams shot outward from the gib origin, each
+ray-traced so it stops at walls, emitting a line of animated gout sprites, plus
+one large ground splat.
+===================
+*/
+#define	GIB_STREAM_NUM		12		// number of streams
+#define	GIB_STREAM_COUNT	12		// sprites per stream
+#define	GIB_STREAM_DIST		220.0f	// max stream length
+
+static void CG_GibBloodSpray( const vec3_t org ) {
+	int				i, j;
+	vec3_t			o, v, tmp, end;
+	trace_t			tr;
+	float			dist;
+	localEntity_t	*le;
+	refEntity_t		*re;
+
+	for ( i = 0; i < GIB_STREAM_NUM; i++ ) {
+		// start point jittered around the origin, biased slightly upward
+		o[0] = org[0] + crandom() * 8;
+		o[1] = org[1] + crandom() * 8;
+		o[2] = org[2] + 8 + crandom() * 12;
+
+		// outward direction, mostly upward
+		v[0] = crandom();
+		v[1] = crandom();
+		v[2] = 0.2f + random();
+
+		// trace to a wall so the stream doesn't punch through geometry
+		VectorMA( o, GIB_STREAM_DIST, v, tmp );
+		CG_Trace( &tr, o, NULL, NULL, tmp, -1, CONTENTS_SOLID );
+		dist = GIB_STREAM_DIST * tr.fraction;
+
+		for ( j = 1; j < GIB_STREAM_COUNT; j++ ) {
+			le = CG_AllocLocalEntity();
+			re = &le->refEntity;
+
+			le->leFlags = LEF_PUFF_DONT_SCALE | LEF_NO_MARK;
+			le->leType = LE_BLOOD_PARTICLE;
+			le->startTime = cg.time;
+			le->endTime = cg.time + 500 + random() * 400;
+			le->lifeRate = 1.0f / ( le->endTime - le->startTime );
+
+			le->pos.trType = TR_GRAVITY;
+			le->pos.trTime = cg.time;
+			VectorCopy( o, le->pos.trBase );
+			// velocity grows along the stream; add upward kick and jitter
+			le->pos.trDelta[0] = v[0] * dist * ( (float)j / GIB_STREAM_COUNT ) + crandom() * 2;
+			le->pos.trDelta[1] = v[1] * dist * ( (float)j / GIB_STREAM_COUNT ) + crandom() * 2;
+			le->pos.trDelta[2] = v[2] * dist * ( (float)j / GIB_STREAM_COUNT ) + crandom() * 2 + 100;
+
+			VectorCopy( o, re->origin );
+			re->reType = RT_SPRITE;
+			re->rotation = rand() % 360;
+			re->radius = 18 + random() * 22;	// 18-40, matches on-hit gout scale
+			re->customShader = cgs.media.bloodGoutShader;
+			re->u.shaderTime = cg.time / 1000.0f;
+			re->shaderRGBA.rgba[0] = 0xff;
+			re->shaderRGBA.rgba[1] = 0xff;
+			re->shaderRGBA.rgba[2] = 0xff;
+			re->shaderRGBA.rgba[3] = 0xff;
+
+			le->color[0] = le->color[1] = le->color[2] = le->color[3] = 1.0f;
+			le->radius = re->radius;
+		}
+	}
+
+	// large ground splat under the gib origin
+	VectorCopy( org, end );
+	end[2] -= 64;
+	CG_Trace( &tr, org, NULL, NULL, end, -1, CONTENTS_SOLID );
+	if ( tr.fraction < 1.0f ) {
+		CG_ImpactMark( cgs.media.bloodSplatShader[ rand() & 3 ], tr.endpos,
+			tr.plane.normal, random() * 360, 1, 1, 1, 1, qtrue,
+			60 + random() * 60, qfalse );	// 60-120, scale-corrected gib ground splat
+	}
 }
 
 /*
@@ -790,6 +837,8 @@ void CG_GibPlayer( const vec3_t playerOrigin ) {
 	if ( !cg_blood.integer ) {
 		return;
 	}
+
+	CG_GibBloodSpray( playerOrigin );
 
 	VectorCopy( playerOrigin, origin );
 	velocity[0] = crandom()*GIB_VELOCITY;

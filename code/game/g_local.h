@@ -399,11 +399,15 @@ struct gclient_s {
 		int		amount;
 	} damage;
 
-	// damage plums - track damage per target for this frame
+	// per-target damage accumulated this frame; drives blood (always) and
+	// damage plums (non-team, when enabled)
 	struct {
 		int		clientNum;
 		int		damage;
-		vec3_t	origin;
+		vec3_t	origin;			// plum position (above target)
+		vec3_t	woundPos;		// hit point, for blood
+		vec3_t	dir;			// damage direction, for blood spray
+		qboolean sameTeam;		// skip the plum (not the blood) for teammates
 	} damagePlums[MAX_CLIENTS];
 	int			damagePlumCount;
 

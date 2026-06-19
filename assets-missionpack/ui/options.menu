@@ -351,9 +351,10 @@ itemDef {
 itemDef {
 		name options
 		group grpOptions
-		text "Blood Particles:"
-		type ITEM_TYPE_YESNO
-		cvar "cg_bloodParticles"
+		text "Blood:"
+		type ITEM_TYPE_MULTI
+		cvar "com_blood"
+		cvarFloatList { "Off" 0 "Classic" 1 "Modern" 2 }
 		rect 245 255 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128

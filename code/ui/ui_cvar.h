@@ -48,6 +48,7 @@ UI_CVAR( ui_brassTime, "cg_brassTime", "2500", CVAR_ARCHIVE )
 UI_CVAR( ui_drawCrosshair, "cg_drawCrosshair", "4", CVAR_ARCHIVE )
 UI_CVAR( ui_drawCrosshairNames, "cg_drawCrosshairNames", "1", CVAR_ARCHIVE )
 UI_CVAR( ui_marks, "cg_marks", "1", CVAR_ARCHIVE )
+UI_CVAR( ui_blood, "com_blood", "2", CVAR_ARCHIVE_ND )	// so the Team Arena menu reads/persists it before cgame loads
 
 UI_CVAR( ui_server1, "server1", "", CVAR_ARCHIVE )
 UI_CVAR( ui_server2, "server2", "", CVAR_ARCHIVE )
