@@ -21,15 +21,18 @@ void CG_Shutdown( void );
 // extension interface
 qboolean intShaderTime = qfalse;
 qboolean linearLight = qfalse;
+qboolean projectDecal = qfalse;
 
 #ifdef Q3_VM
 qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 void (*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
+void (*trap_R_ProjectDecal)( const vec3_t origin, float radius, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
 #else
 int dll_com_trapGetValue;
 int dll_trap_R_AddRefEntityToScene2;
 int dll_trap_R_AddLinearLightToScene;
+int dll_trap_R_ProjectDecal;
 #endif
 
 /*
@@ -1944,6 +1947,10 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 			trap_R_AddLinearLightToScene = (void*)~atoi( value );
 			linearLight = qtrue;
 		}
+		if ( trap_GetValue( value, sizeof( value ), "trap_R_ProjectDecal" ) ) {
+			trap_R_ProjectDecal = (void*)~atoi( value );
+			projectDecal = qtrue;
+		}
 #else
 		dll_com_trapGetValue = atoi( value );
 		if ( trap_GetValue( value, sizeof( value ), "trap_R_AddRefEntityToScene2" ) ) {
@@ -1953,6 +1960,10 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 		if ( trap_GetValue( value, sizeof( value ), "trap_R_AddLinearLightToScene_Q3E" ) ) {
 			dll_trap_R_AddLinearLightToScene = atoi( value );
 			linearLight = qtrue;
+		}
+		if ( trap_GetValue( value, sizeof( value ), "trap_R_ProjectDecal" ) ) {
+			dll_trap_R_ProjectDecal = atoi( value );
+			projectDecal = qtrue;
 		}
 #endif
 	}

@@ -1558,6 +1558,7 @@ void CG_DamagePlum( vec3_t org, int damage );
 void CG_GibPlayer( const vec3_t playerOrigin );
 void CG_BigExplode( vec3_t playerOrigin );
 
+void CG_BloodDecal( const vec3_t origin, float radius );
 void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean directional );
 
 localEntity_t *CG_MakeExplosion( const vec3_t origin, const vec3_t dir,
@@ -1849,16 +1850,20 @@ int CG_NewParticleArea ( int num );
 // extension interface
 extern  qboolean intShaderTime;
 extern  qboolean linearLight;
+extern  qboolean projectDecal;
 
 #ifdef Q3_VM
 extern qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 extern void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 extern void	(*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
+extern void	(*trap_R_ProjectDecal)( const vec3_t origin, float radius, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
 #else
 qboolean trap_GetValue( char *value, int valueSize, const char *key );
 void trap_R_AddRefEntityToScene2( const refEntity_t *re );
 void trap_R_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
+void trap_R_ProjectDecal( const vec3_t origin, float radius, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
 extern int dll_com_trapGetValue;
 extern int dll_trap_R_AddRefEntityToScene2;
 extern int dll_trap_R_AddLinearLightToScene;
+extern int dll_trap_R_ProjectDecal;
 #endif

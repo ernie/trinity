@@ -541,6 +541,29 @@ localEntity_t *CG_MakeExplosion( const vec3_t origin, const vec3_t dir,
 
 /*
 =================
+CG_BloodDecal
+
+Radial blood decal: paints every nearby world surface within radius (walls,
+floor, ceiling), unlike a single traced mark. Modern blood path only.
+=================
+*/
+#define BLOOD_DECAL_LIFETIME	8000
+
+void CG_BloodDecal( const vec3_t origin, float radius ) {
+	static const float red[4] = { 1.0f, 1.0f, 1.0f, 1.0f };	// shader supplies the red
+
+	// projectDecal is the A1 capability flag: false on an engine without the
+	// extension, so Modern blood silently falls back to no engine decals.
+	if ( !projectDecal || radius <= 0 ) {
+		return;
+	}
+	trap_R_ProjectDecal( origin, radius, random() * 360.0f,
+		cgs.media.bloodSplatShader[ rand() & 3 ], red, BLOOD_DECAL_LIFETIME );
+}
+
+
+/*
+=================
 CG_Bleed
 
 This is the spurt of blood when a character gets hit.
@@ -559,8 +582,6 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean di
 	int				i;
 	int				count;
 	vec3_t			baseDir;
-	vec3_t			traceStart, traceDir, splatEnd;
-	trace_t			trace;
 	qboolean		isPlayer;
 	float			puffRadius;
 	int				puffDuration;
@@ -659,32 +680,15 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean di
 		}
 	}
 
-	// Instant surface decals: per decal jitter the start point across a small
-	// disc (so marks spread instead of stacking), then trace outward and stamp
-	// where it hits. A direct hit sprays along the impact momentum (painting
-	// the surface behind the victim) with a downward pull so open hits still
-	// pool; splash has no real impact vector, so it sprays omnidirectionally.
+	// Radial surface blood: one decal at the wound plus a few jittered around it,
+	// each painting all nearby surfaces within its radius (walls included).
+	CG_BloodDecal( origin, 24 + random() * 16 );
 	for ( i = 0; i < count; i++ ) {
-		traceStart[0] = origin[0] + crandom() * 24;
-		traceStart[1] = origin[1] + crandom() * 24;
-		traceStart[2] = origin[2] + crandom() * 8;
-		if ( directional ) {
-			traceDir[0] = baseDir[0] + crandom() * 0.5f;
-			traceDir[1] = baseDir[1] + crandom() * 0.5f;
-			traceDir[2] = baseDir[2] + crandom() * 0.4f - 0.5f;	// forward, pulled down
-		} else {
-			traceDir[0] = crandom();
-			traceDir[1] = crandom();
-			traceDir[2] = crandom() - 1.0f;		// omnidirectional, biased to the floor
-		}
-		VectorNormalize( traceDir );
-		VectorMA( traceStart, 96, traceDir, splatEnd );
-		CG_Trace( &trace, traceStart, NULL, NULL, splatEnd, -1, CONTENTS_SOLID );
-		if ( trace.fraction < 1.0f ) {
-			CG_ImpactMark( cgs.media.bloodSplatShader[ rand() & 3 ], trace.endpos,
-				trace.plane.normal, random() * 360, 1, 1, 1, 1, qtrue,
-				30 + random() * 30, qfalse );
-		}
+		vec3_t splatOrg;
+		splatOrg[0] = origin[0] + crandom() * 24;
+		splatOrg[1] = origin[1] + crandom() * 24;
+		splatOrg[2] = origin[2] + crandom() * 16;
+		CG_BloodDecal( splatOrg, 18 + random() * 18 );
 	}
 
 	// small blood mist at the wound
@@ -759,7 +763,7 @@ one large ground splat.
 
 static void CG_GibBloodSpray( const vec3_t org ) {
 	int				i, j;
-	vec3_t			o, v, tmp, end;
+	vec3_t			o, v, tmp;
 	trace_t			tr;
 	float			dist;
 	localEntity_t	*le;
@@ -815,15 +819,8 @@ static void CG_GibBloodSpray( const vec3_t org ) {
 		}
 	}
 
-	// large ground splat under the gib origin
-	VectorCopy( org, end );
-	end[2] -= 64;
-	CG_Trace( &tr, org, NULL, NULL, end, -1, CONTENTS_SOLID );
-	if ( tr.fraction < 1.0f ) {
-		CG_ImpactMark( cgs.media.bloodSplatShader[ rand() & 3 ], tr.endpos,
-			tr.plane.normal, random() * 360, 1, 1, 1, 1, qtrue,
-			60 + random() * 60, qfalse );	// 60-120, scale-corrected gib ground splat
-	}
+	// large radial blood pool at the gib origin (covers floor and any nearby walls)
+	CG_BloodDecal( org, 60 + random() * 60 );
 }
 
 /*

@@ -436,3 +436,7 @@ void trap_R_AddRefEntityToScene2( const refEntity_t *re ) {
 void trap_R_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b ) {
 	syscall( dll_trap_R_AddLinearLightToScene, start, end, intensity, r, g, b );
 }
+
+void trap_R_ProjectDecal( const vec3_t origin, float radius, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime ) {
+	syscall( dll_trap_R_ProjectDecal, origin, PASSFLOAT(radius), PASSFLOAT(orientation), hShader, rgba, lifeTime );
+}
