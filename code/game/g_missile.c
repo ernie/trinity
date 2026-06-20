@@ -287,7 +287,6 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 #endif
 	// impact damage
 	if (other->takedamage) {
-		// FIXME: wrong damage direction?
 		if ( ent->damage ) {
 			vec3_t	velocity;
 
@@ -299,8 +298,9 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 			if ( VectorLength( velocity ) == 0 ) {
 				velocity[2] = 1;	// stepped on a grenade
 			}
+			// trace->endpos is the impact point; ent->s.origin is stale for a missile
 			G_Damage (other, ent, &g_entities[ent->r.ownerNum], velocity,
-				ent->s.origin, ent->damage, 
+				trace->endpos, ent->damage,
 				0, ent->methodOfDeath);
 		}
 	}

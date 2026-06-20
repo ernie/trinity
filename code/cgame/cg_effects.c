@@ -553,18 +553,17 @@ both counts scaled by damage. dir = damage direction. damage = the hit's damage
 #define BLOOD_DMG_PER_SPLAT	3
 #define BLOOD_SPLAT_CAP		8
 
-void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage ) {
+void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean directional ) {
 	localEntity_t	*le;
 	refEntity_t		*re;
 	int				i;
 	int				count;
 	vec3_t			baseDir;
-	vec3_t			traceDir, splatEnd;
+	vec3_t			traceStart, traceDir, splatEnd;
 	trace_t			trace;
 	qboolean		isPlayer;
 	float			puffRadius;
 	int				puffDuration;
-	float			pick;
 
 	if ( !cg_blood.integer ) {
 		return;
@@ -597,6 +596,7 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage ) {
 	} else {
 		VectorSet( baseDir, 0, 0, 1 );
 	}
+
 
 	// underwater: a single rising puff, no spray/decals
 	if ( CG_PointContents( origin, -1 ) & MASK_WATER ) {
@@ -659,23 +659,27 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage ) {
 		}
 	}
 
-	// Instant surface decals: per decal pick a weighted-random direction
-	// (down > along-shot > lateral), trace a short way, stamp where it hits.
-	// Approximates an omnidirectional decal clip with damage-scaled count.
+	// Instant surface decals: per decal jitter the start point across a small
+	// disc (so marks spread instead of stacking), then trace outward and stamp
+	// where it hits. A direct hit sprays along the impact momentum (painting
+	// the surface behind the victim) with a downward pull so open hits still
+	// pool; splash has no real impact vector, so it sprays omnidirectionally.
 	for ( i = 0; i < count; i++ ) {
-		pick = random();
-		if ( pick < 0.5f ) {				// floor pooling
-			VectorSet( traceDir, crandom() * 0.3f, crandom() * 0.3f, -1.0f );
-		} else if ( pick < 0.8f ) {			// wall behind (along shot)
-			traceDir[0] = baseDir[0] + crandom() * 0.3f;
-			traceDir[1] = baseDir[1] + crandom() * 0.3f;
-			traceDir[2] = baseDir[2] + crandom() * 0.3f;
-		} else {							// lateral
-			VectorSet( traceDir, crandom(), crandom(), crandom() * 0.3f );
+		traceStart[0] = origin[0] + crandom() * 24;
+		traceStart[1] = origin[1] + crandom() * 24;
+		traceStart[2] = origin[2] + crandom() * 8;
+		if ( directional ) {
+			traceDir[0] = baseDir[0] + crandom() * 0.5f;
+			traceDir[1] = baseDir[1] + crandom() * 0.5f;
+			traceDir[2] = baseDir[2] + crandom() * 0.4f - 0.5f;	// forward, pulled down
+		} else {
+			traceDir[0] = crandom();
+			traceDir[1] = crandom();
+			traceDir[2] = crandom() - 1.0f;		// omnidirectional, biased to the floor
 		}
 		VectorNormalize( traceDir );
-		VectorMA( origin, 64, traceDir, splatEnd );
-		CG_Trace( &trace, origin, NULL, NULL, splatEnd, -1, CONTENTS_SOLID );
+		VectorMA( traceStart, 96, traceDir, splatEnd );
+		CG_Trace( &trace, traceStart, NULL, NULL, splatEnd, -1, CONTENTS_SOLID );
 		if ( trace.fraction < 1.0f ) {
 			CG_ImpactMark( cgs.media.bloodSplatShader[ rand() & 3 ], trace.endpos,
 				trace.plane.normal, random() * 360, 1, 1, 1, 1, qtrue,

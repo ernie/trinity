@@ -1558,7 +1558,7 @@ void CG_DamagePlum( vec3_t org, int damage );
 void CG_GibPlayer( const vec3_t playerOrigin );
 void CG_BigExplode( vec3_t playerOrigin );
 
-void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage );
+void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean directional );
 
 localEntity_t *CG_MakeExplosion( const vec3_t origin, const vec3_t dir,
 								qhandle_t hModel, qhandle_t shader, int msec,

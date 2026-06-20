@@ -1133,6 +1133,8 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			} else {
 				VectorSet( attacker->client->damagePlums[p].dir, 0, 0, 1 );
 			}
+			// splash spreads as omnidirectional; a direct hit's dir is real momentum
+			attacker->client->damagePlums[p].directional = !( dflags & DAMAGE_RADIUS );
 			attacker->client->damagePlums[p].sameTeam = OnSameTeam( targ, attacker );
 			attacker->client->damagePlumCount++;
 		}
@@ -1303,6 +1305,7 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 	vec3_t		mins, maxs;
 	vec3_t		v;
 	vec3_t		dir;
+	vec3_t		woundPoint;
 	int			i, e;
 	qboolean	hitClient = qfalse;
 
@@ -1325,14 +1328,19 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 		if (!ent->takedamage)
 			continue;
 
-		// find the distance from the edge of the bounding box
+		// find the distance from the edge of the bounding box;
+		// woundPoint = blast origin clamped onto the box (closest point on
+		// the body) so splash blood lands on the victim, not the blast wall
 		for ( i = 0 ; i < 3 ; i++ ) {
 			if ( origin[i] < ent->r.absmin[i] ) {
 				v[i] = ent->r.absmin[i] - origin[i];
+				woundPoint[i] = ent->r.absmin[i];
 			} else if ( origin[i] > ent->r.absmax[i] ) {
 				v[i] = origin[i] - ent->r.absmax[i];
+				woundPoint[i] = ent->r.absmax[i];
 			} else {
 				v[i] = 0;
+				woundPoint[i] = origin[i];
 			}
 		}
 
@@ -1354,7 +1362,7 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 				const modeConfig_t *gp = Mode_GetConfig( g_mode.integer );
 				dir[2] += gp->splashZKnockback;
 			}
-			G_Damage (ent, NULL, attacker, dir, origin, (int)points, DAMAGE_RADIUS, mod);
+			G_Damage (ent, NULL, attacker, dir, woundPoint, (int)points, DAMAGE_RADIUS, mod);
 		}
 	}
 

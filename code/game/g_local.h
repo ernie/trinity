@@ -407,6 +407,7 @@ struct gclient_s {
 		vec3_t	origin;			// plum position (above target)
 		vec3_t	woundPos;		// hit point, for blood
 		vec3_t	dir;			// damage direction, for blood spray
+		qboolean directional;	// direct hit (dir is momentum) vs splash (omnidirectional)
 		qboolean sameTeam;		// skip the plum (not the blood) for teammates
 	} damagePlums[MAX_CLIENTS];
 	int			damagePlumCount;
