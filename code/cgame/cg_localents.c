@@ -105,6 +105,23 @@ void CG_BloodTrail( localEntity_t *le ) {
 	vec3_t	newOrigin;
 	localEntity_t	*blood;
 
+	// Classic blood: sparse expanding puffs behind the gib (the pre-overhaul
+	// trail), with no animated gouts or projected decals.
+	if ( cg_blood.integer < 2 ) {
+		step = 150;
+		t = step * ( ( cg.time - cg.frametime + step ) / step );
+		t2 = step * ( cg.time / step );
+		for ( ; t <= t2; t += step ) {
+			BG_EvaluateTrajectory( &le->pos, t, newOrigin );
+			blood = CG_SmokePuff( newOrigin, vec3_origin,
+				20, 1, 1, 1, 1, 2000, t, 0, 0,
+				cgs.media.bloodTrailShader );
+			blood->leType = LE_FALL_SCALE_FADE;
+			blood->pos.trDelta[2] = 40;
+		}
+		return;
+	}
+
 	// Dense trail of animated blood gouts along the gib's path.
 	// Time-based step ~40ms ≈ one gout every ~10 units at gib speed, so fast
 	// gibs lay down a continuous ribbon instead of sparse dots.
@@ -147,7 +164,14 @@ void CG_FragmentBounceMark( localEntity_t *le, trace_t *trace ) {
 
 	if ( le->leMarkType == LEMT_BLOOD ) {
 
-		CG_BloodDecal( trace->endpos, 16 + ( rand() & 31 ) );
+		// Modern: radial projected decal. Classic: legacy single blood mark.
+		if ( cg_blood.integer >= 2 ) {
+			CG_BloodDecal( trace->endpos, 16 + ( rand() & 31 ) );
+		} else {
+			radius = 16 + ( rand() & 31 );
+			CG_ImpactMark( cgs.media.bloodMarkShader, trace->endpos, trace->plane.normal,
+				random() * 360, 1, 1, 1, 1, qtrue, radius, qfalse );
+		}
 	} else if ( le->leMarkType == LEMT_BURN ) {
 
 		radius = 8 + (rand()&15);

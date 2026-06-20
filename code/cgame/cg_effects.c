@@ -839,7 +839,10 @@ void CG_GibPlayer( const vec3_t playerOrigin ) {
 		return;
 	}
 
-	CG_GibBloodSpray( playerOrigin );
+	// Modern only: the enhanced gib blood spray. Classic leaves just the gibs.
+	if ( cg_blood.integer >= 2 ) {
+		CG_GibBloodSpray( playerOrigin );
+	}
 
 	VectorCopy( playerOrigin, origin );
 	velocity[0] = crandom()*GIB_VELOCITY;
