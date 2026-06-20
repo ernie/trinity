@@ -68,7 +68,7 @@ typedef struct {
 	menuradiobutton_s	synceveryframe;
 	menuradiobutton_s	forcemodel;
 	menulist_s			drawteamoverlay;
-	menuradiobutton_s	damageeffect;
+	menulist_s			damageeffect;
 	menulist_s			blood;
 	menuradiobutton_s	damageplums;
 	menulist_s			followmode;
@@ -91,6 +91,13 @@ static const char *teamoverlay_names[] =
 	"upper right",
 	"lower right",
 	"lower left",
+	NULL
+};
+
+static const char *damageeffect_names[] =
+{
+	"Classic",
+	"Modern",
 	NULL
 };
 
@@ -510,13 +517,14 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.drawteamoverlay.itemnames			= teamoverlay_names;
 
 	y += BIGCHAR_HEIGHT;
-	s_preferences.damageeffect.generic.type       = MTYPE_RADIOBUTTON;
-	s_preferences.damageeffect.generic.name       = "Modern Damage Effect:";
+	s_preferences.damageeffect.generic.type       = MTYPE_SPINCONTROL;
+	s_preferences.damageeffect.generic.name       = "Damage Effect:";
 	s_preferences.damageeffect.generic.flags      = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_preferences.damageeffect.generic.callback   = Preferences_Event;
 	s_preferences.damageeffect.generic.id         = ID_DAMAGEEFFECT;
 	s_preferences.damageeffect.generic.x          = PREFERENCES_X_POS;
 	s_preferences.damageeffect.generic.y          = y;
+	s_preferences.damageeffect.itemnames          = damageeffect_names;
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.blood.generic.type       = MTYPE_SPINCONTROL;

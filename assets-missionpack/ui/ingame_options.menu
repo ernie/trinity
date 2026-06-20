@@ -375,9 +375,10 @@ itemDef {
 itemDef {
 	name options
 	group grpOptions
-	text "Modern Damage Effect:"
-	type ITEM_TYPE_YESNO
+	text "Damage Effect:"
+	type ITEM_TYPE_MULTI
 	cvar "cg_damageEffect"
+	cvarFloatList { "Classic" 0 "Modern" 1 }
 	rect 3 258 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
