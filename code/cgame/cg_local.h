@@ -1143,7 +1143,7 @@ typedef struct {
 // all clients to begin playing instantly
 typedef struct {
 	gameState_t		gameState;			// gamestate from server
-	qboolean		trinityServer;		// qtrue once the trinity handshake is seen (server supports EV_BLOOD etc.)
+	qboolean		trinity;		// qtrue when the server runs the Trinity qagame (CS_GAME_VERSION == GAME_VERSION)
 	glconfig_t		glconfig;			// rendering configuration
 	float			screenXScale;		// derived from glconfig
 	float			screenYScale;

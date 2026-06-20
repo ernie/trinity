@@ -2113,7 +2113,7 @@ CG_MissileHitPlayer
 void CG_MissileHitPlayer( int weapon, vec3_t origin, vec3_t dir, int entityNum ) {
 	// Trinity servers send aggregated, damage-scaled blood via EV_BLOOD; bleed
 	// per-hit only as the vanilla-server fallback (no real damage here).
-	if ( !cgs.trinityServer ) {
+	if ( !cgs.trinity ) {
 		CG_Bleed( origin, dir, entityNum, 30, qtrue );
 	}
 
@@ -2474,7 +2474,7 @@ void CG_Bullet( vec3_t end, int sourceEntityNum, vec3_t normal, qboolean flesh, 
 			// No valid shooter position, use zero vector for omnidirectional spray
 			VectorClear( dir );
 		}
-		if ( !cgs.trinityServer ) {
+		if ( !cgs.trinity ) {
 			CG_Bleed( end, dir, fleshEntityNum, 3, qtrue );	// vanilla fallback (no real damage)
 		}
 	} else {

@@ -2024,7 +2024,9 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	s = CG_ConfigString( CS_GAME_VERSION );
 	if ( strstr( s, "defrag-" ) ) {
 		cgs.defrag = qtrue;
-	} else if ( strcmp( s, GAME_VERSION ) ) {
+	} else if ( !strcmp( s, GAME_VERSION ) ) {		// a Trinity server
+		cgs.trinity = qtrue;
+	} else if ( strcmp( s, GAME_VERSION_VANILLA ) ) {	// only other accept: a vanilla "baseq3-1" peer
 		CG_Error( "Client/Server game mismatch: %s/%s", GAME_VERSION, s );
 	}
 

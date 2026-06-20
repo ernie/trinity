@@ -5,7 +5,8 @@
 // because games can change separately from the main system version, we need a
 // second version that must match between game and cgame
 
-#define	GAME_VERSION		"baseq3-1"
+#define	GAME_VERSION		"trinity-1"	// both builds; fs_game separates bq3/TA
+#define	GAME_VERSION_VANILLA	"baseq3-1"	// id ships this for baseq3 AND TA
 #define	TRINITY_PROTO_VERSION	1
 
 #define	DEFAULT_GRAVITY		800
