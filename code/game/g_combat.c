@@ -848,8 +848,8 @@ dflags		these flags are used to control how T_Damage works
 */
 
 // Gib launch scales with damage, uncapped by maxKnockback so big hits fly far.
-#define GIB_DAMAGE_PUSH	14.0f
-#define GIB_PUSH_MAX	3000.0f
+#define GIB_DAMAGE_PUSH	7.0f
+#define GIB_PUSH_MAX	1000.0f
 
 void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			   vec3_t dir, vec3_t point, int damage, int dflags, int mod ) {
