@@ -148,6 +148,14 @@ void CG_BloodTrail( localEntity_t *le ) {
 						  cg.time, 0, LEF_PUFF_DONT_SCALE,
 						  cgs.media.bloodGoutShader );
 			blood->pos.trDelta[2] = -10;	// gentle settle
+			if ( animFrame ) {
+				blood->refEntity.renderfx |= RF_ANIMFRAME;	// gout plays once across its life
+			}
+			// slight tumble so trail puffs don't read as identical stamps
+			blood->angles.trType = TR_LINEAR;
+			blood->angles.trTime = cg.time;
+			blood->angles.trBase[0] = blood->refEntity.rotation;
+			blood->angles.trDelta[0] = crandom() * 50;	// deg/sec
 
 			if ( n % 3 == 0 ) {		// decals sparser than sprites (projection is costly)
 				CG_BloodDecal( le->trailOrigin, 16 + random() * 16 );
@@ -375,6 +383,36 @@ static void CG_AddFadeRGB( localEntity_t *le ) {
 
 /*
 ==================
+CG_UpdateGoutSprite
+
+Per-frame sprite updates for blood gouts: RF_ANIMFRAME maps the animMap frame to
+the life fraction (plays once, no loop); a TR_LINEAR angles trajectory spins the
+billboard slightly so the sprite tumbles instead of reading as a stamp.
+==================
+*/
+#define	BLOOD_GOUT_FRAMES	10		// frame count of the bloodGout animMap
+
+static void CG_UpdateGoutSprite( localEntity_t *le ) {
+	refEntity_t	*re = &le->refEntity;
+
+	if ( re->renderfx & RF_ANIMFRAME ) {
+		float frac = 1.0f - ( le->endTime - cg.time ) * le->lifeRate;
+		if ( frac < 0.0f ) {
+			frac = 0.0f;
+		} else if ( frac > 0.999f ) {
+			frac = 0.999f;	// stay on the last frame; never wrap to 0
+		}
+		re->frame = (int)( frac * BLOOD_GOUT_FRAMES );
+	}
+
+	if ( le->angles.trType == TR_LINEAR ) {
+		re->rotation = le->angles.trBase[0]
+			+ le->angles.trDelta[0] * ( cg.time - le->angles.trTime ) * 0.001f;
+	}
+}
+
+/*
+==================
 CG_AddMoveScaleFade
 ==================
 */
@@ -411,6 +449,8 @@ static void CG_AddMoveScaleFade( localEntity_t *le ) {
 		CG_FreeLocalEntity( le );
 		return;
 	}
+
+	CG_UpdateGoutSprite( le );
 
 	if ( intShaderTime )
 		trap_R_AddRefEntityToScene2( re );
@@ -1047,10 +1087,12 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 ===================
 CG_AddBloodParticle
 
-Blood droplet that moves with gravity, traces for collision,
-leaves a blood mark on impact, then fades out on the surface.
+Blood gout/droplet: moves under gravity (mist also drags), traces for collision,
+leaves a mark on impact, then fades out on the surface.
 ===================
 */
+#define	BLOOD_DRAG	6.0f	// mist air resistance (1/s); terminal fall ~= gravity/BLOOD_DRAG
+
 static void CG_AddBloodParticle( localEntity_t *le ) {
 	refEntity_t	*re;
 	vec3_t		newOrigin;
@@ -1064,8 +1106,23 @@ static void CG_AddBloodParticle( localEntity_t *le ) {
 	if ( c < 0 ) c = 0;
 	re->shaderRGBA.rgba[3] = 0xff * c * le->color[3];
 
-	// Calculate new position
-	BG_EvaluateTrajectory( &le->pos, cg.time, newOrigin );
+	// Calculate new position. Mist (LEF_NO_MARK) integrates gravity + air drag so
+	// the fine spray decelerates and hangs like aerosol rather than arcing like a
+	// solid; heavier droplets keep the closed-form ballistic path.
+	if ( le->leFlags & LEF_NO_MARK ) {
+		float dt = ( cg.time - le->pos.trTime ) * 0.001f;
+		if ( dt > 0.0f ) {
+			float damp = 1.0f - BLOOD_DRAG * dt;
+			if ( damp < 0.0f ) damp = 0.0f;
+			le->pos.trDelta[2] -= DEFAULT_GRAVITY * dt;
+			VectorScale( le->pos.trDelta, damp, le->pos.trDelta );
+			VectorMA( le->pos.trBase, dt, le->pos.trDelta, le->pos.trBase );
+			le->pos.trTime = cg.time;
+		}
+		VectorCopy( le->pos.trBase, newOrigin );
+	} else {
+		BG_EvaluateTrajectory( &le->pos, cg.time, newOrigin );
+	}
 
 	// Particle entered water - spawn sinking blood cloud
 	if ( CG_PointContents( newOrigin, -1 ) & MASK_WATER ) {
@@ -1097,6 +1154,8 @@ static void CG_AddBloodParticle( localEntity_t *le ) {
 		// Still in flight
 		VectorCopy( newOrigin, re->origin );
 	}
+
+	CG_UpdateGoutSprite( le );
 
 	trap_R_AddRefEntityToScene( re );
 }

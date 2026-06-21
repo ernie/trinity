@@ -22,6 +22,7 @@ void CG_Shutdown( void );
 qboolean intShaderTime = qfalse;
 qboolean linearLight = qfalse;
 qboolean projectDecal = qfalse;
+qboolean animFrame = qfalse;
 
 #ifdef Q3_VM
 qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
@@ -1951,6 +1952,9 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 			trap_R_ProjectDecal = (void*)~atoi( value );
 			projectDecal = qtrue;
 		}
+		if ( trap_GetValue( value, sizeof( value ), "R_animFrame" ) ) {
+			animFrame = qtrue;
+		}
 #else
 		dll_com_trapGetValue = atoi( value );
 		if ( trap_GetValue( value, sizeof( value ), "trap_R_AddRefEntityToScene2" ) ) {
@@ -1964,6 +1968,9 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 		if ( trap_GetValue( value, sizeof( value ), "trap_R_ProjectDecal" ) ) {
 			dll_trap_R_ProjectDecal = atoi( value );
 			projectDecal = qtrue;
+		}
+		if ( trap_GetValue( value, sizeof( value ), "R_animFrame" ) ) {
+			animFrame = qtrue;
 		}
 #endif
 	}

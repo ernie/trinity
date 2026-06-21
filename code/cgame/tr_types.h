@@ -21,6 +21,8 @@
 #define	RF_SHADOW_PLANE		256		// use refEntity->shadowPlane
 #define	RF_WRAP_FRAMES		512		// mod the model frames by the maxframes to allow continuous
 									// animation without needing to know the frame count
+									// 1024 (0x0400) is RF_WORLD_ORIENTED in the VR clients (trinity-vr, trinity-quest)
+#define	RF_ANIMFRAME		2048	// index animMap by refEntity->frame, not time (R_animFrame ext)
 
 // refdef flags
 #define RDF_NOWORLDMODEL	1		// used for player configuration screen

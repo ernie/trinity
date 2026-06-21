@@ -3,8 +3,7 @@
 // extended shader, so the full MAX_IMAGE_ANIMATIONS (24) applies.
 // NOTE: .shaderx is only scanned on a programmable renderer (GL_ProgramAvailable);
 // VR uses one. If blood renders white, the renderer fell back to non-extended.
-// Rate: 30fps -> a 10-frame cycle is ~333ms, matched to the sprite lifetimes so
-// each plays through once. Source art is red; rgbGen const darkens toward stock.
+// RF_ANIMFRAME drives the frame off sprite lifetime; rgbGen const darkens art to stock.
 bloodGout
 {
 	cull none
@@ -14,4 +13,5 @@ bloodGout
 		rgbGen const ( 0.32 0.0 0.04 )
 		alphaGen vertex
 	}
+	clampTime 0.333	// fallback loop guard; ignored under RF_ANIMFRAME, keep <10/30 or it wraps
 }

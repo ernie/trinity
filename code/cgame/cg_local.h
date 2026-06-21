@@ -1853,6 +1853,7 @@ int CG_NewParticleArea ( int num );
 extern  qboolean intShaderTime;
 extern  qboolean linearLight;
 extern  qboolean projectDecal;
+extern  qboolean animFrame;
 
 #ifdef Q3_VM
 extern qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
