@@ -257,7 +257,8 @@ typedef enum {
 	LEF_TUMBLE			 = 0x0002,			// tumble over time, used for ejecting shells
 	LEF_SOUND1			 = 0x0004,			// sound 1 for kamikaze
 	LEF_SOUND2			 = 0x0008,			// sound 2 for kamikaze
-	LEF_NO_MARK			 = 0x0010			// blood particle: do not leave a mark on impact
+	LEF_NO_MARK			 = 0x0010,			// blood particle: do not leave a mark on impact
+	LEF_BLOOD_TRAIL		 = 0x0020			// gib trails blood across bounces (modern)
 } leFlag_t;
 
 typedef enum {
@@ -287,6 +288,7 @@ typedef struct localEntity_s {
 	trajectory_t	angles;
 
 	float			bounceFactor;		// 0.0 = no bounce, 1.0 = perfect
+	vec3_t			trailOrigin;		// last blood-trail emission point (gibs)
 
 	float			color[4];
 
@@ -1555,7 +1557,7 @@ void CG_LightningBoltBeam( vec3_t start, vec3_t end );
 void CG_ScorePlum( int client, const vec3_t origin, int score );
 void CG_DamagePlum( vec3_t org, int damage );
 
-void CG_GibPlayer( const vec3_t playerOrigin );
+void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity );
 void CG_BigExplode( vec3_t playerOrigin );
 
 void CG_BloodDecal( const vec3_t origin, float radius );

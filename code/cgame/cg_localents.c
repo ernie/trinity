@@ -91,6 +91,11 @@ or generates more localentities along a trail.
 ====================================================================================
 */
 
+// min gib speed (u/s) to keep trailing, so settling gibs don't stack trails
+#define GIB_TRAIL_SPEED	200
+// gout spacing (u) along the path; emit by distance traveled, not by time
+#define GIB_TRAIL_STEP	10
+
 /*
 ================
 CG_BloodTrail
@@ -122,34 +127,32 @@ void CG_BloodTrail( localEntity_t *le ) {
 		return;
 	}
 
-	// Dense trail of animated blood gouts along the gib's path.
-	// Time-based step ~40ms ≈ one gout every ~10 units at gib speed, so fast
-	// gibs lay down a continuous ribbon instead of sparse dots.
-	step = 40;
-	t = step * ( (cg.time - cg.frametime + step ) / step );
-	t2 = step * ( cg.time / step );
+	// Modern: gout trail by distance traveled (speed-independent). Accumulate
+	// from the last emission point, dropping a gout every GIB_TRAIL_STEP units.
+	{
+		vec3_t	dir;
+		float	dist;
+		int		n;
 
-	for ( ; t <= t2; t += step ) {
-		BG_EvaluateTrajectory( &le->pos, t, newOrigin );
+		BG_EvaluateTrajectory( &le->pos, cg.time, newOrigin );
+		VectorSubtract( newOrigin, le->trailOrigin, dir );
+		dist = VectorNormalize( dir );
 
-		blood = CG_SmokePuff( newOrigin, vec3_origin,
-					  24 + random() * 16,		// radius 24-40
-					  1, 1, 1, 1,			// color (shader supplies red)
-					  700 + random() * 300,		// duration <= gout cycle (~1s) so anim plays once
-					  t,				// startTime — per-sprite animMap anchor
-					  0,				// fadeInTime
-					  LEF_PUFF_DONT_SCALE,		// constant size; the animMap does the visual change
-					  cgs.media.bloodGoutShader );
-		// Keep the default LE_MOVE_SCALE_FADE: it draws as a sprite refEntity, so the
-		// animMap is anchored to THIS puff's shaderTime. LE_FALL_SCALE_FADE draws via
-		// a poly (trap_R_AddPolyToScene), which carries no per-entity time, so the
-		// animation would run on the global clock and visibly restart mid-life.
-		blood->pos.trDelta[2] = -10;	// gentle settle
+		for ( n = 0; dist >= GIB_TRAIL_STEP && n < 64; n++ ) {
+			VectorMA( le->trailOrigin, GIB_TRAIL_STEP, dir, le->trailOrigin );
+			dist -= GIB_TRAIL_STEP;
 
-		// Radial blood at each step of the gib's path: paints whatever surface is
-		// near the gib right now — the floor under a low arc, or the WALL a gib
-		// skims past (the streak the old downward-only trace could never make).
-		CG_BloodDecal( newOrigin, 16 + random() * 16 );
+			blood = CG_SmokePuff( le->trailOrigin, vec3_origin,
+						  24 + random() * 16, 1, 1, 1, 1,
+						  300 + random() * 66,		// ~333ms: one 30fps animMap cycle
+						  cg.time, 0, LEF_PUFF_DONT_SCALE,
+						  cgs.media.bloodGoutShader );
+			blood->pos.trDelta[2] = -10;	// gentle settle
+
+			if ( n % 3 == 0 ) {		// decals sparser than sprites (projection is costly)
+				CG_BloodDecal( le->trailOrigin, 16 + random() * 16 );
+			}
+		}
 	}
 }
 
@@ -298,8 +301,12 @@ static void CG_AddFragment( localEntity_t *le ) {
 
 		trap_R_AddRefEntityToScene( &le->refEntity );
 
-		// add a blood trail
-		if ( le->leBounceSoundType == LEBS_BLOOD ) {
+		// modern trails across bounces while fast; classic stops after one
+		if ( le->leFlags & LEF_BLOOD_TRAIL ) {
+			if ( VectorLengthSquared( le->pos.trDelta ) > GIB_TRAIL_SPEED * GIB_TRAIL_SPEED ) {
+				CG_BloodTrail( le );
+			}
+		} else if ( le->leBounceSoundType == LEBS_BLOOD ) {
 			CG_BloodTrail( le );
 		}
 
@@ -792,7 +799,7 @@ void CG_AddInvulnerabilityJuiced( localEntity_t *le ) {
 	}
 	if ( t > 5000 ) {
 		le->endTime = 0;
-		CG_GibPlayer( le->refEntity.origin );
+		CG_GibPlayer( le->refEntity.origin, vec3_origin );
 	}
 	else {
 		trap_R_AddRefEntityToScene( &le->refEntity );

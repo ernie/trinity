@@ -847,6 +847,10 @@ dflags		these flags are used to control how T_Damage works
 ============
 */
 
+// Gib launch scales with damage, uncapped by maxKnockback so big hits fly far.
+#define GIB_DAMAGE_PUSH	14.0f
+#define GIB_PUSH_MAX	3000.0f
+
 void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			   vec3_t dir, vec3_t point, int damage, int dflags, int mod ) {
 	gclient_t	*client;
@@ -1189,6 +1193,23 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
 			if (targ->health < -999)
 				targ->health = -999;
+
+			// Launch gibs along the hit, scaled by damage and ignoring
+			// FL_NO_KNOCKBACK so re-gibbed corpses still throw.
+			if ( g_blood.integer >= 2 && dir && targ->health <= GIB_HEALTH ) {
+				vec3_t	gvel;
+				float	force = (float)damage * GIB_DAMAGE_PUSH;
+
+				if ( force > GIB_PUSH_MAX ) {
+					force = GIB_PUSH_MAX;
+				}
+				VectorScale( dir, force, gvel );
+				if ( targ->client ) {
+					VectorCopy( gvel, targ->client->ps.velocity );
+				} else {
+					VectorCopy( gvel, targ->s.pos.trDelta );
+				}
+			}
 
 			targ->enemy = attacker;
 			targ->die (targ, inflictor, attacker, take, mod);
