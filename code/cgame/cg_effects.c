@@ -547,18 +547,18 @@ Radial blood decal: paints every nearby world surface within radius (walls,
 floor, ceiling), unlike a single traced mark. Modern blood path only.
 =================
 */
-#define BLOOD_DECAL_LIFETIME	8000
-
 void CG_BloodDecal( const vec3_t origin, float radius ) {
 	static const float red[4] = { 1.0f, 1.0f, 1.0f, 1.0f };	// shader supplies the red
+	float size  = radius * cg_bloodDecalScale.value;	// painted footprint
+	float reach = radius * cg_bloodDecalReach.value;	// surface-search distance
 
 	// projectDecal is the A1 capability flag: false on an engine without the
 	// extension, so Modern blood silently falls back to no engine decals.
-	if ( !projectDecal || radius <= 0 ) {
+	if ( !cg_bloodDecals.integer || !projectDecal || size <= 0 ) {
 		return;
 	}
-	trap_R_ProjectDecal( origin, radius, random() * 360.0f,
-		cgs.media.bloodSplatShader[ rand() & 3 ], red, BLOOD_DECAL_LIFETIME );
+	trap_R_ProjectDecal( origin, size, reach, random() * 360.0f,
+		cgs.media.bloodSplatShader[ rand() & 3 ], red, cg_bloodDecalTime.integer );
 }
 
 
@@ -581,6 +581,7 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean di
 	refEntity_t		*re;
 	int				i;
 	int				count;
+	int				goutCount, decalCount;
 	vec3_t			baseDir;
 	qboolean		isPlayer;
 	float			puffRadius;
@@ -643,8 +644,17 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean di
 		count = BLOOD_SPLAT_CAP;
 	}
 
+	goutCount = count;
+	if ( goutCount > cg_bloodBleedGouts.integer ) {
+		goutCount = cg_bloodBleedGouts.integer;
+	}
+	decalCount = count;
+	if ( decalCount > cg_bloodBleedDecals.integer ) {
+		decalCount = cg_bloodBleedDecals.integer;
+	}
+
 	// Cosmetic floating gouts (never mark; the decals below are the surface blood).
-	for ( i = 0; i < count; i++ ) {
+	for ( i = 0; i < goutCount; i++ ) {
 		le = CG_AllocLocalEntity();
 		re = &le->refEntity;
 
@@ -665,7 +675,7 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean di
 		VectorCopy( le->pos.trBase, re->origin );
 		re->reType = RT_SPRITE;
 		re->rotation = rand() % 360;
-		re->radius = 18 + random() * 12;	// 18-30 radius (max capped, smaller outliers ok)
+		re->radius = ( 18 + random() * 12 ) * cg_bloodGoutScale.value;
 		re->customShader = cgs.media.bloodGoutShader;
 		if ( animFrame ) {
 			re->renderfx |= RF_ANIMFRAME;	// play the gout once across its life
@@ -689,7 +699,7 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean di
 	// grows a little with count (12..26, ~half a player) for big-hit
 	// differentiation while staying small enough to skip a punch-through trace.
 	spread = 12 + ( count - 1 ) * 2;
-	for ( i = 0; i < count; i++ ) {
+	for ( i = 0; i < decalCount; i++ ) {
 		vec3_t splatOrg;
 		splatOrg[0] = origin[0] + crandom() * spread;
 		splatOrg[1] = origin[1] + crandom() * spread;
@@ -772,14 +782,29 @@ one large ground splat.
 #define	GIB_STREAM_NUM		12		// streams (burst directions)
 #define	GIB_STREAM_COUNT	11		// sprites per stream (NUM*COUNT total)
 #define	GIB_STREAM_SPEED	220.0f	// launch speed scale (u/s); trace clamps it near walls
+// Spread gout births over a few ms so they don't all stack on one frame.
+#define GIB_STREAM_STAGGER	30	// ms
 
 static void CG_GibBloodSpray( const vec3_t org ) {
 	int				i, j;
+	int				total, perStream;
 	vec3_t			o, v, tmp;
 	trace_t			tr;
 	float			speed;
 	localEntity_t	*le;
 	refEntity_t		*re;
+
+	perStream = (int)( GIB_STREAM_COUNT * cg_bloodGibSpray.value + 0.5f );
+	if ( perStream > GIB_STREAM_COUNT ) {
+		perStream = GIB_STREAM_COUNT;
+	}
+	if ( perStream < 1 ) {
+		// density 0: no gout streams, but still drop the ground pool (it's
+		// governed by cg_bloodDecals, not density).
+		CG_BloodDecal( org, 60 + random() * 60 );
+		return;
+	}
+	total = GIB_STREAM_NUM * perStream;
 
 	for ( i = 0; i < GIB_STREAM_NUM; i++ ) {
 		// start point jittered around the origin, biased slightly upward
@@ -797,45 +822,47 @@ static void CG_GibBloodSpray( const vec3_t org ) {
 		CG_Trace( &tr, o, NULL, NULL, tmp, -1, CONTENTS_SOLID );
 		speed = GIB_STREAM_SPEED * tr.fraction;
 
-		for ( j = 0; j < GIB_STREAM_COUNT; j++ ) {
+		for ( j = 0; j < perStream; j++ ) {
+			int birth = cg.time + ( ( i * perStream + j ) * GIB_STREAM_STAGGER ) / total;
+
 			le = CG_AllocLocalEntity();
 			re = &le->refEntity;
 
 			le->leFlags = LEF_PUFF_DONT_SCALE | LEF_NO_MARK;
 			le->leType = LE_BLOOD_PARTICLE;
-			le->startTime = cg.time;
+			le->startTime = birth;
 			// RF_ANIMFRAME lets a gout linger over its whole life without looping;
 			// fallback caps near one 30fps cycle so the time-based animMap won't.
 			if ( animFrame ) {
-				le->endTime = cg.time + 400 + random() * 500;
+				le->endTime = birth + 400 + random() * 500;
 			} else {
-				le->endTime = cg.time + 300 + random() * 33;
+				le->endTime = birth + 300 + random() * 33;
 			}
 			le->lifeRate = 1.0f / ( le->endTime - le->startTime );
 
 			le->pos.trType = TR_GRAVITY;
-			le->pos.trTime = cg.time;
+			le->pos.trTime = birth;
 			VectorCopy( o, le->pos.trBase );
 			// speed graded 1/perStream..1 along the stream (slowest still moves); + kick & jitter
-			le->pos.trDelta[0] = v[0] * speed * ( (float)( j + 1 ) / GIB_STREAM_COUNT ) + crandom() * 2;
-			le->pos.trDelta[1] = v[1] * speed * ( (float)( j + 1 ) / GIB_STREAM_COUNT ) + crandom() * 2;
-			le->pos.trDelta[2] = v[2] * speed * ( (float)( j + 1 ) / GIB_STREAM_COUNT ) + crandom() * 2 + 100;
+			le->pos.trDelta[0] = v[0] * speed * ( (float)( j + 1 ) / perStream ) + crandom() * 2;
+			le->pos.trDelta[1] = v[1] * speed * ( (float)( j + 1 ) / perStream ) + crandom() * 2;
+			le->pos.trDelta[2] = v[2] * speed * ( (float)( j + 1 ) / perStream ) + crandom() * 2 + 100;
 
 			// slight tumble so the billboard spins as it drifts, not a stamp
 			le->angles.trType = TR_LINEAR;
-			le->angles.trTime = cg.time;
+			le->angles.trTime = birth;
 			le->angles.trBase[0] = rand() % 360;
 			le->angles.trDelta[0] = crandom() * 50;	// deg/sec
 
 			VectorCopy( o, re->origin );
 			re->reType = RT_SPRITE;
 			re->rotation = le->angles.trBase[0];
-			re->radius = 11 + random() * 15;	// 11-26 radius (worldscaled)
+			re->radius = ( 11 + random() * 15 ) * cg_bloodGoutScale.value;
 			re->customShader = cgs.media.bloodGoutShader;
 			if ( animFrame ) {
 				re->renderfx |= RF_ANIMFRAME;
 			}
-			re->u.shaderTime = cg.time / 1000.0f;
+			re->u.shaderTime = birth / 1000.0f;
 			re->shaderRGBA.rgba[0] = 0xff;
 			re->shaderRGBA.rgba[1] = 0xff;
 			re->shaderRGBA.rgba[2] = 0xff;

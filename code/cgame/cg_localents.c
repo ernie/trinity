@@ -93,8 +93,6 @@ or generates more localentities along a trail.
 
 // min gib speed (u/s) to keep trailing, so settling gibs don't stack trails
 #define GIB_TRAIL_SPEED	200
-// gout spacing (u) along the path; emit by distance traveled, not by time
-#define GIB_TRAIL_STEP	10
 
 /*
 ================
@@ -128,22 +126,28 @@ void CG_BloodTrail( localEntity_t *le ) {
 	}
 
 	// Modern: gout trail by distance traveled (speed-independent). Accumulate
-	// from the last emission point, dropping a gout every GIB_TRAIL_STEP units.
+	// from the last emission point, dropping a gout every cg_bloodTrailStep units.
 	{
 		vec3_t	dir;
 		float	dist;
 		int		n;
+		int		step;
+
+		step = cg_bloodTrailStep.integer;
+		if ( step < 1 ) {
+			step = 1;
+		}
 
 		BG_EvaluateTrajectory( &le->pos, cg.time, newOrigin );
 		VectorSubtract( newOrigin, le->trailOrigin, dir );
 		dist = VectorNormalize( dir );
 
-		for ( n = 0; dist >= GIB_TRAIL_STEP && n < 64; n++ ) {
-			VectorMA( le->trailOrigin, GIB_TRAIL_STEP, dir, le->trailOrigin );
-			dist -= GIB_TRAIL_STEP;
+		for ( n = 0; dist >= step && n < 64; n++ ) {
+			VectorMA( le->trailOrigin, step, dir, le->trailOrigin );
+			dist -= step;
 
 			blood = CG_SmokePuff( le->trailOrigin, vec3_origin,
-						  24 + random() * 16, 1, 1, 1, 1,
+						  ( 24 + random() * 16 ) * cg_bloodGoutScale.value, 1, 1, 1, 1,
 						  300 + random() * 66,		// ~333ms: one 30fps animMap cycle
 						  cg.time, 0, LEF_PUFF_DONT_SCALE,
 						  cgs.media.bloodGoutShader );
@@ -157,7 +161,8 @@ void CG_BloodTrail( localEntity_t *le ) {
 			blood->angles.trBase[0] = blood->refEntity.rotation;
 			blood->angles.trDelta[0] = crandom() * 50;	// deg/sec
 
-			if ( n % 3 == 0 ) {		// decals sparser than sprites (projection is costly)
+			if ( cg_bloodTrailDecalStep.integer > 0 &&
+				 n % cg_bloodTrailDecalStep.integer == 0 ) {
 				CG_BloodDecal( le->trailOrigin, 16 + random() * 16 );
 			}
 		}
@@ -413,6 +418,31 @@ static void CG_UpdateGoutSprite( localEntity_t *le ) {
 
 /*
 ==================
+CG_BloodGoutCulled
+
+True when a blood gout is too close to draw this frame: the eye is inside the
+sprite, or it covers more than cg_bloodNearCull of the screen height. The caller
+skips the draw without freeing, so the gout reappears once it pulls back.
+==================
+*/
+static qboolean CG_BloodGoutCulled( const refEntity_t *re ) {
+	vec3_t	delta;
+	float	dist;
+
+	VectorSubtract( re->origin, cg.refdef.vieworg, delta );
+	dist = VectorLength( delta );
+	if ( dist <= re->radius ) {
+		return qtrue;
+	}
+	if ( cg_bloodNearCull.value > 0 &&
+		 re->radius > cg_bloodNearCull.value * dist * tan( cg.refdef.fov_y * ( M_PI / 360.0f ) ) ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+/*
+==================
 CG_AddMoveScaleFade
 ==================
 */
@@ -440,6 +470,12 @@ static void CG_AddMoveScaleFade( localEntity_t *le ) {
 	}
 
 	BG_EvaluateTrajectory( &le->pos, cg.time, re->origin );
+
+	// Blood trail gouts cull without freeing (they reappear as the gib carries
+	// them onward); everything else falls through to the inside-the-sprite free.
+	if ( re->customShader == cgs.media.bloodGoutShader && CG_BloodGoutCulled( re ) ) {
+		return;
+	}
 
 	// if the view would be "inside" the sprite, kill the sprite
 	// so it doesn't add too much overdraw
@@ -1101,6 +1137,11 @@ static void CG_AddBloodParticle( localEntity_t *le ) {
 
 	re = &le->refEntity;
 
+	// Staggered births: a scheduled gout doesn't integrate or draw until born.
+	if ( cg.time < le->startTime ) {
+		return;
+	}
+
 	// Calculate fade
 	c = ( le->endTime - cg.time ) * le->lifeRate;
 	if ( c < 0 ) c = 0;
@@ -1153,6 +1194,12 @@ static void CG_AddBloodParticle( localEntity_t *le ) {
 	} else {
 		// Still in flight
 		VectorCopy( newOrigin, re->origin );
+	}
+
+	// Near-eye cull: skip drawing a gout the camera is on top of (see
+	// CG_BloodGoutCulled). Non-freeing — it draws again once it pulls back.
+	if ( CG_BloodGoutCulled( re ) ) {
+		return;
 	}
 
 	CG_UpdateGoutSprite( le );

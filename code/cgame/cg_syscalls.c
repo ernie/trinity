@@ -437,6 +437,6 @@ void trap_R_AddLinearLightToScene( const vec3_t start, const vec3_t end, float i
 	syscall( dll_trap_R_AddLinearLightToScene, start, end, intensity, r, g, b );
 }
 
-void trap_R_ProjectDecal( const vec3_t origin, float radius, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime ) {
-	syscall( dll_trap_R_ProjectDecal, origin, PASSFLOAT(radius), PASSFLOAT(orientation), hShader, rgba, lifeTime );
+void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime ) {
+	syscall( dll_trap_R_ProjectDecal, origin, PASSFLOAT(size), PASSFLOAT(reach), PASSFLOAT(orientation), hShader, rgba, lifeTime );
 }
