@@ -318,6 +318,10 @@ static void CG_AddFragment( localEntity_t *le ) {
 		if ( le->leFlags & LEF_BLOOD_TRAIL ) {
 			if ( VectorLengthSquared( le->pos.trDelta ) > GIB_TRAIL_SPEED * GIB_TRAIL_SPEED ) {
 				CG_BloodTrail( le );
+			} else {
+				// gate closed: keep the marker on the gib so a later speed-up
+				// doesn't bridge the gap and restamp the path it already flew
+				VectorCopy( newOrigin, le->trailOrigin );
 			}
 		} else if ( le->leBounceSoundType == LEBS_BLOOD ) {
 			CG_BloodTrail( le );
@@ -342,6 +346,12 @@ static void CG_AddFragment( localEntity_t *le ) {
 
 	// reflect the velocity on the trace plane
 	CG_ReflectVelocity( le, &trace );
+
+	// resume the trail from the impact point so the post-bounce segment
+	// hugs the corner instead of drawing a chord across it
+	if ( le->leFlags & LEF_BLOOD_TRAIL ) {
+		VectorCopy( trace.endpos, le->trailOrigin );
+	}
 
 	trap_R_AddRefEntityToScene( &le->refEntity );
 }
