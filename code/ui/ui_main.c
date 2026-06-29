@@ -1917,6 +1917,9 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 		case UI_UPDATEPROGRESS:
 		case UI_UPDATESTATUS:
 			return 0;
+		case UI_HDR_PEAK_NITS:
+			s = va( "%i nits", (int)( trap_Cvar_VariableValue( "r_hdrPeak" ) + 0.5f ) );
+			break;
     default:
       break;
   }
@@ -2194,6 +2197,10 @@ static void UI_DrawGLInfo(rectDef_t *rect, float scale, vec4_t color, int textSt
 
 // FIXME: table drive
 //
+static void UI_DrawHDRPeakNits(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	Text_Paint(rect->x, rect->y, scale, color, va("%i nits", (int)(trap_Cvar_VariableValue("r_hdrPeak") + 0.5f)), 0, 0, textStyle);
+}
+
 static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle) {
 	rectDef_t rect;
 
@@ -2362,6 +2369,9 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 			break;
 		case UI_KEYBINDSTATUS:
 			UI_DrawKeyBindStatus(&rect,scale, color, textStyle);
+			break;
+		case UI_HDR_PEAK_NITS:
+			UI_DrawHDRPeakNits(&rect, scale, color, textStyle);
 			break;
 		case UI_TRINITYLOGIN:
 			{
@@ -3505,6 +3515,18 @@ static void UI_Update(const char *name) {
 	}
 }
 
+static void UI_UpdateHDRAvail( void ) {
+	char buf[64];
+	qboolean avail;
+	trap_Cvar_VariableStringBuffer( "r_hdrDisplay", buf, sizeof( buf ) );
+	avail = (qboolean)( buf[0] != '\0' );
+	if ( avail ) {
+		trap_Cvar_VariableStringBuffer( "cl_renderer", buf, sizeof( buf ) );
+		avail = (qboolean)( Q_stricmp( buf, "vulkan" ) == 0 );
+	}
+	trap_Cvar_Set( "ui_hdrAvail", avail ? "1" : "0" );
+}
+
 static void UI_RunMenuScript(char **args) {
 	const char *name, *name2;
 	char buff[1024];
@@ -3926,6 +3948,15 @@ static void UI_RunMenuScript(char **args) {
 			if (String_Parse(args, &name2)) {
 				UI_Update(name2);
 			}
+		} else if ( Q_stricmp( name, "updateHDRAvail" ) == 0 ) {
+			UI_UpdateHDRAvail();
+		} else if ( Q_stricmp( name, "snapHDRCvars" ) == 0 ) {
+			// Sliders write raw floats ("1000.000000") that never equal the default
+			// string, so CVAR_ARCHIVE_ND persists them even at default. Re-set via
+			// Cvar_SetValue (clean "%i") to keep defaults unwritten and snap Peak.
+			trap_Cvar_SetValue( "r_hdrPeak", (int)( trap_Cvar_VariableValue( "r_hdrPeak" ) + 0.5f ) );
+			trap_Cvar_SetValue( "r_hdrHighlight", trap_Cvar_VariableValue( "r_hdrHighlight" ) );
+			trap_Cvar_SetValue( "r_hdrPaperWhite", 0 );  // keep paper-white on auto; experts set it via console
 		}
 		else {
 			Com_Printf("unknown UI script %s\n", name);
@@ -5606,6 +5637,8 @@ void _UI_Init( qboolean inGameLoad ) {
 	trap_Cvar_Register(NULL, "debug_protocol", "", 0 );
 
 	trap_Cvar_Set("ui_actualNetGameType", va("%d", ui_netGameType.integer));
+
+	UI_UpdateHDRAvail();
 }
 
 

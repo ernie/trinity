@@ -227,6 +227,7 @@ GRAPHICS OPTIONS MENU
 #define ID_DISPLAY		107
 #define ID_SOUND		108
 #define ID_NETWORK		109
+#define ID_HDR			110
 
 typedef struct {
 	menuframework_s	menu;
@@ -248,6 +249,7 @@ typedef struct {
 	menulist_s  	allow_extensions;
 	menulist_s  	texturebits;
 	menulist_s  	colordepth;
+	menuradiobutton_s hdr;
 	menulist_s  	geometry;
 	menulist_s  	filter;
 	menutext_s		driverinfo;
@@ -266,6 +268,7 @@ typedef struct
 	int texturebits;
 	int geometry;
 	int filter;
+	int hdr;
 	qboolean extensions;
 } InitialVideoOptions_s;
 
@@ -309,6 +312,7 @@ static void GraphicsOptions_GetInitialVideo( void )
 	s_ivo.geometry    = s_graphicsoptions.geometry.curvalue;
 	s_ivo.filter      = s_graphicsoptions.filter.curvalue;
 	s_ivo.texturebits = s_graphicsoptions.texturebits.curvalue;
+	s_ivo.hdr         = s_graphicsoptions.hdr.curvalue;
 }
 
 /*
@@ -407,6 +411,10 @@ static void GraphicsOptions_UpdateMenuItems( void )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
+	if ( s_ivo.hdr != s_graphicsoptions.hdr.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
 
 	GraphicsOptions_CheckConfig();
 }	
@@ -481,6 +489,8 @@ static void GraphicsOptions_ApplyChanges( void *unused, int notification )
 	{
 		trap_Cvar_Set( "r_textureMode", "GL_LINEAR_MIPMAP_NEAREST" );
 	}
+
+	trap_Cvar_SetValue( "r_hdrDisplay", s_graphicsoptions.hdr.curvalue );
 
 	trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
 }
@@ -582,6 +592,7 @@ static void GraphicsOptions_SetMenuItems( void )
 		s_graphicsoptions.mode.curvalue = 3;
 	}
 	s_graphicsoptions.fs.curvalue = trap_Cvar_VariableValue("r_fullscreen");
+	s_graphicsoptions.hdr.curvalue = trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0;
 	s_graphicsoptions.allow_extensions.curvalue = trap_Cvar_VariableValue("r_allowExtensions");
 	s_graphicsoptions.tq.curvalue = 3-trap_Cvar_VariableValue( "r_picmip");
 	if ( s_graphicsoptions.tq.curvalue < 0 )
@@ -853,6 +864,19 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.fs.itemnames	      = enabled_names;
 	y += BIGCHAR_HEIGHT+2;
 
+	// references/modifies "r_hdrDisplay"
+	s_graphicsoptions.hdr.generic.type		= MTYPE_RADIOBUTTON;
+	s_graphicsoptions.hdr.generic.name		= "HDR Display:";
+	s_graphicsoptions.hdr.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_graphicsoptions.hdr.generic.callback	= GraphicsOptions_Event;
+	s_graphicsoptions.hdr.generic.id		= ID_HDR;
+	s_graphicsoptions.hdr.generic.x		= 400;
+	s_graphicsoptions.hdr.generic.y		= y;
+	if ( !UI_HDR_Available() ) {
+		s_graphicsoptions.hdr.generic.flags |= QMF_GRAYED;
+	}
+	y += BIGCHAR_HEIGHT+2;
+
 	// references/modifies "r_vertexLight"
 	s_graphicsoptions.lighting.generic.type  = MTYPE_SPINCONTROL;
 	s_graphicsoptions.lighting.generic.name	 = "Lighting:";
@@ -946,6 +970,7 @@ void GraphicsOptions_MenuInit( void )
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.mode );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.colordepth );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.fs );
+	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.hdr );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.lighting );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.geometry );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.tq );

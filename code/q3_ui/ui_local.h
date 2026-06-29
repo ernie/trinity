@@ -666,6 +666,13 @@ void UI_DisplayOptionsMenu_Cache( void );
 void UI_DisplayOptionsMenu( void );
 
 //
+// ui_hdr.c
+//
+qboolean	UI_HDR_Available( void );
+void		UI_HDRCalibrationMenu( void );
+void		UI_HDRCalibrationMenu_Cache( void );
+
+//
 // ui_sound.c
 //
 void UI_SoundOptionsMenu_Cache( void );

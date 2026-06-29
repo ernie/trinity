@@ -1,0 +1,163 @@
+#include "ui/menudef.h"
+
+{
+\\ HDR CALIBRATION \\
+
+menuDef {
+	name "calibration"
+	fullscreen 1
+	rect 0 0 640 480
+	focusColor .5 .4 0 1
+	style 1
+	onOpen { uiScript updateHDRAvail ; setcvar r_hdrCalibrate 1 }
+	onClose { setcvar r_hdrCalibrate 0 ; uiScript snapHDRCvars }
+	onEsc { setcvar r_hdrCalibrate 0 ; close calibration }
+
+	itemDef {
+		name background
+		rect 0 0 640 480
+		style WINDOW_STYLE_FILLED
+		backcolor 0 0 0 1
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name frame
+		rect 95 80 450 320
+		style WINDOW_STYLE_FILLED
+		border 1
+		bordercolor .5 .5 .5 .5
+		backcolor 0 0 0 1
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name title
+		text "HDR CALIBRATION"
+		rect 0 92 640 30
+		textalign ITEM_ALIGN_CENTER
+		textalignx 320
+		textaligny 24
+		textscale .4
+		forecolor .5 .5 .5 1
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name peakslider
+		text "Peak Brightness:"
+		type ITEM_TYPE_SLIDER
+		cvarfloat "r_hdrPeak" 1000 250 2000
+		rect 180 255 280 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 180
+		textaligny 16
+		textscale .3
+		forecolor .5 .5 .5 1
+		visible 1
+	}
+
+	itemDef {
+		name peaknits
+		ownerdraw UI_HDR_PEAK_NITS
+		rect 470 255 120 20
+		textaligny 16
+		textscale .3
+		forecolor .5 .5 .5 1
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name highlight
+		text "Highlight:"
+		type ITEM_TYPE_MULTI
+		cvar "r_hdrHighlight"
+		cvarFloatList { "0.5" 0.5 "1.0" 1 "1.5" 1.5 "2.0" 2 "2.5" 2.5 "3.0" 3 "3.5" 3.5 "4.0" 4 }
+		rect 180 282 280 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 180
+		textaligny 16
+		textscale .3
+		forecolor .5 .5 .5 1
+		visible 1
+		mouseEnter { hide help ; show hltip }
+		mouseExit  { hide hltip ; show help }
+	}
+
+	itemDef {
+		name help
+		text "Raise Peak until the inner rectangle's edge vanishes into the outer."
+		rect 0 310 640 16
+		textalign ITEM_ALIGN_CENTER
+		textalignx 320
+		textaligny 12
+		textscale .25
+		forecolor .5 .5 .5 1
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name hltip
+		text "Extra pop for the brightest highlights. 1.0 = natural, higher is punchier."
+		rect 0 310 640 16
+		textalign ITEM_ALIGN_CENTER
+		textalignx 320
+		textaligny 12
+		textscale .25
+		forecolor .5 .5 .5 1
+		visible 0
+		decoration
+	}
+
+	itemDef {
+		name back
+		text "Back"
+		type ITEM_TYPE_BUTTON
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/button_back.tga"
+		rect 280 355 80 24
+		textalign ITEM_ALIGN_CENTER
+		textalignx 40
+		textaligny 18
+		textscale .3
+		forecolor .5 .5 .5 1
+		backcolor .37 .1 .1 1
+		visible 1
+		action { setcvar r_hdrCalibrate 0 ; close calibration }
+		mouseEnter { setitemcolor back backcolor .1 .37 .1 1 }
+		mouseExit { setitemcolor back backcolor .37 .1 .1 1 }
+	}
+
+	itemDef {
+		name back
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/framebutton.tga"
+		rect 280 355 80 24
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name back
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/leftbutton.tga"
+		rect 268 355 13 24
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name back
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/rightbutton.tga"
+		rect 359 355 13 24
+		visible 1
+		decoration
+	}
+}
+}

@@ -23,6 +23,7 @@ DISPLAY OPTIONS MENU
 #define ID_BRIGHTNESS		14
 #define ID_SCREENSIZE		15
 #define ID_BACK				16
+#define ID_HDRCALIB			17
 
 
 typedef struct {
@@ -39,6 +40,8 @@ typedef struct {
 
 	menuslider_s	brightness;
 	menuslider_s	screensize;
+
+	menutext_s		hdrcalib;
 
 	menubitmap_s	back;
 } displayOptionsInfo_t;
@@ -81,6 +84,10 @@ static void UI_DisplayOptionsMenu_Event( void* ptr, int event ) {
 	
 	case ID_SCREENSIZE:
 		trap_Cvar_SetValue( "cg_viewsize", displayOptionsInfo.screensize.curvalue * 10 );
+		break;
+
+	case ID_HDRCALIB:
+		UI_HDRCalibrationMenu();
 		break;
 
 	case ID_BACK:
@@ -168,7 +175,7 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.network.style				= UI_RIGHT;
 	displayOptionsInfo.network.color				= color_red;
 
-	y = 240 - 1 * (BIGCHAR_HEIGHT+2);
+	y = 240 - 2 * (BIGCHAR_HEIGHT+2);
 	displayOptionsInfo.brightness.generic.type		= MTYPE_SLIDER;
 	displayOptionsInfo.brightness.generic.name		= "Brightness:";
 	displayOptionsInfo.brightness.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -193,6 +200,21 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.screensize.minvalue			= 3;
     displayOptionsInfo.screensize.maxvalue			= 10;
 
+	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+2;	// extra gap to separate the link from the sliders
+	displayOptionsInfo.hdrcalib.generic.type		= MTYPE_PTEXT;
+	displayOptionsInfo.hdrcalib.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	displayOptionsInfo.hdrcalib.generic.id			= ID_HDRCALIB;
+	displayOptionsInfo.hdrcalib.generic.callback	= UI_DisplayOptionsMenu_Event;
+	displayOptionsInfo.hdrcalib.generic.x			= 400;	// center under the slider column
+	displayOptionsInfo.hdrcalib.generic.y			= y;
+	displayOptionsInfo.hdrcalib.string				= "HDR Calibration";
+	displayOptionsInfo.hdrcalib.style				= UI_CENTER|UI_SMALLFONT;
+	displayOptionsInfo.hdrcalib.color				= color_red;
+	if ( !UI_HDR_Available() ) {
+		displayOptionsInfo.hdrcalib.generic.flags |= QMF_GRAYED;
+	}
+
 	displayOptionsInfo.back.generic.type		= MTYPE_BITMAP;
 	displayOptionsInfo.back.generic.name		= ART_BACK0;
 	displayOptionsInfo.back.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
@@ -213,6 +235,7 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.network );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.brightness );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.screensize );
+	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.hdrcalib );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.back );
 
 	displayOptionsInfo.brightness.curvalue  = trap_Cvar_VariableValue("r_gamma") * 10;

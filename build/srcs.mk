@@ -46,7 +46,7 @@ else
 UI_SRC = \
  ui_main $(UIDIR)/ui_syscalls.asm \
  ui_addbots ui_atoms ui_cdkey ui_cinematics ui_confirm ui_connect \
- ui_controls2 ui_credits ui_demo2 ui_display ui_gameinfo ui_ingame \
+ ui_controls2 ui_credits ui_demo2 ui_display ui_gameinfo ui_hdr ui_ingame \
  ui_loadconfig ui_login ui_menu ui_mfield ui_mods ui_network ui_options ui_update \
  ui_playermodel ui_players ui_playersettings ui_preferences ui_qmenu \
  ui_removebots ui_saveconfig ui_serverinfo ui_servers2 ui_setup ui_sound \

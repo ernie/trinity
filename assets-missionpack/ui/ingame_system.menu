@@ -12,7 +12,7 @@ menuDef {
     	focusColor 1 .75 0 1
     	style 1
     	border 1
-	onopen { hide grpsystem ; show graphics }
+	onopen { hide grpsystem ; show graphics ; uiScript updateHDRAvail }
 
 itemDef {
 	name window
@@ -379,6 +379,23 @@ itemDef {
     		}
 	
     		
+
+	itemDef {
+		name graphics
+		group grpSystem
+		type ITEM_TYPE_YESNO
+		text "HDR Display:"
+		cvar "r_hdrDisplay"
+		rect 0 290 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "ui_hdrAvail"
+		enableCvar { 1 }
+	}
 //here
 
 itemDef {
@@ -483,6 +500,55 @@ itemDef {
       		forecolor 1 1 1 1
       		visible 0 
     		}
+
+	itemDef {
+		name other
+		group grpSystem
+		type 1
+		text "HDR Calibration"
+		textscale .25
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/button_back.tga"
+		rect 63 105 130 20
+		textalign 1
+		textalignx 65
+		textaligny 16
+		forecolor 1 1 1 1
+		backcolor .37 .1 .1 1
+		visible 0
+		cvarTest "ui_hdrAvail"
+		enableCvar { 1 }
+		action { close ingame_system ; open calibration }
+		mouseEnter { setcolor backcolor .1 .37 .1 1 }
+		mouseExit  { setcolor backcolor .37 .1 .1 1 }
+	}
+	itemDef {
+		name other
+		group grpSystem
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/framebutton.tga"
+		rect 63 105 130 20
+		visible 0
+		decoration
+	}
+	itemDef {
+		name other
+		group grpSystem
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/leftbutton.tga"
+		rect 51 105 13 20
+		visible 0
+		decoration
+	}
+	itemDef {
+		name other
+		group grpSystem
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/rightbutton.tga"
+		rect 192 105 13 20
+		visible 0
+		decoration
+	}
 
 itemDef {
       	name other			

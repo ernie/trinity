@@ -12,6 +12,7 @@
 	loadMenu { "ui/controls.menu" }
 	loadMenu { "ui/cdkey.menu" }
 	loadMenu { "ui/system.menu" }
+	loadMenu { "ui/calibration.menu" }
 	loadMenu { "ui/options.menu" }
 	loadMenu { "ui/help.menu" }
 	loadMenu { "ui/ordershelp.menu" }
