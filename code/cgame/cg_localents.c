@@ -924,6 +924,7 @@ void CG_AddScorePlum( localEntity_t *le ) {
 	int			i, score, digits[10], numdigits, negative;
 
 	re = &le->refEntity;
+	re->renderfx |= RF_CROSSHAIR;	// draw undimmed inside fog volumes
 
 	c = ( le->endTime - cg.time ) * le->lifeRate;
 
@@ -1009,6 +1010,7 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 	float		progress, fade, spread_x, spread_y, vertical_offset, peak_height;
 
 	re = &le->refEntity;
+	re->renderfx |= RF_CROSSHAIR;	// draw undimmed inside fog volumes
 
 	c = ( le->endTime - cg.time ) * le->lifeRate;
 

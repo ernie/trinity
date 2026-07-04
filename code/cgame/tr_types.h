@@ -12,6 +12,7 @@
 #define	RF_THIRD_PERSON		2		// don't draw through eyes, only mirrors (player bodies, chat sprites)
 #define	RF_FIRST_PERSON		4		// only draw through eyes (view weapon, damage blood blob)
 #define	RF_DEPTHHACK		8		// for view weapon Z crunching
+#define	RF_CROSSHAIR		16		// don't fog-dim this sprite; with RF_DEPTHHACK, draws at true stereo depth (3D crosshair)
 #define	RF_NOSHADOW			64		// don't add stencil shadows
 
 #define RF_LIGHTING_ORIGIN	128		// use refEntity->lightingOrigin instead of refEntity->origin
