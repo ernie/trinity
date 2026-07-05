@@ -186,6 +186,8 @@ This mod would not be possible without their amazing work.
 
 Trinity bundles HD asset improvements derived from **High Quality Quake 3 Team Arena (HQQ3)** by **ZerTerO** ([ModDB profile](https://www.moddb.com/members/zertero)) — specifically HD UI graphics, weapon and player model textures, additional player model geometry (fritzkrieg, pi, james, janet, and head variants), HD HUD elements, and HD levelshots.
 
+`com_blood 2` look and feel is inspired by [Quetoo](https://quetoo.org), and the blood sprites are modified from its assets.
+
 ## Documentation
 
 - [Color schemes reference](docs/COLOR_SCHEMES.md) — chat `^N`, `color1`/`color2`, `cg_enemyColors`, the UI slider, and how they all map to each other
