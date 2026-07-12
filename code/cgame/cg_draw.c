@@ -4005,6 +4005,10 @@ void CG_ResetSeekState( void ) {
 	// Attacker head — CG_DrawAttacker: (cg.time - attackerTime) vs 10000
 	cg.attackerTime = 0;
 
+	// Status bar head idle animation — anchor a fresh cycle to the new timeline
+	cg.headStartTime = cg.time;
+	cg.headEndTime = cg.time;
+
 	// Killer name display
 	cg.killerTime = 0;
 
@@ -4051,8 +4055,9 @@ void CG_ResetSeekState( void ) {
 	// until cg.time catches up (which it never does after a backward seek).
 	cg.soundTime = 0;
 
-	// Force VR head-tracking EMA to re-seed from the new timeline
+	// Force VR head-tracking EMAs to re-seed from the new timeline
 	cg.vrViewInitialized = qfalse;
+	cg.vrPortraitInitialized = qfalse;
 }
 
 
