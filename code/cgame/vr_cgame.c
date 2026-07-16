@@ -10,9 +10,6 @@ const char vr_api_sentinel[] = VR_API_SENTINEL;
 vr_shared_t vr_state;
 vr_shared_t *vr = &vr_state;
 qboolean vrActive = qfalse;
-qboolean hasPostBloom2D = qfalse;
-qboolean hasHUDBuffer = qfalse;
-qboolean hasHapticEvent = qfalse;
 static int probeFrame = 0;
 static int lastEchoSent = 0;
 static int echoFailures = 0;
@@ -48,6 +45,9 @@ void CG_VR_Init( void ) {
 	dll_com_trapGetValue = atoi( ext );
 #endif
 
+	// trap_VR_RegisterState is the VR handshake: a flatscreen engine may expose
+	// trap_GetValue for non-VR extensions but won't answer this, so its absence
+	// means "not a VR engine" - stay dormant.
 	if ( !VR_RESOLVE( trap_VR_RegisterState, ext ) )
 		return;
 
@@ -56,17 +56,13 @@ void CG_VR_Init( void ) {
 	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_VERSION );
 	vrActive = qtrue;
 
-	if ( VR_RESOLVE( trap_R_BeginPostBloom2D, ext ) )
-		hasPostBloom2D = qtrue;
+	// The rest of the VR trap set is part of the v1 contract, so a registered
+	// engine provides all of it - bind unconditionally.
+	VR_RESOLVE( trap_R_BeginPostBloom2D, ext );
 	VR_RESOLVE( trap_R_EndPostBloom2D, ext );
-
 	VR_RESOLVE( trap_R_HUDBufferStart, ext );
 	VR_RESOLVE( trap_R_HUDBufferEnd, ext );
-	if ( VR_HAVE( trap_R_HUDBufferStart ) && VR_HAVE( trap_R_HUDBufferEnd ) )
-		hasHUDBuffer = qtrue;
-
-	if ( VR_RESOLVE( trap_HapticEvent, ext ) )
-		hasHapticEvent = qtrue;
+	VR_RESOLVE( trap_HapticEvent, ext );
 
 	if ( vrActive ) {
 		char buf[16];
@@ -137,7 +133,7 @@ void CG_VR_Frame( void ) {
 }
 
 void CG_VRHaptic( const char *description, int position, int channel, int intensity, float yaw, float height ) {
-	if ( !vrActive || !hasHapticEvent )
+	if ( !vrActive )
 		return;
 	trap_HapticEvent( description, position, channel, intensity, yaw, height );
 }
@@ -2142,11 +2138,8 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 		                   (cgs.gametype == GT_SINGLE_PLAYER);
 		// trinity cgame has no trap_Cvar_VariableValue; read via string buffer
 		trap_Cvar_VariableStringBuffer( "vr_currentHudDrawStatus", cvarBuf, sizeof( cvarBuf ) );
-		// The panel samples the HUD-buffer shader, so it must not render on an
-		// engine without the HUDBuffer traps (unbacked buffer).
-		drawHUDSprite = hasHUDBuffer &&
-		                (((atof( cvarBuf ) != 2.0f &&
-		                  !vr->weapon_zoomed && !vr->virtual_screen) || isSPIntermission));
+		drawHUDSprite = ((atof( cvarBuf ) != 2.0f &&
+		                  !vr->weapon_zoomed && !vr->virtual_screen) || isSPIntermission);
 
 		if (drawHUDSprite)
 		{
@@ -2258,8 +2251,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 
 	// Apply bloom now, BEFORE 2D drawing begins. This ensures bloom only
 	// affects the 3D scene, not UI elements.
-	if ( hasPostBloom2D )
-		trap_R_BeginPostBloom2D();
+	trap_R_BeginPostBloom2D();
 
 	{
 		char  hudBuf[16];
@@ -2306,16 +2298,14 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 		{
 			// HUD mode 2: render directly to main swapchain with stereo parallax
 			cg.drawingHUD = qtrue;
-			if ( hasHUDBuffer )
-				trap_R_HUDBufferStart( qfalse );
+			trap_R_HUDBufferStart( qfalse );
 			CG_WarmupEvents();
 			if ( !selectorHidesHud ) {
 				CG_PushHUDAnchors();
 				CG_Draw2D( STEREO_CENTER );
 				CG_PopHUDAnchors();
 			}
-			if ( hasHUDBuffer )
-				trap_R_HUDBufferEnd();
+			trap_R_HUDBufferEnd();
 			cg.drawingHUD = qfalse;
 		}
 
@@ -2328,32 +2318,28 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 				if (hudStatus == 2 && vr->first_person_following)
 				{
 					// HUD mode 2 in first person following: direct-to-screen with stereo offset
-					if ( hasHUDBuffer )
-						trap_R_HUDBufferStart( qfalse );
+					trap_R_HUDBufferStart( qfalse );
 					CG_WarmupEvents();
 					if ( !selectorHidesHud ) {
 						CG_PushHUDAnchors();
 						CG_Draw2D( STEREO_CENTER );
 						CG_PopHUDAnchors();
 					}
-					if ( hasHUDBuffer )
-						trap_R_HUDBufferEnd();
+					trap_R_HUDBufferEnd();
 				}
 				else if (hudStatus == 1)
 				{
 					// HUD mode 1: use existing HUD buffer (floating in-world); buffer
 					// discipline is unchanged by the selector gate below - it still
 					// clears even when the content draw is skipped.
-					if ( hasHUDBuffer ) {
-						trap_R_HUDBufferStart( qtrue );
-						CG_WarmupEvents();
-						if ( !selectorHidesHud ) {
-							CG_PushHUDAnchors();
-							CG_Draw2D( STEREO_CENTER );
-							CG_PopHUDAnchors();
-						}
-						trap_R_HUDBufferEnd();
+					trap_R_HUDBufferStart( qtrue );
+					CG_WarmupEvents();
+					if ( !selectorHidesHud ) {
+						CG_PushHUDAnchors();
+						CG_Draw2D( STEREO_CENTER );
+						CG_PopHUDAnchors();
 					}
+					trap_R_HUDBufferEnd();
 				}
 
 				cg.drawingHUD = qfalse;
@@ -2361,16 +2347,13 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			else
 			{
 				// HUD disabled - just clear the HUD buffer to remove any stale content
-				if ( hasHUDBuffer ) {
-					trap_R_HUDBufferStart( qtrue );
-					trap_R_HUDBufferEnd();
-				}
+				trap_R_HUDBufferStart( qtrue );
+				trap_R_HUDBufferEnd();
 			}
 		}
 	}
 
-	if ( hasPostBloom2D && VR_HAVE( trap_R_EndPostBloom2D ) )
-		trap_R_EndPostBloom2D();
+	trap_R_EndPostBloom2D();
 
 	return qtrue;
 }

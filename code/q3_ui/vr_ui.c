@@ -11,8 +11,6 @@ const char vr_api_sentinel[] = VR_API_SENTINEL;
 vr_shared_t vr_state;
 vr_shared_t *vr = &vr_state;
 qboolean vrActive = qfalse;
-static qboolean hasHapticEvent = qfalse;
-static qboolean hasVKeyboard = qfalse;
 
 #ifdef Q3_VM
 qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
@@ -61,6 +59,9 @@ void UI_VR_Init( void ) {
 	dll_com_trapGetValue = atoi( ext );
 #endif
 
+	// trap_VR_RegisterState is the VR handshake; an engine can expose
+	// trap_GetValue for non-VR extensions yet not answer this, which means
+	// "not a VR engine" - stay dormant.
 	if ( !VR_RESOLVE( trap_VR_RegisterState, ext ) )
 		return;
 
@@ -69,15 +70,13 @@ void UI_VR_Init( void ) {
 	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_VERSION );
 	vrActive = qtrue;
 
-	if ( VR_RESOLVE( trap_HapticEvent, ext ) )
-		hasHapticEvent = qtrue;
-
-	// virtual keyboard traps ship as a set; require all four
-	if ( VR_RESOLVE( trap_VKeyboard_Show, ext ) &&
-	     VR_RESOLVE( trap_VKeyboard_Hide, ext ) &&
-	     VR_RESOLVE( trap_VKeyboard_IsActive, ext ) &&
-	     VR_RESOLVE( trap_VKeyboard_HandleKey, ext ) )
-		hasVKeyboard = qtrue;
+	// The rest of the VR trap set is part of the v1 contract, so a registered
+	// engine provides all of it - bind unconditionally.
+	VR_RESOLVE( trap_HapticEvent, ext );
+	VR_RESOLVE( trap_VKeyboard_Show, ext );
+	VR_RESOLVE( trap_VKeyboard_Hide, ext );
+	VR_RESOLVE( trap_VKeyboard_IsActive, ext );
+	VR_RESOLVE( trap_VKeyboard_HandleKey, ext );
 
 	// engine cursor-registration replacement: the UI owns the menu cursor
 	vr->menuCursorActive = qtrue;
@@ -96,34 +95,33 @@ void UI_VR_Shutdown( void ) {
 }
 
 void UI_VRHaptic( const char *description, int position, int channel, int intensity, float yaw, float height ) {
-	if ( !vrActive || !hasHapticEvent )
+	if ( !vrActive )
 		return;
 	trap_HapticEvent( description, position, channel, intensity, yaw, height );
 }
 
-// NULL-safe virtual keyboard wrappers; dormant on a flatscreen host or an
-// older VR engine that doesn't export the traps.
+// Virtual keyboard wrappers; dormant on a flatscreen host.
 
 void UI_VKeyboardShow( void ) {
-	if ( !vrActive || !hasVKeyboard )
+	if ( !vrActive )
 		return;
 	trap_VKeyboard_Show();
 }
 
 void UI_VKeyboardHide( void ) {
-	if ( !vrActive || !hasVKeyboard )
+	if ( !vrActive )
 		return;
 	trap_VKeyboard_Hide();
 }
 
 qboolean UI_VKeyboardIsActive( void ) {
-	if ( !vrActive || !hasVKeyboard )
+	if ( !vrActive )
 		return qfalse;
 	return trap_VKeyboard_IsActive();
 }
 
 qboolean UI_VKeyboardHandleKey( int key ) {
-	if ( !vrActive || !hasVKeyboard )
+	if ( !vrActive )
 		return qfalse;
 	return trap_VKeyboard_HandleKey( key );
 }

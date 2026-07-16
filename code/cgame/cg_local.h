@@ -1922,9 +1922,6 @@ extern int dll_trap_VR_RegisterState;
 extern vr_shared_t vr_state;
 extern vr_shared_t *vr;
 extern qboolean vrActive;
-extern qboolean hasPostBloom2D;
-extern qboolean hasHUDBuffer;
-extern qboolean hasHapticEvent;
 
 #ifdef Q3_VM
 extern void	(*trap_R_BeginPostBloom2D)( void );
