@@ -11,19 +11,20 @@ static	vec3_t	forward, right, up;
 static	vec3_t	muzzle;
 static	vec3_t	muzzle_origin; // for hitscan weapon trace
 
-
-
 /*
 ===============
 CalcMuzzlePointOrigin
 ===============
 */
-void CalcMuzzlePointOrigin( const gentity_t *ent, vec3_t origin, const vec3_t forward, const vec3_t right, const vec3_t up, vec3_t muzzlePoint ) {
-	VectorCopy( ent->client->ps.origin, origin );
-	origin[2] += ent->client->ps.viewheight;
-	VectorMA( origin, 14.0, forward, muzzlePoint );
-	// snap to integer coordinates for more efficient network bandwidth usage
-	//SnapVector( muzzlePoint );
+void CalcMuzzlePointOrigin( gentity_t *ent, vec3_t origin, const vec3_t forward, const vec3_t right, const vec3_t up, vec3_t muzzlePoint ) {
+	if ( !G_VR_MuzzlePoint( ent, forward, right, up, origin, muzzlePoint ) )
+	{
+		VectorCopy( ent->client->ps.origin, origin );
+		origin[2] += ent->client->ps.viewheight;
+		VectorMA( origin, 14.0, forward, muzzlePoint );
+		// snap to integer coordinates for more efficient network bandwidth usage
+		//SnapVector( muzzlePoint );
+	}
 }
 
 
@@ -68,13 +69,23 @@ qboolean CheckGauntletAttack( gentity_t *ent ) {
 	gentity_t	*tent;
 	gentity_t	*traceEnt;
 	int			damage;
-	
+	vec3_t		angles;
+	qboolean	vrAim;
+
 	// set aiming directions
-	AngleVectors( ent->client->ps.viewangles, forward, right, up );
+	vrAim = G_VR_AimAngles( ent, angles );
+	if ( !vrAim )
+	{
+		VectorCopy( ent->client->ps.viewangles, angles );
+	}
+
+	AngleVectors (angles, forward, right, up);
 
 	CalcMuzzlePointOrigin( ent, muzzle_origin, forward, right, up, muzzle );
 
-	VectorMA( muzzle_origin, ( 32.0 + 14.0 ), forward, end );
+	// the +14 compensates the stock eye->muzzle offset, which doesn't exist
+	// when the muzzle IS the 6DOF controller position
+	VectorMA( muzzle_origin, vrAim ? 32.0 : ( 32.0 + 14.0 ), forward, end );
 
 	trap_Trace( &tr, muzzle_origin, NULL, NULL, end, ent->s.number, MASK_SHOT );
 	if ( tr.surfaceFlags & SURF_NOIMPACT ) {
@@ -839,6 +850,8 @@ FireWeapon
 ===============
 */
 void FireWeapon( gentity_t *ent ) {
+	vec3_t viewang;
+
 	if ( ent->client->ps.powerups[PW_QUAD] ) {
 		s_quadFactor = g_quadfactor.value;
 	} else {
@@ -865,7 +878,12 @@ void FireWeapon( gentity_t *ent ) {
 	}
 
 	// set aiming directions
-	AngleVectors( ent->client->ps.viewangles, forward, right, up );
+	if ( !G_VR_AimAngles( ent, viewang ) )
+	{
+		VectorCopy( ent->client->ps.viewangles, viewang );
+	}
+
+	AngleVectors( viewang, forward, right, up );
 
 	CalcMuzzlePointOrigin( ent, muzzle_origin, forward, right, up, muzzle );
 

@@ -7,6 +7,7 @@
 #include "bg_public.h"
 #include "bg_local.h"
 #include "bg_mode.h"
+#include "vr_bg.h"
 
 pmove_t		*pm;
 pml_t		pml;
@@ -1408,7 +1409,7 @@ PM_Footsteps
 */
 static void PM_Footsteps( void ) {
 	float		bobmove;
-	float		xyspeedQ;
+	float		xyspeed;
 	int			old;
 	qboolean	footstep;
 
@@ -1416,8 +1417,8 @@ static void PM_Footsteps( void ) {
 	// calculate speed and cycle to be used for
 	// all cyclic walking effects
 	//
-	//xyspeedQ = pm->ps->velocity[0] * pm->ps->velocity[0] 
-	//	+ pm->ps->velocity[1] * pm->ps->velocity[1];
+	xyspeed = sqrt( pm->ps->velocity[0] * pm->ps->velocity[0]
+		+ pm->ps->velocity[1] * pm->ps->velocity[1] );
 
 	if ( pm->ps->groundEntityNum == ENTITYNUM_NONE ) {
 
@@ -1431,17 +1432,15 @@ static void PM_Footsteps( void ) {
 		return;
 	}
 
-	// if not trying to move
-	if ( !pm->cmd.forwardmove && !pm->cmd.rightmove ) {
-		xyspeedQ = pm->ps->velocity[0] * pm->ps->velocity[0] 
-			+ pm->ps->velocity[1] * pm->ps->velocity[1];
-		if ( xyspeedQ < 5.0*5.0 ) { // not using sqrt() there
-			pm->ps->bobCycle = 0;	// start at beginning of cycle again
-			if ( pm->ps->pm_flags & PMF_DUCKED ) {
-				PM_ContinueLegsAnim( LEGS_IDLECR );
-			} else {
-				PM_ContinueLegsAnim( LEGS_IDLE );
-			}
+	// if not trying to move, or barely moving - analog sticks and roomscale
+	// drift produce tiny velocities that must not advance the walk cycle
+	if (( !pm->cmd.forwardmove && !pm->cmd.rightmove ) ||
+		( xyspeed < 10 )) {
+		pm->ps->bobCycle = 0;	// start at beginning of cycle again
+		if ( pm->ps->pm_flags & PMF_DUCKED ) {
+			PM_ContinueLegsAnim( LEGS_IDLECR );
+		} else {
+			PM_ContinueLegsAnim( LEGS_IDLE );
 		}
 		return;
 	}
@@ -1497,7 +1496,7 @@ static void PM_Footsteps( void ) {
 	if ( ( ( old + 64 ) ^ ( pm->ps->bobCycle + 64 ) ) & 128 ) {
 		if ( pm->waterlevel == 0 ) {
 			// on ground will only play sounds if running
-			if ( footstep ) {
+			if ( footstep && !pm->noFootsteps ) {
 				PM_AddEvent( PM_FootstepForSurface() );
 			}
 		} else if ( pm->waterlevel == 1 ) {
@@ -1866,13 +1865,18 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 		return;		// no view changes at all
 	}
 
-	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0 ) {
+	if ( BG_VR_DeadViewLocked( ps ) ) {
 		return;		// no view changes at all
+	}
+
+	if ( BG_VR_UpdateViewAngles( ps, cmd ) ) {
+		return;		// 6DOF client: YAW-only delta compensation applied
 	}
 
 	// circularly clamp the angles with deltas
 	for (i=0 ; i<3 ; i++) {
 		temp = cmd->angles[i] + ps->delta_angles[i];
+
 		if ( i == PITCH ) {
 			// don't let the player look up or down more than 90 degrees
 			if ( temp > 16000 ) {
@@ -1902,6 +1906,7 @@ void PmoveSingle (pmove_t *pmove) {
 
 	// pull this frame's tuning from the mode table
 	pm_mode = Mode_GetConfig( pm->pmove_mode );
+	pm_mode = BG_VR_PmovePhysics( pm->ps, pm_mode );
 
 	// this counter lets us debug movement problems with a journal
 	// by setting a conditional breakpoint fot the previous frame

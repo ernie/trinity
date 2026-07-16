@@ -772,3 +772,7 @@ int trap_PC_SourceFileAndLine( int handle, char *filename, int *line ) {
 qboolean trap_GetValue( char *value, int valueSize, const char *key ) {
 	return syscall( dll_com_trapGetValue, value, valueSize, key );
 }
+
+void trap_VR_RegisterState( void *state, int stateSize, int apiVersion ) {
+	syscall( dll_trap_VR_RegisterState, state, stateSize, apiVersion );
+}

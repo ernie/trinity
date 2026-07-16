@@ -5,6 +5,7 @@
 #include "q_shared.h"
 #include "bg_public.h"
 #include "g_public.h"
+#include "vr_shared.h"
 
 // Per-client obelisk-attack tracker (Overload). lastAttackTime is the
 // level.time of the most recent damage hit, 0 if the slot is idle.
@@ -411,11 +412,6 @@ struct gclient_s {
 		qboolean sameTeam;		// skip the plum (not the blood) for teammates
 	} damagePlums[MAX_CLIENTS];
 	int			damagePlumCount;
-
-	// VR head orientation (from usercmd)
-	// Roll is sent via standard cmd->angles[ROLL] mechanism
-	float		vrHeadPitch;
-	float		vrHeadYawOffset;
 
 	int			skullContributorGen[MAX_CLIENTS];	// gen of each skull-feeder this carry, 0 = absent
 	int			skullContributorCount[MAX_CLIENTS];	// skulls fed per contributor; bonus scales per skull
@@ -1092,11 +1088,20 @@ void	trap_SnapVector( float *v );
 // extension interface
 
 #ifdef Q3_VM
-//
+extern qboolean	(*trap_GetValue)( char *value, int valueSize, const char *key );
 #else
 qboolean trap_GetValue( char *value, int valueSize, const char *key );
+void trap_VR_RegisterState( void *state, int stateSize, int apiVersion );
 extern int dll_com_trapGetValue;
+extern int dll_trap_VR_RegisterState;
 #endif
 
 extern	int svf_self_portal2;
+
+// VR shared-state mirror (vr_game.c); zeroed/dormant on flatscreen engines
+extern vr_shared_t vr_state;
+extern vr_shared_t *vr;
+extern qboolean g_vrActive;
+
+#include "vr_game.h"
 

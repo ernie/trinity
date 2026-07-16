@@ -152,6 +152,7 @@ typedef struct {
 	usercmd_t	cmd;
 	int			tracemask;			// collide against these types of surfaces
 	int			debugLevel;			// if set, diagnostic output will be printed
+	qboolean	noFootsteps;		// if the game is setup for no footsteps by the server
 	qboolean	gauntletHit;		// true if a gauntlet attack would actually hit something
 
 	int			framecount;
@@ -171,7 +172,7 @@ typedef struct {
 	int			pmove_fixed;
 	int			pmove_msec;
 
-	int			pmove_mode;			// mode_t; combat & movement both index from it
+	int			pmove_mode;			// gamemode_t; combat & movement both index from it
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame
@@ -257,7 +258,6 @@ typedef enum {
 #define	EF_AWARD_ASSIST		0x00020000		// draw a assist sprite
 #define EF_AWARD_DENIED		0x00040000		// denied
 #define EF_TEAMVOTED		0x00080000		// already cast a team vote
-#define EF_VR_PLAYER		0x00000400  // Shares bit with EF_MOVER_STOP (safe: movers aren't players)
 
 #define EF_PERSISTANT ( EF_CONNECTION | EF_VOTED | EF_TEAMVOTED )
 #define EF_AWARDS ( EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP )
@@ -628,7 +628,9 @@ int Q_vsprintf( char *buffer, const char *fmt, va_list argptr );
 
 char *Q_stristr( const char * str1, const char * str2 );
 
-char *strtok( char *strToken, const char *strDelimit );
+#ifdef Q3_VM
+char *strtok( char *strToken, const char *strDelimit ); // native builds use the CRT strtok
+#endif
 char *EncodedString( const char *str );
 char *DecodedString( const char *str );
 
