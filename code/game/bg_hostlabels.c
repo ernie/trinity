@@ -15,6 +15,7 @@ static const hostlabel_t hostLabels[] = {
 	{ "directory.trinity.run",	"Trinity" },
 	{ "master.quake3arena.com",	"Q3A" },
 	{ "master.ioquake3.org",	"ioquake3" },
+	{ "master.maverickservers.com",	"Maverick" },
 };
 
 static const int numHostLabels = ARRAY_LEN( hostLabels );
