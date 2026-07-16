@@ -76,7 +76,7 @@ void CG_DamageFeedback( int yawByte, int pitchByte, int damage ) {
 	vec3_t		dir;
 	vec3_t		angles;
 	float		dist;
-	float		yaw, pitch;
+	float		yaw=0, pitch=0;
 	const char	*info;
 
 	// show the attacking player's head and name in corner
@@ -165,6 +165,8 @@ void CG_DamageFeedback( int yawByte, int pitchByte, int damage ) {
 		cg.damageY = -1.0;
 	}
 
+	CG_VR_OnDamageTaken( damage, yaw );
+
 	// don't let the screen flashes vary as much
 	if ( kick > 10 ) {
 		kick = 10;
@@ -193,6 +195,9 @@ void CG_Respawn( void ) {
 	cg.weaponSelect = cg.snap->ps.weapon;
 
 	cg.timeResidual = cg.snap->ps.commandTime + 1000;
+
+	// reset death cam grace period
+	cg.deathCamTime = -1;
 }
 
 

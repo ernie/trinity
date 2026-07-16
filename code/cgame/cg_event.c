@@ -203,7 +203,7 @@ static void CG_Obituary( entityState_t *ent ) {
 	}
 
 	// check for kill messages from the current clientNum
-	if ( attacker == cg.snap->ps.clientNum ) {
+	if ( attacker == cg.snap->ps.clientNum && cg_fragMessage.integer ) {
 		char	*s;
 
 		if ( cgs.gametype < GT_TEAM ) {
@@ -550,6 +550,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 	int				clientNum;
 	clientInfo_t	*ci;
 	vec3_t			vec;
+	vec3_t			angles;
 	float			fovOffset;
 	centity_t		*ce;
 
@@ -574,6 +575,13 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		clientNum = 0;
 	}
 	ci = &cgs.clientinfo[ clientNum ];
+
+	if (event >= EV_USE_ITEM0 && event <= EV_USE_ITEM15)
+	{
+		if (clientNum == cg.predictedPlayerState.clientNum) {
+			CG_VR_OnUseItem();
+		}
+	}
 
 	switch ( event ) {
 	//
@@ -620,6 +628,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			// smooth landing z changes
 			cg.landChange = -8;
 			cg.landTime = cg.time;
+			CG_VR_OnFall( 40 );
 		}
 		break;
 
@@ -632,6 +641,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			// smooth landing z changes
 			cg.landChange = -16;
 			cg.landTime = cg.time;
+			CG_VR_OnFall( 60 );
 		}
 		break;
 
@@ -643,6 +653,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			// smooth landing z changes
 			cg.landChange = -24;
 			cg.landTime = cg.time;
+			CG_VR_OnFall( 100 );
 		}
 		break;
 
@@ -699,12 +710,18 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		// boing sound at origin, jump sound on player
 		trap_S_StartSound ( cent->lerpOrigin, -1, CHAN_VOICE, cgs.media.jumpPadSound );
 		trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*jump1.wav" ) );
+		if ( clientNum == cg.predictedPlayerState.clientNum ) {
+			CG_VR_OnJump( qtrue );
+		}
 		break;
 
 	case EV_JUMP:
 		// pain event with fast sequential jump just creates sound distortion
 		if ( cg.time - cent->pe.painTime > 50 )
 			trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*jump1.wav" ) );
+		if ( clientNum == cg.predictedPlayerState.clientNum ) {
+			CG_VR_OnJump( qfalse );
+		}
 		break;
 
 	case EV_TAUNT:
@@ -799,6 +816,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			} else {
 				trap_S_StartSound (NULL, es->number, CHAN_AUTO,	trap_S_RegisterSound( item->pickup_sound, qfalse ) );
 			}
+			if ( clientNum == cg.predictedPlayerState.clientNum ) {
+				CG_VR_OnItemPickup( item );
+			}
 
 			// show icon and name on status bar
 			if ( es->number == cg.snap->ps.clientNum ) {
@@ -861,6 +881,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 
 	case EV_CHANGE_WEAPON:
 		trap_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.selectSound );
+		if ( clientNum == cg.predictedPlayerState.clientNum ) {
+			CG_VR_OnWeaponSwitch();
+		}
 		break;
 
 	case EV_FIRE_WEAPON:
@@ -894,6 +917,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 	case EV_PLAYER_TELEPORT_IN:
 		trap_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.teleInSound );
 		CG_SpawnEffect( position);
+		CG_VR_OnTeleport( clientNum );
 		break;
 
 	case EV_PLAYER_TELEPORT_OUT:
@@ -989,6 +1013,8 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 
 		if ( cent->currentState.clientNum == cg.snap->ps.clientNum && !cg.renderingThirdPerson )
 		{
+			if ( !CG_VR_WeaponMuzzleOrigin( vec, angles ) )
+			{
 			VectorCopy( cg.refdef.vieworg, vec );
 			fovOffset = -0.2f * ( cgs.fov - 90.0f );
 
@@ -996,6 +1022,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			VectorMA( vec, cg_gun_x.value + 13.5f, cg.refdef.viewaxis[0], vec );
 			VectorMA( vec, cg_gun_y.value - 5.5f, cg.refdef.viewaxis[1], vec );
 			VectorMA( vec, cg_gun_z.value + fovOffset - 6.0f, cg.refdef.viewaxis[2], vec );
+			}
 		}
 		else
 			VectorCopy( es->origin2, vec );
@@ -1182,6 +1209,10 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			trap_S_StartSound( NULL, es->number, CHAN_VOICE, CG_CustomSound(es->number, va("*death%i.wav", event - EV_DEATH1 + 1)) );
 		}
 
+		if(es->clientNum == cg.snap->ps.clientNum)
+		{
+			CG_VR_OnDeath();
+		}
 		break;
 
 	case EV_OBITUARY:
@@ -1197,6 +1228,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.quadSound );
+		if ( clientNum == cg.predictedPlayerState.clientNum ) {
+			CG_VR_OnPowerup();
+		}
 		break;
 
 	case EV_POWERUP_BATTLESUIT:
@@ -1205,6 +1239,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.protectSound );
+		if ( clientNum == cg.snap->ps.clientNum ) {
+			CG_VR_OnPowerup();
+		}
 		break;
 
 	case EV_POWERUP_REGEN:
@@ -1213,6 +1250,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.regenSound );
+		if ( clientNum == cg.predictedPlayerState.clientNum ) {
+			CG_VR_OnPowerup();
+		}
 		break;
 
 	case EV_GIB_PLAYER:
@@ -1227,6 +1267,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		trap_S_StartSound( NULL, es->number, CHAN_BODY, cgs.media.gibSound );
 #endif
 		CG_GibPlayer( cent->lerpOrigin, cent->currentState.pos.trDelta );
+		if ( clientNum == cg.snap->ps.clientNum ) {
+			CG_VR_OnGibbed();
+		}
 		break;
 
 	case EV_STOPLOOPINGSOUND:

@@ -306,6 +306,10 @@ void CG_FollowRecenter_f( void ) {
 	if ( !cg.snap ) return;
 	if ( !cg.demoPlayback && !(cg.snap->ps.pm_flags & PMF_FOLLOW) ) return;
 
+	if ( vrActive ) {
+		vr->recenter_follow_camera = qtrue;
+	}
+
 	if ( cg_followMode.integer == 1 ) {
 		CG_InitOrbitCamera();
 	} else if ( cg_followMode.integer == 2 ) {
@@ -753,7 +757,7 @@ CG_OffsetFirstPersonView
 
 ===============
 */
-static void CG_OffsetFirstPersonView( void ) {
+void CG_OffsetFirstPersonView( void ) {
 	float			*origin;
 	float			*angles;
 	float			bob;
@@ -763,6 +767,7 @@ static void CG_OffsetFirstPersonView( void ) {
 	float			f;
 	vec3_t			predictedVelocity;
 	int				timeDelta;
+	float			hitRollCoeff;
 	
 	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
 		return;
@@ -780,21 +785,26 @@ static void CG_OffsetFirstPersonView( void ) {
 		return;
 	}
 
+	hitRollCoeff = CG_VR_DamageRollScale();
+
 	// add angles based on weapon kick
-	VectorAdd (angles, cg.kick_angles, angles);
+	if ( !CG_VR_OwnsViewKick() )
+	{
+		VectorAdd (angles, cg.kick_angles, angles);
+	}
 
 	// add angles based on damage kick
 	if ( cg.damageTime ) {
 		ratio = cg.time - cg.damageTime;
 		if ( ratio < DAMAGE_DEFLECT_TIME ) {
 			ratio /= DAMAGE_DEFLECT_TIME;
-			angles[PITCH] += ratio * cg.v_dmg_pitch;
-			angles[ROLL] += ratio * cg.v_dmg_roll;
+			angles[PITCH] += ratio * cg.v_dmg_pitch * hitRollCoeff;
+			angles[ROLL] += ratio * cg.v_dmg_roll * hitRollCoeff;
 		} else {
 			ratio = 1.0 - ( ratio - DAMAGE_DEFLECT_TIME ) / DAMAGE_RETURN_TIME;
 			if ( ratio > 0 ) {
-				angles[PITCH] += ratio * cg.v_dmg_pitch;
-				angles[ROLL] += ratio * cg.v_dmg_roll;
+				angles[PITCH] += ratio * cg.v_dmg_pitch * hitRollCoeff;
+				angles[ROLL] += ratio * cg.v_dmg_roll * hitRollCoeff;
 			}
 		}
 	}
@@ -810,27 +820,31 @@ static void CG_OffsetFirstPersonView( void ) {
 	// add angles based on velocity
 	VectorCopy( cg.predictedPlayerState.velocity, predictedVelocity );
 
-	delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[0]);
-	angles[PITCH] += delta * cg_runpitch.value;
-	
-	delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[1]);
-	angles[ROLL] -= delta * cg_runroll.value;
+	// run sway / view bob fight the headset-tracked camera; suppress at the
+	// application site so flatscreen keeps stock behavior and stock defaults
+	if ( !CG_VR_OwnsViewBob() ) {
+		delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[0]);
+		angles[PITCH] += delta * cg_runpitch.value;
 
-	// add angles based on bob
+		delta = DotProduct ( predictedVelocity, cg.refdef.viewaxis[1]);
+		angles[ROLL] -= delta * cg_runroll.value;
 
-	// make sure the bob is visible even at low speeds
-	speed = cg.xyspeed > 200 ? cg.xyspeed : 200;
+		// add angles based on bob
 
-	delta = cg.bobfracsin * cg_bobpitch.value * speed;
-	if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
-		delta *= 3;		// crouching
-	angles[PITCH] += delta;
-	delta = cg.bobfracsin * cg_bobroll.value * speed;
-	if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
-		delta *= 3;		// crouching accentuates roll
-	if (cg.bobcycle & 1)
-		delta = -delta;
-	angles[ROLL] += delta;
+		// make sure the bob is visible even at low speeds
+		speed = cg.xyspeed > 200 ? cg.xyspeed : 200;
+
+		delta = cg.bobfracsin * cg_bobpitch.value * speed;
+		if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
+			delta *= 3;		// crouching
+		angles[PITCH] += delta;
+		delta = cg.bobfracsin * cg_bobroll.value * speed;
+		if (cg.predictedPlayerState.pm_flags & PMF_DUCKED)
+			delta *= 3;		// crouching accentuates roll
+		if (cg.bobcycle & 1)
+			delta = -delta;
+		angles[ROLL] += delta;
+	}
 
 //===================================
 
@@ -844,13 +858,15 @@ static void CG_OffsetFirstPersonView( void ) {
 			* (DUCK_TIME - timeDelta) / DUCK_TIME;
 	}
 
-	// add bob height
-	bob = cg.bobfracsin * cg.xyspeed * cg_bobup.value;
-	if (bob > 6) {
-		bob = 6;
+	// add bob height (suppressed in VR: the HMD overwrite discards bob angles
+	// but a bobbing origin would still shake the world)
+	if ( !CG_VR_OwnsViewBob() ) {
+		bob = cg.bobfracsin * cg.xyspeed * cg_bobup.value;
+		if (bob > 6) {
+			bob = 6;
+		}
+		origin[2] += bob;
 	}
-
-	origin[2] += bob;
 
 
 	// add fall height
@@ -869,7 +885,10 @@ static void CG_OffsetFirstPersonView( void ) {
 
 	// add kick offset
 
-	VectorAdd (origin, cg.kick_origin, origin);
+	if ( !CG_VR_OwnsViewKick() )
+	{
+		VectorAdd (origin, cg.kick_origin, origin);
+	}
 
 	// pivot the eye based on a neck length
 #if 0
@@ -1016,6 +1035,8 @@ static int CG_CalcFov( void ) {
 	cg.refdef.fov_x = fov_x;
 	cg.refdef.fov_y = fov_y;
 
+	CG_VR_Fov( &cg.refdef.fov_x, &cg.refdef.fov_y );
+
 	if ( !cg.zoomed ) {
 		cg.zoomSensitivity = 1;
 	} else {
@@ -1139,6 +1160,128 @@ void CG_DamageBorderVignette( void ) {
 	topWeight = 1.0f + cg.damageY;
 	bottomWeight = 1.0f - cg.damageY;
 
+	// VR draws the vignette directly to the per-eye XR swapchain. The single-eye
+	// refdef only covers one eye's frustum, and OpenXR frustums are asymmetric
+	// (more down-look than up, offset horizontally per eye). Transplant native's
+	// FOV-asymmetry offsets + combined-FOV stereo extension so the border covers
+	// the full binocular field and stays optically centred. Flatscreen keeps the
+	// plain refdef-pixel path below unchanged.
+	if ( vrActive ) {
+		float projCenterX, projCenterY;
+		float verticalAsymmetryOffset, horizontalAsymmetryOffset;
+		float combinedFovScale, extraWidth;
+		int   leftEdge, rightEdge, leftExtension, rightExtension;
+
+		// Calculate FOV asymmetry offsets
+		// OpenXR typically has asymmetric FOV (more down than up, offset horizontal per eye)
+		CG_GetProjectionCenter(&projCenterX, &projCenterY);
+		// projCenterY is in 640x480 coords where 240 is geometric center
+		// Positive offset means optical center is below geometric center
+		verticalAsymmetryOffset = (projCenterY - 240.0f) / 480.0f * cg.refdef.height;
+		// projCenterX is in 640x480 coords where 320 is geometric center
+		// Positive offset means optical center is to the right of geometric center
+		horizontalAsymmetryOffset = (projCenterX - 320.0f) / 640.0f * cg.refdef.width;
+
+		// Calculate weighted border dimensions with asymmetry adjustments
+		topBorder = (int)(borderBase * topWeight + verticalAsymmetryOffset);
+		bottomBorder = (int)(borderBase * bottomWeight - verticalAsymmetryOffset);
+		leftBorder = (int)(borderBase * leftWeight + horizontalAsymmetryOffset);
+		rightBorder = (int)(borderBase * rightWeight - horizontalAsymmetryOffset);
+
+		// Clamp negative values
+		if (topBorder < 0) topBorder = 0;
+		if (bottomBorder < 0) bottomBorder = 0;
+		if (leftBorder < 0) leftBorder = 0;
+		if (rightBorder < 0) rightBorder = 0;
+
+		// Calculate combined FOV scale for stereo coverage
+		combinedFovScale = CG_GetCombinedFovScale();
+		extraWidth = (cg.refdef.width * (combinedFovScale - 1.0f)) / 2.0f;
+		leftEdge = (int)(-extraWidth);
+		rightEdge = (int)(cg.refdef.width + extraWidth);
+
+		// Dimensions for edge pieces (between corners)
+		innerWidth = cg.refdef.width - leftBorder - rightBorder;
+		innerHeight = cg.refdef.height - topBorder - bottomBorder;
+
+		// Red with fading alpha
+		red[0] = 1.0f;
+		red[1] = 0.0f;
+		red[2] = 0.0f;
+		red[3] = alpha * 0.8f;
+
+		trap_R_SetColor(red);
+
+		// Screen base coordinates
+		x = cg.refdef.x;
+		y = cg.refdef.y;
+		w = cg.refdef.width;
+		h = cg.refdef.height;
+
+		// Extended widths for stereo FOV coverage
+		leftExtension = x - leftEdge;
+		rightExtension = rightEdge - (x + w);
+
+		// Draw 4 corners (from texture corners, extended for stereo)
+		// Top-left corner
+		if ((leftBorder + leftExtension) > 0 && topBorder > 0) {
+			trap_R_DrawStretchPic(leftEdge, y, leftBorder + leftExtension, topBorder,
+				0.0f, 0.0f, UV_EDGE_H, UV_EDGE_V, cgs.media.vignetteShader);
+		}
+		// Top-right corner
+		if ((rightBorder + rightExtension) > 0 && topBorder > 0) {
+			trap_R_DrawStretchPic(x + w - rightBorder, y, rightBorder + rightExtension, topBorder,
+				1.0f - UV_EDGE_H, 0.0f, 1.0f, UV_EDGE_V, cgs.media.vignetteShader);
+		}
+		// Bottom-left corner
+		if ((leftBorder + leftExtension) > 0 && bottomBorder > 0) {
+			trap_R_DrawStretchPic(leftEdge, y + h - bottomBorder, leftBorder + leftExtension, bottomBorder,
+				0.0f, 1.0f - UV_EDGE_V, UV_EDGE_H, 1.0f, cgs.media.vignetteShader);
+		}
+		// Bottom-right corner
+		if ((rightBorder + rightExtension) > 0 && bottomBorder > 0) {
+			trap_R_DrawStretchPic(x + w - rightBorder, y + h - bottomBorder, rightBorder + rightExtension, bottomBorder,
+				1.0f - UV_EDGE_H, 1.0f - UV_EDGE_V, 1.0f, 1.0f, cgs.media.vignetteShader);
+		}
+
+		// Draw 4 edges (stretched pieces from texture edge middles)
+		// Left edge (extended for stereo, and into missing corner spaces)
+		if ((leftBorder + leftExtension) > 0) {
+			// Extend into top corner space if top corner wasn't drawn
+			int edgeTop = (topBorder > 0) ? topBorder : 0;
+			// Extend into bottom corner space if bottom corner wasn't drawn
+			int edgeBottom = (bottomBorder > 0) ? bottomBorder : 0;
+			int edgeHeight = h - edgeTop - edgeBottom;
+			if (edgeHeight > 0) {
+				trap_R_DrawStretchPic(leftEdge, y + edgeTop, leftBorder + leftExtension, edgeHeight,
+					0.0f, UV_EDGE_V, UV_EDGE_H, 1.0f - UV_EDGE_V, cgs.media.vignetteShader);
+			}
+		}
+		// Right edge (extended for stereo, and into missing corner spaces)
+		if ((rightBorder + rightExtension) > 0) {
+			int edgeTop = (topBorder > 0) ? topBorder : 0;
+			int edgeBottom = (bottomBorder > 0) ? bottomBorder : 0;
+			int edgeHeight = h - edgeTop - edgeBottom;
+			if (edgeHeight > 0) {
+				trap_R_DrawStretchPic(x + w - rightBorder, y + edgeTop, rightBorder + rightExtension, edgeHeight,
+					1.0f - UV_EDGE_H, UV_EDGE_V, 1.0f, 1.0f - UV_EDGE_V, cgs.media.vignetteShader);
+			}
+		}
+		// Top edge (between top-left and top-right corners)
+		if (topBorder > 0 && innerWidth > 0) {
+			trap_R_DrawStretchPic(x + leftBorder, y, innerWidth, topBorder,
+				UV_EDGE_H, 0.0f, 1.0f - UV_EDGE_H, UV_EDGE_V, cgs.media.vignetteShader);
+		}
+		// Bottom edge (between bottom-left and bottom-right corners)
+		if (bottomBorder > 0 && innerWidth > 0) {
+			trap_R_DrawStretchPic(x + leftBorder, y + h - bottomBorder, innerWidth, bottomBorder,
+				UV_EDGE_H, 1.0f - UV_EDGE_V, 1.0f - UV_EDGE_H, 1.0f, cgs.media.vignetteShader);
+		}
+
+		trap_R_SetColor(NULL);
+		return;
+	}
+
 	// Calculate weighted border dimensions (all based on height for aspect-ratio independence)
 	leftBorder = (int)(borderBase * leftWeight);
 	rightBorder = (int)(borderBase * rightWeight);
@@ -1213,99 +1356,6 @@ void CG_DamageBorderVignette( void ) {
 
 /*
 ===============
-CG_DrawCrosshair3D
-
-Renders the crosshair as a 3D sprite at the weapon's aim point.
-Used during VR first-person follow so the crosshair shows where
-the weapon is actually pointing (which may differ from view center).
-===============
-*/
-static void CG_DrawCrosshair3D( void ) {
-	float		w;
-	qhandle_t	hShader;
-	int			ca;
-	trace_t		trace;
-	vec3_t		endpos, forward;
-	refEntity_t	ent;
-	float		dist;
-
-	if ( !cg_drawCrosshair.integer ) {
-		return;
-	}
-
-	// fire a trace along weapon aim direction
-	AngleVectors( cg.predictedPlayerState.viewangles, forward, NULL, NULL );
-	VectorMA( cg.refdef.vieworg, 8192, forward, endpos );
-	CG_Trace( &trace, cg.refdef.vieworg, NULL, NULL, endpos,
-		cg.predictedPlayerState.clientNum, MASK_SOLID );
-
-	// pull back slightly from hit surface
-	VectorMA( trace.endpos, -1, forward, endpos );
-
-	// scale sprite so it appears roughly the same angular size regardless of distance
-	dist = Distance( cg.refdef.vieworg, endpos );
-	w = dist * cg_crosshairSize.value / 640.0f;
-	if ( w < 0.5f ) {
-		w = 0.5f;
-	}
-
-	ca = cg_drawCrosshair.integer;
-	if ( ca < 0 ) {
-		ca = 0;
-	}
-	hShader = cgs.media.crosshairShader[ ca % NUM_CROSSHAIRS ];
-
-	memset( &ent, 0, sizeof( ent ) );
-	ent.reType = RT_SPRITE;
-	ent.radius = w;
-	ent.rotation = 0;
-	ent.customShader = hShader;
-	ent.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON;
-	VectorCopy( endpos, ent.origin );
-
-	// crosshair color
-	if ( cg_crosshairHealth.integer ) {
-		vec4_t hcolor;
-		CG_ColorForHealth( hcolor );
-		ent.shaderRGBA.rgba[0] = (byte)( hcolor[0] * 255 );
-		ent.shaderRGBA.rgba[1] = (byte)( hcolor[1] * 255 );
-		ent.shaderRGBA.rgba[2] = (byte)( hcolor[2] * 255 );
-		ent.shaderRGBA.rgba[3] = 255;
-	} else if ( cg_crosshairColor.integer ) {
-		int val = cg_crosshairColor.integer;
-		ent.shaderRGBA.rgba[0] = (val & 1) ? 255 : 0;
-		ent.shaderRGBA.rgba[1] = (val & 2) ? 255 : 0;
-		ent.shaderRGBA.rgba[2] = (val & 4) ? 255 : 0;
-		ent.shaderRGBA.rgba[3] = 255;
-	} else {
-		ent.shaderRGBA.rgba[0] = 255;
-		ent.shaderRGBA.rgba[1] = 255;
-		ent.shaderRGBA.rgba[2] = 255;
-		ent.shaderRGBA.rgba[3] = 255;
-	}
-
-	trap_R_AddRefEntityToScene( &ent );
-}
-
-/*
-===============
-CG_IsVRFollow
-
-Returns qtrue when following a VR player (first or third person).
-===============
-*/
-qboolean CG_IsVRFollow( void ) {
-	if ( !cg.demoPlayback && !(cg.snap->ps.pm_flags & PMF_FOLLOW) ) {
-		return qfalse;
-	}
-	if ( !(cg.predictedPlayerState.eFlags & EF_VR_PLAYER) ) {
-		return qfalse;
-	}
-	return qtrue;
-}
-
-/*
-===============
 CG_CalcViewValues
 
 Sets cg.refdef view values
@@ -1313,6 +1363,12 @@ Sets cg.refdef view values
 */
 static int CG_CalcViewValues( void ) {
 	playerState_t	*ps;
+
+	// VR menu freeze: keep last frame's refdef, only vrect/fov update
+	if ( CG_VR_MenuViewFreeze() ) {
+		CG_CalcVrect();
+		return CG_CalcFov();
+	}
 
 	memset( &cg.refdef, 0, sizeof( cg.refdef ) );
 
@@ -1340,9 +1396,11 @@ static int CG_CalcViewValues( void ) {
 */
 	// intermission view
 	if ( ps->pm_type == PM_INTERMISSION ) {
-		VectorCopy( ps->origin, cg.refdef.vieworg );
-		VectorCopy( ps->viewangles, cg.refdefViewAngles );
-		AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+		if ( !CG_VR_IntermissionView() ) {
+			VectorCopy( ps->origin, cg.refdef.vieworg );
+			VectorCopy( ps->viewangles, cg.refdefViewAngles );
+			AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+		}
 		return CG_CalcFov();
 	}
 
@@ -1355,33 +1413,7 @@ static int CG_CalcViewValues( void ) {
 	VectorCopy( ps->origin, cg.refdef.vieworg );
 	VectorCopy( ps->viewangles, cg.refdefViewAngles );
 
-	// VR first-person follow: look through the player's head, not weapon.
-	// EMA smooths the ~1.4 degree steps from 7-bit usercmd packing.
-	if ( !cg.renderingThirdPerson
-			&& (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
-			&& (ps->eFlags & EF_VR_PLAYER) ) {
-		float	targetPitch, targetYaw, alpha;
-
-		targetPitch = (float)ps->stats[STAT_VR_HEAD_PITCH] / 182.04f;
-		targetYaw   = ps->viewangles[YAW]
-			+ (float)ps->stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f;
-
-		if ( !cg.vrViewInitialized || cg.nextFrameTeleport ) {
-			cg.vrViewPitch = targetPitch;
-			cg.vrViewYaw   = targetYaw;
-			cg.vrViewInitialized = qtrue;
-		} else {
-			// tau ~30ms: smooths quantization steps without perceptible lag
-			alpha = (float)cg.frametime / ( (float)cg.frametime + 30.0f );
-			cg.vrViewPitch += alpha * AngleSubtract( targetPitch, cg.vrViewPitch );
-			cg.vrViewYaw   += alpha * AngleSubtract( targetYaw,   cg.vrViewYaw );
-		}
-
-		cg.refdefViewAngles[PITCH] = cg.vrViewPitch;
-		cg.refdefViewAngles[YAW]   = cg.vrViewYaw;
-	} else {
-		cg.vrViewInitialized = qfalse;
-	}
+	CG_VR_FollowHeadView( ps );
 
 	if (cg_cameraOrbit.integer) {
 		if (cg.time > cg.nextOrbitTime) {
@@ -1403,37 +1435,43 @@ static int CG_CalcViewValues( void ) {
 		}
 	}
 
-	// free-fly camera — only available in TV playback
-	if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
-			&& cg_followMode.integer == 2 ) {
-		if ( !cgs.tvPlayback ) {
-			// reset — freefly not available outside TV
-			trap_Cvar_Set( "cg_followMode", "0" );
-			cg.freeFlyInitialized = qfalse;
+	if ( !CG_VR_OffsetView() ) {
+		// free-fly camera — only available in TV playback
+		if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
+				&& cg_followMode.integer == 2 ) {
+			if ( !cgs.tvPlayback ) {
+				// reset — freefly not available outside TV
+				trap_Cvar_Set( "cg_followMode", "0" );
+				cg.freeFlyInitialized = qfalse;
+			} else {
+				CG_UpdateFreeFlyInput();
+				CG_OffsetFreeFlyView();
+				AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+				return CG_CalcFov();
+			}
+		}
+
+		if ( cg.renderingThirdPerson ) {
+			if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
+					&& cg_followMode.integer == 1 ) {
+				CG_UpdateOrbitInput();
+				CG_OffsetOrbitView();
+			} else {
+				// back away from character
+				CG_OffsetThirdPersonView();
+			}
 		} else {
-			CG_UpdateFreeFlyInput();
-			CG_OffsetFreeFlyView();
-			AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
-			return CG_CalcFov();
+			// offset for local bobbing and kicks
+			CG_OffsetFirstPersonView();
 		}
 	}
 
-	if ( cg.renderingThirdPerson ) {
-		if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
-				&& cg_followMode.integer == 1 ) {
-			CG_UpdateOrbitInput();
-			CG_OffsetOrbitView();
-		} else {
-			// back away from character
-			CG_OffsetThirdPersonView();
-		}
-	} else {
-		// offset for local bobbing and kicks
-		CG_OffsetFirstPersonView();
-	}
+	CG_VR_ComputeWeaponAngles();
 
 	// position eye relative to origin
-	AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+	if ( !CG_VR_ViewAxis() ) {
+		AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+	}
 
 	if ( cg.hyperspace ) {
 		cg.refdef.rdflags |= RDF_NOWORLDMODEL | RDF_HYPERSPACE;
@@ -1558,6 +1596,8 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	CG_UpdateVoipLevels();
 	CG_UpdateVoipChannelState();
 
+	CG_VR_Frame();
+
 	// if we are only updating the screen as a loading
 	// pacifier, don't even try to read snapshots
 	if ( cg.infoScreenText[0] != 0 ) {
@@ -1602,6 +1642,11 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		cg.renderingThirdPerson = qtrue;
 	}
 
+	// VR spectator/demo/follow camera modes also render in third person
+	if ( CG_VR_ForceThirdPerson() ) {
+		cg.renderingThirdPerson = qtrue;
+	}
+
 	CG_TrackClientTeamChange();
 
 	// follow killer
@@ -1643,10 +1688,14 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		CG_AddParticles ();
 		CG_AddLocalEntities();
 	}
+	// Process weapon adjustment mode (reads thumbstick, updates cvars)
+	CG_WeaponAdjustFrame();
 	CG_AddViewWeapon( &cg.predictedPlayerState );
 
-	// VR follow: add 3D crosshair at weapon aim point (first-person only)
-	if ( !cg.renderingThirdPerson && CG_IsVRFollow() ) {
+	// VR follow: add 3D crosshair at weapon aim point (first-person only).
+	// In VR the primary CG_VR_DrawFrame crosshair site already covers follow
+	// mode; gate this flatscreen site off when vrActive to avoid a double blend.
+	if ( !vrActive && !cg.renderingThirdPerson && CG_VR_IsVRFollow() ) {
 		CG_DrawCrosshair3D();
 	}
 
@@ -1700,6 +1749,11 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 
 	// actually issue the rendering calls
 	CG_DrawActive( stereoView );
+
+	// VR API conformance probe overlay; when VR is active the draw tail
+	// renders it inside the protected 2D bracket instead
+	if ( !vrActive )
+		CG_VRProbe_Draw();
 
 	// this counter will be bumped for every valid scene we generate
 	cg.clientFrame++;

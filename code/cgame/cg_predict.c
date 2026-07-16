@@ -239,13 +239,7 @@ static void CG_InterpolatePlayerState( qboolean grabAngles ) {
 			f * (next->ps.velocity[i] - prev->ps.velocity[i] );
 	}
 
-	// Interpolate VR head angle stats (same treatment as viewangles)
-	out->stats[STAT_VR_HEAD_PITCH] = (int)( LerpAngle(
-		(float)prev->ps.stats[STAT_VR_HEAD_PITCH] / 182.04f,
-		(float)next->ps.stats[STAT_VR_HEAD_PITCH] / 182.04f, f ) * 182.04f );
-	out->stats[STAT_VR_HEAD_YAW_OFFSET] = (int)( LerpAngle(
-		(float)prev->ps.stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f,
-		(float)next->ps.stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f, f ) * 182.04f );
+	CG_VR_InterpolateHeadStats( out, &prev->ps, &next->ps, f );
 
 }
 
@@ -991,6 +985,7 @@ void CG_PredictPlayerState( void ) {
 	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
 		cg_pmove.tracemask &= ~CONTENTS_BODY;	// spectators can fly through bodies
 	}
+	cg_pmove.noFootsteps = ( cgs.dmflags & DF_NO_FOOTSTEPS ) > 0;
 
 	// save the state before the pmove so we can detect transitions
 	oldPlayerState = cg.predictedPlayerState;

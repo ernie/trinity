@@ -29,11 +29,13 @@ qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 void (*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 void (*trap_R_ProjectDecal)( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
+void (*trap_VR_RegisterState)( void *state, int stateSize, int apiVersion );
 #else
 int dll_com_trapGetValue;
 int dll_trap_R_AddRefEntityToScene2;
 int dll_trap_R_AddLinearLightToScene;
 int dll_trap_R_ProjectDecal;
+int dll_trap_VR_RegisterState;
 #endif
 
 /*
@@ -117,6 +119,23 @@ static const cvarTable_t cvarTable[] = {
 
 };
 
+// A cvar may carry more than one entry: the most specific match wins - fewest
+// platforms in the mask - so a narrow exception beats a broad rule whichever
+// order they are listed in. Equally specific matches: first listed wins.
+typedef struct {
+	vmCvar_t	*vmCvar;
+	const int	platformMask;
+	const char	*defaultString;
+} cvarPlatformTable_t;
+
+static const cvarPlatformTable_t cvarPlatformTable[] = {
+
+#define CG_CVAR_PLATFORM_LIST
+	#include "cg_cvar.h"
+#undef CG_CVAR_PLATFORM_LIST
+
+};
+
 
 /*
 =================
@@ -124,13 +143,35 @@ CG_RegisterCvars
 =================
 */
 void CG_RegisterCvars( void ) {
-	int			i;
+	int			i, j;
 	const cvarTable_t	*cv;
 	char		var[MAX_TOKEN_CHARS];
+	const char	*defaultString;
+	int			platformBit;
+	int			bits, bestBits, mask;
+
+	platformBit = 1 << VR_Platform( vrActive );
 
 	for ( i = 0, cv = cvarTable ; i < ARRAY_LEN( cvarTable ) ; i++, cv++ ) {
+		defaultString = cv->defaultString;
+		bestBits = 0;
+		for ( j = 0 ; j < ARRAY_LEN( cvarPlatformTable ) ; j++ ) {
+			if ( cvarPlatformTable[j].vmCvar != cv->vmCvar
+					|| !( cvarPlatformTable[j].platformMask & platformBit ) ) {
+				continue;
+			}
+			// specificity = platforms covered (popcount of the mask)
+			bits = 0;
+			for ( mask = cvarPlatformTable[j].platformMask ; mask ; mask &= mask - 1 ) {
+				bits++;
+			}
+			if ( bestBits == 0 || bits < bestBits ) {
+				bestBits = bits;
+				defaultString = cvarPlatformTable[j].defaultString;
+			}
+		}
 		trap_Cvar_Register( cv->vmCvar, cv->cvarName,
-			cv->defaultString, cv->cvarFlags );
+			defaultString, cv->cvarFlags );
 	}
 
 	// see if we are also running the server on this machine
@@ -953,10 +994,10 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.dustPuffShader = trap_R_RegisterShader("hasteSmokePuff" );
 #endif
 
+	cgs.media.friendShader = trap_R_RegisterShader( "sprites/foe" );
+	cgs.media.teamStatusBar = trap_R_RegisterShader( "gfx/2d/colorbar.tga" );
 	if ( cgs.gametype >= GT_TEAM || cg_buildScript.integer ) {
-		cgs.media.friendShader = trap_R_RegisterShader( "sprites/foe" );
 		cgs.media.redQuadShader = trap_R_RegisterShader("powerups/blueflag" );
-		cgs.media.teamStatusBar = trap_R_RegisterShader( "gfx/2d/colorbar.tga" );
 #ifdef MISSIONPACK
 		cgs.media.blueKamikazeShader = trap_R_RegisterShader( "models/weaphits/kamikblu" );
 #endif
@@ -1049,6 +1090,9 @@ static void CG_RegisterGraphics( void ) {
 		}
 	}
 
+	// register all weapons (as they are used on weapon wheel selector)
+	CG_VR_RegisterMedia();
+
 	cg.skipDFshaders = qfalse;
 
 	// wall marks
@@ -1059,6 +1103,9 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.shadowMarkShader = trap_R_RegisterShader( "markShadow" );
 	cgs.media.wakeMarkShader = trap_R_RegisterShader( "wake" );
 	cgs.media.bloodMarkShader = trap_R_RegisterShader( "bloodMark" );
+
+	//Used for the weapon selector
+	cgs.media.smallSphereModel = trap_R_RegisterModel("models/powerups/health/small_sphere.md3");
 
 	// register the inline models
 	cgs.numInlineModels = trap_CM_NumInlineModels();
@@ -1761,6 +1808,21 @@ static void CG_FeederSelection(float feederID, int index) {
 	}
 }
 
+static int CG_GetCurrentClientNum(void) {
+	if (cg.snap) {
+		return cg.snap->ps.clientNum;
+	}
+	return -1;
+}
+
+static int CG_FeederItemClientNum(float feederID, int index) {
+	int scoreIndex = CG_ScoreIndexFromFeederIndex(feederID, index);
+	if (scoreIndex >= 0) {
+		return cg.scores[scoreIndex].client;
+	}
+	return -1;
+}
+
 static float CG_Cvar_Get(const char *cvar) {
 	char buff[128];
 	memset(buff, 0, sizeof(buff));
@@ -1855,6 +1917,8 @@ void CG_LoadHudMenu( void ) {
 	cgDC.feederItemImage = &CG_FeederItemImage;
 	cgDC.feederItemText = &CG_FeederItemText;
 	cgDC.feederSelection = &CG_FeederSelection;
+	cgDC.feederItemClientNum = &CG_FeederItemClientNum;
+	cgDC.getCurrentClientNum = &CG_GetCurrentClientNum;
 	//cgDC.setBinding = &trap_Key_SetBinding;
 	//cgDC.getBindingBuf = &trap_Key_GetBindingBuf;
 	//cgDC.keynumToStringBuf = &trap_Key_KeynumToStringBuf;
@@ -1870,7 +1934,8 @@ void CG_LoadHudMenu( void ) {
 	cgDC.stopCinematic = &CG_StopCinematic;
 	cgDC.drawCinematic = &CG_DrawCinematic;
 	cgDC.runCinematicFrame = &CG_RunCinematicFrame;
-	
+	cgDC.vrMenuMove = &CG_VR_OnMenuMove;
+
 	Init_Display(&cgDC);
 
 	Menu_Reset();
@@ -1928,6 +1993,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );
 
+	cg.deathCamTime = -1;
 	cgs.voteCaller = -1;
 	cgs.teamVoteCaller[0] = cgs.teamVoteCaller[1] = -1;
 
@@ -1974,6 +2040,8 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 		}
 #endif
 	}
+
+	CG_VR_Init();
 
 	// load a few needed things before we do any screen updates
 	cgs.media.charsetShader		= trap_R_RegisterShader( "gfx/2d/bigchars" );
@@ -2117,6 +2185,9 @@ Called before every level change or subsystem restart
 void CG_Shutdown( void ) {
 	// some mods may need to do cleanup work here,
 	// like closing files or archiving session data
+	// Clear the VR scoreboard-cursor tracking flag on shutdown so the engine
+	// stops treating cgame's last cursor state as live.
+	CG_VR_Shutdown();
 }
 
 
@@ -2139,14 +2210,21 @@ void CG_SetScoreCatcher( qboolean enable )
 	if ( currentCatcher & KEYCATCH_CONSOLE || !cg.snap )
 		return;
 	
-	spectator = cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR || cg.demoPlayback || ( cg.snap->ps.pm_flags & PMF_FOLLOW );
+	spectator = cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR || cg.demoPlayback || ( cg.snap->ps.pm_flags & PMF_FOLLOW ) || cgs.tvPlayback;
 
 	if ( enable && spectator ) {
 		cgs.score_key = trap_Key_GetKey( "+scores" );
 		cgs.score_catched = qtrue;
+		if ( vrActive ) {
+			// Center cursor on HUD and point VR scoreboard cursor to cgame cursor
+			cgs.cursorX = SCREEN_WIDTH / 2;
+			cgs.cursorY = SCREEN_HEIGHT / 2;
+			CG_VR_SetScoreboardCursor( qtrue );
+		}
 		newCatcher = currentCatcher | KEYCATCH_CGAME;
 	} else {
 		cgs.score_catched = qfalse;
+		CG_VR_SetScoreboardCursor( qfalse );
 		newCatcher = currentCatcher & ~KEYCATCH_CGAME;
 	}
 
@@ -2181,6 +2259,10 @@ void CG_KeyEvent( int key, qboolean down )
 		if ( down && key == /*K_ESCAPE*/27 ) {
 			int currentCatcher;
 			cgs.tvScrubActive = qfalse;
+			CG_VR_UnlockMenuYaw( cgs.tvScrubSavedMenuYaw );
+			if ( !cgs.score_catched ) {
+				CG_VR_SetScoreboardCursor( qfalse );
+			}
 			if ( !cgs.score_catched ) {
 				currentCatcher = trap_Key_GetCatcher();
 				trap_Key_SetCatcher( currentCatcher & ~KEYCATCH_CGAME );
@@ -2196,7 +2278,7 @@ void CG_KeyEvent( int key, qboolean down )
 			return;
 		if ( key == /*K_MOUSE1*/178 )
 			CG_ScoreboardClick();
-		else
+		else if ( key != /*K_PGUP*/142 && key != /*K_PGDN*/141 )
 			CG_SetScoreCatcher( qfalse );
 	}
 }
@@ -2204,6 +2286,9 @@ void CG_KeyEvent( int key, qboolean down )
 
 void CG_MouseEvent( int x, int y )
 {
+	if ( CG_VR_ScoreboardCursor( &cgs.cursorX, &cgs.cursorY ) ) {
+		return;
+	}
 	cgs.cursorX += x * cgs.cursorScaleR;
 	cgs.cursorY += y * cgs.cursorScaleR;
 

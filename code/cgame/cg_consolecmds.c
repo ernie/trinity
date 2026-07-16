@@ -537,18 +537,45 @@ static void CG_TVScrubDown_f( void ) {
 	int		currentCatcher, newCatcher;
 	int		old_state, new_state;
 	float	frac;
+	float	playbackX, controllerYaw;
 
 	if ( !cgs.tvPlayback || cg_tvDuration.integer <= 0 ) {
 		return;
 	}
 
-	cgs.tvScrubActive = qtrue;
+	if ( vrActive ) {
+		// Release scoreboard if held, so it doesn't stay stuck during scrub
+		if ( cg.showScores ) {
+			CG_ScoresUp_f();
+		}
 
-	// initialize cursor at current playback position
-	frac = (float)cg_tvTime.integer / (float)cg_tvDuration.integer;
-	if ( frac < 0.0f ) frac = 0.0f;
-	if ( frac > 1.0f ) frac = 1.0f;
-	cgs.cursorX = 640.0f * frac;
+		cgs.tvScrubActive = qtrue;
+
+		// Compute playback position in screen coordinates
+		playbackX = 640.0f * (float)cg_tvTime.integer / (float)cg_tvDuration.integer;
+		if ( playbackX < 0.0f ) playbackX = 0.0f;
+		if ( playbackX > 640.0f ) playbackX = 640.0f;
+
+		// Read current controller yaw (must match cursor tracking logic in vr_input.c)
+		controllerYaw = CG_VR_MenuPointerYaw();
+
+		// Save current menuYaw and adjust so cursor maps to playback position
+		cgs.tvScrubSavedMenuYaw = CG_VR_MenuYaw();
+		CG_VR_LockMenuYaw( controllerYaw - RAD2DEG( atan2( (320.0f - playbackX) / 400.0f, 1.0f ) ) );
+		cgs.cursorX = (int)playbackX;
+
+		// Enable VR hand-pointing cursor tracking
+		CG_VR_SetScoreboardCursor( qtrue );
+	} else
+	{
+		cgs.tvScrubActive = qtrue;
+
+		// initialize cursor at current playback position
+		frac = (float)cg_tvTime.integer / (float)cg_tvDuration.integer;
+		if ( frac < 0.0f ) frac = 0.0f;
+		if ( frac > 1.0f ) frac = 1.0f;
+		cgs.cursorX = 640.0f * frac;
+	}
 
 	// capture input
 	cgs.tvScrubKey = trap_Key_GetKey( "+tv_scrub" );
@@ -584,6 +611,9 @@ static void CG_TVScrubUp_f( void ) {
 
 	cgs.tvScrubActive = qfalse;
 
+	// Restore menuYaw
+	CG_VR_UnlockMenuYaw( cgs.tvScrubSavedMenuYaw );
+
 	// calculate seek time from cursor position
 	frac = cgs.cursorX / 640.0f;
 	if ( frac < 0.0f ) frac = 0.0f;
@@ -592,11 +622,32 @@ static void CG_TVScrubUp_f( void ) {
 
 	// release input capture (preserve if scoreboard is also catching)
 	if ( !cgs.score_catched ) {
+		CG_VR_SetScoreboardCursor( qfalse );
 		currentCatcher = trap_Key_GetCatcher();
 		trap_Key_SetCatcher( currentCatcher & ~KEYCATCH_CGAME );
 	}
 
 	trap_SendConsoleCommand( va( "tv_seek %i\n", ms / 1000 ) );
+}
+
+static void CG_TVScrubCancel_f( void ) {
+	int		currentCatcher;
+
+	if ( !cgs.tvScrubActive ) {
+		return;
+	}
+
+	cgs.tvScrubActive = qfalse;
+
+	// Restore menuYaw
+	CG_VR_UnlockMenuYaw( cgs.tvScrubSavedMenuYaw );
+
+	// Release input capture (but preserve if scoreboard is also active)
+	if ( !cgs.score_catched ) {
+		CG_VR_SetScoreboardCursor( qfalse );
+		currentCatcher = trap_Key_GetCatcher();
+		trap_Key_SetCatcher( currentCatcher & ~KEYCATCH_CGAME );
+	}
 }
 
 
@@ -671,9 +722,8 @@ int CG_ActiveVoteTarget( void ) {
 	return 1;
 }
 
-static void CG_Vote_f( void ) {
-	const char *arg = CG_Argv( 1 );
-	qboolean yes = ( arg[0] == 'y' || arg[0] == 'Y' || arg[0] == '1' );
+void CG_VoteSubmit( qboolean yes ) {
+	const char *arg = yes ? "yes" : "no";
 	int target;
 
 	// TVD offer always takes priority
@@ -694,6 +744,12 @@ static void CG_Vote_f( void ) {
 		// no unvoted dialog — fall through to server
 		trap_SendClientCommand( va( "vote %s", arg ) );
 	}
+}
+
+static void CG_Vote_f( void ) {
+	const char *arg = CG_Argv( 1 );
+	qboolean yes = ( arg[0] == 'y' || arg[0] == 'Y' || arg[0] == '1' );
+	CG_VoteSubmit( yes );
 }
 
 static void CG_TeamVote_f( void ) {
@@ -871,6 +927,10 @@ static consoleCommand_t	commands[] = {
 	{ "tcmd", CG_TargetCommand_f },
 	{ "tell_target", CG_TellTarget_f },
 	{ "tell_attacker", CG_TellAttacker_f },
+	{ "weapon_select", CG_WeaponSelectorSelect_f },
+	{ "weapon_adjust", CG_WeaponAdjust_f },
+	{ "weapon_adjust_reset", CG_WeaponAdjustReset_f },
+	{ "weapon_adjust_reset_all", CG_WeaponAdjustResetAll_f },
 #ifdef MISSIONPACK
 	{ "vtell_target", CG_VoiceTellTarget_f },
 	{ "vtell_attacker", CG_VoiceTellAttacker_f },
@@ -912,6 +972,7 @@ static consoleCommand_t	commands[] = {
 	{ "tv_backward", CG_TVBackward_f },
 	{ "+tv_scrub", CG_TVScrubDown_f },
 	{ "-tv_scrub", CG_TVScrubUp_f },
+	{ "tv_scrub_cancel", CG_TVScrubCancel_f },
 	{ "loaddeferred", CG_LoadDeferredPlayers },
 	{ "callvote", CG_CallVote_f },
 	{ "vote", CG_Vote_f },

@@ -291,6 +291,8 @@ void CG_Draw3DModel( float x, float y, float w, float h, qhandle_t model, qhandl
 
 	refdef.time = cg.time;
 
+	refdef.isHUD = qtrue;
+
 	trap_R_ClearScene();
 	trap_R_AddRefEntityToScene( &ent );
 	trap_R_RenderScene( &refdef );
@@ -335,6 +337,8 @@ void CG_Draw3DModelColor( float x, float y, float w, float h, qhandle_t model, q
 	refdef.height = h;
 
 	refdef.time = cg.time;
+
+	refdef.isHUD = qtrue;
 
 	ent.shaderRGBA.rgba[0] = color[0] * 255;
 	ent.shaderRGBA.rgba[1] = color[1] * 255;
@@ -459,48 +463,6 @@ void CG_DrawFlagModel( float x, float y, float w, float h, int team, qboolean fo
 
 /*
 ================
-CG_VRPortraitHeadAngles
-
-Fills 'angles' with the viewed player's real VR head orientation for the HUD
-portrait, EMA-smoothing pitch and yaw to hide the ~1.42 degree steps from the
-7-bit usercmd packing. Yaw is weapon-relative (added to the viewer-facing 180);
-pitch is absolute world look pitch; roll comes straight from viewangles (full
-precision, already interpolated). Returns qtrue when VR head data is present
-(current player, followed player, or demo), qfalse otherwise so callers fall
-back to the legacy idle-bob.
-================
-*/
-qboolean CG_VRPortraitHeadAngles( vec3_t angles ) {
-	playerState_t	*ps = &cg.snap->ps;
-	float			targetPitch, targetYaw, alpha;
-
-	if ( !( ps->eFlags & EF_VR_PLAYER ) ) {
-		cg.vrPortraitInitialized = qfalse;
-		return qfalse;
-	}
-
-	targetYaw   = 180.0f + (float)ps->stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f;
-	targetPitch = (float)ps->stats[STAT_VR_HEAD_PITCH] / 182.04f;
-
-	if ( !cg.vrPortraitInitialized || cg.nextFrameTeleport ) {
-		cg.vrPortraitYaw   = targetYaw;
-		cg.vrPortraitPitch = targetPitch;
-		cg.vrPortraitInitialized = qtrue;
-	} else {
-		// tau ~30ms: smooths quantization steps without perceptible lag
-		alpha = (float)cg.frametime / ( (float)cg.frametime + 30.0f );
-		cg.vrPortraitYaw   += alpha * AngleSubtract( targetYaw,   cg.vrPortraitYaw );
-		cg.vrPortraitPitch += alpha * AngleSubtract( targetPitch, cg.vrPortraitPitch );
-	}
-
-	angles[PITCH] = cg.vrPortraitPitch;
-	angles[YAW]   = cg.vrPortraitYaw;
-	angles[ROLL]  = ps->viewangles[ROLL];	// full precision, applied directly
-	return qtrue;
-}
-
-/*
-================
 CG_DrawStatusBarHead
 
 ================
@@ -517,7 +479,7 @@ static void CG_DrawStatusBarHead( float x ) {
 
 	// VR players: portrait reflects the real head orientation (current player,
 	// followed player, or demo). Falls back to the random idle-bob otherwise.
-	vr = CG_VRPortraitHeadAngles( angles );
+	vr = CG_VR_PortraitHeadAngles( angles );
 
 	if ( cg.damageTime && cg.time - cg.damageTime < DAMAGE_TIME ) {
 		frac = (float)(cg.time - cg.damageTime ) / DAMAGE_TIME;
@@ -604,7 +566,12 @@ void CG_DrawTeamBackground( int x, int y, int w, int h, float alpha, int team )
 		hcolor[1] = 0.1f;
 		hcolor[2] = 1.0f;
 	} else {
-		return;
+		if ( !cg_drawFFABackground.integer ) {
+			return;
+		}
+		hcolor[0] = 0.0f;
+		hcolor[1] = 0.0f;
+		hcolor[2] = 0.0f;
 	}
 	trap_R_SetColor( hcolor );
 	CG_DrawPic( x, y, w, h, cgs.media.teamStatusBar );
@@ -668,7 +635,7 @@ static void CG_DrawStatusBar( void ) {
 		{ 0.5f, 0.5f, 0.5f, 1.0f },     // weapon firing
 		{ 1.0f, 1.0f, 1.0f, 1.0f } };   // health > 100
 
-	if ( cg_drawStatus.integer == 0 ) {
+	if ( !CG_VR_OwnsHudVisibility() && cg_drawStatus.integer == 0 ) {
 		return;
 	}
 
@@ -1566,7 +1533,7 @@ static void CG_DrawUpperRight(stereoFrame_t stereoFrame)
 	if ( cg_drawAttacker.integer ) {
 		y = CG_DrawAttacker( y );
 	}
-	if ( CG_IsVRFollow() ) {
+	if ( CG_VR_IsVRFollow() ) {
 		y = CG_DrawVRFollowIcon( y );
 	}
 	y = CG_DrawModeIndicators( y );
@@ -1865,7 +1832,9 @@ CG_DrawLowerRight
 static void CG_DrawLowerRight( void ) {
 	float	y;
 
-	y = cgs.screenYmax + 1 - STATUSBAR_HEIGHT;
+	// Minimal (zoomed) HUD doesn't draw the status bar, so don't reserve
+	// space for it — anchor scores/powerups to the actual bottom edge.
+	y = cg.drawingZoomedHUD ? cgs.screenYmax + 1 : cgs.screenYmax + 1 - STATUSBAR_HEIGHT;
 
 	if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 2 ) {
 		y = CG_DrawTeamOverlay( y, qtrue, qfalse );
@@ -2021,13 +1990,16 @@ CG_DrawHoldableItem
 ===================
 */
 #ifndef MISSIONPACK
-static void CG_DrawHoldableItem( void ) { 
+static void CG_DrawHoldableItem( void ) {
 	int		value;
 
 	value = cg.snap->ps.stats[STAT_HOLDABLE_ITEM];
 	if ( value ) {
 		CG_RegisterItemVisuals( value );
-		CG_DrawPic( cgs.screenXmax + 1 - ICON_SIZE, (SCREEN_HEIGHT-ICON_SIZE)/2, ICON_SIZE, ICON_SIZE, cg_items[ value ].icon );
+
+		if ( !CG_VR_OwnsHoldableIcon() ) {
+			CG_DrawPic( cgs.screenXmax + 1 - ICON_SIZE, (SCREEN_HEIGHT-ICON_SIZE)/2, ICON_SIZE, ICON_SIZE, cg_items[ value ].icon );
+		}
 	}
 }
 #endif // MISSIONPACK
@@ -2506,7 +2478,7 @@ static void CG_DrawCrosshair( void ) {
 	}
 
 	// VR follow uses a 3D crosshair at the weapon aim point instead
-	if ( CG_IsVRFollow() ) {
+	if ( CG_VR_IsVRFollow() ) {
 		return;
 	}
 
@@ -2560,6 +2532,122 @@ static void CG_DrawCrosshair( void ) {
 
 /*
 =================
+CG_DrawCrosshair3D
+=================
+*/
+void CG_DrawCrosshair3D(void)
+{
+	float		w;
+	qhandle_t	hShader;
+	float		f;
+	int			ca;
+
+	trace_t trace;
+	vec3_t endpos;
+	float stereoSep, zProj, maxdist, xmax;
+	char rendererinfos[128];
+	refEntity_t ent;
+	vec3_t viewaxis[3];
+	vec3_t weaponangles;
+	vec3_t origin;
+
+	if ( !cg_drawCrosshair.integer || vr->no_crosshair ) {
+		return;
+	}
+
+	if (cg.snap->ps.pm_type == PM_INTERMISSION)
+	{
+		return;
+	}
+
+	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR) {
+		return;
+	}
+
+	if ( cg.renderingThirdPerson || CG_VR_IsDeathCam()) {
+		return;
+	}
+
+	w = cg_crosshairSize.value;
+
+	// pulse the size of the crosshair when picking up items
+	f = cg.time - cg.itemPickupBlendTime;
+	if ( f > 0 && f < ITEM_BLOB_TIME ) {
+		f /= ITEM_BLOB_TIME;
+		w *= ( 1 + f );
+	}
+
+	ca = cg_drawCrosshair.integer;
+	if (ca < 0) {
+		ca = 0;
+	}
+	hShader = cgs.media.crosshairShader[ ca % NUM_CROSSHAIRS ];
+
+	// Use a different method rendering the crosshair so players don't see two of them when
+	// focusing their eyes at distant objects with high stereo separation
+	// We are going to trace to the next shootable object and place the crosshair in front of it.
+
+	// first get all the important renderer information
+	trap_Cvar_VariableStringBuffer("r_zProj", rendererinfos, sizeof(rendererinfos));
+	zProj = atof(rendererinfos);
+	trap_Cvar_VariableStringBuffer("r_stereoSeparation", rendererinfos, sizeof(rendererinfos));
+	stereoSep = zProj / atof(rendererinfos);
+
+	xmax = zProj * tan(cg.refdef.fov_x * M_PI / 360.0f);
+
+	// let the trace run through until a change in stereo separation of the crosshair becomes less than one pixel.
+	CG_CalculateVRWeaponPosition(origin, weaponangles);
+	AnglesToAxis(weaponangles, viewaxis);
+	maxdist = (cgs.glconfig.vidWidth * stereoSep * zProj / (2 * xmax)) * 1.5f;
+	VectorMA(origin, maxdist, viewaxis[0], endpos);
+	CG_Trace(&trace, origin, NULL, NULL, endpos, 0, MASK_SHOT);
+#if 0
+	maxdist = cgs.glconfig.vidWidth * stereoSep * zProj / (2 * xmax);
+	VectorMA(cg.refdef.vieworg, maxdist, cg.refdef.viewaxis[0], endpos);
+	CG_Trace(&trace, cg.refdef.vieworg, NULL, NULL, endpos, 0, MASK_SHOT);
+#endif
+	memset(&ent, 0, sizeof(ent));
+	ent.reType = RT_SPRITE;
+	ent.renderfx = RF_DEPTHHACK | RF_CROSSHAIR;
+
+	VectorCopy(trace.endpos, ent.origin);
+
+	// scale the crosshair so it appears the same size for all distances
+	// Position is based on weapon aim, but size is based on distance from eyes
+	{
+		vec3_t delta;
+		float distance;
+		VectorSubtract(trace.endpos, cg.refdef.vieworg, delta);
+		distance = VectorLength(delta);
+
+		// Scale radius proportional to distance to maintain constant angular size
+		// radius = (normalized_size) * distance * tan(half_fov)
+		ent.radius = (w / 640.0f) * distance * tan(cg.refdef.fov_x * M_PI / 360.0f);
+	}
+	ent.customShader = hShader;
+
+	// set crosshair color
+	if ( cg_crosshairHealth.integer ) {
+		vec4_t hcolor;
+		CG_ColorForHealth( hcolor );
+		ent.shaderRGBA.rgba[0] = (byte)(hcolor[0] * 255);
+		ent.shaderRGBA.rgba[1] = (byte)(hcolor[1] * 255);
+		ent.shaderRGBA.rgba[2] = (byte)(hcolor[2] * 255);
+		ent.shaderRGBA.rgba[3] = (byte)(hcolor[3] * 255);
+	} else {
+		CG_CrosshairColorFromInt( cg_crosshairColor.integer, ent.shaderRGBA.rgba );
+	}
+
+	// ensure crosshair is aligned with world, not HMD/view
+	// Don't apply roll when rendering to virtual screen
+	ent.rotation = vr->virtual_screen ? 0 : vr->hmdorientation[ROLL];
+
+	trap_R_AddRefEntityToScene(&ent);
+}
+
+
+/*
+=================
 CG_ScanForCrosshairEntity
 =================
 */
@@ -2568,8 +2656,10 @@ static void CG_ScanForCrosshairEntity( void ) {
 	vec3_t		start, end;
 	int			content;
 
-	VectorCopy( cg.refdef.vieworg, start );
-	VectorMA( start, 131072, cg.refdef.viewaxis[0], end );
+	if ( !CG_VR_CrosshairScanRay( start, end ) ) {
+		VectorCopy( cg.refdef.vieworg, start );
+		VectorMA( start, 131072, cg.refdef.viewaxis[0], end );
+	}
 
 	CG_Trace( &trace, start, vec3_origin, vec3_origin, end, 
 		cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
@@ -2605,6 +2695,16 @@ static void CG_DrawCrosshairNames( void ) {
 #ifdef MISSIONPACK
 	int			w;
 #endif
+
+	// in VR the name scan follows the weapon: hide names when both the
+	// 3D crosshair and the laser sight are disabled
+	if ( vrActive && vr->no_crosshair ) {
+		char buf[8];
+		trap_Cvar_VariableStringBuffer( "vr_lasersight", buf, sizeof( buf ) );
+		if ( atoi( buf ) == 0 ) {
+			return;
+		}
+	}
 
 	if ( !cg_drawCrosshair.integer ) {
 		return;
@@ -2660,6 +2760,8 @@ static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
 						   const char *line3, const char *line4,
 						   float barFrac, vec4_t barColor, float alpha,
 						   qboolean highlighted );
+
+static void CG_DrawVoteHoldBar( float boxY, qboolean hasLine3 );
 
 /*
 =================
@@ -2731,9 +2833,16 @@ static float CG_DrawVote( float y, qboolean highlighted ) {
 	}
 
 	barFg[0] = 0.2f; barFg[1] = 0.6f; barFg[2] = 0.8f; barFg[3] = 0.7f;
-	return CG_DrawDialogBox( y, caller, desc, tally,
-		( highlighted && keyYes[0] && keyNo[0] && !cg.myVote ) ? keys : NULL,
-		frac, barFg, 1.0f, highlighted );
+	{
+		float retY = CG_DrawDialogBox( y, caller, desc, tally,
+			( highlighted && keyYes[0] && keyNo[0] && !cg.myVote ) ? keys : NULL,
+			frac, barFg, 1.0f, highlighted );
+
+		if ( highlighted && !cg.myVote )
+			CG_DrawVoteHoldBar( y, qtrue );  // has tally (line3)
+
+		return retY;
+	}
 }
 
 
@@ -2816,9 +2925,16 @@ static float CG_DrawTeamVote( float y, qboolean highlighted ) {
 	}
 
 	barFg[0] = 0.2f; barFg[1] = 0.6f; barFg[2] = 0.8f; barFg[3] = 0.7f;
-	return CG_DrawDialogBox( y, caller, desc, tally,
-		( highlighted && keyYes[0] && keyNo[0] && !cg.myTeamVote ) ? keys : NULL,
-		frac, barFg, 1.0f, highlighted );
+	{
+		float retY = CG_DrawDialogBox( y, caller, desc, tally,
+			( highlighted && keyYes[0] && keyNo[0] && !cg.myTeamVote ) ? keys : NULL,
+			frac, barFg, 1.0f, highlighted );
+
+		if ( highlighted && !cg.myTeamVote )
+			CG_DrawVoteHoldBar( y, qtrue );  // has tally (line3)
+
+		return retY;
+	}
 }
 
 
@@ -3003,7 +3119,7 @@ static qboolean CG_DrawScoreboard( void ) {
 		return qfalse;
 	}
 
-	if ( cg.showScores || (cg.predictedPlayerState.pm_type == PM_DEAD && !(cgs.tvPlayback && cg_followMode.integer == 2)) || cg.predictedPlayerState.pm_type == PM_INTERMISSION ) {
+	if ( cg.showScores || (cg.predictedPlayerState.pm_type == PM_DEAD && !(cgs.tvPlayback && cg_followMode.integer == 2) && !CG_VR_SuppressDeadScoreboard()) || cg.predictedPlayerState.pm_type == PM_INTERMISSION ) {
 		fade = 1.0;
 		fadeColor = colorWhite;
 	} else {
@@ -3013,9 +3129,11 @@ static qboolean CG_DrawScoreboard( void ) {
 			cg.deferredPlayerLoading = 0;
 			cg.killerName[0] = 0;
 			firstTime = qtrue;
-			if ( scoreboardCursorActive ) {
+			// Leave the cursor to an active TV scrub; teardown resumes once the scrub ends
+			if ( scoreboardCursorActive && !cgs.tvScrubActive ) {
 				trap_Key_SetCatcher( trap_Key_GetCatcher() & ~KEYCATCH_CGAME );
 				scoreboardCursorActive = qfalse;
+				CG_VR_SetScoreboardCursor( qfalse );
 				if (menuScoreboard) {
 					menuScoreboard->window.flags &= ~WINDOW_FORCED;
 				}
@@ -3068,9 +3186,12 @@ static qboolean CG_DrawScoreboard( void ) {
 		trap_Key_SetCatcher( trap_Key_GetCatcher() | KEYCATCH_CGAME );
 		menuScoreboard->window.flags |= WINDOW_FORCED;
 		scoreboardCursorActive = qtrue;
-	} else if ( !cg.showScores && scoreboardCursorActive ) {
+		CG_VR_SetScoreboardCursor( qtrue );
+	} else if ( !cg.showScores && scoreboardCursorActive && !cgs.tvScrubActive ) {
+		// Leave the cursor to an active TV scrub; teardown resumes once the scrub ends
 		trap_Key_SetCatcher( trap_Key_GetCatcher() & ~KEYCATCH_CGAME );
 		scoreboardCursorActive = qfalse;
+		CG_VR_SetScoreboardCursor( qfalse );
 		menuScoreboard->window.flags &= ~WINDOW_FORCED;
 	}
 
@@ -3370,6 +3491,156 @@ void CG_DrawTimedMenus( void ) {
 
 /*
 =================
+CG_ProcessVoteHold
+
+Reads CG_VR_VoteHolding() each frame and manages the hold-to-vote timer.
+Fires CG_VoteSubmit when the hold threshold is reached or when a vote
+is about to expire and the player has held long enough to show intent.
+=================
+*/
+/*
+Returns which dialog CG_VoteSubmit would route to:
+  -1 = TVD offer, 1 = vote, 2 = team vote, 0 = none
+*/
+static int CG_ActiveDialogTarget( void ) {
+	if ( CG_TVDOfferActive() )
+		return -1;
+	return CG_ActiveVoteTarget();  // 0, 1, or 2
+}
+
+static int CG_DialogRemaining( int target ) {
+	int cs_offset;
+
+	if ( target == -1 ) {
+		int timeout = (int)( cg_tvdTimeout.value * 1000.0f );
+		return timeout - ( cg.time - cg.tvdOfferTime );
+	}
+	if ( target == 1 )
+		return VOTE_TIME - ( cg.time - cgs.voteTime );
+	if ( target == 2 ) {
+		cs_offset = ( cgs.clientinfo[ cg.clientNum ].team == TEAM_RED ) ? 0 : 1;
+		return VOTE_TIME - ( cg.time - cgs.teamVoteTime[cs_offset] );
+	}
+
+	return INT_MAX;  // no active dialog
+}
+
+static void CG_ResetVoteHold( void ) {
+	cg.voteHoldStartTime = 0;
+	cg.voteHoldButton = 0;
+}
+
+static void CG_ProcessVoteHold( void ) {
+	int holdButton = CG_VR_VoteHolding();
+	int elapsed, remain, target;
+
+	target = CG_ActiveDialogTarget();
+
+	// nothing to do if no dialog would accept our input
+	if ( target == 0 ) {
+		CG_ResetVoteHold();
+		return;
+	}
+
+	if ( holdButton != 0 ) {
+		if ( cg.voteHoldButton != holdButton || cg.voteHoldTarget != target ) {
+			// started holding a new button, or target dialog changed — restart
+			cg.voteHoldStartTime = cg.time;
+			cg.voteHoldButton = holdButton;
+			cg.voteHoldTarget = target;
+		}
+
+		elapsed = cg.time - cg.voteHoldStartTime;
+
+		// normal threshold reached
+		if ( elapsed >= VOTE_HOLD_TIME ) {
+			CG_VoteSubmit( cg.voteHoldButton == 1 );
+			CG_ResetVoteHold();
+			return;
+		}
+
+		// early fire: active dialog about to expire and player has held long enough
+		remain = CG_DialogRemaining( target );
+		if ( elapsed >= VOTE_HOLD_MIN && remain <= VOTE_HOLD_MIN ) {
+			CG_VoteSubmit( cg.voteHoldButton == 1 );
+			CG_ResetVoteHold();
+			return;
+		}
+	} else {
+		// released — cancel hold
+		CG_ResetVoteHold();
+	}
+}
+
+
+/*
+=================
+CG_DrawVoteHoldBar
+
+Draws a thin progress bar under the active vote button label
+in the key hints line of a dialog box.
+boxY is the top of the dialog, hasLine3 indicates whether the
+dialog has a third text line (tally).
+=================
+*/
+static void CG_DrawVoteHoldBar( float boxY, qboolean hasLine3 ) {
+	float	textX, lineY, barX, barW, barH, frac;
+	float	yesW, gapW;
+	int		yesLen, noLen;
+	const char *keyYes, *keyNo;
+	vec4_t	bgColor, fillColor;
+
+	if ( cg.voteHoldButton == 0 || cg.voteHoldStartTime == 0 )
+		return;
+
+	frac = (float)( cg.time - cg.voteHoldStartTime ) / VOTE_HOLD_TIME;
+	if ( frac < 0.0f ) frac = 0.0f;
+	if ( frac > 1.0f ) frac = 1.0f;
+
+	keyYes = cg_voteYesKey.string;
+	keyNo = cg_voteNoKey.string;
+	if ( !keyYes[0] || !keyNo[0] )
+		return;
+
+	textX = cgs.screenXmin + DIALOG_PAD_X + DIALOG_PAD_X;
+
+	// position hold bar so its bottom edge aligns with the top of the countdown bar
+	barH = 2.0f;
+	{
+		float boxH = hasLine3 ? DIALOG_H4 : DIALOG_H3;
+		lineY = boxY + boxH - DIALOG_BAR_H - barH;
+	}
+
+	// calculate text widths: "A: yes" and "B: no"
+	// format is "%s: yes    %s: no"
+	yesLen = CG_DrawStrlen( keyYes ) + 5;  // "%s: yes" = keyLen + ": yes"
+	noLen = CG_DrawStrlen( keyNo ) + 4;    // "%s: no" = keyLen + ": no"
+	yesW = yesLen * DIALOG_CHARW;
+	gapW = 4 * DIALOG_CHARW;  // "    " gap
+
+	// use the longer of the two label widths so both bars match
+	barW = yesW;
+	if ( noLen * DIALOG_CHARW > barW )
+		barW = noLen * DIALOG_CHARW;
+
+	bgColor[0] = 0.5f; bgColor[1] = 0.5f; bgColor[2] = 0.5f; bgColor[3] = 0.6f;
+
+	if ( cg.voteHoldButton == 1 ) {
+		barX = textX;
+		fillColor[0] = 0.2f; fillColor[1] = 0.9f; fillColor[2] = 0.3f; fillColor[3] = 0.8f;
+	} else {
+		barX = textX + yesW + gapW;
+		fillColor[0] = 0.9f; fillColor[1] = 0.3f; fillColor[2] = 0.2f; fillColor[3] = 0.8f;
+	}
+
+	CG_FillRect( barX, lineY, barW, barH, bgColor );
+	if ( frac > 0.0f )
+		CG_FillRect( barX, lineY, barW * frac, barH, fillColor );
+}
+
+
+/*
+=================
 CG_DrawDialogBox
 
 Shared helper: draws a left-aligned dimmed box with text lines
@@ -3630,8 +3901,14 @@ static float CG_DrawTVOffer( float y ) {
 	}
 
 	barFg[0] = 0.8f; barFg[1] = 0.8f; barFg[2] = 0.2f; barFg[3] = 0.7f;
-	return CG_DrawDialogBox( y, "Download last match?", cg.tvdOfferName,
-		NULL, keys, frac, barFg, 1.0f, qfalse );
+	{
+		float retY = CG_DrawDialogBox( y, "Download last match?", cg.tvdOfferName,
+			NULL, keys, frac, barFg, 1.0f, qfalse );
+
+		CG_DrawVoteHoldBar( y, qfalse );  // TVD offer has no tally line (no line3)
+
+		return retY;
+	}
 }
 
 
@@ -3658,9 +3935,15 @@ static void CG_DrawTVTimeline( void ) {
 		return;
 	}
 
-	// auto-cancel scrub if input capture was lost
+	// Auto-cancel scrub if input capture was lost. Must run before the
+	// early-return below so scrub state never leaks into VR menuYaw /
+	// scoreboard cursor state.
 	if ( cgs.tvScrubActive && !( trap_Key_GetCatcher() & KEYCATCH_CGAME ) ) {
 		cgs.tvScrubActive = qfalse;
+		CG_VR_UnlockMenuYaw( cgs.tvScrubSavedMenuYaw );
+		if ( !cgs.score_catched ) {
+			CG_VR_SetScoreboardCursor( qfalse );
+		}
 	}
 
 	if ( !cgs.tvScrubActive ) {
@@ -3745,6 +4028,21 @@ static void CG_DrawTVOverlay( void ) {
 	}
 
 	CG_DrawTVTimeline();
+
+	{
+		// Check if any yes/no dialog is active for VR button intercept.
+		qboolean voteActive = CG_TVDOfferActive() || CG_VoteActive() || CG_TeamVoteActive();
+		CG_VR_SetVoteActive( voteActive );
+
+		// Process hold-to-vote timing (must run after vote_active is set)
+		if ( vrActive ) {
+			if ( voteActive ) {
+				CG_ProcessVoteHold();
+			} else {
+				CG_ResetVoteHold();
+			}
+		}
+	}
 }
 
 
@@ -3753,7 +4051,7 @@ static void CG_DrawTVOverlay( void ) {
 CG_Draw2D
 =================
 */
-static void CG_Draw2D( stereoFrame_t stereoFrame )
+void CG_Draw2D( stereoFrame_t stereoFrame )
 {
 #ifdef MISSIONPACK
 	if (cgs.orderPending && cg.time > cgs.orderTime) {
@@ -3765,7 +4063,8 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 		return;
 	}
 
-	if ( cg_draw2D.integer == 0 ) {
+	// cg_draw2D is flatscreen-only; VR HUD visibility is the vr_hudDrawStatus ladder's (A9)
+	if ( !CG_VR_OwnsHudVisibility() && cg_draw2D.integer == 0 ) {
 		return;
 	}
 
@@ -3782,7 +4081,10 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 */
 	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
 		CG_DrawSpectator();
-		CG_DrawCrosshair();
+		if ( !CG_VR_Owns2DCrosshair() )
+		{
+			CG_DrawCrosshair();
+		}
 		CG_DrawCrosshairNames();
 	} else {
 		// don't draw any status if dead or the scoreboard is being explicitly shown
@@ -3790,11 +4092,17 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 
 			// Draw damage border vignette (must be after scene render for 2D overlay)
 			if ( cg_damageEffect.integer && !cg.renderingThirdPerson ) {
-				CG_DamageBorderVignette();
+				if ( !CG_VR_OwnsDamageBorder() )
+				{
+					CG_DamageBorderVignette();
+				}
 			}
 
 #ifdef MISSIONPACK
-			if ( cg_drawStatus.integer ) {
+			// cg_drawStatus is flatscreen-only; VR HUD visibility is the
+			// vr_hudDrawStatus ladder's (A9) - see CG_VR_HudVisible/
+			// CG_VR_OwnsHudVisibility in vr_cgame.c
+			if ( CG_VR_HudVisible() && ( CG_VR_OwnsHudVisibility() || cg_drawStatus.integer ) ) {
 				Menu_PaintAll();
 				CG_DrawTimedMenus();
 			}
@@ -3806,10 +4114,15 @@ static void CG_Draw2D( stereoFrame_t stereoFrame )
 
 #ifdef MISSIONPACK
 			CG_DrawProxWarning();
-#endif      
-			CG_DrawCrosshair();
+#endif
+			if ( !CG_VR_Owns2DCrosshair() )
+			{
+				CG_DrawCrosshair();
+			}
 			CG_DrawCrosshairNames();
-			CG_DrawWeaponSelect();
+			if ( !CG_VR_OwnsWeaponSelect() ) {
+				CG_DrawWeaponSelect();
+			}
 
 #ifndef MISSIONPACK
 			CG_DrawHoldableItem();
@@ -3901,7 +4214,7 @@ static void CG_CalculatePing( void ) {
 }
 
 
-static void CG_WarmupEvents( void ) {
+void CG_WarmupEvents( void ) {
 
 	int	count;
 
@@ -4056,7 +4369,7 @@ void CG_ResetSeekState( void ) {
 	cg.soundTime = 0;
 
 	// Force VR head-tracking EMAs to re-seed from the new timeline
-	cg.vrViewInitialized = qfalse;
+	CG_VR_FollowHeadViewReset();
 	cg.vrPortraitInitialized = qfalse;
 }
 
@@ -4173,6 +4486,370 @@ void CG_TrackClientTeamChange( void )
 
 
 /*
+==============
+CG_GetProjectionCenter
+
+Calculates the optical center of the VR projection in virtual 640x480 coordinates.
+
+VR headsets have asymmetric FOV (more down-look than up-look), which causes the
+OpenXR projection matrix to shift the optical center away from the geometric
+framebuffer center. This function computes that offset based on the current FOV
+angles and weapon zoom level.
+
+The OpenGL projection matrix elements m[8] and m[9] determine the horizontal and
+vertical offsets:
+  m[8] = (tanRight + tanLeft) / (tanRight - tanLeft)
+  m[9] = (tanUp + tanDown) / (tanUp - tanDown)
+
+A point along the view axis (straight ahead) projects to NDC position (-m[8], -m[9]).
+Converting to screen coordinates (with 0,0 at top-left):
+  screenX = 320 * (1 + m[8])
+  screenY = 240 * (1 + m[9])
+==============
+*/
+void CG_GetProjectionCenter( float *outX, float *outY )
+{
+	// Default to geometric center
+	float x = 320.0f;
+	float y = 240.0f;
+	float zoomLevel;
+	float angleUp, angleDown, angleLeft, angleRight;
+	float tanUp, tanDown, tanLeft, tanRight;
+	float tanHeightV, tanWidthH;
+
+	// Get the effective FOV angles, accounting for weapon zoom
+	// The projection matrix in vr_renderer.c divides angles by weapon_zoomLevel
+	zoomLevel = vr->weapon_zoomLevel;
+	if (zoomLevel < 1.0f) zoomLevel = 1.0f;
+
+	angleUp = vr->fov_angle_up / zoomLevel;
+	angleDown = vr->fov_angle_down / zoomLevel;
+	angleLeft = vr->fov_angle_left / zoomLevel;
+	angleRight = vr->fov_angle_right / zoomLevel;
+
+	tanUp = tan(angleUp);
+	tanDown = tan(angleDown);
+	tanLeft = tan(angleLeft);
+	tanRight = tan(angleRight);
+
+	// Vertical: m[9] = (tanUp + tanDown) / (tanUp - tanDown)
+	tanHeightV = tanUp - tanDown;
+	if (fabs(tanHeightV) > 0.001f) {
+		float m9 = (tanUp + tanDown) / tanHeightV;
+		y = 240.0f * (1.0f + m9);
+	}
+
+	// Horizontal: m[8] = (tanRight + tanLeft) / (tanRight - tanLeft)
+	tanWidthH = tanRight - tanLeft;
+	if (fabs(tanWidthH) > 0.001f) {
+		float m8 = (tanRight + tanLeft) / tanWidthH;
+		x = 320.0f * (1.0f + m8);
+	}
+
+	if (outX) *outX = x;
+	if (outY) *outY = y;
+}
+
+/*
+==============
+CG_DrawWeapReticle
+
+Draws the railgun scope reticle overlay.
+==============
+*/
+static void CG_DrawWeapReticle( void )
+{
+	vec4_t light_color = {0.7f, 0.7f, 0.7f, 0.5f};
+	vec4_t black = {0.0f, 0.0f, 0.0f, 1.0f};
+	vec4_t red = {0.8f, 0.0f, 0.0f, 0.5f};
+
+	float indentX = 0.16f;
+	float indentY = 0.21f;  // larger Y indent to make scope circular (compensates for 4:3 aspect)
+	float X_WIDTH = 640;
+	float Y_HEIGHT = 480;
+
+	// Geometric center — cyclopean scope renders to the geometric framebuffer center.
+	float centerX = 320.0f;
+	float centerY = 240.0f;
+
+	float x = (X_WIDTH * indentX);
+	float y = (Y_HEIGHT * indentY);
+	float w = (X_WIDTH * (1-(2*indentX))) / 2.0f;
+	float h = (Y_HEIGHT * (1-(2*indentY))) / 2;
+
+	CG_AdjustFrom640( &x, &y, &w, &h );
+
+	// sides - black mask outside the scope circle
+	CG_FillRect( 0, 0, X_WIDTH * indentX, Y_HEIGHT, black );
+	CG_FillRect( X_WIDTH * (1 - indentX), 0, X_WIDTH * indentX, Y_HEIGHT, black );
+	// top/bottom
+	CG_FillRect( X_WIDTH * indentX, 0, X_WIDTH * (1-2*indentX), Y_HEIGHT * indentY, black );
+	CG_FillRect( X_WIDTH * indentX, Y_HEIGHT * (1-indentY), X_WIDTH * (1-2*indentX), Y_HEIGHT * indentY, black );
+
+	{
+		// crosshairs - coming from scope edges toward center
+		float hairThick = 1.0f;
+		float hairLength = 160.0f;
+
+		// Scope edges
+		float leftEdge = X_WIDTH * indentX;
+		float rightEdge = X_WIDTH * (1.0f - indentX);
+		float topEdge = Y_HEIGHT * indentY;
+		float bottomEdge = Y_HEIGHT * (1.0f - indentY);
+
+		// center
+		if ( cgs.media.reticleShader ) {
+			trap_R_DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cgs.media.reticleShader );    // tl
+			trap_R_DrawStretchPic( x + w, y, w, h, 1, 0, 0, 1, cgs.media.reticleShader );  // tr
+			trap_R_DrawStretchPic( x, y + h, w, h, 0, 1, 1, 0, cgs.media.reticleShader );    // bl
+			trap_R_DrawStretchPic( x + w, y + h, w, h, 1, 1, 0, 0, cgs.media.reticleShader );  // br
+		}
+
+		CG_FillRect( leftEdge, centerY - hairThick/2.66f, hairLength, hairThick * 0.75f, light_color );                 // left
+		CG_FillRect( rightEdge - hairLength, centerY - hairThick/2.66f, hairLength, hairThick * 0.75f, light_color );   // right
+		CG_FillRect( centerX - hairThick/2, topEdge, hairThick, hairLength * 0.65f, light_color );                  // top
+		CG_FillRect( centerX - hairThick/2, bottomEdge - (hairLength * 0.65f), hairThick, hairLength * 0.75f, light_color );  // bottom
+		CG_FillRect( centerX - hairThick/2, centerY - 6, hairThick, 12, red ); // Vertical center
+		CG_FillRect( centerX - 8, centerY - hairThick/2.66f, 16, hairThick * 0.75f, red ); // Horizontal center
+	}
+}
+
+/*
+==============
+CG_GetCombinedFovScale
+
+Return ratio of combined binocular FOV to single eye FOV.
+Used to scale vignette width for full stereo coverage.
+==============
+*/
+float CG_GetCombinedFovScale( void )
+{
+	float leftEyeLeft = vr->eye_fov_angle_left[0];
+	float leftEyeRight = vr->eye_fov_angle_right[0];
+	float rightEyeRight = vr->eye_fov_angle_right[1];
+
+	float singleEyeTanWidth = tan(leftEyeRight) - tan(leftEyeLeft);
+	float combinedTanWidth = tan(rightEyeRight) - tan(leftEyeLeft);
+
+	if (fabs(singleEyeTanWidth) < 0.001f) {
+		return 1.0f;
+	}
+
+	return combinedTanWidth / singleEyeTanWidth;
+}
+
+/*
+==============
+CG_DrawVignette
+==============
+*/
+float currentComfortVignetteValue = 0.0f;
+float filteredViewYawDelta = 0.0f;
+
+static void CG_DrawVignette( void )
+{
+	char  vignetteBuf[16];
+	float comfortVignetteValue;
+	float yawDelta;
+
+	// trinity cgame has no trap_Cvar_VariableValue; read via string buffer
+	trap_Cvar_VariableStringBuffer( "vr_comfortVignette", vignetteBuf, sizeof( vignetteBuf ) );
+	comfortVignetteValue = atof( vignetteBuf );
+	if (comfortVignetteValue <= 0.0f || comfortVignetteValue > 1.0f)
+	{
+		return;
+	}
+
+	yawDelta = fabs(vr->clientview_yaw_delta);
+	if (yawDelta > 180)
+	{
+		yawDelta = fabs(yawDelta - 360);
+	}
+	filteredViewYawDelta = filteredViewYawDelta * 0.75f + yawDelta * 0.25f;
+	if (VectorLength(cg.predictedPlayerState.velocity) > 30.0 || (filteredViewYawDelta > 1))
+	{
+		if (currentComfortVignetteValue <  comfortVignetteValue)
+		{
+			currentComfortVignetteValue += comfortVignetteValue * 0.05;
+			if (currentComfortVignetteValue > 1.0f)
+				currentComfortVignetteValue = 1.0f;
+		}
+	} else{
+		if (currentComfortVignetteValue >  0.0f)
+			currentComfortVignetteValue -= comfortVignetteValue * 0.05;
+	}
+
+	if (currentComfortVignetteValue > 0.0f && currentComfortVignetteValue <= 1.0f && !(vr->weapon_zoomed))
+	{
+		// Calculate combined FOV scale - the ratio of binocular FOV to single eye FOV
+		// This tells us how much wider the total view is than a single eye's view
+		float combinedFovScale = CG_GetCombinedFovScale();
+
+		// How much extra width on each side to cover the combined FOV
+		float extraWidth = (cg.refdef.width * (combinedFovScale - 1.0f)) / 2.0f;
+
+		float projCenterX, projCenterY;
+		float verticalAsymmetryOffset;
+		float baseInsetX;
+		float baseInsetY;
+		int insetTop;
+		int insetBottom;
+		int insetX;
+		int vignetteX;
+		int vignetteW;
+		int vignetteH;
+		int yOffset;
+		int leftEdge;
+		int rightEdge;
+		vec4_t black = {0.0, 0.0, 0.0, 1};
+
+		// Calculate vertical FOV asymmetry offset
+		// OpenXR typically has more FOV below optical center than above
+		CG_GetProjectionCenter(&projCenterX, &projCenterY);
+		// projCenterY is in 640x480 coords where 240 is geometric center
+		// Convert to screen pixel offset: positive means optical center is below geometric center
+		verticalAsymmetryOffset = (projCenterY - 240.0f) / 480.0f * cg.refdef.height;
+
+		// Base inset from the edges based on comfort vignette value
+		baseInsetX = currentComfortVignetteValue * cg.refdef.width / 3.5f;
+		baseInsetY = currentComfortVignetteValue * cg.refdef.height / 3.5f;
+
+		// Adjust top/bottom insets for vertical asymmetry
+		// verticalAsymmetryOffset is positive when optical center is below geometric center
+		// Adding it to top inset and subtracting from bottom shifts the opening upward
+		insetTop = (int)(baseInsetY + verticalAsymmetryOffset);
+		insetBottom = (int)(baseInsetY - verticalAsymmetryOffset);
+		if (insetTop < 0) insetTop = 0;
+		if (insetBottom < 0) insetBottom = 0;
+
+		insetX = (int)baseInsetX;
+
+		// Vignette covers the normal viewport minus insets (not stretched into extended FOV)
+		vignetteX = insetX;
+		vignetteW = cg.refdef.width - 2 * insetX;
+		vignetteH = cg.refdef.height - insetTop - insetBottom;
+
+		// Account for vertical offset when viewport is centered (e.g., virtual screen mode)
+		yOffset = cg.refdef.y;
+
+		// Extended FOV edges
+		leftEdge = (int)(-extraWidth);
+		rightEdge = (int)(cg.refdef.width + extraWidth);
+
+		// Black borders to fill the solid black areas around the vignette
+		trap_R_SetColor( black );
+
+		// Left border: from extended left edge to vignette start
+		trap_R_DrawStretchPic( leftEdge, yOffset, vignetteX - leftEdge, cg.refdef.height, 0, 0, 1, 1, cgs.media.whiteShader );
+		// Right border: from vignette end to extended right edge
+		trap_R_DrawStretchPic( vignetteX + vignetteW, yOffset, rightEdge - (vignetteX + vignetteW), cg.refdef.height, 0, 0, 1, 1, cgs.media.whiteShader );
+
+		// Top border: between the side borders, above the vignette
+		trap_R_DrawStretchPic( vignetteX, yOffset, vignetteW, insetTop, 0, 0, 1, 1, cgs.media.whiteShader );
+		// Bottom border: between the side borders, below the vignette
+		trap_R_DrawStretchPic( vignetteX, yOffset + cg.refdef.height - insetBottom, vignetteW, insetBottom, 0, 0, 1, 1, cgs.media.whiteShader );
+
+		// Vignette shader - covers normal viewport minus insets
+		trap_R_DrawStretchPic( vignetteX, yOffset + insetTop, vignetteW, vignetteH, 0, 0, 1, 1, cgs.media.vignetteShader );
+
+		trap_R_SetColor( NULL );
+	}
+}
+
+/*
+=================
+CG_Draw2DMinimal - Draws minimal 2D HUD elements for weapon zoomed state
+There are some checks here that are  overkill for current use case, given
+the current usage for specifically vr->weapon_zoomed, but keeping the checks
+more or less identical to non-minimal HUD, just in case.
+=================
+*/
+void CG_Draw2DMinimal( stereoFrame_t stereoView )
+{
+	// If the HUD is disabled, we don't want this content
+	if ( !CG_VR_HudVisible() ) {
+		return;
+	}
+
+	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		return;
+	}
+
+	// Skip if spectator - no minimal HUD needed
+	if ( cg.snap->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
+		CG_DrawCrosshairNames();
+		return;
+	}
+
+	// don't draw any status if dead or the scoreboard is being explicitly shown
+	if ( !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 ) {
+		CG_DrawAmmoWarning();
+		CG_DrawCrosshairNames();
+		CG_DrawReward();
+	}
+
+	CG_DrawLagometer();
+
+#ifdef MISSIONPACK
+	if (!cg_paused.integer) {
+		CG_DrawUpperRight(stereoView);
+	}
+#else
+	CG_DrawUpperRight(stereoView);
+#endif
+
+#ifndef MISSIONPACK
+	CG_DrawLowerRight();
+	CG_DrawLowerLeft();
+#endif
+
+	if ( !CG_DrawFollow() ) {
+		CG_DrawWarmup();
+	}
+
+	// don't draw center string if scoreboard is up
+	if ( !cg.scoreBoardShowing ) {
+		CG_DrawCenterString();
+	}
+}
+
+/*
+=================
+CG_DrawScreen2D - Draws 2D elements always intended for the screen
+=================
+*/
+void CG_DrawScreen2D(void)
+{
+	// if we are taking a levelshot for the menu, don't draw anything
+	if ( cg.levelShot ) {
+		return;
+	}
+
+	if ( cg.snap->ps.pm_type == PM_INTERMISSION ) {
+		return;
+	}
+
+	if ( cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR   &&
+	    !cg.showScores && cg.snap->ps.stats[STAT_HEALTH] > 0 ) {
+
+        CG_DrawVignette();
+
+        // Draw modern damage indicator if enabled
+        if ( cg_damageEffect.integer && !cg.renderingThirdPerson ) {
+            CG_DamageBorderVignette();
+        }
+
+        if(vr->weapon_zoomed) {
+            CG_DrawWeapReticle();
+        }
+    }
+
+	// Weapon adjustment overlay (drawn regardless of team/health since we auto-exit on those)
+	CG_WeaponAdjustDraw();
+}
+
+
+/*
 =====================
 CG_DrawActive
 
@@ -4199,6 +4876,10 @@ void CG_DrawActive( stereoFrame_t stereoView ) {
 
 	// clear around the rendered view if sized down
 	CG_TileClear();
+
+	if ( CG_VR_DrawFrame( stereoView ) ) {
+		return;
+	}
 
 	// draw 3D view
 	trap_R_RenderScene( &cg.refdef );

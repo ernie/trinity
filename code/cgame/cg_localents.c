@@ -1075,9 +1075,11 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 	origin[2] += vertical_offset;
 
 	VectorSubtract(cg.refdef.vieworg, origin, dir);
-	CrossProduct(dir, up, vec);
-	vec[2] = 0;  // Keep digits on same horizontal plane
-	VectorNormalize(vec);
+	if ( !CG_VR_DamagePlumAxis( re, dir, up, vec ) ) {
+		CrossProduct(dir, up, vec);
+		vec[2] = 0;  // Keep digits on same horizontal plane
+		VectorNormalize(vec);
+	}
 
 	negative = qfalse;
 	if (damage < 0) {

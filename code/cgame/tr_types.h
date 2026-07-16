@@ -13,6 +13,7 @@
 #define	RF_FIRST_PERSON		4		// only draw through eyes (view weapon, damage blood blob)
 #define	RF_DEPTHHACK		8		// for view weapon Z crunching
 #define	RF_CROSSHAIR		16		// don't fog-dim this sprite; with RF_DEPTHHACK, draws at true stereo depth (3D crosshair)
+#define RF_OVERBRIGHT		0x0020		// apply overbright scaling to diffuse lighting
 #define	RF_NOSHADOW			64		// don't add stencil shadows
 
 #define RF_LIGHTING_ORIGIN	128		// use refEntity->lightingOrigin instead of refEntity->origin
@@ -22,7 +23,7 @@
 #define	RF_SHADOW_PLANE		256		// use refEntity->shadowPlane
 #define	RF_WRAP_FRAMES		512		// mod the model frames by the maxframes to allow continuous
 									// animation without needing to know the frame count
-									// 1024 (0x0400) is RF_WORLD_ORIENTED in the VR clients (trinity-vr, trinity-quest)
+#define RF_WORLD_ORIENTED	0x0400		// sprite uses entity axis instead of billboarding toward camera
 #define	RF_ANIMFRAME		2048	// index animMap by refEntity->frame, not time (R_animFrame ext)
 
 // refdef flags
@@ -50,6 +51,7 @@ typedef enum {
 	RT_RAIL_RINGS,
 	RT_LIGHTNING,
 	RT_PORTALSURFACE,		// doesn't draw anything, just info for portals
+	RT_LASERSIGHT,
 
 	RT_MAX_REF_ENTITY_TYPE
 } refEntityType_t;
@@ -90,6 +92,10 @@ typedef struct {
 	// extra sprite information
 	float		radius;
 	float		rotation;
+
+	// VR-engine extension; must remain last so the stock ioq3 prefix
+	// stays layout-compatible with engines that do not know this field
+	qboolean	invert;
 } refEntity_t;
 
 
@@ -112,6 +118,10 @@ typedef struct {
 
 	// text messages for deform text shaders
 	char		text[MAX_RENDER_STRINGS][MAX_RENDER_STRING_LENGTH];
+
+	// VR-engine extension; must remain last so the stock ioq3 prefix
+	// stays layout-compatible with engines that do not know this field
+	qboolean	isHUD;
 } refdef_t;
 
 

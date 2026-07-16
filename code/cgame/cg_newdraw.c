@@ -142,7 +142,7 @@ static void CG_DrawPlayerArmorIcon( rectDef_t *rect, qboolean draw2D ) {
 	vec3_t		angles;
 	vec3_t		origin;
 
-  if ( cg_drawStatus.integer == 0 ) {
+  if ( !CG_VR_OwnsHudVisibility() && cg_drawStatus.integer == 0 ) {
 		return;
 	}
 
@@ -257,7 +257,7 @@ static void CG_DrawPlayerHead(rectDef_t *rect, qboolean draw2D) {
 
 	// VR players: portrait reflects the real head orientation (current player,
 	// followed player, or demo). Falls back to the random idle-bob otherwise.
-	vr = CG_VRPortraitHeadAngles( angles );
+	vr = CG_VR_PortraitHeadAngles( angles );
 
 	if ( cg.damageTime && cg.time - cg.damageTime < DAMAGE_TIME ) {
 		frac = (float)(cg.time - cg.damageTime ) / DAMAGE_TIME;
@@ -1103,15 +1103,15 @@ static void CG_DrawPlayerHasFlag(rectDef_t *rect, qboolean force2D) {
 }
 
 static void CG_DrawAreaSystemChat(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader) {
-  CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, systemChat, 0, 0, 0);
+  CG_Text_Paint(rect->x + CG_VR_ChatOffsetX(), rect->y + rect->h + CG_VR_ChatOffsetY(), scale, color, systemChat, 0, 0, 0);
 }
 
 static void CG_DrawAreaTeamChat(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader) {
-  CG_Text_Paint(rect->x, rect->y + rect->h, scale, color,teamChat1, 0, 0, 0);
+  CG_Text_Paint(rect->x + CG_VR_ChatOffsetX(), rect->y + rect->h + CG_VR_ChatOffsetY(), scale, color,teamChat1, 0, 0, 0);
 }
 
 static void CG_DrawAreaChat(rectDef_t *rect, float scale, vec4_t color, qhandle_t shader) {
-  CG_Text_Paint(rect->x, rect->y + rect->h, scale, color, teamChat2, 0, 0, 0);
+  CG_Text_Paint(rect->x + CG_VR_ChatOffsetX(), rect->y + rect->h + CG_VR_ChatOffsetY(), scale, color, teamChat2, 0, 0, 0);
 }
 
 const char *CG_GetKillerText() {
@@ -1543,7 +1543,10 @@ static void CG_DrawPlayerVoipBadge(rectDef_t *rect) {
 void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle) {
 	rectDef_t rect;
 
-  if ( cg_drawStatus.integer == 0 ) {
+	if ( !CG_VR_HudVisible() ) {
+		return;
+	}
+	if ( !CG_VR_OwnsHudVisibility() && cg_drawStatus.integer == 0 ) {
 		return;
 	}
 
@@ -1733,6 +1736,10 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
 void CG_MouseEvent(int x, int y) {
 	int n;
 
+	if ( CG_VR_ScoreboardCursor( &cgs.cursorX, &cgs.cursorY ) ) {
+		return;
+	}
+
 	// timeline scrub owns the cursor — just update position
 	if ( cgs.tvScrubActive ) {
 		cgs.cursorX += x * cgs.cursorScaleR;
@@ -1839,6 +1846,10 @@ void CG_KeyEvent(int key, qboolean down) {
 		if ( down && key == /*K_ESCAPE*/27 ) {
 			int currentCatcher;
 			cgs.tvScrubActive = qfalse;
+			CG_VR_UnlockMenuYaw( cgs.tvScrubSavedMenuYaw );
+			if ( !cgs.score_catched ) {
+				CG_VR_SetScoreboardCursor( qfalse );
+			}
 			if ( !cgs.score_catched ) {
 				currentCatcher = trap_Key_GetCatcher();
 				trap_Key_SetCatcher( currentCatcher & ~KEYCATCH_CGAME );
@@ -1904,7 +1915,17 @@ int CG_ClientNumFromName(const char *p) {
 }
 
 void CG_ShowResponseHead() {
-	menuDef_t *menu = Menus_FindByName("voiceMenu");
+	menuDef_t *menu;
+	if ( vrActive ) {
+		// VR: keep the menu's scripted position (the flatscreen true-screen-edge
+		// lies outside the VR HUD's visible area) and pass the console offset
+		// unscaled - the VR engine's Con_DrawNotify applies its own scaling
+		Menus_OpenByName("voiceMenu");
+		trap_Cvar_Set("cl_conXOffset", "50");
+		cg.voiceTime = cg.time;
+		return;
+	}
+	menu = Menus_FindByName("voiceMenu");
 	if (menu) {
 		// Position voiceMenu at true screen edge, not 4:3 safe area
 		// screenXmin/screenYmin are the virtual coordinates of the actual screen edges

@@ -5,6 +5,8 @@
 #include "../game/bg_public.h"
 #include "../game/bg_mode.h"
 #include "cg_public.h"
+#include "../game/vr_shared.h"
+#include "../game/vr_platform.h"
 
 // VOIP channel flags (must match engine q_shared.h)
 #define VOIP_SPATIAL	0x01
@@ -33,8 +35,11 @@
 #define	LAND_RETURN_TIME	300
 #define	STEP_TIME			200
 #define	DUCK_TIME			100
+#define PLAYER_HEIGHT		48
 #define	PAIN_TWITCH_TIME	200
 #define	WEAPON_SELECT_TIME	1400
+#define	VOTE_HOLD_TIME		1000		// ms to hold A/B before vote registers
+#define	VOTE_HOLD_MIN		500			// minimum hold for early fire near vote expiry
 #define	ITEM_SCALEUP_TIME	1000
 #define	ZOOM_TIME			150
 #define	ITEM_BLOB_TIME		200
@@ -68,6 +73,10 @@
 #define	GIANT_HEIGHT		48
 
 #define	NUM_CROSSHAIRS		10
+
+//multiplying size you go to when dead looking down on the match
+#define SPECTATOR2_WORLDSCALE_MULTIPLIER	15
+#define SPECTATOR_WORLDSCALE_MULTIPLIER		10
 
 #define TEAM_OVERLAY_MAXNAME_WIDTH	12
 #define TEAM_OVERLAY_MAXLOCATION_WIDTH	16
@@ -158,6 +167,8 @@ typedef struct {
 	qboolean		painIgnore;
 	int				lightningFiring;
 
+	int				railFireTime;
+
 	vec3_t			muzzleOrigin;
 
 	// railgun trail spawning
@@ -168,10 +179,6 @@ typedef struct {
 	float			barrelAngle;
 	int				barrelTime;
 	qboolean		barrelSpinning;
-
-	// VR head orientation interpolation (roll uses standard angles networking)
-	float			vrHeadPitch;
-	float			vrHeadYawOffset;
 } playerEntity_t;
 
 //=================================================
@@ -348,6 +355,8 @@ typedef struct {
 
 	vec3_t			color1;
 	vec3_t			color2;
+
+	byte c1RGBA[4];
 
 	int				score;			// updated by score servercmds
 	int				location;		// location index for team mode
@@ -528,6 +537,10 @@ typedef struct {
 
 	qboolean	renderingThirdPerson;		// during deaths, chasecams, etc
 
+	qboolean	drawingHUD;			// inside VR HUD-buffer 2D pass
+	qboolean	drawingZoomedHUD;	// inside weapon-zoom minimal HUD pass
+	float		worldscale;			// vr_worldscale mirror, refreshed each frame
+
 	// prediction state
 	qboolean	hyperspace;				// true if prediction has hit a trigger_teleport
 	playerState_t	predictedPlayerState;
@@ -560,6 +573,7 @@ typedef struct {
 	// view rendering
 	refdef_t	refdef;
 	vec3_t		refdefViewAngles;		// will be converted to refdef.viewaxis
+	vec3_t		vr_vieworigin;			// last first-person view origin (VR)
 
 	// zoom key
 	qboolean	zoomed;
@@ -676,6 +690,12 @@ typedef struct {
 	int			weaponAnimation;
 	int			weaponAnimationTime;
 
+	int                     weaponSelectorSelection;
+	int   		weaponSelectorTime;
+	vec3_t		weaponSelectorAngles;
+	vec3_t		weaponSelectorOrigin;
+	vec3_t		weaponSelectorOffset;
+
 	// blend blobs
 	int			damageTime;
 	float		damageX, damageY, damageValue;
@@ -725,11 +745,6 @@ typedef struct {
 
 	qboolean		skipDFshaders;
 
-	// VR first-person head view smoothing
-	float			vrViewPitch;			// smoothed head pitch
-	float			vrViewYaw;				// smoothed head absolute yaw
-	qboolean		vrViewInitialized;		// set once first valid target is computed
-
 	// VR HUD portrait head smoothing (independent of the first-person view above)
 	float			vrPortraitPitch;		// smoothed portrait head pitch (absolute world)
 	float			vrPortraitYaw;			// smoothed portrait-space head yaw (180 = facing viewer, plus head offset off weapon aim)
@@ -741,7 +756,18 @@ typedef struct {
 	float			orbitDistanceTarget;	// target distance (smoothly lerped to)
 	int				orbitLastCmdAngles[3];	// previous frame's cmd.angles
 	qboolean		orbitInitialized;		// set once orbit state has been seeded
+
+	// smooth follow camera control (spherical coordinates)
+	float			smoothFollow_distance;          // current radius from player
+	float			smoothFollow_distanceTarget;    // target radius (smoothly lerped to)
+	float			smoothFollow_yaw;               // horizontal angle around player
+	float			smoothFollow_pitch;             // vertical angle (elevation)
+	float			smoothFollow_hmdYawOffset;      // HMD yaw captured at recenter
+	qboolean		smoothFollow_initialized;       // set once camera state has been seeded
 	int				followLastClientNum;	// detect followed-player changes
+
+	// death cam grace period
+	int				deathCamTime;			// cg.time when death cam activated, -1 = inactive
 
 	// Free-fly camera state (TV / demo)
 	vec3_t			freeFlyOrigin;
@@ -762,6 +788,11 @@ typedef struct {
 	// local vote tracking (0=not voted, 1=yes, -1=no)
 	int				myVote;
 	int				myTeamVote;
+
+	// hold-to-vote tracking
+	int				voteHoldStartTime;	// cg.time when hold began (0 = not holding)
+	int				voteHoldButton;		// 1=yes(A), -1=no(B), 0=none
+	int				voteHoldTarget;		// dialog target when hold began (-1=TVD, 1=vote, 2=teamvote)
 
 	// VOIP state
 	qboolean		voipTalking[MAX_CLIENTS];
@@ -914,11 +945,15 @@ typedef struct {
 	qhandle_t	blueKamikazeShader;
 #endif
 
+	qhandle_t	smallSphereModel;
+
 	// weapon effect models
 	qhandle_t	bulletFlashModel;
 	qhandle_t	ringFlashModel;
 	qhandle_t	dishFlashModel;
 	qhandle_t	lightningExplosionModel;
+
+	qhandle_t	reticleShader;
 
 	// weapon effect shaders
 	qhandle_t	railExplosionShader;
@@ -949,13 +984,15 @@ typedef struct {
 	qhandle_t	invulnerabilityPowerupModel;
 #endif
 
+	qhandle_t	hudShader;
+
 	// scoreboard headers
 	qhandle_t	scoreboardName;
 	qhandle_t	scoreboardPing;
 	qhandle_t	scoreboardScore;
 	qhandle_t	scoreboardTime;
 
-	// profile icons for the HUD mode indicator (indexed by mode_t)
+	// profile icons for the HUD mode indicator (indexed by gamemode_t)
 	qhandle_t	modeIcons[MODE_COUNT];
 
 	// medals shown during gameplay
@@ -1221,8 +1258,6 @@ typedef struct {
 	int				teamLastChatPos;
 
 #ifdef MISSIONPACK
-	int cursorX;
-	int cursorY;
 	qboolean eventHandling;
 	qboolean mouseCaptured;
 	qboolean sizingHud;
@@ -1259,16 +1294,15 @@ typedef struct {
 	qboolean		score_catched;
 	int				score_key;
 
-#ifndef MISSIONPACK
 	float			cursorX;
 	float			cursorY;
-#endif
 
 	qboolean		tvPlayback;		// playing back a TV demo (\tv\1 in serverinfo)
 
 	qboolean		tvScrubActive;		// currently scrubbing the timeline
 	int				tvScrubKey;			// keycode that activated scrub (for phantom key-up filtering)
 	qboolean		tvScrubFilterKeyUp;	// filter phantom -tv_scrub from catcher change
+	float			tvScrubSavedMenuYaw;	// menuYaw to restore when scrub ends
 
 	// VOIP state
 	int				voipVersion;				// engine VOIP version (0 = legacy, 2 = channels)
@@ -1345,9 +1379,9 @@ void CG_ZoomUp_f( void );
 void CG_AddBufferedSound( sfxHandle_t sfx);
 
 void CG_ResetViewOffsets( void );
+void CG_OffsetFirstPersonView( void );
 void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demoPlayback );
 void CG_DamageBorderVignette( void );
-qboolean CG_IsVRFollow( void );
 void CG_FollowCam_f( void );
 void CG_FollowZoomIn_f( void );
 void CG_FollowZoomOut_f( void );
@@ -1358,9 +1392,15 @@ void CG_FollowRecenter_f( void );
 // cg_drawtools.c
 //
 void CG_AdjustFrom640( float *x, float *y, float *w, float *h );
+void CG_GetViewable4x3Dimensions( float *outWidth, float *outHeight );
+void CG_GetProjectionCenter( float *outX, float *outY );
+float CG_GetCombinedFovScale( void );
+void CG_PushHUDAnchors( void );
+void CG_PopHUDAnchors( void );
 void CG_FillRect( float x, float y, float width, float height, const float *color );
 void CG_FillScreen( const float *color );
 void CG_DrawPic( float x, float y, float width, float height, qhandle_t hShader );
+void CG_DrawChar( int x, int y, int width, int height, int ch );
 
 void CG_DrawStringExt( int x, int y, const char *string, const float *setColor, 
 		qboolean forceColor, qboolean shadow, int charWidth, int charHeight, int maxChars );
@@ -1412,7 +1452,6 @@ void CG_CenterPrint( const char *str, int y, int charWidth );
 qhandle_t CG_GetArmorIcon( void );
 qhandle_t CG_GetArmorModel( void );
 void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles );
-qboolean CG_VRPortraitHeadAngles( vec3_t angles );
 void CG_DrawActive( stereoFrame_t stereoView );
 void CG_DrawFlagModel( float x, float y, float w, float h, int team, qboolean force2D );
 void CG_DrawTeamBackground( int x, int y, int w, int h, float alpha, int team );
@@ -1451,6 +1490,7 @@ void CG_ResetPlayerEntity( centity_t *cent );
 void CG_AddRefEntityWithPowerups( refEntity_t *ent, entityState_t *state, int team );
 void CG_NewClientInfo( int clientNum );
 sfxHandle_t	CG_CustomSound( int clientNum, const char *soundName );
+void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale );
 
 //
 // cg_predict.c
@@ -1509,6 +1549,9 @@ void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi );
 void CG_AddViewWeapon (playerState_t *ps);
 void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent, int team );
 void CG_DrawWeaponSelect( void );
+void CG_LaserSight( vec3_t start, vec3_t end, byte colour[4], float width );
+qboolean CG_WeaponSelectable( int i );
+void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles );
 
 void CG_OutOfAmmoChange( void );	// should this be in pmove?
 
@@ -1597,6 +1640,7 @@ qboolean CG_VoteActive( void );
 qboolean CG_TeamVoteActive( void );
 qboolean CG_TVDOfferActive( void );
 int CG_ActiveVoteTarget( void );	// 0=none, 1=vote, 2=teamvote
+void CG_VoteSubmit( qboolean yes );
 #ifdef MISSIONPACK
 void Menu_Reset( void );
 #endif
@@ -1860,13 +1904,51 @@ extern qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 extern void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 extern void	(*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 extern void	(*trap_R_ProjectDecal)( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
+extern void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiVersion );
 #else
 qboolean trap_GetValue( char *value, int valueSize, const char *key );
 void trap_R_AddRefEntityToScene2( const refEntity_t *re );
 void trap_R_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
+void trap_VR_RegisterState( void *state, int stateSize, int apiVersion );
 extern int dll_com_trapGetValue;
 extern int dll_trap_R_AddRefEntityToScene2;
 extern int dll_trap_R_AddLinearLightToScene;
 extern int dll_trap_R_ProjectDecal;
+extern int dll_trap_VR_RegisterState;
 #endif
+
+// VR API conformance probe (vr_cgame.c)
+extern vr_shared_t vr_state;
+extern vr_shared_t *vr;
+extern qboolean vrActive;
+extern qboolean hasPostBloom2D;
+extern qboolean hasHUDBuffer;
+extern qboolean hasHapticEvent;
+
+#ifdef Q3_VM
+extern void	(*trap_R_BeginPostBloom2D)( void );
+extern void	(*trap_R_EndPostBloom2D)( void );
+extern void	(*trap_R_HUDBufferStart)( qboolean clear );
+extern void	(*trap_R_HUDBufferEnd)( void );
+extern void	(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
+#else
+void trap_R_BeginPostBloom2D( void );
+void trap_R_EndPostBloom2D( void );
+void trap_R_HUDBufferStart( qboolean clear );
+void trap_R_HUDBufferEnd( void );
+void trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height );
+extern int dll_trap_R_BeginPostBloom2D;
+extern int dll_trap_R_EndPostBloom2D;
+extern int dll_trap_R_HUDBufferStart;
+extern int dll_trap_R_HUDBufferEnd;
+extern int dll_trap_HapticEvent;
+#endif
+
+void CG_DrawScreen2D( void );
+void CG_DrawCrosshair3D( void );
+void CG_Draw2D( stereoFrame_t stereoFrame );
+void CG_Draw2DMinimal( stereoFrame_t stereoView );
+void CG_WarmupEvents( void );
+
+#include "vr_cgame.h"

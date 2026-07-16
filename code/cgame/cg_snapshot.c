@@ -392,6 +392,7 @@ void CG_ProcessSnapshots( void ) {
 					// from the old timeline leaks through
 					memset( cg_entities, 0, sizeof( cg_entities ) );
 					memset( &cg.predictedPlayerEntity, 0, sizeof( cg.predictedPlayerEntity ) );
+					CG_VR_PlayerHeadReset();
 					cg.validPPS = qfalse;
 
 					// Set time BEFORE CG_SetInitialSnapshot so

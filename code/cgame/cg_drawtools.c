@@ -5,18 +5,80 @@
 
 /*
 ================
+CG_GetViewable4x3Dimensions
+
+Calculate the maximum 4:3 area that fits within the framebuffer.
+For ultra-wide headsets (e.g., Pimax 8KX with ~2:1 ratio), we may be height-limited
+rather than width-limited.
+================
+*/
+void CG_GetViewable4x3Dimensions(float *outWidth, float *outHeight)
+{
+	float fbWidth = cgs.glconfig.vidWidth;
+	float fbHeight = cgs.glconfig.vidHeight;
+
+	float heightFromWidth = fbWidth * 0.75f;  // 4:3 height if we use full width
+	float widthFromHeight = fbHeight * (4.0f / 3.0f); // 4:3 width if we use full height
+
+	if (heightFromWidth <= fbHeight) {
+		// Normal case: width-limited, full width fits with 4:3 height
+		*outWidth = fbWidth;
+		*outHeight = heightFromWidth;
+	} else {
+		// Ultra-wide case: height-limited, constrain width to fit 4:3
+		*outHeight = fbHeight;
+		*outWidth = widthFromHeight;
+	}
+}
+
+/*
+================
 CG_AdjustFrom640
 
 Adjusted for resolution and screen aspect ratio
 ================
 */
-void CG_AdjustFrom640( float *x, float *y, float *w, float *h ) 
+void CG_AdjustFrom640( float *x, float *y, float *w, float *h )
 {
+	if ( CG_VR_AdjustFrom640( x, y, w, h ) ) {
+		return;
+	}
 	// scale for screen sizes
 	*x = *x * cgs.screenXScale + cgs.screenXBias;
 	*y = *y * cgs.screenYScale + cgs.screenYBias;
 	*w *= cgs.screenXScale;
 	*h *= cgs.screenYScale;
+}
+
+static float pushedXmin, pushedXmax, pushedYmin, pushedYmax;
+static float pushedXBias, pushedYBias;
+static qboolean anchorsPushed = qfalse;
+
+// While drawing into the VR HUD panel, trinity's widescreen anchors must
+// describe the panel's own box: 640x480 author space. When the HUD is
+// zoomed, CG_AdjustFrom640's zoomed branch already remaps that authored
+// Y range onto the 640 square, so the anchors themselves stay at 480 --
+// pushing Ymax to 640 here would double-extend the remap and draw
+// bottom-anchored elements too low.
+void CG_PushHUDAnchors( void ) {
+	if ( anchorsPushed )
+		return;
+	pushedXmin = cgs.screenXmin;   pushedXmax = cgs.screenXmax;
+	pushedYmin = cgs.screenYmin;   pushedYmax = cgs.screenYmax;
+	pushedXBias = cgs.screenXBias; pushedYBias = cgs.screenYBias;
+	cgs.screenXmin = 0;   cgs.screenXmax = 640;
+	cgs.screenYmin = 0;   cgs.screenYmax = 480;
+	cgs.screenXBias = 0;  cgs.screenYBias = 0;
+	anchorsPushed = qtrue;
+}
+
+void CG_PopHUDAnchors( void ) {
+	if ( !anchorsPushed )
+		return;
+	cgs.screenXmin = pushedXmin;   cgs.screenXmax = pushedXmax;
+	cgs.screenYmin = pushedYmin;   cgs.screenYmax = pushedYmax;
+	cgs.screenXBias = pushedXBias; cgs.screenYBias = pushedYBias;
+	anchorsPushed = qfalse;
 }
 
 
@@ -58,16 +120,22 @@ Coords are virtual 640x480
 ================
 */
 void CG_DrawSides(float x, float y, float w, float h, float size) {
+	float rx, ry, rw, rh; // unit reference box to derive the effective x scale
+	rx = 0.0f; ry = 0.0f; rw = 1.0f; rh = 1.0f;
+	CG_AdjustFrom640( &rx, &ry, &rw, &rh );
 	CG_AdjustFrom640( &x, &y, &w, &h );
-	size *= cgs.screenXScale;
+	size *= rw;
 	trap_R_DrawStretchPic( x, y, size, h, 0, 0, 0, 0, cgs.media.whiteShader );
 	trap_R_DrawStretchPic( x + w - size, y, size, h, 0, 0, 0, 0, cgs.media.whiteShader );
 }
 
 
 void CG_DrawTopBottom(float x, float y, float w, float h, float size) {
+	float rx, ry, rw, rh; // unit reference box to derive the effective y scale
+	rx = 0.0f; ry = 0.0f; rw = 1.0f; rh = 1.0f;
+	CG_AdjustFrom640( &rx, &ry, &rw, &rh );
 	CG_AdjustFrom640( &x, &y, &w, &h );
-	size *= cgs.screenYScale;
+	size *= rh;
 	trap_R_DrawStretchPic( x, y, w, size, 0, 0, 0, 0, cgs.media.whiteShader );
 	trap_R_DrawStretchPic( x, y + h - size, w, size, 0, 0, 0, 0, cgs.media.whiteShader );
 }
@@ -110,7 +178,7 @@ CG_DrawChar
 Coordinates and size in 640*480 virtual screen size
 ===============
 */
-static void CG_DrawChar( int x, int y, int width, int height, int ch ) {
+void CG_DrawChar( int x, int y, int width, int height, int ch ) {
 	int row, col;
 	float frow, fcol;
 	float size;
@@ -548,6 +616,7 @@ void CG_DrawString( float x, float y, const char *string, const vec4_t setColor,
 	const float		*tc; // texture coordinates for char
 	float			ax, ay, aw, aw1, ah; // absolute positions/dimensions
 	float			scale;
+	float			xscale, yscale; // effective scales derived from the adjusted box
 	float			x_end, xx;
 	vec4_t			color;
 	const byte		*s;
@@ -562,11 +631,17 @@ void CG_DrawString( float x, float y, const char *string, const vec4_t setColor,
 
 	s = (const byte *)string;
 
-	ax = x * cgs.screenXScale + cgs.screenXBias;
-	ay = y * cgs.screenYScale + cgs.screenYBias;
+	// Route the glyph box through CG_AdjustFrom640 so text lands under the
+	// same VR coordinate mapping as pics; derive effective scales for the
+	// per-char advances and shadow offsets from the adjusted box.
+	ax = x;
+	ay = y;
+	aw = charWidth;
+	ah = charHeight;
+	CG_AdjustFrom640( &ax, &ay, &aw, &ah );
 
-	aw = charWidth * cgs.screenXScale;
-	ah = charHeight * cgs.screenYScale;
+	xscale = aw / charWidth;
+	yscale = ah / charHeight;
 
 	if ( maxChars <= 0 ) {
 		max_ax = 9999999.0f;
@@ -591,8 +666,8 @@ void CG_DrawString( float x, float y, const char *string, const vec4_t setColor,
 
 		// calculate shadow offsets
 		scale = charWidth * 0.075f; // charWidth/15
-		xx_add = scale * cgs.screenXScale;
-		yy_add = scale * cgs.screenYScale;
+		xx_add = scale * xscale;
+		yy_add = scale * yscale;
 
 		color[0] = color[1] = color[2] = 0.0f;
 		color[3] = setColor[3] * 0.5f;
@@ -1119,19 +1194,27 @@ static void UI_DrawBannerString2( int x, int y, const char* str, vec4_t color )
 	float	fcol;
 	float	fwidth;
 	float	fheight;
+	float	xscale; // effective x scale derived from the adjusted box
 
 	// draw the colored text
 	trap_R_SetColor( color );
-	
-	ax = x * cgs.screenXScale + cgs.screenXBias;
-	ay = y * cgs.screenYScale + cgs.screenYBias;
+
+	// Route the anchor box through CG_AdjustFrom640 so banner text follows the
+	// same VR coordinate mapping as pics; banner glyph widths and heights both
+	// track the x scale, so derive it from the adjusted box.
+	ax = x;
+	ay = y;
+	aw = (float)PROPB_HEIGHT;
+	ah = (float)PROPB_HEIGHT;
+	CG_AdjustFrom640( &ax, &ay, &aw, &ah );
+	xscale = aw / (float)PROPB_HEIGHT;
 
 	s = str;
 	while ( *s )
 	{
 		ch = *s & 127;
 		if ( ch == ' ' ) {
-			ax += ((float)PROPB_SPACE_WIDTH + (float)PROPB_GAP_WIDTH)* cgs.screenXScale;
+			ax += ((float)PROPB_SPACE_WIDTH + (float)PROPB_GAP_WIDTH)* xscale;
 		}
 		else if ( ch >= 'A' && ch <= 'Z' ) {
 			ch -= 'A';
@@ -1139,10 +1222,10 @@ static void UI_DrawBannerString2( int x, int y, const char* str, vec4_t color )
 			frow = (float)propMapB[ch][1] / 256.0f;
 			fwidth = (float)propMapB[ch][2] / 256.0f;
 			fheight = (float)PROPB_HEIGHT / 256.0f;
-			aw = (float)propMapB[ch][2] * cgs.screenXScale;
-			ah = (float)PROPB_HEIGHT * cgs.screenXScale;
+			aw = (float)propMapB[ch][2] * xscale;
+			ah = (float)PROPB_HEIGHT * xscale;
 			trap_R_DrawStretchPic( ax, ay, aw, ah, fcol, frow, fcol+fwidth, frow+fheight, cgs.media.charsetPropB );
-			ax += (aw + (float)PROPB_GAP_WIDTH * cgs.screenXScale);
+			ax += (aw + (float)PROPB_GAP_WIDTH * xscale);
 		}
 		s++;
 	}
@@ -1229,32 +1312,40 @@ static void UI_DrawProportionalString2( int x, int y, const char* str, vec4_t co
 	float	fcol;
 	float	fwidth;
 	float	fheight;
+	float	xscale; // effective x scale derived from the adjusted box
 
 	// draw the colored text
 	trap_R_SetColor( color );
-	
-	ax = x * cgs.screenXScale + cgs.screenXBias;
-	ay = y * cgs.screenYScale + cgs.screenYBias;
+
+	// Route the anchor box through CG_AdjustFrom640 so proportional text follows
+	// the same VR coordinate mapping as pics; glyph widths and heights both track
+	// the x scale, so derive it from the adjusted box.
+	ax = x;
+	ay = y;
+	aw = (float)PROP_HEIGHT;
+	ah = (float)PROP_HEIGHT;
+	CG_AdjustFrom640( &ax, &ay, &aw, &ah );
+	xscale = aw / (float)PROP_HEIGHT;
 
 	s = str;
 	while ( *s )
 	{
 		ch = *s & 127;
 		if ( ch == ' ' ) {
-			aw = (float)PROP_SPACE_WIDTH * cgs.screenXScale * sizeScale;
+			aw = (float)PROP_SPACE_WIDTH * xscale * sizeScale;
 		} else if ( propMap[ch][2] != -1 ) {
 			fcol = (float)propMap[ch][0] / 256.0f;
 			frow = (float)propMap[ch][1] / 256.0f;
 			fwidth = (float)propMap[ch][2] / 256.0f;
 			fheight = (float)PROP_HEIGHT / 256.0f;
-			aw = (float)propMap[ch][2] * cgs.screenXScale * sizeScale;
-			ah = (float)PROP_HEIGHT * cgs.screenXScale * sizeScale;
+			aw = (float)propMap[ch][2] * xscale * sizeScale;
+			ah = (float)PROP_HEIGHT * xscale * sizeScale;
 			trap_R_DrawStretchPic( ax, ay, aw, ah, fcol, frow, fcol+fwidth, frow+fheight, charset );
 		} else {
 			aw = 0;
 		}
 
-		ax += (aw + (float)PROP_GAP_WIDTH * cgs.screenXScale * sizeScale);
+		ax += (aw + (float)PROP_GAP_WIDTH * xscale * sizeScale);
 		s++;
 	}
 

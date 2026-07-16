@@ -434,9 +434,33 @@ void trap_R_AddRefEntityToScene2( const refEntity_t *re ) {
 }
 
 void trap_R_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b ) {
-	syscall( dll_trap_R_AddLinearLightToScene, start, end, intensity, r, g, b );
+	syscall( dll_trap_R_AddLinearLightToScene, start, end, PASSFLOAT(intensity), PASSFLOAT(r), PASSFLOAT(g), PASSFLOAT(b) );
 }
 
 void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime ) {
 	syscall( dll_trap_R_ProjectDecal, origin, PASSFLOAT(size), PASSFLOAT(reach), PASSFLOAT(orientation), hShader, rgba, lifeTime );
+}
+
+void trap_VR_RegisterState( void *state, int stateSize, int apiVersion ) {
+	syscall( dll_trap_VR_RegisterState, state, stateSize, apiVersion );
+}
+
+void trap_R_BeginPostBloom2D( void ) {
+	syscall( dll_trap_R_BeginPostBloom2D );
+}
+
+void trap_R_EndPostBloom2D( void ) {
+	syscall( dll_trap_R_EndPostBloom2D );
+}
+
+void trap_R_HUDBufferStart( qboolean clear ) {
+	syscall( dll_trap_R_HUDBufferStart, clear );
+}
+
+void trap_R_HUDBufferEnd( void ) {
+	syscall( dll_trap_R_HUDBufferEnd );
+}
+
+void trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height ) {
+	syscall( dll_trap_HapticEvent, description, position, channel, intensity, PASSFLOAT(yaw), PASSFLOAT(height) );
 }

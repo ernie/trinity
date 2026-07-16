@@ -190,6 +190,38 @@ static void CG_NailgunEjectBrass( centity_t *cent ) {
 
 /*
 ==========================
+CG_LaserSight
+==========================
+*/
+void CG_LaserSight( vec3_t start, vec3_t end, byte colour[4], float width ) {
+  refEntity_t     re;
+	memset( &re, 0, sizeof( re ) );
+
+	//Ensure shader is loaded
+	cgs.media.railCoreShader = trap_R_RegisterShader( "railCore" );
+
+  re.reType = RT_LASERSIGHT;
+  re.renderfx = RF_FIRST_PERSON;
+  re.customShader = cgs.media.railCoreShader;
+
+  VectorCopy( start, re.origin );
+  VectorCopy( end, re.oldorigin );
+
+  //radius is used to store width info
+  re.radius = width;
+
+  AxisClear( re.axis );
+
+	re.shaderRGBA.rgba[0] = colour[0];
+	re.shaderRGBA.rgba[1] = colour[1];
+	re.shaderRGBA.rgba[2] = colour[2];
+	re.shaderRGBA.rgba[3] = colour[3];
+
+	trap_R_AddRefEntityToScene(&re);
+}
+
+/*
+==========================
 CG_RailTrail
 ==========================
 */
@@ -929,7 +961,7 @@ static int CG_MapTorsoToWeaponFrame( const clientInfo_t *ci, int frame ) {
 CG_CalculateWeaponPosition
 ==============
 */
-static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
+void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 	float	scale;
 	int		delta;
 	float	fracsin;
@@ -937,7 +969,7 @@ static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 	VectorCopy( cg.refdef.vieworg, origin );
 
 	// VR follow: weapon points along weapon aim, not head direction
-	if ( CG_IsVRFollow() ) {
+	if ( CG_VR_IsVRFollow() ) {
 		VectorCopy( cg.predictedPlayerState.viewangles, angles );
 	} else {
 		VectorCopy( cg.refdefViewAngles, angles );
@@ -951,9 +983,12 @@ static void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles ) {
 	}
 
 	// gun angles from bobbing
-	angles[ROLL] += scale * cg.bobfracsin * 0.005;
-	angles[YAW] += scale * cg.bobfracsin * 0.01;
-	angles[PITCH] += cg.xyspeed * cg.bobfracsin * 0.005;
+	if ( !vrActive || cg_weaponbob.value != 0 )
+	{
+		angles[ROLL] += scale * cg.bobfracsin * 0.005;
+		angles[YAW] += scale * cg.bobfracsin * 0.01;
+		angles[PITCH] += cg.xyspeed * cg.bobfracsin * 0.005;
+	}
 
 	// drop the weapon when landing
 	delta = cg.time - cg.landTime;
@@ -1001,6 +1036,7 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 	vec3_t   muzzlePoint, endPoint;
 	int      anim;
 	qboolean directView;
+	vec3_t   vrAngle;
 
 	if (cent->currentState.weapon != WP_LIGHTNING) {
 		return;
@@ -1010,6 +1046,9 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 
 	if ( !cg.renderingThirdPerson && cent->currentState.number == cg.predictedPlayerState.clientNum ) {
 		directView = qtrue;
+		if ( vrActive )
+			CG_CalculateVRWeaponPosition( muzzlePoint, vrAngle );
+		else
 		VectorCopy( cg.refdef.vieworg, muzzlePoint );
 	} else {
 		directView = qfalse;
@@ -1022,6 +1061,11 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 		}
 	}
 
+	if ( vrActive && directView ) {
+		AngleVectors( vrAngle, forward, NULL, NULL );
+
+		CG_VR_OnWeaponFiring( cent->currentState.weapon );
+	} else
 	// CPMA  "true" lightning
 	if ( directView && cg_trueLightning.value ) {
 		//vec3_t	viewangles;
@@ -1446,6 +1490,8 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	const weaponInfo_t *weapon;
 	vec3_t		fovOffset;
 	vec3_t		angles;
+	qboolean	vrPosed;
+	float		vrScale;
 
 	if ( ps->persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
 		return;
@@ -1467,11 +1513,14 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 		vec3_t		origin;
 
 		if ( ( cg.predictedPlayerState.eFlags & EF_FIRING )
-		|| ps->weapon == WP_GRAPPLING_HOOK ) {
+		|| ( !CG_VR_OwnsHiddenGunMuzzle() && ps->weapon == WP_GRAPPLING_HOOK ) ) {
 			// special hack for lightning gun and grappling hook...
 			VectorCopy( cg.refdef.vieworg, origin );
 			VectorMA( origin, -8, cg.refdef.viewaxis[2], origin );
-			VectorCopy( origin, cg_entities[ps->clientNum].pe.muzzleOrigin );
+			if ( !CG_VR_OwnsHiddenGunMuzzle() ) {
+				// head-derived muzzle would clobber the controller muzzle in VR
+				VectorCopy( origin, cg_entities[ps->clientNum].pe.muzzleOrigin );
+			}
 			CG_LightningBolt( &cg_entities[ps->clientNum], origin );
 		}
 		return;
@@ -1479,6 +1528,14 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 
 	// don't draw if testing a gun model
 	if ( cg.testGun ) {
+		return;
+	}
+
+	if ( CG_VR_WeaponWheel() ) {
+		return;		// selector drew instead of the gun
+	}
+
+	if ( CG_VR_HideViewWeapon() ) {
 		return;
 	}
 
@@ -1499,19 +1556,23 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	memset (&hand, 0, sizeof(hand));
 
 	// set up gun position
-	CG_CalculateWeaponPosition( hand.origin, angles );
+	vrScale = 1.0f;
+	vrPosed = CG_VR_WeaponHandPose( hand.origin, angles, &vrScale );
+	if ( !vrPosed ) {
+		CG_CalculateWeaponPosition( hand.origin, angles );
 
-	// VR follow: offset weapon along weapon-aim axes, not head-view axes
-	if ( CG_IsVRFollow() ) {
-		vec3_t	weaponAxis[3];
-		AnglesToAxis( cg.predictedPlayerState.viewangles, weaponAxis );
-		VectorMA( hand.origin, (cg_gun_x.value+fovOffset[0]), weaponAxis[0], hand.origin );
-		VectorMA( hand.origin, cg_gun_y.value, weaponAxis[1], hand.origin );
-		VectorMA( hand.origin, (cg_gun_z.value+fovOffset[2]), weaponAxis[2], hand.origin );
-	} else {
-		VectorMA( hand.origin, (cg_gun_x.value+fovOffset[0]), cg.refdef.viewaxis[0], hand.origin );
-		VectorMA( hand.origin, cg_gun_y.value, cg.refdef.viewaxis[1], hand.origin );
-		VectorMA( hand.origin, (cg_gun_z.value+fovOffset[2]), cg.refdef.viewaxis[2], hand.origin );
+		// VR follow: offset weapon along weapon-aim axes, not head-view axes
+		if ( CG_VR_IsVRFollow() ) {
+			vec3_t	weaponAxis[3];
+			AnglesToAxis( cg.predictedPlayerState.viewangles, weaponAxis );
+			VectorMA( hand.origin, (cg_gun_x.value+fovOffset[0]), weaponAxis[0], hand.origin );
+			VectorMA( hand.origin, cg_gun_y.value, weaponAxis[1], hand.origin );
+			VectorMA( hand.origin, (cg_gun_z.value+fovOffset[2]), weaponAxis[2], hand.origin );
+		} else {
+			VectorMA( hand.origin, (cg_gun_x.value+fovOffset[0]), cg.refdef.viewaxis[0], hand.origin );
+			VectorMA( hand.origin, cg_gun_y.value, cg.refdef.viewaxis[1], hand.origin );
+			VectorMA( hand.origin, (cg_gun_z.value+fovOffset[2]), cg.refdef.viewaxis[2], hand.origin );
+		}
 	}
 
 	AnglesToAxis( angles, hand.axis );
@@ -1530,7 +1591,11 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	}
 
 	hand.hModel = weapon->handsModel;
-	hand.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON | RF_MINLIGHT;
+	if ( vrPosed ) {
+		CG_VR_WeaponHandFinish( &hand, vrScale );
+	} else {
+		hand.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON | RF_MINLIGHT;
+	}
 
 	// add everything onto the hand
 	CG_AddPlayerWeapon( &hand, ps, &cg.predictedPlayerEntity, ps->persistant[PERS_TEAM] );
@@ -1564,6 +1629,11 @@ void CG_DrawWeaponSelect( void ) {
 
 	// don't display if dead
 	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 || cg_drawWeaponSelect.integer == 0 ) {
+		return;
+	}
+
+	// don't display while the 3D weapon wheel is open (reads zero when VR inactive)
+	if ( vr->weapon_select ) {
 		return;
 	}
 
@@ -1654,7 +1724,7 @@ void CG_DrawWeaponSelect( void ) {
 CG_WeaponSelectable
 ===============
 */
-static qboolean CG_WeaponSelectable( int i ) {
+qboolean CG_WeaponSelectable( int i ) {
 	if ( !cg.snap->ps.ammo[i] ) {
 		return qfalse;
 	}
@@ -1859,6 +1929,10 @@ void CG_FireWeapon( centity_t *cent ) {
 		}
 	}
 
+	if( ent->weapon == WP_RAILGUN ) {
+		cent->pe.railFireTime = cg.time;
+	}
+
 	// play quad sound if needed
 	if ( cent->currentState.powerups & ( 1 << PW_QUAD ) ) {
 		trap_S_StartSound (NULL, cent->currentState.number, CHAN_ITEM, cgs.media.quadSound );
@@ -1881,6 +1955,12 @@ void CG_FireWeapon( centity_t *cent ) {
 	// do brass ejection
 	if ( weap->ejectBrassFunc && cg_brassTime.integer > 0 ) {
 		weap->ejectBrassFunc( cent );
+	}
+
+	//Are we the player?
+	if (cent->currentState.number == cg.predictedPlayerState.clientNum)
+	{
+		CG_VR_OnWeaponFired( ent->weapon );
 	}
 }
 
@@ -2111,11 +2191,18 @@ CG_MissileHitPlayer
 =================
 */
 void CG_MissileHitPlayer( int weapon, vec3_t origin, vec3_t dir, int entityNum ) {
+	vec3_t bleedDir;
+	// The dir from EV_MISSILE_HIT is the surface normal (pointing outward from
+	// the player toward the shooter). Negate it to get the projectile travel
+	// direction for the blood spray.
+	VectorNegate( dir, bleedDir );
 	// Trinity servers send aggregated, damage-scaled blood via EV_BLOOD; bleed
 	// per-hit only as the vanilla-server fallback (no real damage here).
 	if ( !cgs.trinity ) {
-		CG_Bleed( origin, dir, entityNum, 30, qtrue );
+		CG_Bleed( origin, bleedDir, entityNum, 30, qtrue );
 	}
+
+	CG_VR_OnHitByMissile( entityNum );
 
 	// some weapons will make an explosion with the blood, while
 	// others will just make the blood
@@ -2182,7 +2269,13 @@ static void CG_ShotgunPellet( vec3_t start, vec3_t end, int skipNum ) {
 	}
 
 	if ( cg_entities[tr.entityNum].currentState.eType == ET_PLAYER ) {
-		CG_MissileHitPlayer( WP_SHOTGUN, tr.endpos, tr.plane.normal, tr.entityNum );
+		vec3_t	pelletDir;
+		// Direction from impact back toward the shooter, matching the
+		// EV_MISSILE_HIT convention (surface normal toward shooter); it gets
+		// negated in CG_MissileHitPlayer for the blood spray.
+		VectorSubtract( start, end, pelletDir );
+		VectorNormalize( pelletDir );
+		CG_MissileHitPlayer( WP_SHOTGUN, tr.endpos, pelletDir, tr.entityNum );
 	} else {
 		if ( tr.surfaceFlags & SURF_NOIMPACT ) {
 			// SURF_NOIMPACT will not make a flame puff or a mark

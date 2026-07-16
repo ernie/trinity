@@ -1306,6 +1306,11 @@ void CG_NewClientInfo( int clientNum ) {
 	v = Info_ValueForKey( configstring, "c1" );
 	CG_ColorFromString( v, newInfo.color1 );
 
+	newInfo.c1RGBA[0] = 255 * newInfo.color1[0];
+	newInfo.c1RGBA[1] = 255 * newInfo.color1[1];
+	newInfo.c1RGBA[2] = 255 * newInfo.color1[2];
+	newInfo.c1RGBA[3] = 255;
+
 	v = Info_ValueForKey( configstring, "c2" );
 	CG_ColorFromString( v, newInfo.color2 );
 
@@ -1691,42 +1696,6 @@ static void CG_SwingAngles( float destination, float swingTolerance, float clamp
 }
 
 /*
-================
-AxisTranspose - Transpose a 3x3 rotation matrix (for orthonormal matrices, transpose = inverse)
-================
-*/
-static void AxisTranspose(vec3_t in[3], vec3_t out[3]) {
-	out[0][0] = in[0][0]; out[0][1] = in[1][0]; out[0][2] = in[2][0];
-	out[1][0] = in[0][1]; out[1][1] = in[1][1]; out[1][2] = in[2][1];
-	out[2][0] = in[0][2]; out[2][1] = in[1][2]; out[2][2] = in[2][2];
-}
-
-/*
-================
-AxisToAngles - Extract Euler angles from a rotation matrix (inverse of AnglesToAxis)
-================
-*/
-static void AxisToAngles(vec3_t axis[3], vec3_t angles) {
-	float sp = -axis[0][2];
-
-	if (sp >= 1.0f) {
-		angles[PITCH] = 90.0f;
-	} else if (sp <= -1.0f) {
-		angles[PITCH] = -90.0f;
-	} else {
-		angles[PITCH] = RAD2DEG(atan2(sp, sqrt(1.0 - sp * sp)));
-	}
-
-	if (fabs(sp) < 0.999f) {
-		angles[YAW] = RAD2DEG(atan2(axis[0][1], axis[0][0]));
-		angles[ROLL] = RAD2DEG(atan2(axis[1][2], axis[2][2]));
-	} else {
-		angles[YAW] = RAD2DEG(atan2(-axis[1][0], axis[1][1]));
-		angles[ROLL] = 0.0f;
-	}
-}
-
-/*
 =================
 CG_AddPainTwitch
 =================
@@ -1773,8 +1742,6 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	int			dir, clientNum;
 	clientInfo_t	*ci;
 	vec3_t		absoluteTorsoAngles;
-	vec3_t		headWorldAngles, headLocalAngles;
-	vec3_t		headWorldAxis[3], torsoWorldAxis[3], torsoInverseAxis[3], headLocalAxis[3];
 
 	// NOTE: headAngles is a misnomer inherited from vanilla Q3, where the
 	// head/torso/legs shared a single aim direction (viewangles). In VR,
@@ -1786,22 +1753,7 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	VectorClear( torsoAngles );
 
 	// VR player - interpolate head pitch and yaw offset (applied after AnglesSubtract below)
-	if ((cent->currentState.eFlags & EF_VR_PLAYER) && !(cent->currentState.eFlags & EF_DEAD)) {
-		float headPitch, headYawOffset;
-
-		if (cg.nextSnap && cent->interpolate) {
-			headPitch = LerpAngle(cent->currentState.angles2[PITCH],
-			                      cent->nextState.angles2[PITCH], cg.frameInterpolation);
-			headYawOffset = LerpAngle(cent->currentState.angles2[ROLL],
-			                          cent->nextState.angles2[ROLL], cg.frameInterpolation);
-		} else {
-			headPitch = cent->currentState.angles2[PITCH];
-			headYawOffset = cent->currentState.angles2[ROLL];
-		}
-
-		cent->pe.vrHeadPitch = headPitch;
-		cent->pe.vrHeadYawOffset = headYawOffset;
-	}
+	CG_VR_PlayerHeadLerp( cent );
 
 	// --------- yaw -------------
 
@@ -1828,11 +1780,7 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	legsAngles[YAW] = headAngles[YAW] + movementOffsets[ dir ];
 	// VR: torso follows weapon aim 1:1 (no movement offset);
 	// flatscreen: torso turns 25% toward movement direction
-	if (cent->currentState.eFlags & EF_VR_PLAYER) {
-		torsoAngles[YAW] = headAngles[YAW];
-		cent->pe.torso.yawAngle = torsoAngles[YAW];
-		cent->pe.torso.yawing = qfalse;
-	} else {
+	if ( !CG_VR_PlayerTorsoYaw( cent, headAngles, torsoAngles ) ) {
 		torsoAngles[YAW] = headAngles[YAW] + 0.25 * movementOffsets[ dir ];
 		CG_SwingAngles( torsoAngles[YAW], 25, 90, cg_swingSpeed.value, &cent->pe.torso.yawAngle, &cent->pe.torso.yawing );
 	}
@@ -1851,10 +1799,7 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 		dest = headAngles[PITCH] * 0.75f;
 	}
 	// VR: torso follows weapon pitch directly; flatscreen uses swing tolerance
-	if (cent->currentState.eFlags & EF_VR_PLAYER) {
-		cent->pe.torso.pitchAngle = dest;
-		cent->pe.torso.pitching = qfalse;
-	} else {
+	if ( !CG_VR_PlayerTorsoPitch( cent, dest ) ) {
 		CG_SwingAngles( dest, 15, 30, 0.1f, &cent->pe.torso.pitchAngle, &cent->pe.torso.pitching );
 	}
 	torsoAngles[PITCH] = cent->pe.torso.pitchAngle;
@@ -1903,33 +1848,14 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 	CG_AddPainTwitch( cent, torsoAngles );
 
 	// Save absolute torso angles for VR head calculation
-	if (cent->currentState.eFlags & EF_VR_PLAYER) {
-		VectorCopy(torsoAngles, absoluteTorsoAngles);
-	}
+	CG_VR_PlayerSaveAbsoluteTorso( cent, torsoAngles, absoluteTorsoAngles );
 
 	// pull the angles back out of the hierarchial chain
 	AnglesSubtract( headAngles, torsoAngles, headAngles );
 	AnglesSubtract( torsoAngles, legsAngles, torsoAngles );
 
 	// VR: compute head orientation relative to torso using matrix math
-	if (cent->currentState.eFlags & EF_VR_PLAYER) {
-		headWorldAngles[PITCH] = cent->pe.vrHeadPitch;
-		headWorldAngles[YAW] = cent->lerpAngles[YAW] + cent->pe.vrHeadYawOffset;
-		headWorldAngles[ROLL] = cent->lerpAngles[ROLL];
-
-		AnglesToAxis(headWorldAngles, headWorldAxis);
-		AnglesToAxis(absoluteTorsoAngles, torsoWorldAxis);
-		AxisTranspose(torsoWorldAxis, torsoInverseAxis);
-
-		MatrixMultiply(headWorldAxis, torsoInverseAxis, headLocalAxis);
-
-		AxisToAngles(headLocalAxis, headLocalAngles);
-
-		// Apply biological limits
-		headAngles[PITCH] = Com_Clamp(-80.0f, 80.0f, headLocalAngles[PITCH]);
-		headAngles[YAW] = Com_Clamp(-80.0f, 80.0f, headLocalAngles[YAW]);
-		headAngles[ROLL] = Com_Clamp(-60.0f, 60.0f, headLocalAngles[ROLL]);
-	}
+	CG_VR_PlayerHeadAngles( cent, absoluteTorsoAngles, headAngles );
 
 	AnglesToAxis( legsAngles, legs );
 	AnglesToAxis( torsoAngles, torso );
@@ -2071,21 +1997,39 @@ static void CG_DustTrail( centity_t *cent ) {
 CG_TrailItem
 ===============
 */
-static void CG_TrailItem( const centity_t *cent, qhandle_t hModel ) {
+void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale ) {
 	refEntity_t		ent;
 	vec3_t			angles;
 	vec3_t			axis[3];
+	float			horizontalScale;
 
-	VectorCopy( cent->lerpAngles, angles );
-	angles[PITCH] = 0;
-	angles[ROLL] = 0;
-	AnglesToAxis( angles, axis );
+	if (!cent)
+	{
+		return;
+	}
 
-	memset( &ent, 0, sizeof( ent ) );
-	VectorMA( cent->lerpOrigin, -16, axis[0], ent.origin );
-	ent.origin[2] += 16;
-	angles[YAW] += 90;
-	AnglesToAxis( angles, ent.axis );
+	memset(&ent, 0, sizeof(ent));
+
+	horizontalScale = scale;
+	scale = fabs(scale);
+
+	if ( CG_VR_SuppressOffHandItem( cent ) ) {
+		return;
+	}
+
+	if ( !CG_VR_OffHandItemPose( cent, &ent, offset, scale, horizontalScale ) )
+	{
+		VectorCopy(cent->lerpAngles, angles);
+		angles[PITCH] = 0;
+		angles[ROLL] = 0;
+		AnglesToAxis(angles, axis);
+
+		memset(&ent, 0, sizeof(ent));
+		VectorMA(cent->lerpOrigin, -16, axis[0], ent.origin);
+		ent.origin[2] += 16;
+		angles[YAW] += 90;
+		AnglesToAxis(angles, ent.axis);
+	}
 
 	ent.hModel = hModel;
 	trap_R_AddRefEntityToScene( &ent );
@@ -2221,6 +2165,9 @@ static void CG_PlayerTokens( centity_t *cent, int renderfx ) {
 	refEntity_t	ent;
 	vec3_t		dir, origin;
 	skulltrail_t *trail;
+	if ( cent->currentState.number >= MAX_CLIENTS ) {
+		return;
+	}
 	trail = &cg.skulltrails[cent->currentState.number];
 	tokens = cent->currentState.generic1;
 	if ( !tokens ) {
@@ -2286,6 +2233,9 @@ static void CG_PlayerPowerups( centity_t *cent, refEntity_t *torso ) {
 	int		powerups;
 	clientInfo_t	*ci;
 
+	// off-hand holdable item render (VR) - see vr_cgame.c
+	CG_VR_DrawOffHandHoldable( cent );
+
 	powerups = cent->currentState.powerups;
 	if ( !powerups ) {
 		return;
@@ -2308,33 +2258,39 @@ static void CG_PlayerPowerups( centity_t *cent, refEntity_t *torso ) {
 	ci = &cgs.clientinfo[ cent->currentState.clientNum ];
 	// redflag
 	if ( powerups & ( 1 << PW_REDFLAG ) ) {
-		if (ci->newAnims) {
+		if (ci->newAnims && !CG_VR_OffHandCarriesFlag( cent )) {
 			CG_PlayerFlag( cent, cgs.media.redFlagFlapSkin, torso );
 		}
 		else {
-			CG_TrailItem( cent, cgs.media.redFlagModel );
+			vec3_t offset;
+			VectorSet(offset, 0, -1, 0);
+			CG_TrailItem( cent, cgs.media.redFlagModel, offset, 0.1f );
 		}
 		trap_R_AddLightToScene( cent->lerpOrigin, ( POWERUP_GLOW_RADIUS + (rand() & POWERUP_GLOW_RADIUS_MOD) ), 1.0f, 0.2f, 0.2f );
 	}
 
 	// blueflag
 	if ( powerups & ( 1 << PW_BLUEFLAG ) ) {
-		if (ci->newAnims){
+		if (ci->newAnims && !CG_VR_OffHandCarriesFlag( cent )){
 			CG_PlayerFlag( cent, cgs.media.blueFlagFlapSkin, torso );
 		}
 		else {
-			CG_TrailItem( cent, cgs.media.blueFlagModel );
+			vec3_t offset;
+			VectorSet(offset, 0, -1, 0);
+			CG_TrailItem( cent, cgs.media.blueFlagModel, offset, 0.1f );
 		}
 		trap_R_AddLightToScene( cent->lerpOrigin, ( POWERUP_GLOW_RADIUS + (rand() & POWERUP_GLOW_RADIUS_MOD) ), 0.2f, 0.2f, 1.0f );
 	}
 
 	// neutralflag
 	if ( powerups & ( 1 << PW_NEUTRALFLAG ) ) {
-		if (ci->newAnims) {
+		if (ci->newAnims && !CG_VR_OffHandCarriesFlag( cent )) {
 			CG_PlayerFlag( cent, cgs.media.neutralFlagFlapSkin, torso );
 		}
 		else {
-			CG_TrailItem( cent, cgs.media.neutralFlagModel );
+			vec3_t offset;
+			VectorSet(offset, 0, -1, 0);
+			CG_TrailItem( cent, cgs.media.neutralFlagModel, offset, 0.1f );
 		}
 		trap_R_AddLightToScene( cent->lerpOrigin, ( POWERUP_GLOW_RADIUS + (rand() & POWERUP_GLOW_RADIUS_MOD) ), 1.0f, 1.0f, 1.0f );
 	}
@@ -2387,6 +2343,12 @@ Float sprites over the player's head
 */
 static void CG_PlayerSprites( centity_t *cent ) {
 	int		team;
+
+	//Put a sprite over the followed player's head
+	if ( CG_VR_FollowedPlayerSprite( cent ) ) {
+		CG_PlayerFloatSprite( cent, cgs.media.friendShader );
+		return;
+	}
 
 	if ( cent->currentState.eFlags & EF_CONNECTION ) {
 		CG_PlayerFloatSprite( cent, cgs.media.connectionShader );
@@ -2487,15 +2449,23 @@ static qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
 	vec3_t		end, mins = {-15, -15, 0}, maxs = {15, 15, 2};
 	trace_t		trace;
 	float		alpha;
+	qboolean	clientPlayer;
 
 	*shadowPlane = 0;
 
-	if ( cg_shadows.integer == 0 ) {
+	clientPlayer = CG_VR_IsLocalClientEntity( cent );
+
+	if ( (clientPlayer && cg_playerShadow.integer == 0) || (!clientPlayer && cg_shadows.integer == 0) ) {
 		return qfalse;
 	}
 
 	// no shadows when invisible
 	if ( cent->currentState.powerups & ( 1 << PW_INVIS ) ) {
+		return qfalse;
+	}
+
+	// no shadow if the VR player is dead (the corpse entity casts its own)
+	if ( clientPlayer && cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {
 		return qfalse;
 	}
 
@@ -2512,7 +2482,7 @@ static qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
 
 	*shadowPlane = trace.endpos[2] + 1;
 
-	if ( cg_shadows.integer != 1 ) {	// no mark for stencil or projection shadows
+	if ( (clientPlayer && cg_playerShadow.integer != 1) || (!clientPlayer && cg_shadows.integer != 1) ) {	// no mark for stencil or projection shadows
 		return qtrue;
 	}
 
@@ -2543,8 +2513,11 @@ static void CG_PlayerSplash( const centity_t *cent ) {
 	trace_t		trace;
 	int			contents;
 	polyVert_t	verts[4];
+	qboolean	clientPlayer;
 
-	if ( !cg_shadows.integer ) {
+	clientPlayer = CG_VR_IsLocalClientEntity( cent );
+
+	if ( (clientPlayer && !cg_playerShadow.integer) || (!clientPlayer && !cg_shadows.integer) ) {
 		return;
 	}
 
@@ -2729,6 +2702,8 @@ void CG_Player( centity_t *cent ) {
 	int				renderfx;
 	qboolean		shadow;
 	float			shadowPlane;
+	qboolean		firstPersonBody;
+	qboolean		clientPlayer;
 #ifdef MISSIONPACK
 	refEntity_t		skull;
 	refEntity_t		powerup;
@@ -2755,10 +2730,14 @@ void CG_Player( centity_t *cent ) {
 	}
 
 	// get the player model information
+	firstPersonBody = CG_VR_FirstPersonBody( cent );
+
 	renderfx = 0;
 	if ( cent->currentState.number == cg.snap->ps.clientNum) {
 		if (!cg.renderingThirdPerson) {
-			renderfx = RF_THIRD_PERSON;			// only draw in mirrors
+			if ( !CG_VR_ShowFirstPersonBody() ) {
+				renderfx = RF_THIRD_PERSON;			// only draw in mirrors
+			}
 		} else {
 			if (cg_cameraMode.integer) {
 				return;
@@ -2776,8 +2755,15 @@ void CG_Player( centity_t *cent ) {
 	memset( &head, 0, sizeof(head) );
 
 	// get the rotation information
-	CG_PlayerAngles( cent, legs.axis, torso.axis, head.axis );
-	
+	if (firstPersonBody)
+	{
+		CG_VR_FirstPersonBodyAxes( &legs, &torso );
+	}
+	else
+	{
+		CG_PlayerAngles( cent, legs.axis, torso.axis, head.axis );
+	}
+
 	// get the animation state (after rotation, to allow feet shuffle)
 	CG_PlayerAnimation( cent, &legs.oldframe, &legs.frame, &legs.backlerp,
 		 &torso.oldframe, &torso.frame, &torso.backlerp );
@@ -2791,7 +2777,9 @@ void CG_Player( centity_t *cent ) {
 	// add a water splash if partially in and out of water
 	CG_PlayerSplash( cent );
 
-	if ( cg_shadows.integer == 3 && shadow ) {
+	clientPlayer = CG_VR_IsLocalClientEntity( cent );
+
+	if ( shadow && ( (clientPlayer && cg_playerShadow.integer == 3) || (!clientPlayer && cg_shadows.integer == 3) ) ) {
 		renderfx |= RF_SHADOW_PLANE;
 	}
 	renderfx |= RF_LIGHTING_ORIGIN;			// use the same origin for all
@@ -3094,8 +3082,11 @@ void CG_Player( centity_t *cent ) {
 		head.shaderRGBA.rgba[2] = ci->headColor[2] * 255;
 	}
 	head.shaderRGBA.rgba[3] = 255;
-	
-	CG_AddRefEntityWithPowerups( &head, &cent->currentState, ci->team );
+
+	if (!firstPersonBody)
+	{
+		CG_AddRefEntityWithPowerups( &head, &cent->currentState, ci->team );
+	}
 
 #ifdef MISSIONPACK
 	CG_BreathPuffs(cent, &head);
@@ -3106,7 +3097,9 @@ void CG_Player( centity_t *cent ) {
 	//
 	// add the gun / barrel / flash
 	//
-	CG_AddPlayerWeapon( &torso, NULL, cent, ci->team );
+	if (!firstPersonBody) {
+		CG_AddPlayerWeapon( &torso, NULL, cent, ci->team );
+	}
 
 	// add powerups floating behind the player
 	CG_PlayerPowerups( cent, &torso );
