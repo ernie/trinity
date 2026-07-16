@@ -1,0 +1,100 @@
+// hand-synced from trinity-vr code/vrcommon/vr_shared.h — do not edit here
+#ifndef __VR_SHARED
+#define __VR_SHARED
+
+#include "q_shared.h"
+#include "vr_safe_types.h"
+
+// Engine <-> game-module VR state ABI. QVM-safe: 4-byte scalar types only,
+// no pointers, identical layout on 64-bit host and 32-bit QVM.
+// LAYOUT IS FROZEN once published: append to a block, never reorder/remove.
+// Bump VR_API_VERSION on any incompatible change.
+
+#define VR_API_VERSION  1
+#define VR_API_SENTINEL "TRINITY_VR_API/1"
+
+// thumbstick_location[] index constants (module-facing)
+#define THUMB_LEFT  0
+#define THUMB_RIGHT 1
+
+typedef struct vr_shared_s {
+	int structSize;     // sizeof(vr_shared_t), set by the module before registering
+	int apiVersion;     // VR_API_VERSION the module was built against
+
+	// ---- eng block: engine-written; module writes are local-transient ----
+	float fov_x;
+	float fov_y;
+	float fov_angle_up;
+	float fov_angle_down;
+	float fov_angle_left;
+	float fov_angle_right;
+	float eye_fov_angle_left[2];
+	float eye_fov_angle_right[2];
+	int   weapon_zoomed;
+	float weapon_zoomLevel;
+	int   right_handed;
+	int   virtual_screen;
+	int   first_person_following;
+	int   use_6dof;
+	int   follow_mode;          // VR_FollowMode value
+	int   vote_holding;
+	int   clientNum;
+	float clientview_yaw_delta;
+	vec3_t hmdposition;
+	vec3_t hmdorientation;
+	vec3_t hmdorigin;
+	vec3_t weaponangles;
+	vec3_t weaponoffset;
+	vec3_t weaponposition;
+	vec3_t offhandangles;
+	vec3_t offhandoffset;
+	vec3_t offhandposition;
+	vec2_t thumbstick_location[2];
+	int   menuLeftHanded;
+	int   menuCursorX;          // engine-computed cursor coords (640x480 virtual)
+	int   menuCursorY;
+	int   scoreboardCursorX;
+	int   scoreboardCursorY;
+	int   sp_intermission_active;
+	int   probeEchoBack;        // engine reflects probeEcho here at every sync-in
+
+	// ---- cg block: cgame-writable ----
+	int   weapon_select;
+	int   weapon_select_autoclose;
+	int   weapon_select_using_thumbstick;
+	int   weapon_adjust;
+	int   weapon_stabilised;
+	float snapTurnYaw;
+	int   realign;
+	int   recenter_follow_camera;
+	vec3_t clientviewangles;
+	vec3_t calculated_weaponangles;
+	int   vote_active;
+	float sp_intermission_hud_origin[3];
+	float sp_intermission_hud_radius;
+	int   probeEcho;            // ABI conformance round-trip (see probeEchoBack)
+
+	// ---- uiShared block: cgame+ui-writable ----
+	float menuYaw;
+	int   menuYawLocked;
+	int   menuCursorActive;       // replaces int* cursor registration
+	int   scoreboardCursorActive; // replaces int* cursor registration
+
+	// ---- cfg block: cgame+game-writable ----
+	int   no_crosshair;
+	int   local_server;
+	int   single_player;
+
+	// ---- engine-written, appended at tail (trap ABI: keep last) ----
+	int   menuStickNavActive;   // engine: thumbstick is driving menu nav -> UI freezes hover + hides cursor
+} vr_shared_t;
+
+// Block boundaries for the engine's writer-scoped sync-out (offsetof ranges).
+#define VR_SHARED_CG_FIRST   weapon_select
+#define VR_SHARED_CG_LAST    probeEcho
+#define VR_SHARED_UI_FIRST   menuYaw
+#define VR_SHARED_UI_LAST    scoreboardCursorActive
+#define VR_SHARED_CFG_FIRST  no_crosshair
+#define VR_SHARED_CFG_LAST   single_player
+
+#endif
