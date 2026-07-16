@@ -89,7 +89,8 @@ typedef struct vr_shared_s {
 	int   menuStickNavActive;   // engine: thumbstick is driving menu nav -> UI freezes hover + hides cursor
 } vr_shared_t;
 
-// Block boundaries for the engine's writer-scoped sync-out (offsetof ranges).
+// Block-start field markers. Only the _FIRST names are load-bearing (the
+// engine pins their offsets with ABI asserts); the _LAST names are unused.
 #define VR_SHARED_CG_FIRST   weapon_select
 #define VR_SHARED_CG_LAST    probeEcho
 #define VR_SHARED_UI_FIRST   menuYaw
