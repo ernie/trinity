@@ -313,7 +313,7 @@ rendering the exact same string.
 
 Original id Quake 3 did not have this asymmetry — its engine also used an
 8-entry table with `& 7` wrap, matching the mod. The split-brain in Trinity
-is downstream from the Quake3e/CNQ3 lineage adding extended palettes without
+is downstream from Quake3e/CNQ3 adding extended palettes without
 coordinating with mod-side rendering. A fix is tracked separately in
 [trinity-engine](https://github.com/ernie/trinity-engine).
 
