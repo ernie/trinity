@@ -8,10 +8,14 @@
 // Engine <-> game-module VR state ABI. QVM-safe: 4-byte scalar types only,
 // no pointers, identical layout on 64-bit host and 32-bit QVM.
 // LAYOUT IS FROZEN once published: append to a block, never reorder/remove.
-// Bump VR_API_VERSION on any incompatible change.
-
-#define VR_API_VERSION  1
-#define VR_API_SENTINEL "TRINITY_VR_API/1"
+// Additive changes (new tail field, new trap) bump the MINOR; reordering,
+// removing, or retyping an existing field or trap bumps the MAJOR. The engine
+// runs a QVM whose major matches and whose minor it can meet or exceed.
+#define VR_API_MAJOR 1
+#define VR_API_MINOR 0
+#define VR_API_STR2(x) #x
+#define VR_API_STR(x) VR_API_STR2(x)
+#define VR_API_SENTINEL "TRINITY_VR_API/" VR_API_STR(VR_API_MAJOR) "." VR_API_STR(VR_API_MINOR)
 
 // thumbstick_location[] index constants (module-facing)
 #define THUMB_LEFT  0
@@ -19,7 +23,7 @@
 
 typedef struct vr_shared_s {
 	int structSize;     // sizeof(vr_shared_t), set by the module before registering
-	int apiVersion;     // VR_API_VERSION the module was built against
+	int apiVersion;     // VR_API_MAJOR the module was built against
 
 	// ---- eng block: engine-written; module writes are local-transient ----
 	float fov_x;
