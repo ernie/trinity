@@ -10,7 +10,7 @@ typedef enum {
 	MODE_CPM,	// 1 - CPMA
 	MODE_QL,	// 2 - Quake Live
 	MODE_QLT	// 3 - Quake Live Turbo (QL combat + CPM-style air control)
-} mode_t;
+} gamemode_t;	// not "mode_t": collides with POSIX mode_t in the native build
 
 #define MODE_COUNT 4
 

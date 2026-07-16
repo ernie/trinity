@@ -63,10 +63,13 @@ $(BD)/cgame.qvm: $(cg_asm)
 $(BD)/ui.qvm: $(ui_asm)
 	$(Q3ASM) -o $@ $(ui_asm)
 
-# Header dependencies - force rebuild when core headers change
-GAME_HEADERS = $(QADIR)/g_local.h $(QADIR)/g_cvar.h $(QADIR)/bg_public.h $(QADIR)/q_shared.h
-CGAME_HEADERS = $(CGDIR)/cg_local.h $(CGDIR)/cg_cvar.h $(QADIR)/bg_public.h $(QADIR)/q_shared.h
-UI_HEADERS = $(UIDIR)/ui_local.h $(UIDIR)/ui_cvar.h $(QADIR)/q_shared.h
+# Header dependencies - conservatively depend on every header reachable from
+# each module's include paths, so a header edit always rebuilds the module.
+# A hand-picked list here once omitted vr_shared.h/tr_types.h and let stale
+# .asm files ride through incremental builds after ABI header changes.
+GAME_HEADERS = $(wildcard $(QADIR)/*.h)
+CGAME_HEADERS = $(wildcard $(CGDIR)/*.h) $(wildcard $(QADIR)/*.h) $(wildcard $(UIDIR)/*.h)
+UI_HEADERS = $(wildcard $(UIDIR)/*.h) $(wildcard $(QADIR)/*.h)
 
 $(BD)/game/%.asm: $(QADIR)/%.c $(GAME_HEADERS) $(VERSION_STAMP); $(qa_cc)
 $(BD)/cgame/%.asm: $(QADIR)/%.c $(CGAME_HEADERS) $(VERSION_STAMP); $(cg_cc)

@@ -40,6 +40,9 @@
  * SUCH DAMAGE.
  */
 
+// native builds get qsort from the CRT; this replacement is QVM-only
+#if defined( Q3_VM )
+
 // bk001127 - needed for DLL's
 #if !defined( Q3_VM )
 typedef int		 cmp_t(const void *, const void *);
@@ -181,6 +184,8 @@ loop:	SWAPINIT(a, es);
 	}
 /*		qsort(pn - r, r / es, es, cmp);*/
 }
+
+#endif // Q3_VM
 
 //==================================================================================
 
@@ -563,6 +568,9 @@ double tan( double x ) {
 #endif
 
 
+// native builds get srand/rand/atof from the CRT; these replacements are QVM-only
+#ifdef Q3_VM
+
 static int randSeed = 0;
 
 void	srand( unsigned seed ) {
@@ -640,6 +648,8 @@ double atof( const char *string ) {
 
 	return value * sign;
 }
+
+#endif // Q3_VM
 
 
 #if defined ( Q3_VM )
@@ -808,6 +818,8 @@ qboolean replace1( const char match, const char replace, char *str )
 }
 
 
+// native builds get strtok from the CRT; this replacement is QVM-only
+#ifdef Q3_VM
 char *strtok( char *strToken, const char *strDelimit ) {
 	static char		*lastStr = NULL;
 
@@ -870,6 +882,7 @@ char *strtok( char *strToken, const char *strDelimit ) {
 
 	return strToken;
 }
+#endif // Q3_VM
 
 
 char *BG_StripColor( char *string ) {

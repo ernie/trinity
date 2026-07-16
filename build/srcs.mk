@@ -5,7 +5,7 @@ QA_SRC = \
  bg_mode bg_lib bg_misc bg_pmove bg_hash bg_slidemove \
  g_active g_arenas g_bot g_client g_cmds g_combat g_items g_mem g_misc \
  g_missile g_mover g_rotation g_session g_spawn g_svcmds g_target g_team \
- g_trigger g_trinity_announce g_unlagged g_utils g_weapon \
+ g_trigger g_trinity_announce g_unlagged g_utils g_weapon vr_bg vr_game \
  q_math q_shared \
 
 # CGgame sources differ between baseq3 and missionpack
@@ -15,9 +15,9 @@ CG_SRC = \
  cg_main $(CGDIR)/cg_syscalls.asm \
  cg_consolecmds cg_draw cg_drawtools cg_effects cg_ents cg_event cg_info \
  cg_localents cg_marks cg_newdraw cg_players cg_playerstate \
- cg_predict cg_scoreboard cg_servercmds cg_snapshot cg_trinity_announce cg_view cg_weapons \
- ui_shared \
- bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc \
+ cg_predict cg_scoreboard cg_servercmds cg_snapshot cg_trinity_announce cg_view vr_cgame cg_weapons \
+ ui_shared vr_uishared \
+ bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc vr_bg vr_platform \
  q_math q_shared \
 
 else
@@ -26,8 +26,8 @@ CG_SRC = \
  cg_main $(CGDIR)/cg_syscalls.asm \
  cg_consolecmds cg_draw cg_drawtools cg_effects cg_ents cg_event cg_info \
  cg_localents cg_marks cg_players cg_playerstate cg_predict cg_scoreboard \
- cg_servercmds cg_snapshot cg_trinity_announce cg_view cg_weapons \
- bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc \
+ cg_servercmds cg_snapshot cg_trinity_announce cg_view vr_cgame cg_weapons \
+ bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc vr_bg vr_platform \
  q_math q_shared \
 
 endif
@@ -37,8 +37,8 @@ ifeq ($(CONFIG),missionpack)
 # Missionpack uses code/ui
 UI_SRC = \
  ui_main $(UIDIR)/ui_syscalls.asm \
- ui_atoms ui_gameinfo ui_players ui_shared ui_util \
- bg_mode bg_misc bg_lib \
+ ui_atoms ui_gameinfo ui_players ui_shared ui_util vr_ui vr_uishared \
+ bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform \
  q_math q_shared \
 
 else
@@ -51,8 +51,9 @@ UI_SRC = \
  ui_playermodel ui_players ui_playersettings ui_preferences ui_qmenu \
  ui_removebots ui_saveconfig ui_serverinfo ui_servers2 ui_setup ui_sound \
  ui_sparena ui_specifyserver ui_splevel ui_sppostgame ui_spskill \
- ui_startserver ui_team ui_teamorders ui_video \
- bg_mode bg_misc bg_lib \
+ ui_startserver ui_team ui_teamorders ui_video ui_vrcomfort ui_vrcontrols \
+ ui_vrhud ui_vrmirror ui_vroptions vr_ui \
+ bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform \
  q_math q_shared \
 
 endif
