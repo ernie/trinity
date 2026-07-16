@@ -1958,7 +1958,7 @@ static void ArenaServers_MenuInit( void ) {
 	g_arenaservers.arrows.generic.name		= ART_ARROWS0;
 	g_arenaservers.arrows.generic.flags		= QMF_LEFT_JUSTIFY|QMF_INACTIVE;
 	g_arenaservers.arrows.generic.callback	= ArenaServers_Event;
-	g_arenaservers.arrows.generic.x			= 512+48;
+	g_arenaservers.arrows.generic.x			= 512+60;
 	g_arenaservers.arrows.generic.y			= 240-64+32;
 	g_arenaservers.arrows.width				= 64;
 	g_arenaservers.arrows.height			= 128;
@@ -1967,7 +1967,7 @@ static void ArenaServers_MenuInit( void ) {
 	g_arenaservers.up.generic.flags			= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_MOUSEONLY;
 	g_arenaservers.up.generic.callback		= ArenaServers_Event;
 	g_arenaservers.up.generic.id			= ID_SCROLL_UP;
-	g_arenaservers.up.generic.x				= 512+48;
+	g_arenaservers.up.generic.x				= 512+60;
 	g_arenaservers.up.generic.y				= 240-64+32;
 	g_arenaservers.up.width					= 64;
 	g_arenaservers.up.height				= 64;
@@ -1977,7 +1977,7 @@ static void ArenaServers_MenuInit( void ) {
 	g_arenaservers.down.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_MOUSEONLY;
 	g_arenaservers.down.generic.callback	= ArenaServers_Event;
 	g_arenaservers.down.generic.id			= ID_SCROLL_DOWN;
-	g_arenaservers.down.generic.x			= 512+48;
+	g_arenaservers.down.generic.x			= 512+60;
 	g_arenaservers.down.generic.y			= 240+32;
 	g_arenaservers.down.width				= 64;
 	g_arenaservers.down.height				= 64;
