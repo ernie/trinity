@@ -310,8 +310,8 @@ static void UI_PositionRotatedEntityOnTag( refEntity_t *entity, const refEntity_
 	}
 
 	// cast away const because of compiler problems
-	MatrixMultiply( entity->axis, ((refEntity_t *)parent)->axis, tempAxis );
-	MatrixMultiply( lerped.axis, tempAxis, entity->axis );
+	MatrixMultiply( entity->axis, lerped.axis, tempAxis );
+	MatrixMultiply( tempAxis, ((refEntity_t *)parent)->axis, entity->axis );
 }
 
 
@@ -343,7 +343,7 @@ UI_RunLerpFrame
 ===============
 */
 static void UI_RunLerpFrame( playerInfo_t *ci, lerpFrame_t *lf, int newAnimation ) {
-	int			f;
+	int			f, numFrames;
 	animation_t	*anim;
 
 	// see if the animation sequence is switching
@@ -359,25 +359,41 @@ static void UI_RunLerpFrame( playerInfo_t *ci, lerpFrame_t *lf, int newAnimation
 
 		// get the next frame based on the animation
 		anim = lf->animation;
+		if ( !anim->frameLerp ) {
+			return;		// shouldn't happen
+		}
 		if ( dp_realtime < lf->animationTime ) {
 			lf->frameTime = lf->animationTime;		// initial lerp
 		} else {
 			lf->frameTime = lf->oldFrameTime + anim->frameLerp;
 		}
 		f = ( lf->frameTime - lf->animationTime ) / anim->frameLerp;
-		if ( f >= anim->numFrames ) {
-			f -= anim->numFrames;
+
+		numFrames = anim->numFrames;
+		if (anim->flipflop) {
+			numFrames *= 2;
+		}
+		if ( f >= numFrames ) {
+			f -= numFrames;
 			if ( anim->loopFrames ) {
 				f %= anim->loopFrames;
 				f += anim->numFrames - anim->loopFrames;
 			} else {
-				f = anim->numFrames - 1;
+				f = numFrames - 1;
 				// the animation is stuck at the end, so it
 				// can immediately transition to another sequence
 				lf->frameTime = dp_realtime;
 			}
 		}
-		lf->frame = anim->firstFrame + f;
+		if ( anim->reversed ) {
+			lf->frame = anim->firstFrame + anim->numFrames - 1 - f;
+		}
+		else if (anim->flipflop && f>=anim->numFrames) {
+			lf->frame = anim->firstFrame + anim->numFrames - 1 - (f%anim->numFrames);
+		}
+		else {
+			lf->frame = anim->firstFrame + f;
+		}
 		if ( dp_realtime > lf->frameTime ) {
 			lf->frameTime = dp_realtime;
 		}
@@ -555,6 +571,8 @@ static void UI_PlayerAngles( playerInfo_t *pi, vec3_t legs[3], vec3_t torso[3], 
 	float		dest;
 	float		adjust;
 
+	pi->viewAngles[YAW] = 180 + (45.0f * sin(DEG2RAD(AngleNormalize360(uis.realtime / 40.0f))));
+
 	VectorCopy( pi->viewAngles, headAngles );
 	headAngles[YAW] = AngleMod( headAngles[YAW] );
 	VectorClear( legsAngles );
@@ -594,6 +612,16 @@ static void UI_PlayerAngles( playerInfo_t *pi, vec3_t legs[3], vec3_t torso[3], 
 	}
 	UI_SwingAngles( dest, 15, 30, 0.1f, &pi->torso.pitchAngle, &pi->torso.pitching );
 	torsoAngles[PITCH] = pi->torso.pitchAngle;
+
+	if ( pi->fixedtorso ) {
+		torsoAngles[PITCH] = 0.0f;
+	}
+
+	if ( pi->fixedlegs ) {
+		legsAngles[YAW] = torsoAngles[YAW];
+		legsAngles[PITCH] = 0.0f;
+		legsAngles[ROLL] = 0.0f;
+	}
 
 	// pull the angles back out of the hierarchial chain
 	AnglesSubtract( headAngles, torsoAngles, headAngles );
@@ -679,6 +707,7 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	vec3_t			maxs = {16, 16, 32};
 	float			len;
 	float			xx;
+	float			desiredFovY;
 
 	if ( !pi->legsModel || !pi->torsoModel || !pi->headModel || !pi->animations[0].numFrames ) {
 		return;
@@ -701,12 +730,29 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	memset( &torso, 0, sizeof(torso) );
 	memset( &head, 0, sizeof(head) );
 
-	// calculate fov from virtual dimensions
-	// so it will be resolution-independent
-	refdef.fov_x = (int)(w / 640.0f * 90.0f);
-	xx = w / tan( refdef.fov_x / 360 * M_PI );
-	refdef.fov_y = atan2( h, xx );
-	refdef.fov_y *= ( 360 / (float)M_PI );
+	// calculate fov from virtual dimensions so it is resolution-independent
+	if ( vrActive ) {
+		float desiredFovX = (int)(w / 640.0f * 90.0f);
+
+		xx = w / tan( desiredFovX / 360 * M_PI );
+		desiredFovY = atan2( h, xx );
+		desiredFovY *= ( 360 / M_PI );
+
+		UI_VR_CompensateModelFov( &refdef, desiredFovX, desiredFovY );
+
+		// calculate distance so the player nearly fills the box
+		len = 0.7 * ( maxs[2] - mins[2] );
+		origin[0] = len / tan( DEG2RAD(desiredFovX) * 0.5 );
+	} else {
+		refdef.fov_x = (int)(w / 640.0f * 90.0f);
+		xx = w / tan( refdef.fov_x / 360 * M_PI );
+		refdef.fov_y = atan2( h, xx );
+		refdef.fov_y *= ( 360 / (float)M_PI );
+
+		// calculate distance so the player nearly fills the box
+		len = 0.7 * ( maxs[2] - mins[2] );
+		origin[0] = len / tan( DEG2RAD(refdef.fov_x) * 0.5 );
+	}
 
 	UI_AdjustFrom640( &x, &y, &w, &h );
 
@@ -721,9 +767,6 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	refdef.width = w;
 	refdef.height = h;
 
-	// calculate distance so the player nearly fills the box
-	len = 0.7 * ( maxs[2] - mins[2] );		
-	origin[0] = len / tan( DEG2RAD(refdef.fov_x) * 0.5 );
 	origin[1] = 0.5 * ( mins[1] + maxs[1] );
 	origin[2] = -0.5 * ( mins[2] + maxs[2] );
 
@@ -805,6 +848,12 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 	if ( pi->currentWeapon != WP_NONE ) {
 		memset( &gun, 0, sizeof(gun) );
 		gun.hModel = pi->weaponModel;
+		if( pi->currentWeapon == WP_RAILGUN ) {
+			Byte4Copy( pi->c1RGBA, gun.shaderRGBA.rgba );
+		}
+		else {
+			Byte4Copy( colorWhite, gun.shaderRGBA.rgba );
+		}
 		VectorCopy( origin, gun.lightingOrigin );
 		UI_PositionEntityOnTag( &gun, &torso, pi->torsoModel, "tag_weapon" );
 		gun.renderfx = renderfx;
@@ -843,6 +892,12 @@ void UI_DrawPlayer( float x, float y, float w, float h, playerInfo_t *pi, int ti
 		if ( pi->flashModel ) {
 			memset( &flash, 0, sizeof(flash) );
 			flash.hModel = pi->flashModel;
+			if( pi->currentWeapon == WP_RAILGUN ) {
+				Byte4Copy( pi->c1RGBA, flash.shaderRGBA.rgba );
+			}
+			else {
+				Byte4Copy( colorWhite, flash.shaderRGBA.rgba );
+			}
 			VectorCopy( origin, flash.lightingOrigin );
 			UI_PositionEntityOnTag( &flash, &gun, pi->weaponModel, "tag_flash" );
 			flash.renderfx = renderfx;
@@ -910,7 +965,7 @@ static qboolean UI_RegisterClientSkin( playerInfo_t *pi, const char *modelName, 
 UI_ParseAnimationFile
 ======================
 */
-static qboolean UI_ParseAnimationFile( const char *filename, animation_t *animations ) {
+static qboolean UI_ParseAnimationFile( const char *filename, playerInfo_t *pi ) {
 	char		*text_p, *prev;
 	int			len;
 	int			i;
@@ -919,8 +974,14 @@ static qboolean UI_ParseAnimationFile( const char *filename, animation_t *animat
 	int			skip;
 	char		text[20000];
 	fileHandle_t	f;
+	animation_t *animations;
+
+	animations = pi->animations;
 
 	memset( animations, 0, sizeof( animation_t ) * MAX_ANIMATIONS );
+
+	pi->fixedlegs = qfalse;
+	pi->fixedtorso = qfalse;
 
 	// load the file
 	len = trap_FS_FOpenFile( filename, &f, FS_READ );
@@ -970,6 +1031,12 @@ static qboolean UI_ParseAnimationFile( const char *filename, animation_t *animat
 				break;
 			}
 			continue;
+		} else if ( !Q_stricmp( token, "fixedlegs" ) ) {
+			pi->fixedlegs = qtrue;
+			continue;
+		} else if ( !Q_stricmp( token, "fixedtorso" ) ) {
+			pi->fixedtorso = qtrue;
+			continue;
 		}
 
 		// if it is a number, start parsing animations
@@ -1003,7 +1070,7 @@ static qboolean UI_ParseAnimationFile( const char *filename, animation_t *animat
 		if ( i == LEGS_WALKCR ) {
 			skip = animations[LEGS_WALKCR].firstFrame - animations[TORSO_GESTURE].firstFrame;
 		}
-		if ( i >= LEGS_WALKCR ) {
+		if ( i >= LEGS_WALKCR && i<TORSO_GETFLAG) {
 			animations[i].firstFrame -= skip;
 		}
 
@@ -1012,6 +1079,14 @@ static qboolean UI_ParseAnimationFile( const char *filename, animation_t *animat
 			break;
 		}
 		animations[i].numFrames = atoi( token );
+
+		animations[i].reversed = qfalse;
+		animations[i].flipflop = qfalse;
+		// if numFrames is negative the animation is reversed
+		if (animations[i].numFrames < 0) {
+			animations[i].numFrames = -animations[i].numFrames;
+			animations[i].reversed = qtrue;
+		}
 
 		token = COM_Parse( &text_p );
 		if ( !token[0] ) {
@@ -1103,7 +1178,7 @@ qboolean UI_RegisterClientModelname( playerInfo_t *pi, const char *modelSkinName
 
 	// load the animations
 	Com_sprintf( filename, sizeof( filename ), "models/players/%s/animation.cfg", modelName );
-	if ( !UI_ParseAnimationFile( filename, pi->animations ) ) {
+	if ( !UI_ParseAnimationFile( filename, pi ) ) {
 		Com_Printf( "Failed to load animation file %s\n", filename );
 		return qfalse;
 	}
@@ -1139,8 +1214,35 @@ UI_PlayerInfo_SetInfo
 void UI_PlayerInfo_SetInfo( playerInfo_t *pi, int legsAnim, int torsoAnim, vec3_t viewAngles, vec3_t moveAngles, weapon_t weaponNumber, qboolean chat ) {
 	int			currentAnim;
 	weapon_t	weaponNum;
+	int			c;
 
 	pi->chat = chat;
+
+	c = (int)trap_Cvar_VariableValue( "color1" );
+
+	VectorClear( pi->color1 );
+
+	if( c < 1 || c > 7 ) {
+		VectorSet( pi->color1, 1, 1, 1 );
+	}
+	else {
+		if( c & 1 ) {
+			pi->color1[2] = 1.0f;
+		}
+
+		if( c & 2 ) {
+			pi->color1[1] = 1.0f;
+		}
+
+		if( c & 4 ) {
+			pi->color1[0] = 1.0f;
+		}
+	}
+
+	pi->c1RGBA[0] = 255 * pi->color1[0];
+	pi->c1RGBA[1] = 255 * pi->color1[1];
+	pi->c1RGBA[2] = 255 * pi->color1[2];
+	pi->c1RGBA[3] = 255;
 
 	// view angles
 	VectorCopy( viewAngles, pi->viewAngles );

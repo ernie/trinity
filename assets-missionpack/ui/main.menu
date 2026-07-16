@@ -441,8 +441,7 @@ itemDef {
       	visible 0
       	action { play "sound/misc/kcaction.wav" ;
 	close main ;
-	open setup_menu ;
-	open control_menu }
+	open setup_menu }
     	}
 
 itemDef {

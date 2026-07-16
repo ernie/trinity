@@ -27,8 +27,12 @@ qboolean UI_HDR_Available( void ) {
 	if ( buf[0] == '\0' ) {
 		return qfalse; // cvar absent -> engine has no HDR support
 	}
+	// Single-renderer VR builds (USE_RENDERER_DLOPEN off) never register
+	// cl_renderer, so it reads back empty; treat empty as the compiled-in
+	// Vulkan renderer. A present-but-non-vulkan cl_renderer (trinity-engine
+	// with another renderer selected) still disqualifies HDR.
 	trap_Cvar_VariableStringBuffer( "cl_renderer", buf, sizeof( buf ) );
-	return (qboolean)( Q_stricmp( buf, "vulkan" ) == 0 );
+	return (qboolean)( buf[0] == '\0' || Q_stricmp( buf, "vulkan" ) == 0 );
 }
 
 static int UI_HDR_NearestIndex( int value, const int* table, int count ) {
@@ -99,6 +103,14 @@ static void UI_HDRCalibration_Draw( void ) {
 
 	// status + instructions below the test pattern
 	if ( trap_Cvar_VariableValue( "r_hdrActive" ) != 0 ) {
+		// The HDR test pattern renders only on the desktop mirror (it is meaningless
+		// through the headset's SDR tonemap), so where the box would be, cue the
+		// player to look at the monitor. This sits inside the box footprint, so on
+		// the mirror it is hidden under the opaque pattern; only the headset sees it.
+		UI_DrawString( 320, 168, "Test pattern is on the",   UI_CENTER|UI_SMALLFONT, text_color_disabled );
+		UI_DrawString( 320, 184, "desktop mirror - view it",  UI_CENTER|UI_SMALLFONT, text_color_disabled );
+		UI_DrawString( 320, 200, "on your monitor",           UI_CENTER|UI_SMALLFONT, text_color_disabled );
+
 		UI_DrawString( 320, 312, "Raise Peak until the inner rectangle's edge vanishes into the outer.",
 			UI_CENTER|UI_SMALLFONT, text_color_disabled );
 		UI_DrawString( 320, 328, "HDR: Active", UI_CENTER|UI_SMALLFONT, text_color_disabled );

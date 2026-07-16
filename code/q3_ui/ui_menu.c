@@ -232,6 +232,7 @@ static void Main_MenuDraw( void ) {
 		refEntity_t		bgEnt;
 		vec3_t			bgMins, bgMaxs, bgOrigin, bgAngles;
 		float			bgX, bgY, bgW, bgH, bgLen;
+		float			desiredFovX, desiredFovY;
 
 		memset( &bgRefdef, 0, sizeof( bgRefdef ) );
 		bgRefdef.rdflags = RDF_NOWORLDMODEL;
@@ -247,13 +248,14 @@ static void Main_MenuDraw( void ) {
 		bgRefdef.width = bgW;
 		bgRefdef.height = bgH;
 
-		bgRefdef.fov_x = 30;
-		bgRefdef.fov_y = 22.5;
+		desiredFovX = 30.0f;
+		desiredFovY = 22.5f;
+		UI_VR_CompensateModelFov( &bgRefdef, desiredFovX, desiredFovY );
 		bgRefdef.time = uis.realtime;
 
 		trap_R_ModelBounds( trinityModel, bgMins, bgMaxs );
 		bgLen = 0.5 * ( bgMaxs[2] - bgMins[2] );
-		bgOrigin[0] = ( bgLen / tan( DEG2RAD( bgRefdef.fov_y ) * 0.5 ) ) * 1.5;
+		bgOrigin[0] = ( bgLen / tan( DEG2RAD( desiredFovY ) * 0.5 ) ) * 1.5;
 		bgOrigin[1] = 0.5 * ( bgMins[1] + bgMaxs[1] );
 		bgOrigin[2] = -0.5 * ( bgMins[2] + bgMaxs[2] ) - 0.08 * ( bgMaxs[2] - bgMins[2] );
 
@@ -321,8 +323,7 @@ static void Main_MenuDraw( void ) {
 	refdef.height = h;
 
 	adjust = 0; // JDC: Kenneth asked me to stop this 1.0 * sin( (float)uis.realtime / 1000 );
-	refdef.fov_x = 60 + adjust;
-	refdef.fov_y = 19.6875 + adjust;
+	UI_VR_CompensateModelFov( &refdef, 60 + adjust, 19.6875 + adjust );
 
 	refdef.time = uis.realtime;
 
@@ -390,6 +391,8 @@ static void Main_MenuDraw( void ) {
 			refEntity_t re;
 			vec3_t mins, maxs, org, ang;
 			float mx, my, mw, mh, len;
+			float desFovX = 30.0f;
+			float desFovY = 30.0f;
 
 			mx = vx - modelSize;
 			my = vy;
@@ -400,8 +403,7 @@ static void Main_MenuDraw( void ) {
 			rd.rdflags = RDF_NOWORLDMODEL;
 			AxisClear( rd.viewaxis );
 
-			rd.fov_x = 30;
-			rd.fov_y = 30;
+			UI_VR_CompensateModelFov( &rd, desFovX, desFovY );
 
 			UI_AdjustFrom640( &mx, &my, &mw, &mh );
 			rd.x = mx;
@@ -412,7 +414,7 @@ static void Main_MenuDraw( void ) {
 			trap_R_ModelBounds( trinityModel, mins, maxs );
 
 			len = 0.5 * ( maxs[2] - mins[2] );
-			org[0] = len / tan( DEG2RAD( rd.fov_x ) * 0.5 );
+			org[0] = len / tan( DEG2RAD( desFovX ) * 0.5 );
 			org[1] = 0.5 * ( mins[1] + maxs[1] );
 			org[2] = -0.5 * ( mins[2] + maxs[2] );
 

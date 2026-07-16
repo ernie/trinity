@@ -1,7 +1,15 @@
-// 
+//
 // string allocation/managment
 
 #include "ui_shared.h"
+#include "../game/vr_shared.h"
+
+// VR API bootstrap mirror (defined in vr_ui.c for the TA UI module,
+// vr_cgame.c for the missionpack cgame that also compiles this TU)
+extern vr_shared_t	*vr;
+extern qboolean		vrActive;
+
+extern int Q_vsprintf( char *buffer, const char *fmt, va_list argptr );
 
 #define SCROLL_TIME_START					500
 #define SCROLL_TIME_ADJUST				150
@@ -56,7 +64,7 @@ static qboolean Menu_OverActiveItem(menuDef_t *menu, float x, float y);
 #ifdef CGAME
 #define MEM_POOL_SIZE  128 * 1024
 #else
-#define MEM_POOL_SIZE  1024 * 1024
+#define MEM_POOL_SIZE  1536 * 1024
 #endif
 
 static char		memoryPool[MEM_POOL_SIZE];
@@ -1386,6 +1394,9 @@ qboolean Item_SetFocus(itemDef_t *item, float x, float y) {
 
 	if (playSound && sfx) {
 		DC->startLocalSound( *sfx, CHAN_LOCAL_SOUND );
+		if ( DC->vrMenuMove ) {
+			DC->vrMenuMove();
+		}
 	}
 
 	for (i = 0; i < parent->itemCount; i++) {
@@ -1718,6 +1729,14 @@ qboolean Item_ListBox_HandleKey(itemDef_t *item, int key, qboolean down, qboolea
 
 	if (force || (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && item->window.flags & WINDOW_HASFOCUS)) {
 		max = Item_ListBox_MaxScroll(item);
+		// hover pre-highlights via listPtr->cursorPos without selecting (the click
+		// path reads it); key steps must start from the real selection instead
+		if ( !listPtr->notselectable &&
+		     (key == K_UPARROW || key == K_KP_UPARROW || key == K_DOWNARROW || key == K_KP_DOWNARROW ||
+		      key == K_LEFTARROW || key == K_KP_LEFTARROW || key == K_RIGHTARROW || key == K_KP_RIGHTARROW ||
+		      key == K_PGUP || key == K_KP_PGUP || key == K_PGDN || key == K_KP_PGDN) ) {
+			listPtr->cursorPos = item->cursorPos;
+		}
 		if (item->window.flags & WINDOW_HORIZONTAL) {
 			viewmax = (item->window.rect.w / listPtr->elementWidth);
 			if ( key == K_LEFTARROW || key == K_KP_LEFTARROW ) 
@@ -1816,16 +1835,36 @@ qboolean Item_ListBox_HandleKey(itemDef_t *item, int key, qboolean down, qboolea
 				return qtrue;
 			}
 		}
+		// Use mouse wheel in vertical and horizontal menus.
+		// If scrolling 3 items would replace over half of the
+		// displayed items, only scroll 1 item at a time.
+		if ( key == K_MWHEELUP ) {
+			int scroll = viewmax < 6 ? 1 : 3;
+			listPtr->startPos -= scroll;
+			if (listPtr->startPos < 0) {
+				listPtr->startPos = 0;
+			}
+			return qtrue;
+		}
+		if ( key == K_MWHEELDOWN ) {
+			int scroll = viewmax < 6 ? 1 : 3;
+			listPtr->startPos += scroll;
+			if (listPtr->startPos > max) {
+				listPtr->startPos = max;
+			}
+			return qtrue;
+		}
 		// mouse hit
 		if (key == K_MOUSE1 || key == K_MOUSE2) {
 			if (item->window.flags & WINDOW_LB_LEFTARROW) {
-				listPtr->startPos--;
+				// page up (single-line nav is on the thumbstick now)
+				listPtr->startPos -= viewmax;
 				if (listPtr->startPos < 0) {
 					listPtr->startPos = 0;
 				}
 			} else if (item->window.flags & WINDOW_LB_RIGHTARROW) {
-				// one down
-				listPtr->startPos++;
+				// page down
+				listPtr->startPos += viewmax;
 				if (listPtr->startPos > max) {
 					listPtr->startPos = max;
 				}
@@ -1920,8 +1959,16 @@ qboolean Item_ListBox_HandleKey(itemDef_t *item, int key, qboolean down, qboolea
 
 qboolean Item_YesNo_HandleKey(itemDef_t *item, int key) {
 
-  if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && item->window.flags & WINDOW_HASFOCUS && item->cvar) {
-		if (key == K_MOUSE1 || key == K_ENTER || key == K_MOUSE2 || key == K_MOUSE3) {
+  if (item->cvar) {
+		qboolean action = qfalse;
+		if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_MOUSE3) {
+			if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && item->window.flags & WINDOW_HASFOCUS) {
+				action = qtrue;
+			}
+		} else if (UI_SelectForKey(key) != 0) {
+			action = qtrue;
+		}
+		if (action) {
 	    DC->setCVar(item->cvar, va("%i", !DC->getCVarValue(item->cvar)));
 		  return qtrue;
 		}
@@ -1994,11 +2041,21 @@ const char *Item_Multi_Setting(itemDef_t *item) {
 qboolean Item_Multi_HandleKey(itemDef_t *item, int key) {
 	multiDef_t *multiPtr = (multiDef_t*)item->typeData;
 	if (multiPtr) {
-	  if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && item->window.flags & WINDOW_HASFOCUS && item->cvar) {
-			if (key == K_MOUSE1 || key == K_ENTER || key == K_MOUSE2 || key == K_MOUSE3) {
-				int current = Item_Multi_FindCvarByValue(item) + 1;
+		if (item->cvar) {
+			int select = 0;
+			if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_MOUSE3) {
+				if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && item->window.flags & WINDOW_HASFOCUS) {
+					select = (key == K_MOUSE2) ? -1 : 1;
+				}
+			} else {
+				select = UI_SelectForKey(key);
+			}
+			if (select != 0) {
+				int current = Item_Multi_FindCvarByValue(item) + select;
 				int max = Item_Multi_CountSettings(item);
-				if ( current < 0 || current >= max ) {
+				if ( current < 0 ) {
+					current = max-1;
+				} else if ( current >= max ) {
 					current = 0;
 				}
 				if (multiPtr->strDef) {
@@ -2153,6 +2210,15 @@ qboolean Item_TextField_HandleKey(itemDef_t *item, int key) {
 
 			if ( key == K_INS || key == K_KP_INS ) {
 				DC->setOverstrikeMode(!DC->getOverstrikeMode());
+				return qtrue;
+			}
+		}
+
+		// If virtual keyboard is active, block navigation keys
+		if (DC->vkeyboardIsActive && DC->vkeyboardIsActive()) {
+			if (key == K_TAB || key == K_DOWNARROW || key == K_KP_DOWNARROW ||
+			    key == K_UPARROW || key == K_KP_UPARROW ||
+			    key == K_ENTER || key == K_KP_ENTER) {
 				return qtrue;
 			}
 		}
@@ -2340,10 +2406,27 @@ qboolean Item_Slider_HandleKey(itemDef_t *item, int key, qboolean down) {
 	float x, value, width, work;
 
 	//DC->Print("slider handle key\n");
-	if (item->window.flags & WINDOW_HASFOCUS && item->cvar && Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory)) {
-		if (key == K_MOUSE1 || key == K_ENTER || key == K_MOUSE2 || key == K_MOUSE3) {
+	if ( (item->window.flags & WINDOW_HASFOCUS) && item->cvar &&
+	     (key == K_LEFTARROW || key == K_KP_LEFTARROW || key == K_RIGHTARROW || key == K_KP_RIGHTARROW) ) {
+		editFieldDef_t *editDef = item->typeData;
+		if ( editDef ) {
+			float step = (editDef->maxVal - editDef->minVal) / 40.0f;
+			value = DC->getCVarValue( item->cvar );
+			if ( key == K_RIGHTARROW || key == K_KP_RIGHTARROW ) value += step; else value -= step;
+			if ( value < editDef->minVal ) value = editDef->minVal;
+			if ( value > editDef->maxVal ) value = editDef->maxVal;
+			DC->setCVar( item->cvar, va("%f", value) );
+			return qtrue;
+		}
+	}
+
+	if (item->cvar) {
+		// under VR stick-nav the cursor is parked away from the slider, so
+		// ENTER must not click-warp the thumb to a stale cursor position;
+		// it falls through to the select-key step below instead
+		if (key == K_MOUSE1 || (!vrActive && key == K_ENTER) || key == K_MOUSE2 || key == K_MOUSE3) {
 			editFieldDef_t *editDef = item->typeData;
-			if (editDef) {
+			if (editDef && Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && item->window.flags & WINDOW_HASFOCUS) {
 				rectDef_t testRect;
 				width = SLIDER_WIDTH;
 				if (item->text) {
@@ -2366,6 +2449,23 @@ qboolean Item_Slider_HandleKey(itemDef_t *item, int key, qboolean down) {
 					// vm fuckage
 					// value = (((float)(DC->cursorx - x)/ SLIDER_WIDTH) * (editDef->maxVal - editDef->minVal));
 					value += editDef->minVal;
+					DC->setCVar(item->cvar, va("%f", value));
+					return qtrue;
+				}
+			}
+		} else {
+			int select = UI_SelectForKey(key);
+			if (select != 0) {
+				editFieldDef_t *editDef = item->typeData;
+				if (editDef) {
+					// 20 is number of steps
+					value = DC->getCVarValue(item->cvar) + (((editDef->maxVal - editDef->minVal)/20) * select);
+
+					if (value < editDef->minVal)
+						value = editDef->minVal;
+					else if (value > editDef->maxVal)
+						value = editDef->maxVal;
+
 					DC->setCVar(item->cvar, va("%f", value));
 					return qtrue;
 				}
@@ -2601,6 +2701,32 @@ static rectDef_t *Item_CorrectedTextRect(itemDef_t *item) {
 	return &rect;
 }
 
+// menu item key horizontal action: -1 = previous value, 1 = next value, 0 = no change
+int UI_SelectForKey(int key)
+{
+	switch (key) {
+		case K_MOUSE1:
+		case K_MOUSE3:
+		case K_ENTER:
+		case K_KP_ENTER:
+		case K_RIGHTARROW:
+		case K_KP_RIGHTARROW:
+		case K_JOY1:
+		case K_JOY2:
+		case K_JOY3:
+		case K_JOY4:
+			return 1; // next
+
+		case K_MOUSE2:
+		case K_LEFTARROW:
+		case K_KP_LEFTARROW:
+			return -1; // previous
+	}
+
+	// no change
+	return 0;
+}
+
 void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 	int i;
 	itemDef_t *item = NULL;
@@ -2618,14 +2744,27 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 	}
 
 	if (g_editingField && down) {
+		// If virtual keyboard is active, let it handle keys first
+		if (DC->vkeyboardIsActive && DC->vkeyboardIsActive()) {
+			if (DC->vkeyboardHandleKey && DC->vkeyboardHandleKey(key)) {
+				inHandler = qfalse;
+				return;
+			}
+		}
 		if (!Item_TextField_HandleKey(g_editItem, key)) {
 			g_editingField = qfalse;
 			g_editItem = NULL;
+			if (DC->vkeyboardHide) {
+				DC->vkeyboardHide();
+			}
 			inHandler = qfalse;
 			return;
 		} else if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_MOUSE3) {
 			g_editingField = qfalse;
 			g_editItem = NULL;
+			if (DC->vkeyboardHide) {
+				DC->vkeyboardHide();
+			}
 			Display_MouseMove(NULL, DC->cursorx, DC->cursory);
 		} else if (key == K_TAB || key == K_UPARROW || key == K_DOWNARROW) {
 			return;
@@ -2715,6 +2854,9 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 						g_editingField = qtrue;
 						g_editItem = item;
 						DC->setOverstrikeMode(qtrue);
+						if (DC->vkeyboardShow) {
+							DC->vkeyboardShow();
+						}
 					}
 				} else {
 					if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory)) {
@@ -2753,6 +2895,9 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 					g_editingField = qtrue;
 					g_editItem = item;
 					DC->setOverstrikeMode(qtrue);
+					if (DC->vkeyboardShow) {
+						DC->vkeyboardShow();
+					}
 				} else {
 						Item_Action(item);
 				}
@@ -3075,7 +3220,13 @@ void Item_TextField_Paint(itemDef_t *item) {
 	offset = (item->text && *item->text) ? 8 : 0;
 	if (item->window.flags & WINDOW_HASFOCUS && g_editingField) {
 		char cursor = DC->getOverstrikeMode() ? '_' : '|';
-		DC->drawTextWithCursor(item->textRect.x + item->textRect.w + offset, item->textRect.y, item->textscale, newColor, buff + editPtr->paintOffset, item->cursorPos - editPtr->paintOffset , cursor, editPtr->maxPaintChars, item->textStyle);
+		// When virtual keyboard is active, show color codes literally (^1, ^2, etc.)
+		// instead of interpreting them, so user can edit color codes in names
+		if (DC->vkeyboardIsActive && DC->vkeyboardIsActive() && DC->drawTextWithCursor_NoColorEscape) {
+			DC->drawTextWithCursor_NoColorEscape(item->textRect.x + item->textRect.w + offset, item->textRect.y, item->textscale, newColor, buff + editPtr->paintOffset, item->cursorPos - editPtr->paintOffset, cursor, editPtr->maxPaintChars, item->textStyle);
+		} else {
+			DC->drawTextWithCursor(item->textRect.x + item->textRect.w + offset, item->textRect.y, item->textscale, newColor, buff + editPtr->paintOffset, item->cursorPos - editPtr->paintOffset , cursor, editPtr->maxPaintChars, item->textStyle);
+		}
 	} else {
 		DC->drawText(item->textRect.x + item->textRect.w + offset, item->textRect.y, item->textscale, newColor, buff + editPtr->paintOffset, 0, editPtr->maxPaintChars, item->textStyle);
 	}
@@ -3477,7 +3628,21 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 	int			id;
 	int			i;
 
-	if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && !g_waitingForKey)
+	if (vrActive) {
+		// stick-nav binding: the focused bind item arms on the activate keys
+		// with the cursor parked anywhere; only a mouse click still requires
+		// the cursor inside the rect
+		if (!g_waitingForKey)
+		{
+			if (down && ((key == K_MOUSE1 && Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory))
+					|| key == K_ENTER || key == K_KP_ENTER || key == K_JOY1 || key == K_JOY2 || key == K_JOY3 || key == K_JOY4)) {
+				g_waitingForKey = qtrue;
+				g_bindItem = item;
+			}
+			return qtrue;
+		}
+	}
+	else if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && !g_waitingForKey)
 	{
 		if (down && (key == K_MOUSE1 || key == K_ENTER)) {
 			g_waitingForKey = qtrue;
@@ -3485,7 +3650,7 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 		}
 		return qtrue;
 	}
-	else
+
 	{
 		if (!g_waitingForKey || g_bindItem == NULL) {
 			return qtrue;
@@ -3572,13 +3737,51 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 
 
 void AdjustFrom640(float *x, float *y, float *w, float *h) {
-	*x = *x * DC->scale + DC->biasX;
-	*y = *y * DC->scale + DC->biasY;
-	*w *= DC->scale;
-	*h *= DC->scale;
+	if (!vrActive) {
+		*x = *x * DC->scale + DC->biasX;
+		*y = *y * DC->scale + DC->biasY;
+		*w *= DC->scale;
+		*h *= DC->scale;
+		return;
+	}
+
+	// Shared with ui_atoms.c UI_AdjustFrom640 via UI_VR_AdjustFrom640() so text,
+	// cursor, ownerdraws and .menu widgets (bars/backgrounds/model rects) use
+	// ONE VR transform: scale into the centered 4:3 viewable box and apply the
+	// optical-center Y offset for the headset's asymmetric FOV. Menu hit-testing
+	// is done in raw 640 space, so any draw path that used a different mapping
+	// would drift the visible target away from its clickable rect.
+	if ( UI_VR_AdjustFrom640( x, y, w, h ) ) {
+		return;
+	}
+
+	// Non-virtual-screen VR: the in-world transform, and it IS live. Missionpack
+	// paints the VR HUD (hud.menu widgets) through Menu_PaintAll during gameplay
+	// (cg_draw.c, when the VR HUD mode != 0) while vr->virtual_screen is false, so
+	// this branch scales those widgets. It intentionally differs from the
+	// virtual_screen menu transform above (which matches ui_atoms UI_AdjustFrom640);
+	// do not assume it is dead and delete it.
+	{
+		float screenXScale = DC->xscale / 2.75f;
+		float screenYScale = DC->yscale / 2.75f;
+
+		*x *= screenXScale;
+		*y *= screenYScale;
+		*w *= screenXScale;
+		*h *= screenYScale;
+
+		*x += (DC->glconfig.vidWidth - (640 * screenXScale)) / 2.0f;
+		*y += (DC->glconfig.vidHeight - (480 * screenYScale)) / 2.0f;
+	}
 }
 
 void Item_Model_Paint(itemDef_t *item) {
+	// NOTE: this ITEM_TYPE_MODEL path uses ui_shared's AdjustFrom640 and does NOT
+	// set refdef.isHUD, so it is intended for the UI module's own menu model
+	// previews. A model item placed in a cgame-painted .menu will NOT receive
+	// cgame's CG_AdjustFrom640 transform or the isHUD flag, so it renders wrong in
+	// VR. For 3D icons in cgame menus use an ownerdraw backed by CG_Draw3DModel
+	// (see cg_newdraw.c) -- the parity path with baseq3's CG_DrawHead/CG_DrawFlagModel.
 	float x, y, w, h;
 	refdef_t refdef;
 	refEntity_t		ent;
@@ -3619,8 +3822,15 @@ void Item_Model_Paint(itemDef_t *item) {
 	} else {
 		origin[0] = item->textscale;
 	}
-	refdef.fov_x = (modelPtr->fov_x) ? modelPtr->fov_x : w;
-	refdef.fov_y = (modelPtr->fov_y) ? modelPtr->fov_y : h;
+	{
+		// Origin above uses a fixed tan(fov/2) term, so only the projection
+		// fov needs compensating: UI_VR_CompensateModelFov pre-widens under VR
+		// so the Vulkan renderer's 4:3 cropFactor rescale of NOWORLDMODEL scenes
+		// restores the intended aspect. Flatscreen keeps the desired fov unchanged.
+		float desFovX = (modelPtr->fov_x) ? modelPtr->fov_x : w;
+		float desFovY = (modelPtr->fov_y) ? modelPtr->fov_y : h;
+		UI_VR_CompensateModelFov( &refdef, desFovX, desFovY );
+	}
 
 	//refdef.fov_x = (int)((float)refdef.width / 640.0f * 90.0f);
 	//xx = refdef.width / tan( refdef.fov_x / 360 * M_PI );
@@ -3777,12 +3987,23 @@ void Item_ListBox_Paint(itemDef_t *item) {
 				// fit++;
 			}
 		} else {
+			int currentClient = (DC->getCurrentClientNum) ? DC->getCurrentClientNum() : -1;
+
 			x = item->window.rect.x + 1;
 			y = item->window.rect.y + 1;
 			for (i = listPtr->startPos; i < count; i++) {
 				const char *text;
 				// always draw at least one
 				// which may overdraw the box if it is too small for the element
+
+				// Highlight current client row (for scoreboard)
+				if (currentClient >= 0 && DC->feederItemClientNum) {
+					int clientNum = DC->feederItemClientNum(item->special, i);
+					if (clientNum == currentClient) {
+						vec4_t highlightColor = {1.0f, 0.9f, 0.5f, 0.5f};  // light yellow
+						DC->fillRect(x + 2, y + 6, item->window.rect.w - SCROLLBAR_SIZE - 4, listPtr->elementHeight - 3, highlightColor);
+					}
+				}
 
 				if (listPtr->numColumns > 0) {
 					int j;
@@ -5180,6 +5401,42 @@ void Item_SetupKeywordHash(void) {
 
 /*
 ===============
+Item_ApplyHacks
+
+Hacks to fix issues with Team Arena menu scripts
+===============
+*/
+static void Item_ApplyHacks( itemDef_t *item ) {
+
+	// Fix length of favorite address in createfavorite.menu
+	if ( item->type == ITEM_TYPE_EDITFIELD && item->cvar && !Q_stricmp( item->cvar, "ui_favoriteAddress" ) ) {
+		editFieldDef_t *editField = (editFieldDef_t *)item->typeData;
+
+		// enough to hold an IPv6 address plus null
+		if ( editField->maxChars < 48 ) {
+			Com_Printf( "Extended create favorite address edit field length to hold an IPv6 address\n" );
+			editField->maxChars = 48;
+		}
+	}
+
+	if ( item->type == ITEM_TYPE_EDITFIELD && item->cvar && ( !Q_stricmp( item->cvar, "ui_Name" ) || !Q_stricmp( item->cvar, "ui_findplayer" ) ) ) {
+		editFieldDef_t *editField = (editFieldDef_t *)item->typeData;
+
+		// enough to hold a full player name
+		if ( editField->maxChars < MAX_NAME_LENGTH ) {
+			if ( editField->maxPaintChars > editField->maxChars ) {
+				editField->maxPaintChars = editField->maxChars;
+			}
+
+			Com_Printf( "Extended player name field using cvar %s to %d characters\n", item->cvar, MAX_NAME_LENGTH );
+			editField->maxChars = MAX_NAME_LENGTH;
+		}
+	}
+
+}
+
+/*
+===============
 Item_Parse
 ===============
 */
@@ -5200,6 +5457,7 @@ qboolean Item_Parse(int handle, itemDef_t *item) {
 		}
 
 		if (*token.string == '}') {
+			Item_ApplyHacks( item );
 			return qtrue;
 		}
 

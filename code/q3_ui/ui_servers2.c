@@ -12,11 +12,12 @@ MULTIPLAYER MENU (SERVER BROWSER)
 #include "ui_local.h"
 #include "../game/q_shared.h"
 #include "../game/bg_mode.h"
+#include "../game/bg_hostlabels.h"
 
 
 #define REFRESH_DELAY			10	  // in ms
 #define MAX_RESPONSE_TIME		10000 // in ms
-#define MAX_GLOBALSERVERS		MAX_GLOBAL_SERVERS
+#define MASTER_QUIET_TIME		2500  // in ms - a master query is complete once the count stops growing for this long
 #define MAX_PINGLISTSIZE		MAX_PINGREQUESTS*8
 #define MAX_ADDRESSLENGTH		64
 #define MAX_HOSTNAMELENGTH		26
@@ -26,7 +27,7 @@ MULTIPLAYER MENU (SERVER BROWSER)
 #define MAX_LOCALSERVERS		512
 #define MAX_STATUSLENGTH		64
 
-#define MAX_LISTBOXWIDTH		MAX_HOSTNAMELENGTH + 1 + MAX_MAPNAMELENGTH + 1 + 5 /*players/max*/ + 1 + MAX_GAMENAMELENGTH + 1 + 3 /*netname*/ + 1 + 3 /*ping*/
+#define MAX_LISTBOXWIDTH		MAX_HOSTNAMELENGTH + 1 + MAX_MAPNAMELENGTH + 1 + 5 /*players/max*/ + 1 + MAX_GAMENAMELENGTH + 1 + 4 /*netname*/ + 1 + 3 /*ping*/
 
 #define MAX_LISTBOXWIDTH_BUF	MAX_LISTBOXWIDTH + 2 /*color ping */ + 1 /*zero termination*/
 
@@ -84,13 +85,22 @@ MULTIPLAYER MENU (SERVER BROWSER)
 #define GAMES_TEAMPLAY		3
 #define GAMES_CTF			4
 
-static const char *master_items[] = {
-	"Local",
-	"Trinity",
-	"Internet",
-	"Favorites",
-	NULL
-};
+// Browser sources are slot-driven: Local, Trinity (sv_master2), Internet
+// (all masters), one source per remaining non-empty sv_master slot, then
+// Favorites. Empty slots produce no source.
+#define MAX_MASTER_SLOTS		5
+#define TRINITY_MASTER_SLOT		2
+#define MAX_BROWSERSOURCES		(3 + MAX_MASTER_SLOTS - 1 + 1)
+
+// spin control value column: text runs from x=348 (SMALLCHAR, 8px) and must
+// stay clear of the save/remove buttons at x=470 -> (470-348)/8 = 15 chars
+#define MAX_SOURCELABEL			15
+
+#define SRC_LOCAL				0
+#define SRC_TRINITY				1
+#define SRC_INTERNET			2
+#define SRC_MASTER				3
+#define SRC_FAVORITES			4
 
 static const char *servertype_items[] = {
 	"All",
@@ -113,7 +123,7 @@ static const char *sortkey_items[] = {
 static char* netnames[] = {
 	"???",
 	"UDP",
-	"IP6",
+	"UDP6",
 	NULL
 };
 
@@ -195,23 +205,43 @@ typedef struct {
 	int					nextpingtime;
 	int					maxservers;
 	int					refreshtime;
+	int					lastcounttime;
 	char				favoriteaddresses[MAX_FAVORITESERVERS][MAX_ADDRESSLENGTH];
 	int					numfavoriteaddresses;
 
 	char				serverfilter[ MAX_EDIT_LINE ];
 } arenaservers_t;
 
+typedef struct {
+	int				type;			// SRC_*
+	int				masterSlot;		// globalservers argument: 0 = all masters
+	char			label[MAX_SOURCELABEL+1];
+	servernode_t	*serverlist;	// per-source snapshot cache
+	int				*numservers;
+	int				maxservers;
+} browsersource_t;
+
 static arenaservers_t	g_arenaservers;
 
-static servernode_t		g_globalserverlist[MAX_GLOBALSERVERS];
-static int				g_numglobalservers;
-static servernode_t		g_mplayerserverlist[MAX_GLOBALSERVERS];
-static int				g_nummplayerservers;
+// per-source snapshot caches: index 0 holds Internet (all masters), 1..5 the
+// per-slot sources (Trinity lives at its slot); a source's list survives tab
+// switches and only a refresh of that source rewrites it
+static servernode_t		g_masterserverlist[1 + MAX_MASTER_SLOTS][MAX_LISTBOXITEMS];
+static int				g_nummasterservers[1 + MAX_MASTER_SLOTS];
 static servernode_t		g_localserverlist[MAX_LOCALSERVERS];
 static int				g_numlocalservers;
 static servernode_t		g_favoriteserverlist[MAX_FAVORITESERVERS];
 static int				g_numfavoriteservers;
-static int				g_servertype;
+static browsersource_t	g_sources[MAX_BROWSERSOURCES];
+static const char		*g_sourceitems[MAX_BROWSERSOURCES+1];
+static int				g_numsources;
+static int				g_servertype;	// index into g_sources
+
+// which engine bucket answers a "globalservers 2" Trinity query: quake3e
+// routes slot 2 to AS_MPLAYER, trinity-vr retired that bucket and fills
+// AS_GLOBAL; -1 while the current refresh is still probing
+static int				g_trinitybucket = -1;
+static int				g_trinityprobeglobal;
 static int				g_gametype;
 static int				g_sortkey;
 static int				g_emptyservers;
@@ -221,6 +251,224 @@ static int				g_excludebots;
 
 static void ArenaServers_UpdateList( void );
 static void ArenaServers_UpdatePicture( void );
+
+/*
+=================
+ArenaServers_SourceType
+
+SRC_* kind of the active source.
+=================
+*/
+static int ArenaServers_SourceType( void ) {
+	return g_sources[g_servertype].type;
+}
+
+/*
+=================
+ArenaServers_AddSource
+=================
+*/
+static void ArenaServers_AddSource( int type, int masterSlot, const char *label ) {
+	browsersource_t	*src;
+
+	if ( g_numsources >= MAX_BROWSERSOURCES ) {
+		return;
+	}
+
+	src = &g_sources[g_numsources];
+	src->type = type;
+	src->masterSlot = masterSlot;
+	Q_strncpyz( src->label, label, sizeof( src->label ) );
+
+	switch ( type ) {
+	case SRC_LOCAL:
+		src->serverlist = g_localserverlist;
+		src->numservers = &g_numlocalservers;
+		src->maxservers = MAX_LOCALSERVERS;
+		break;
+	case SRC_FAVORITES:
+		src->serverlist = g_favoriteserverlist;
+		src->numservers = &g_numfavoriteservers;
+		src->maxservers = MAX_FAVORITESERVERS;
+		break;
+	default:
+		src->serverlist = g_masterserverlist[masterSlot];
+		src->numservers = &g_nummasterservers[masterSlot];
+		src->maxservers = MAX_LISTBOXITEMS;
+		break;
+	}
+
+	g_sourceitems[g_numsources] = src->label;
+	g_numsources++;
+}
+
+/*
+=================
+ArenaServers_BuildSources
+
+Local, Trinity, Internet, one source per remaining non-empty sv_master slot,
+Favorites. Labels come from the shared hostname table, cut to the spin
+control's column.
+=================
+*/
+static void ArenaServers_BuildSources( void ) {
+	char	master[MAX_ADDRESSLENGTH];
+	char	label[MAX_SOURCELABEL+1];
+	int		slot;
+
+	g_numsources = 0;
+
+	ArenaServers_AddSource( SRC_LOCAL, 0, "Local" );
+
+	trap_Cvar_VariableStringBuffer( va( "sv_master%d", TRINITY_MASTER_SLOT ), master, sizeof( master ) );
+	if ( master[0] ) {
+		BG_ServerSourceName( master, label, sizeof( label ), MAX_SOURCELABEL );
+		ArenaServers_AddSource( SRC_TRINITY, TRINITY_MASTER_SLOT, label );
+	}
+
+	ArenaServers_AddSource( SRC_INTERNET, 0, "Internet" );
+
+	for ( slot = 1; slot <= MAX_MASTER_SLOTS; slot++ ) {
+		if ( slot == TRINITY_MASTER_SLOT ) {
+			continue;
+		}
+		trap_Cvar_VariableStringBuffer( va( "sv_master%d", slot ), master, sizeof( master ) );
+		if ( !master[0] ) {
+			continue;
+		}
+		BG_ServerSourceName( master, label, sizeof( label ), MAX_SOURCELABEL );
+		ArenaServers_AddSource( SRC_MASTER, slot, label );
+	}
+
+	ArenaServers_AddSource( SRC_FAVORITES, 0, "Favorites" );
+
+	g_sourceitems[g_numsources] = NULL;
+}
+
+/*
+=================
+ArenaServers_ProbeTrinityBucket
+
+Engine-agnostic Trinity read: after "globalservers 2" is issued, quake3e
+parks the reset/results in AS_MPLAYER while trinity-vr's retired-MPLAYER
+client uses AS_GLOBAL. Any MPLAYER activity is authoritative (only slot-2
+queries ever touch it); AS_GLOBAL is chosen once it visibly reacts to our
+query. Until either happens the refresh keeps waiting.
+=================
+*/
+static void ArenaServers_ProbeTrinityBucket( void ) {
+	int		count;
+
+	if ( g_trinitybucket == AS_MPLAYER ) {
+		return;
+	}
+
+	count = trap_LAN_GetServerCount( AS_MPLAYER );
+	if ( count != 0 ) {
+		g_trinitybucket = AS_MPLAYER;
+		return;
+	}
+
+	if ( g_trinitybucket != -1 ) {
+		return;
+	}
+
+	count = trap_LAN_GetServerCount( AS_GLOBAL );
+	if ( count == -1 || count != g_trinityprobeglobal ) {
+		g_trinitybucket = AS_GLOBAL;
+	}
+}
+
+/*
+=================
+ArenaServers_LANCount
+
+Result count for the active source. The Internet source concatenates the
+engine's two net buckets: on quake3e a "globalservers 0" walk sends slot 2
+to AS_MPLAYER while everything else lands in AS_GLOBAL.
+=================
+*/
+static int ArenaServers_LANCount( void ) {
+	int		count;
+	int		mcount;
+
+	switch ( ArenaServers_SourceType() ) {
+	case SRC_LOCAL:
+		return trap_LAN_GetServerCount( AS_LOCAL );
+	case SRC_FAVORITES:
+		return g_arenaservers.numfavoriteaddresses;
+	case SRC_TRINITY:
+		if ( g_trinitybucket == -1 ) {
+			return -1;
+		}
+		return trap_LAN_GetServerCount( g_trinitybucket );
+	case SRC_INTERNET:
+		count = trap_LAN_GetServerCount( AS_GLOBAL );
+		if ( count < 0 ) {
+			return -1;
+		}
+		mcount = trap_LAN_GetServerCount( AS_MPLAYER );
+		if ( mcount > 0 ) {
+			count += mcount;
+		}
+		return count;
+	default:	// SRC_MASTER
+		return trap_LAN_GetServerCount( AS_GLOBAL );
+	}
+}
+
+/*
+=================
+ArenaServers_QueriesMasters
+
+Whether the active source's refresh polls master servers, so lists can still
+be arriving after the ping queue drains.
+=================
+*/
+static qboolean ArenaServers_QueriesMasters( void ) {
+	int		type;
+
+	type = ArenaServers_SourceType();
+	if ( type == SRC_TRINITY || type == SRC_INTERNET || type == SRC_MASTER ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+
+/*
+=================
+ArenaServers_LANAddress
+
+Address of result n for the active source, using the same bucket layout as
+ArenaServers_LANCount.
+=================
+*/
+static void ArenaServers_LANAddress( int n, char *buf, int buflen ) {
+	int		count;
+
+	switch ( ArenaServers_SourceType() ) {
+	case SRC_LOCAL:
+		trap_LAN_GetServerAddressString( AS_LOCAL, n, buf, buflen );
+		return;
+	case SRC_TRINITY:
+		trap_LAN_GetServerAddressString( ( g_trinitybucket == AS_MPLAYER ) ? AS_MPLAYER : AS_GLOBAL, n, buf, buflen );
+		return;
+	case SRC_INTERNET:
+		count = trap_LAN_GetServerCount( AS_GLOBAL );
+		if ( count < 0 ) {
+			count = 0;
+		}
+		if ( n < count ) {
+			trap_LAN_GetServerAddressString( AS_GLOBAL, n, buf, buflen );
+		} else {
+			trap_LAN_GetServerAddressString( AS_MPLAYER, n - count, buf, buflen );
+		}
+		return;
+	default:	// SRC_MASTER
+		trap_LAN_GetServerAddressString( AS_GLOBAL, n, buf, buflen );
+		return;
+	}
+}
 
 /*
 =================
@@ -506,7 +754,7 @@ static void ArenaServers_UpdateList( void )
 			pingColor = S_COLOR_RED;
 		}
 
-		Com_sprintf( tableptr->buff, sizeof( tableptr->buff ), "%-*.*s %-*.*s %2d/%2d %-*.*s %3s %s%3d",
+		Com_sprintf( tableptr->buff, sizeof( tableptr->buff ), "%-*.*s %-*.*s %2d/%2d %-*.*s %-4.4s %s%3d",
 			MAX_HOSTNAMELENGTH, MAX_HOSTNAMELENGTH, servernodeptr->hostname,
 			MAX_MAPNAMELENGTH, MAX_MAPNAMELENGTH, servernodeptr->mapname,
 			(g_excludebots ? servernodeptr->g_humanplayers : servernodeptr->numclients), servernodeptr->maxclients,
@@ -527,6 +775,34 @@ static void ArenaServers_UpdateList( void )
 
 /*
 =================
+ArenaServers_StopPrompt
+
+Statusbar prompt shown while a refresh is in flight. Under a VR engine
+the stop key is synthesized from a controller button, so the engine is
+asked once for its real name; on flatscreen, or when the engine doesn't
+answer, the stock SPACE text is used unchanged.
+=================
+*/
+static char *ArenaServers_StopPrompt( void ) {
+	static char	prompt[MAX_STATUSLENGTH];
+
+	if ( !prompt[0] ) {
+		char	button[32];
+
+		if ( UI_VR_Platform() != VRP_NONE
+				&& trap_GetValue( button, sizeof( button ), "vr_menu_skip_button" )
+				&& button[0] ) {
+			Com_sprintf( prompt, sizeof( prompt ), "Press %s to stop", button );
+		} else {
+			Q_strncpyz( prompt, "Press SPACE to stop", sizeof( prompt ) );
+		}
+	}
+	return prompt;
+}
+
+
+/*
+=================
 ArenaServers_UpdateMenu
 =================
 */
@@ -539,7 +815,7 @@ static void ArenaServers_UpdateMenu( void ) {
 		{
 			// show progress
 			Com_sprintf( g_arenaservers.status.string, MAX_STATUSLENGTH, "%d of %d Arena Servers.", g_arenaservers.currentping, g_arenaservers.numqueriedservers);
-			g_arenaservers.statusbar.string  = "Press SPACE to stop";
+			g_arenaservers.statusbar.string  = ArenaServers_StopPrompt();
 			qsort( g_arenaservers.serverlist, *g_arenaservers.numservers, sizeof( servernode_t ), ArenaServers_Compare);
 		}
 		else 
@@ -554,7 +830,7 @@ static void ArenaServers_UpdateMenu( void ) {
 			g_arenaservers.go.generic.flags			&= ~QMF_GRAYED;
 
 			// update status bar
-			if ( g_servertype == AS_GLOBAL ) {
+			if ( ArenaServers_SourceType() == SRC_INTERNET ) {
 				g_arenaservers.statusbar.string = quake3worldMessage;
 			} else {
 				g_arenaservers.statusbar.string = "";
@@ -565,7 +841,7 @@ static void ArenaServers_UpdateMenu( void ) {
 		// no servers found
 		if( g_arenaservers.refreshservers ) {
 			strcpy( g_arenaservers.status.string,"Scanning For Servers." );
-			g_arenaservers.statusbar.string = "Press SPACE to stop";
+			g_arenaservers.statusbar.string = ArenaServers_StopPrompt();
 
 			// disable controls during refresh
 			//g_arenaservers.gametype.generic.flags	|= QMF_GRAYED;
@@ -579,13 +855,13 @@ static void ArenaServers_UpdateMenu( void ) {
 		else 
 		{
 			if ( g_arenaservers.numqueriedservers < 0 ) {
-				strcpy( g_arenaservers.status.string, "No Response From Master Server." );
+				strcpy( g_arenaservers.status.string, "No response from directory." );
 			} else {
 				strcpy( g_arenaservers.status.string, "No Servers Found." );
 			}
 
 			// update status bar
-			if ( g_servertype == AS_GLOBAL ) {
+			if ( ArenaServers_SourceType() == SRC_INTERNET ) {
 				g_arenaservers.statusbar.string = quake3worldMessage;
 			} else {
 				g_arenaservers.statusbar.string = "";
@@ -798,15 +1074,24 @@ static void ArenaServers_Insert( const char *adrstr, const char *info, int pingt
 	int				i;
 
 	s = Info_ValueForKey( info, "game" );
-	if ( !Q_stricmp( s, "q3ut4" ) ) 
+	if ( !Q_stricmp( s, "q3ut4" ) )
 	{
 		return; // filter urbanterror servers
 	}
 
-	if ((pingtime >= ArenaServers_MaxPing()) && (g_servertype != AS_FAVORITES))
+	if ((pingtime >= ArenaServers_MaxPing()) && (ArenaServers_SourceType() != SRC_FAVORITES))
 	{
 		// slow global or local servers do not get entered
 		return;
+	}
+
+	// one row per address: the Internet source concatenates the engine's two
+	// buckets on quake3e, so a server listed by both the Trinity directory
+	// and a global master would otherwise appear twice
+	for ( i = 0; i < *g_arenaservers.numservers; i++ ) {
+		if ( !Q_stricmp( g_arenaservers.serverlist[i].adrstr, adrstr ) ) {
+			return;
+		}
 	}
 
 	if ( pingtime < 0 )
@@ -845,12 +1130,19 @@ static void ArenaServers_Insert( const char *adrstr, const char *info, int pingt
 	// avoid potential string overflow
 	if( servernodeptr->numclients > 99 )
 		servernodeptr->numclients = 99;
+	if( servernodeptr->numclients < 0 )
+		servernodeptr->numclients = 0;
 	if( servernodeptr->maxclients > 99 )
 		servernodeptr->maxclients = 99;
+	if( servernodeptr->maxclients < 0 )
+		servernodeptr->maxclients = 0;
 
 	if ( strlen( Info_ValueForKey( info, "g_humanplayers" ) ) ) {
 		servernodeptr->g_humanplayers = atoi( Info_ValueForKey( info, "g_humanplayers" ) );
 	}
+	// clamped after the assignment above, since either source may be negative
+	if( servernodeptr->g_humanplayers < 0 )
+		servernodeptr->g_humanplayers = 0;
 
 	/*
 	s = Info_ValueForKey( info, "nettype" );
@@ -1016,24 +1308,30 @@ static void ArenaServers_DoRefresh( void )
 	int		i;
 	int		j;
 	int		time;
+	int		count;
 	int		maxPing;
 	char	adrstr[MAX_ADDRESSLENGTH];
 	char	info[MAX_INFO_STRING];
 
+	if (ArenaServers_SourceType() == SRC_TRINITY) {
+		// resolve which engine bucket answers the slot-2 query
+		ArenaServers_ProbeTrinityBucket();
+	}
+
 	if (uis.realtime < g_arenaservers.refreshtime)
 	{
-	  if (g_servertype != AS_FAVORITES) {
-			if (g_servertype == AS_LOCAL) {
-				if (!trap_LAN_GetServerCount(g_servertype)) {
+	  if (ArenaServers_SourceType() != SRC_FAVORITES) {
+			if (ArenaServers_SourceType() == SRC_LOCAL) {
+				if (!trap_LAN_GetServerCount(AS_LOCAL)) {
 					return;
 				}
 			}
-			if (trap_LAN_GetServerCount(g_servertype) < 0) {
+			if (ArenaServers_LANCount() < 0) {
 			  // still waiting for response
 			  return;
 			}
 	  }
-	} else if (g_servertype == AS_LOCAL) {
+	} else if (ArenaServers_SourceType() == SRC_LOCAL) {
 		if ( !trap_LAN_GetServerCount(AS_LOCAL)) {
 			// no local servers found, check again
 			trap_Cmd_ExecuteText( EXEC_APPEND, "localservers\n" );
@@ -1087,7 +1385,7 @@ static void ArenaServers_DoRefresh( void )
 				time = maxPing;
 
 				// set hostname for nonresponsive favorite server
-				if ( g_servertype == AS_LOCAL ) {
+				if ( ArenaServers_SourceType() == SRC_LOCAL ) {
 					Info_SetValueForKey( info, "hostname", adrstr );
 					Info_SetValueForKey( info, "game", "???" );
 				}
@@ -1113,11 +1411,13 @@ static void ArenaServers_DoRefresh( void )
 
 	// get results of servers query
 	// counts can increase as servers respond
-	if ( g_servertype == AS_FAVORITES ) {
-		g_arenaservers.numqueriedservers = g_arenaservers.numfavoriteaddresses;
-	} else {
-		g_arenaservers.numqueriedservers = trap_LAN_GetServerCount( g_servertype );
+	count = ArenaServers_LANCount();
+	if (count != g_arenaservers.numqueriedservers)
+	{
+		// a master's list (or another packet of one) just landed
+		g_arenaservers.lastcounttime = uis.realtime;
 	}
+	g_arenaservers.numqueriedservers = count;
 
 //	if (g_arenaservers.numqueriedservers > g_arenaservers.maxservers)
 //		g_arenaservers.numqueriedservers = g_arenaservers.maxservers;
@@ -1150,10 +1450,10 @@ static void ArenaServers_DoRefresh( void )
 
 		// get an address to ping
 
-		if (g_servertype == AS_FAVORITES) {
-		  strcpy( adrstr, g_arenaservers.favoriteaddresses[g_arenaservers.currentping] ); 		
+		if (ArenaServers_SourceType() == SRC_FAVORITES) {
+		  strcpy( adrstr, g_arenaservers.favoriteaddresses[g_arenaservers.currentping] );
 		} else {
-		  trap_LAN_GetServerAddressString(g_servertype, g_arenaservers.currentping, adrstr, MAX_ADDRESSLENGTH );
+		  ArenaServers_LANAddress( g_arenaservers.currentping, adrstr, MAX_ADDRESSLENGTH );
 		}
 
 		strcpy( g_arenaservers.pinglist[j].adrstr, adrstr );
@@ -1167,9 +1467,16 @@ static void ArenaServers_DoRefresh( void )
 
 	if ( !trap_LAN_GetPingQueueCount() )
 	{
-		// all pings completed
-		ArenaServers_StopRefresh();
-		return;
+		// all pings completed; a source that queries masters can still have
+		// a slower master's list in flight, so hold the refresh open until
+		// the count has been quiet for a while, inside the response window
+		if ( !ArenaServers_QueriesMasters() ||
+			uis.realtime >= g_arenaservers.refreshtime ||
+			uis.realtime - g_arenaservers.lastcounttime >= MASTER_QUIET_TIME )
+		{
+			ArenaServers_StopRefresh();
+			return;
+		}
 	}
 
 	// update the user interface with ping status
@@ -1187,7 +1494,7 @@ static void ArenaServers_StartRefresh( void )
 	int		i;
 	char	myargs[32], protocol[24];
 
-	memset( g_arenaservers.serverlist, 0, g_arenaservers.maxservers*sizeof(table_t) );
+	memset( g_arenaservers.serverlist, 0, g_arenaservers.maxservers*sizeof(servernode_t) );
 
 	for ( i = 0; i < MAX_PINGLISTSIZE; i++ )
 		g_arenaservers.pinglist[i].adrstr[0] = '\0';
@@ -1200,6 +1507,7 @@ static void ArenaServers_StartRefresh( void )
 	g_arenaservers.nextpingtime      = 0;
 	*g_arenaservers.numservers       = 0;
 	g_arenaservers.numqueriedservers = 0;
+	g_arenaservers.lastcounttime     = uis.realtime;
 
 	// allow max 10 seconds for responses
 	g_arenaservers.refreshtime = uis.realtime + MAX_RESPONSE_TIME;
@@ -1207,14 +1515,21 @@ static void ArenaServers_StartRefresh( void )
 	// place menu in zeroed state
 	ArenaServers_UpdateMenu();
 
-	if ( g_servertype == AS_LOCAL ) {
+	if ( ArenaServers_SourceType() == SRC_LOCAL ) {
 		trap_Cmd_ExecuteText( EXEC_APPEND, "localservers\n" );
 		return;
 	}
 
-	if ( g_servertype == AS_GLOBAL || g_servertype == AS_MPLAYER ) {
-		// AS_GLOBAL → masterIdx 0 (all masters); AS_MPLAYER → 2 (sv_master2 = Trinity directory).
-		int masterIdx = ( g_servertype == AS_MPLAYER ) ? 2 : 0;
+	if ( ArenaServers_SourceType() == SRC_TRINITY || ArenaServers_SourceType() == SRC_INTERNET ||
+			ArenaServers_SourceType() == SRC_MASTER ) {
+		// Internet walks every master (0); the other sources query their slot.
+		int masterIdx = g_sources[g_servertype].masterSlot;
+
+		if ( ArenaServers_SourceType() == SRC_TRINITY && g_trinitybucket != AS_MPLAYER ) {
+			// re-probe which bucket this engine fills for slot 2
+			g_trinitybucket = -1;
+			g_trinityprobeglobal = trap_LAN_GetServerCount( AS_GLOBAL );
+		}
 #if 1
 		myargs[0] = '\0';
 #else
@@ -1300,47 +1615,38 @@ ArenaServers_SetType
 */
 void ArenaServers_SetType( int type )
 {
+	browsersource_t	*src;
+
 	if ( g_servertype == type )
 		return;
 
 	ArenaServers_StopRefresh();
 
 	g_servertype = type;
+	src = &g_sources[type];
 
-	switch( type ) {
-	default:
-	case AS_LOCAL:
+	switch( src->type ) {
+	case SRC_LOCAL:
 		g_arenaservers.save.generic.flags |= (QMF_INACTIVE|QMF_HIDDEN);
 		g_arenaservers.remove.generic.flags |= (QMF_INACTIVE|QMF_HIDDEN);
-		g_arenaservers.serverlist = g_localserverlist;
-		g_arenaservers.numservers = &g_numlocalservers;
-		g_arenaservers.maxservers = MAX_LOCALSERVERS;
 		break;
 
-	case AS_GLOBAL:
-		g_arenaservers.save.generic.flags &= ~(QMF_INACTIVE|QMF_HIDDEN);
-		g_arenaservers.remove.generic.flags |= (QMF_INACTIVE|QMF_HIDDEN);
-		g_arenaservers.serverlist = g_globalserverlist;
-		g_arenaservers.numservers = &g_numglobalservers;
-		g_arenaservers.maxservers = MAX_GLOBALSERVERS;
-		break;
-
-	case AS_MPLAYER:
-		g_arenaservers.save.generic.flags &= ~(QMF_INACTIVE|QMF_HIDDEN);
-		g_arenaservers.remove.generic.flags |= (QMF_INACTIVE|QMF_HIDDEN);
-		g_arenaservers.serverlist = g_mplayerserverlist;
-		g_arenaservers.numservers = &g_nummplayerservers;
-		g_arenaservers.maxservers = MAX_GLOBALSERVERS;
-		break;
-
-	case AS_FAVORITES:
+	case SRC_FAVORITES:
 		g_arenaservers.save.generic.flags |= (QMF_INACTIVE|QMF_HIDDEN);
 		g_arenaservers.remove.generic.flags &= ~(QMF_INACTIVE|QMF_HIDDEN);
-		g_arenaservers.serverlist = g_favoriteserverlist;
-		g_arenaservers.numservers = &g_numfavoriteservers;
-		g_arenaservers.maxservers = MAX_FAVORITESERVERS;
+		break;
+
+	default:
+		g_arenaservers.save.generic.flags &= ~(QMF_INACTIVE|QMF_HIDDEN);
+		g_arenaservers.remove.generic.flags |= (QMF_INACTIVE|QMF_HIDDEN);
 		break;
 	}
+
+	// tab switches render this source's snapshot only; a refresh of the tab
+	// is what rewrites it
+	g_arenaservers.serverlist = src->serverlist;
+	g_arenaservers.numservers = src->numservers;
+	g_arenaservers.maxservers = src->maxservers;
 
 	if( !*g_arenaservers.numservers ) {
 		ArenaServers_StartRefresh();
@@ -1431,11 +1737,11 @@ static void ArenaServers_Event( void* ptr, int event ) {
 		break;
 
 	case ID_SCROLL_UP:
-		ScrollList_Key( &g_arenaservers.list, K_UPARROW );
+		ScrollList_Key( &g_arenaservers.list, K_PGUP );
 		break;
 
 	case ID_SCROLL_DOWN:
-		ScrollList_Key( &g_arenaservers.list, K_DOWNARROW );
+		ScrollList_Key( &g_arenaservers.list, K_PGDN );
 		break;
 
 	case ID_BACK:
@@ -1499,7 +1805,7 @@ static sfxHandle_t ArenaServers_MenuKey( int key ) {
 		return menu_move_sound;
 	}
 
-	if ( ( key == K_DEL || key == K_KP_DEL ) && ( g_servertype == AS_FAVORITES ) &&
+	if ( ( key == K_DEL || key == K_KP_DEL ) && ( ArenaServers_SourceType() == SRC_FAVORITES ) &&
 		( Menu_ItemAtCursor( &g_arenaservers.menu) == &g_arenaservers.list ) ) {
 		ArenaServers_Remove();
 		ArenaServers_UpdateMenu();
@@ -1536,6 +1842,8 @@ static void ArenaServers_MenuInit( void ) {
 	// zero set all our globals
 	memset( &g_arenaservers, 0 ,sizeof(arenaservers_t) );
 
+	ArenaServers_BuildSources();
+
 	ArenaServers_Cache();
 
 	g_arenaservers.menu.fullscreen = qtrue;
@@ -1559,7 +1867,7 @@ static void ArenaServers_MenuInit( void ) {
 	g_arenaservers.master.generic.id			= ID_MASTER;
 	g_arenaservers.master.generic.x				= 340;
 	g_arenaservers.master.generic.y				= y;
-	g_arenaservers.master.itemnames				= master_items;
+	g_arenaservers.master.itemnames				= g_sourceitems;
 
 	y += SMALLCHAR_HEIGHT;
 	g_arenaservers.gametype.generic.type		= MTYPE_SPINCONTROL;
@@ -1797,7 +2105,7 @@ static void ArenaServers_MenuInit( void ) {
 
 	ArenaServers_LoadFavorites();
 
-	g_servertype = Com_Clamp( 0, 3, ui_browserMaster.integer );
+	g_servertype = Com_Clamp( 0, g_numsources - 1, ui_browserMaster.integer );
 	g_arenaservers.master.curvalue = g_servertype;
 
 	g_gametype = Com_Clamp( 0, GT_MAX_GAME_TYPE-1, ui_browserGameType.integer );

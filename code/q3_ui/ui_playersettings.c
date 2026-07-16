@@ -137,7 +137,10 @@ static void PlayerSettings_DrawName( void *self ) {
 		}
 
 		style &= ~UI_PULSE;
-		style |= UI_BLINK;
+		// When keyboard is active, show solid cursor; otherwise blink
+		if ( !VirtualKeyboard_IsActive() ) {
+			style |= UI_BLINK;
+		}
 
 		UI_DrawChar( basex + f->field.cursor * SMALLCHAR_WIDTH, y, c, style, color_white );
 	}

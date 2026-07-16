@@ -93,10 +93,14 @@ Options_MenuInit
 void Options_MenuInit( void ) {
 	int				y;
 	uiClientState_t	cstate;
+	qboolean		vrEnabled;
 
 	memset( &s_options, 0, sizeof(optionsmenu_t) );
 
 	SystemConfig_Cache();
+
+	vrEnabled = ( UI_VR_Platform() != VRP_NONE );
+
 	s_options.menu.wrapAround = qtrue;
 
 	trap_GetClientState( &cstate );
@@ -142,16 +146,19 @@ void Options_MenuInit( void ) {
 	s_options.graphics.color			= color_red;
 	s_options.graphics.style			= UI_CENTER;
 
-	y += VERTICAL_SPACING;
-	s_options.display.generic.type		= MTYPE_PTEXT;
-	s_options.display.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_options.display.generic.callback	= Options_Event;
-	s_options.display.generic.id		= ID_DISPLAY;
-	s_options.display.generic.x			= 320;
-	s_options.display.generic.y			= y;
-	s_options.display.string			= "DISPLAY";
-	s_options.display.color				= color_red;
-	s_options.display.style				= UI_CENTER;
+	// no DISPLAY under VR; the column closes the gap
+	if( !vrEnabled ) {
+		y += VERTICAL_SPACING;
+		s_options.display.generic.type		= MTYPE_PTEXT;
+		s_options.display.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+		s_options.display.generic.callback	= Options_Event;
+		s_options.display.generic.id		= ID_DISPLAY;
+		s_options.display.generic.x			= 320;
+		s_options.display.generic.y			= y;
+		s_options.display.string			= "DISPLAY";
+		s_options.display.color				= color_red;
+		s_options.display.style				= UI_CENTER;
+	}
 
 	y += VERTICAL_SPACING;
 	s_options.sound.generic.type		= MTYPE_PTEXT;
@@ -190,7 +197,9 @@ void Options_MenuInit( void ) {
 	Menu_AddItem( &s_options.menu, ( void * ) &s_options.framel );
 	Menu_AddItem( &s_options.menu, ( void * ) &s_options.framer );
 	Menu_AddItem( &s_options.menu, ( void * ) &s_options.graphics );
-	Menu_AddItem( &s_options.menu, ( void * ) &s_options.display );
+	if( !vrEnabled ) {
+		Menu_AddItem( &s_options.menu, ( void * ) &s_options.display );
+	}
 	Menu_AddItem( &s_options.menu, ( void * ) &s_options.sound );
 	Menu_AddItem( &s_options.menu, ( void * ) &s_options.network );
 	Menu_AddItem( &s_options.menu, ( void * ) &s_options.back );

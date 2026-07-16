@@ -135,6 +135,7 @@ void UI_LoadBestScores(const char *map, int game) {
 	char		fileName[MAX_QPATH];
 	fileHandle_t f;
 	postGameInfo_t newInfo;
+	int protocol, protocolLegacy;
 	memset(&newInfo, 0, sizeof(postGameInfo_t));
 	Com_sprintf(fileName, MAX_QPATH, "games/%s_%i.game", map, game);
 	if (trap_FS_FOpenFile(fileName, &f, FS_READ) >= 0) {
@@ -147,12 +148,31 @@ void UI_LoadBestScores(const char *map, int game) {
 	}
 	UI_SetBestScores(&newInfo, qfalse);
 
-	Com_sprintf(fileName, MAX_QPATH, "demos/%s_%d.dm_%d", map, game, (int)trap_Cvar_VariableValue("protocol"));
 	uiInfo.demoAvailable = qfalse;
-	if (trap_FS_FOpenFile(fileName, &f, FS_READ) >= 0) {
+
+	protocolLegacy = trap_Cvar_VariableValue("com_legacyprotocol");
+	protocol = trap_Cvar_VariableValue("com_protocol");
+
+	if(!protocol)
+		protocol = trap_Cvar_VariableValue("protocol");
+	if(protocolLegacy == protocol)
+		protocolLegacy = 0;
+
+	Com_sprintf(fileName, MAX_QPATH, "demos/%s_%d.dm_%d", map, game, protocol);
+	if(trap_FS_FOpenFile(fileName, &f, FS_READ) >= 0)
+	{
 		uiInfo.demoAvailable = qtrue;
 		trap_FS_FCloseFile(f);
-	} 
+	}
+	else if(protocolLegacy > 0)
+	{
+		Com_sprintf(fileName, MAX_QPATH, "demos/%s_%d.dm_%d", map, game, protocolLegacy);
+		if (trap_FS_FOpenFile(fileName, &f, FS_READ) >= 0)
+		{
+			uiInfo.demoAvailable = qtrue;
+			trap_FS_FCloseFile(f);
+		}
+	}
 }
 
 /*
@@ -314,6 +334,7 @@ qboolean UI_ConsoleCommand( int realTime ) {
 
 	if ( Q_stricmp (cmd, "ui_test") == 0 ) {
 		UI_ShowPostGame(qtrue);
+		return qtrue;
 	}
 
 	if ( Q_stricmp (cmd, "ui_report") == 0 ) {
@@ -377,6 +398,19 @@ Adjusted for resolution and screen aspect ratio
 ================
 */
 void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
+	if ( UI_VR_AdjustFrom640( x, y, w, h ) ) {
+		return;
+	}
+
+	if ( vrActive && vr->sp_intermission_active ) {
+		// SP intermission: drawing to the HUD buffer (1280x960), 2x scale, no offset
+		*x = *x * 2.0f;
+		*y = *y * 2.0f;
+		*w *= 2.0f;
+		*h *= 2.0f;
+		return;
+	}
+
 	// expect valid pointers
 	*x = *x * uiInfo.uiDC.scale + uiInfo.uiDC.biasX;
 	*y = *y * uiInfo.uiDC.scale + uiInfo.uiDC.biasY;

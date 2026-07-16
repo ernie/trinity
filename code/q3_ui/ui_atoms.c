@@ -850,6 +850,11 @@ void UI_KeyEvent( int key, int down ) {
 		return;
 	}
 
+	// handle virtual keyboard input first
+	if ( UI_VR_KeyEvent( key ) ) {
+		return;
+	}
+
 	if (uis.activemenu->key)
 		s = uis.activemenu->key( key );
 	else
@@ -870,6 +875,12 @@ void UI_MouseEvent( int dx, int dy )
 	int				i;
 	menucommon_s*	m;
 
+	if ( UI_VR_StickNavActive() ) {
+		return;   // thumbstick nav owns selection; ignore ray hover
+	}
+
+	UI_VR_CursorOverride( &uis.cursorx, &uis.cursory );
+
 	if ( !uis.activemenu )
 		return;
 
@@ -887,6 +898,11 @@ void UI_MouseEvent( int dx, int dy )
 		uis.cursory = uis.screenYmin;
 	else if ( uis.cursory > uis.screenYmax )
 		uis.cursory = uis.screenYmax;
+
+	// Don't change menu cursor while keyboard is active - keep focus on the field
+	if (VirtualKeyboard_IsActive()) {
+		return;
+	}
 
 	// region test the active menu items
 	for ( i = 0; i < uis.activemenu->nitems; i++ )
@@ -913,6 +929,7 @@ void UI_MouseEvent( int dx, int dy )
 
 			if ( !(((menucommon_s*)(uis.activemenu->items[uis.activemenu->cursor]))->flags & QMF_SILENT ) ) {
 				trap_S_StartLocalSound( menu_move_sound, CHAN_LOCAL_SOUND );
+				UI_VR_OnMenuMove();
 			}
 		}
 
@@ -1060,6 +1077,8 @@ UI_Init
 =================
 */
 void UI_Init( void ) {
+	UI_VR_Init();
+
 	UI_RegisterCvars();
 
 	UI_InitGameinfo();
@@ -1079,11 +1098,13 @@ void UI_Init( void ) {
 ================
 UI_AdjustFrom640
 
-Adjusted for resolution and screen aspect ratio
+Adjusted for resolution and screen aspect ratio. The VR transform (viewable
+4:3 box, optical-center offset, follow-mode, intermission) is baked into
+uis.scale/biasX/biasY by UI_VR_UpdateScale, so this stays the stock uniform
+form - guaranteeing widgets/cursor match the direct-scale text draw paths.
 ================
 */
 void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
-	// expect valid pointers
 	*x = *x * uis.scale + uis.biasX;
 	*y = *y * uis.scale + uis.biasY;
 	*w *= uis.scale;
@@ -1189,6 +1210,10 @@ UI_Refresh
 */
 void UI_Refresh( int realtime )
 {
+	UI_VR_UpdateScale();
+
+	UI_VR_CursorOverride( &uis.cursorx, &uis.cursory );
+
 	uis.frametime = realtime - uis.realtime;
 	uis.realtime  = realtime;
 
@@ -1222,9 +1247,11 @@ void UI_Refresh( int realtime )
 		}
 	}
 
-	// draw cursor
-	UI_SetColor( NULL );
-	UI_DrawCursor( uis.cursorx-16, uis.cursory-16, 32, 32 );
+	// draw cursor (hidden when virtual keyboard has its own cursors, or when thumbstick nav owns selection)
+	if ( !UI_VR_HideCursor() ) {
+		UI_SetColor( NULL );
+		UI_DrawCursor( uis.cursorx-16, uis.cursory-16, 32, 32 );
+	}
 
 #ifndef NDEBUG
 	if ( uis.debug )

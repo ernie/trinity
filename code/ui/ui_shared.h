@@ -323,6 +323,7 @@ typedef struct {
   void (*setCVar)(const char *cvar, const char *value);
   void (*getClipboardData)(char *buf, int bufsize);
   void (*drawTextWithCursor)(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style);
+  void (*drawTextWithCursor_NoColorEscape)(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style);
   void (*setOverstrikeMode)(qboolean b);
   qboolean (*getOverstrikeMode)();
   void (*startLocalSound)( sfxHandle_t sfx, int channelNum );
@@ -331,6 +332,8 @@ typedef struct {
   const char *(*feederItemText)(float feederID, int index, int column, qhandle_t *handle);
   qhandle_t (*feederItemImage)(float feederID, int index);
   void (*feederSelection)(float feederID, int index);
+  int (*feederItemClientNum)(float feederID, int index);  // returns client number for scoreboard items
+  int (*getCurrentClientNum)(void);                        // returns current client number (for highlighting)
 	void (*keynumToStringBuf)( int keynum, char *buf, int buflen );
 	void (*getBindingBuf)( int keynum, char *buf, int buflen );
 	void (*setBinding)( int keynum, const char *binding );
@@ -346,6 +349,12 @@ typedef struct {
 	void (*stopCinematic)(int handle);
 	void (*drawCinematic)(int handle, float x, float y, float w, float h);
 	void (*runCinematicFrame)(int handle);
+
+	// Virtual keyboard support (NULL in cgame context)
+	void (*vkeyboardShow)( void );
+	void (*vkeyboardHide)( void );
+	qboolean (*vkeyboardIsActive)( void );
+	qboolean (*vkeyboardHandleKey)( int key );
 
   float			yscale;
   float			xscale;
@@ -376,6 +385,11 @@ typedef struct {
 	float				screenYmin;
 	float				screenYmax;
 	int					lastVideoCheck;
+
+	// VR menu-move haptic: fired on item focus change; each module wires its
+	// own handler (UI_VR_OnMenuMove in the ui link, CG_VR_OnMenuMove in the
+	// cgame link).
+	void (*vrMenuMove)( void );
 
 } displayContextDef_t;
 
@@ -411,6 +425,7 @@ void Menu_Reset();
 qboolean Menus_AnyFullScreenVisible();
 void  Menus_Activate(menuDef_t *menu);
 
+int UI_SelectForKey(int key);
 displayContextDef_t *Display_GetContext();
 void *Display_CaptureItem(int x, int y);
 qboolean Display_MouseMove(void *p, int x, int y);
@@ -442,5 +457,11 @@ int			trap_PC_LoadSource( const char *filename );
 int			trap_PC_FreeSource( int handle );
 int			trap_PC_ReadToken( int handle, pc_token_t *pc_token );
 int			trap_PC_SourceFileAndLine( int handle, char *filename, int *line );
+
+// vr_uishared.c compiles into both the ui and cgame links that include this
+// header (ui_atoms.c/ui_main.c/ui_players.c via ui_local.h; cg_consolecmds.c/
+// cg_draw.c/cg_main.c/cg_newdraw.c directly). Tail include so displayContextDef_t
+// and refdef_t are already visible above.
+#include "vr_uishared.h"
 
 #endif

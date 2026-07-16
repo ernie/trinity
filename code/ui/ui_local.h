@@ -9,6 +9,37 @@
 #include "keycodes.h"
 #include "../game/bg_public.h"
 #include "ui_shared.h"
+#include "../game/vr_shared.h"
+
+// VR API bootstrap (vr_ui.c) — extension interface discovered by name
+extern vr_shared_t	vr_state;
+extern vr_shared_t	*vr;
+extern qboolean		vrActive;
+
+#ifdef Q3_VM
+extern qboolean	(*trap_GetValue)( char *value, int valueSize, const char *key );
+extern void		(*trap_VR_RegisterState)( void *state, int stateSize, int apiVersion );
+extern void		(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
+extern void		(*trap_VKeyboard_Show)( void );
+extern void		(*trap_VKeyboard_Hide)( void );
+extern qboolean	(*trap_VKeyboard_IsActive)( void );
+extern qboolean	(*trap_VKeyboard_HandleKey)( int key );
+#else
+qboolean	trap_GetValue( char *value, int valueSize, const char *key );
+void		trap_VR_RegisterState( void *state, int stateSize, int apiVersion );
+void		trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height );
+void		trap_VKeyboard_Show( void );
+void		trap_VKeyboard_Hide( void );
+qboolean	trap_VKeyboard_IsActive( void );
+qboolean	trap_VKeyboard_HandleKey( int key );
+extern int	dll_com_trapGetValue;
+extern int	dll_trap_VR_RegisterState;
+extern int	dll_trap_HapticEvent;
+extern int	dll_trap_VKeyboard_Show;
+extern int	dll_trap_VKeyboard_Hide;
+extern int	dll_trap_VKeyboard_IsActive;
+extern int	dll_trap_VKeyboard_HandleKey;
+#endif
 
 // global display context
 
@@ -351,7 +382,7 @@ extern void SpecifyServer_Cache( void );
 //
 // ui_servers2.c
 //
-#define MAX_FAVORITESERVERS 16
+#define MAX_FAVORITESERVERS 64
 
 extern void UI_ArenaServersMenu( void );
 extern void ArenaServers_Cache( void );
@@ -416,6 +447,9 @@ typedef struct {
 	qhandle_t		headSkin;
 
 	animation_t		animations[MAX_TOTALANIMATIONS];
+
+	qboolean		fixedlegs;		// true if legs yaw is always the same as torso yaw
+	qboolean		fixedtorso;		// true if torso never changes yaw
 
 	qhandle_t		weaponModel;
 	qhandle_t		barrelModel;
@@ -492,7 +526,7 @@ typedef struct {
 #define MAX_HEADNAME  32
 #define MAX_TEAMS 64
 #define MAX_GAMETYPES 16
-#define MAX_MAPS 128
+#define MAX_MAPS MAX_ARENAS
 #define MAX_SPMAPS 16
 #define PLAYERS_PER_TEAM 5
 #define MAX_PINGREQUESTS		32
@@ -515,7 +549,7 @@ typedef struct {
 #define MAPS_PER_TIER 3
 #define MAX_TIERS 16
 #define MAX_MODS 64
-#define MAX_DEMOS 256
+#define MAX_DEMOS 512
 #define MAX_MOVIES 256
 #define MAX_PLAYERMODELS 256
 
@@ -592,7 +626,9 @@ typedef struct serverStatus_s {
 	int		sortKey;
 	int		sortDir;
 	int		lastCount;
+	int		lastCountTime;
 	qboolean refreshActive;
+	int		refreshSource;		// browser source index the active refresh belongs to
 	int		currentServer;
 	int		displayServers[MAX_DISPLAY_SERVERS];
 	int		numDisplayServers;
@@ -1013,6 +1049,6 @@ typedef struct postGameInfo_s {
 	int baseScore;
 } postGameInfo_t;
 
-
+#include "vr_ui.h"
 
 #endif

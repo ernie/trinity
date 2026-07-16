@@ -10,6 +10,7 @@ menuDef {
 		outOfBoundsClick			// this closes the window if it gets a click out of the rectangle
     	rect 298 30 276 345
     	focusColor 1 .75 0 1
+    	disableColor .5 .5 .5 1
     	style 1
     	border 1
 	onopen { hide grpsystem ; show graphics ; uiScript updateHDRAvail }
@@ -185,7 +186,7 @@ itemDef {
 			text "Quality:"
 		cvar "ui_glCustom"
 		cvarFloatList { "High Quality" 0 "Normal" 1 "Fast" 2 "Fastest" 3 "Custom" 4 }
-		rect 0 50 256 20
+		rect 0 76 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -196,87 +197,20 @@ itemDef {
     		}
 
 	itemDef {
-      		name graphics
+		name graphics
 		group grpSystem
-     	type ITEM_TYPE_EDITFIELD
-		text "GL Driver:"
-		cvar "r_gldriver"
-		//cvarFloatList {  }
-		rect 0 70 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 133
-      		textaligny 17
-		textscale .25        
-      		forecolor 1 1 1 1
-      		visible 0 
-			decoration
-    		}
-
-	itemDef {
-      		name graphics
-		group grpSystem
-      		type ITEM_TYPE_YESNO
-		text "GL Extensions:"
-		cvar "r_allowExtensions"
-		rect 0 90 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 133
-      		textaligny 17
-		textscale .25        
-      		forecolor 1 1 1 1
-      		visible 0 
-		action { uiScript glCustom }
-    		}
-	
-	itemDef {
-      		name graphics
-			group grpSystem
-      		type ITEM_TYPE_MULTI
-		text "Video Mode:"
-		cvar "r_mode"
-		cvarFloatList { "320x240" 0 "400x300" 1 "512x384" 2 "640x480" 3 "800x600" 4 "960x720" 5 "1024x768" 6 "1152x864" 7 "1280x1024" 8 "1600x1200" 9 "2048x1536" 10 "856x480 wide screen" 11 }
-		rect 0 110 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 133
-      		textaligny 17
-		textscale .25        
-      		forecolor 1 1 1 1
-      		visible 0 
-			action { uiScript glCustom }
-    		}
-
-	itemDef {
-      		name graphics
-		group grpSystem
-      		type ITEM_TYPE_MULTI
-		text "Color Depth:"
-		cvar "r_colorbits"
-		cvarFloatList { "Default" 0 "16 bit" 16 "32 bit" 32 }
-		rect 0 130 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 133
-      		textaligny 17
-		textscale .25        
-      		forecolor 1 1 1 1
-      		visible 0 
-			action { uiScript glCustom ; uiScript update "r_colorbits" }
-    		}
-
-	itemDef {
-      		name graphics
-		group grpSystem
-      	 	type ITEM_TYPE_YESNO
-		text "Fullscreen:"
-		cvar "r_fullscreen"
-		rect 0 150 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 133
-      		textaligny 17
-		textscale .25        
-      		forecolor 1 1 1 1
-      		visible 0 
-			action { uiScript glCustom }
-    		}
+		type ITEM_TYPE_MULTI
+		text "MSAA:"
+		cvar "r_ext_multisample"
+		cvarFloatList { "Off" 0 "2x" 2 "4x" 4 "8x" 8 }
+		rect 0 95 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+	}
 
 	itemDef {
       		name graphics
@@ -285,7 +219,7 @@ itemDef {
 		text "Lighting:"
 		cvar "r_vertexlight"
 		cvarFloatList { "Light Map (high)" 0 "Vertex (low)" 1  }
-		rect 0 170 256 20
+		rect 0 114 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -296,20 +230,53 @@ itemDef {
     		}
 
 	itemDef {
+		name graphics
+		group grpSystem
+		type ITEM_TYPE_MULTI
+		text "Shadows:"
+		cvar "cg_shadows"
+		cvarFloatList { "None" 0 "Low" 1 "High" 2 }
+		rect 0 133 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+	}
+
+	itemDef {
       		name graphics
 		group grpSystem
       		type ITEM_TYPE_MULTI
-		text "Geometric Detail:"
+		text "Model Detail:"
 		cvar "r_lodbias"
-		cvarFloatList { "High" 0 "Medium" 1 "Low" 2 }
-		rect 0 190 256 20
+		cvarFloatList { "Very High" -2 "High" -1 "Medium" 0 "Low" 1 "Very Low" 2 }
+		rect 0 152 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
-		textscale .25        
+		textscale .25
       		forecolor 1 1 1 1
-      		visible 0 
-			action { uiScript glCustom ; uiScript update "r_lodbias" }
+      		visible 0
+			action { uiScript glCustom }
+    		}
+
+	itemDef {
+      		name graphics
+		group grpSystem
+      		type ITEM_TYPE_MULTI
+		text "Curve Detail:"
+		cvar "r_subdivisions"
+		cvarFloatList { "Very High" 1 "High" 2 "Medium" 4 "Low" 12 "Very Low" 20 }
+		rect 0 171 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 133
+      		textaligny 17
+		textscale .25
+      		forecolor 1 1 1 1
+      		visible 0
+			action { uiScript glCustom }
     		}
 
 	itemDef {
@@ -319,7 +286,7 @@ itemDef {
 		text "Texture Detail:"
 		cvar "r_picmip"
 		cvarFloatList { "Low" 2 "Normal" 1 "High" 0 }
-		rect 0 210 256 20
+		rect 0 190 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -328,7 +295,7 @@ itemDef {
       		visible 0 
 			action { uiScript glCustom }
     		}
-	
+
 	itemDef {
       		name graphics
 		group grpSystem
@@ -336,7 +303,7 @@ itemDef {
 		text "Texture Quality:"
 		cvar "r_texturebits"
 		cvarFloatList { "Default" 0 "16 bit" 16 "32 bit" 32 }
-		rect 0 230 256 20
+		rect 0 209 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -352,7 +319,7 @@ itemDef {
 		text "Texture Filter:"
 		cvar "r_texturemode"
 		cvarStrList { "Bilinear", "GL_LINEAR_MIPMAP_NEAREST", "Trilinear", "GL_LINEAR_MIPMAP_LINEAR"  }
-		rect 0 250 256 20
+		rect 0 228 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -367,8 +334,8 @@ itemDef {
 		group grpSystem
       		type ITEM_TYPE_YESNO
 		text "Compress Textures:"
-		cvar "r_ext_compressed_textures "
-		rect 0 270 256 20
+		cvar "r_ext_compressed_textures"
+		rect 0 247 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -377,8 +344,6 @@ itemDef {
       		visible 0 
 		action { uiScript glCustom }
     		}
-	
-    		
 
 	itemDef {
 		name graphics
@@ -386,7 +351,7 @@ itemDef {
 		type ITEM_TYPE_YESNO
 		text "HDR Display:"
 		cvar "r_hdrDisplay"
-		rect 0 290 256 20
+		rect 0 266 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -471,18 +436,18 @@ itemDef {
     	}
 	
 	itemDef {
-      		name other			
+      		name other
 		group grpSystem
       		type ITEM_TYPE_SLIDER
 		text "Brightness:"
-		cvarfloat "r_gamma" 1 .5 2
+		cvarfloat "r_gamma" 1 0.5 2
 		rect 0 65 256 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128 
+      		textalignx 128
       		textaligny 17
-		textscale .25         
+		textscale .25
       		forecolor 1 1 1 1
-      		visible 0 
+      		visible 0
     		}
 
 	itemDef {
@@ -496,9 +461,9 @@ itemDef {
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
-		textscale .25        
+		textscale .25
       		forecolor 1 1 1 1
-      		visible 0 
+      		visible 0
     		}
 
 	itemDef {
@@ -614,9 +579,9 @@ itemDef {
       		name other
 		group grpSystem
       		type ITEM_TYPE_MULTI
-		text "Sound Quality:"
-		cvar "s_khz"
-		cvarFloatList { "22 khz (high)" 22 "11 khz (low)" 11 }
+		text "Sound System:"
+		cvar "s_useOpenAL"
+		cvarFloatList { "SDL" 0 "OpenAL" 1 }
 		rect 0 205 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
@@ -629,10 +594,28 @@ itemDef {
 	itemDef {
       		name other
 		group grpSystem
+      		type ITEM_TYPE_MULTI
+		text "SDL Sound Quality:"
+		cvar "s_khz"
+		cvarFloatList { "44 khz (high)" 44 "22 khz (medium)" 22 "11 khz (low)" 11 }
+		rect 0 225 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 17
+		textscale .25
+      		forecolor 1 1 1 1
+      		visible 0
+		cvarTest "s_useOpenAL"
+		enableCvar { 0 }
+    		}
+
+	itemDef {
+      		name other
+		group grpSystem
       		type ITEM_TYPE_YESNO
 		text "Doppler Sound:"
 		cvar "s_doppler"
-		rect 0 225 256 20
+		rect 0 245 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -647,7 +630,7 @@ itemDef {
 	group grpSystem
       	style 1
 	text "Network"
-	rect 0 265 128 20
+	rect 0 297 128 20
       	textalign ITEM_ALIGN_CENTER
       	textalignx 128
       	textaligny 17
@@ -664,7 +647,7 @@ itemDef {
 		text "Net Data Rate:"
 		cvar "rate"
 		cvarFloatList { "<=28.8k" 2500 "33.6k" 3000 "56k" 4000 "ISDN" 5000 "LAN/CABLE/xDSl" 25000  }
-		rect 0 285 256 20
+		rect 0 317 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -681,17 +664,37 @@ itemDef {
 	group grpsystem
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 101 315 75 20
+	rect 101 288 75 20
 	textalign 1
 	textalignx 37
 	textaligny 15
 	forecolor 1 1 1 1
-	backcolor .37 .1 .1 1 
+	backcolor .37 .1 .1 1
 	visible 0
 	action { exec "vid_restart" }
 	mouseEnter { setcolor backcolor .1 .37 .1 1 }
       	mouseExit { setcolor backcolor .37 .1 .1 1 }
 	}
+
+itemDef {
+	name other
+	text "Apply"
+	type 1
+	textscale .25
+	group grpSystem
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 101 269 75 20
+	textalign 1
+	textalignx 37
+	textaligny 15
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 0
+	action { exec "snd_restart" }
+	mouseEnter { setcolor backcolor .1 .37 .1 1 }
+	mouseExit { setcolor backcolor .37 .1 .1 1 }
+}
 
 
 }

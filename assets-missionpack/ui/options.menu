@@ -34,7 +34,7 @@ itemDef {
       		name options
 		group grpOptions
 		text "Crosshair:"
-		rect 158 75 20 20
+		rect 158 85 20 20
 		ownerdraw UI_CROSSHAIR
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 0
@@ -49,7 +49,22 @@ itemDef {
 		group grpOptions
 		text "Crosshair Color:"
 		ownerdraw UI_CROSSHAIRCOLOR
-		rect 30 95 210 20
+		rect 30 105 210 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+	}
+
+	itemDef {
+		name options
+		group grpOptions
+		type ITEM_TYPE_YESNO
+		text "Crosshair Health Tint:"
+		cvar "cg_crosshairHealth"
+		rect 30 125 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -64,7 +79,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Simple Items:"
 		cvar "cg_simpleItems"
-		rect 30 115 210 20
+		rect 30 145 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -79,7 +94,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Marks On Walls:"
 		cvar "cg_marks"
-		rect 30 135 210 20
+		rect 30 165 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -94,7 +109,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Show Floating Scores:"
 		cvar "cg_scorePlums"
-		rect 30 155 210 20
+		rect 30 185 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -110,7 +125,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "cg_brassTime"
 		cvarFloatList { "High" 2500 "Med" 1250 "Off" 0 }
-		rect 30 175 210 20
+		rect 30 205 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -122,10 +137,9 @@ itemDef {
 	itemDef {
       		name options
 		group grpOptions
-      		type ITEM_TYPE_YESNO
 		text "Dynamic Lights:"
-		cvar "r_dynamiclight"
-		rect 30 195 210 20
+		ownerdraw UI_DYNAMICLIGHTS
+		rect 30 225 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -140,7 +154,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Identify Target:"
 		cvar "cg_drawCrosshairNames"
-		rect 30 215 210 20
+		rect 30 245 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -155,7 +169,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Force Player Models:"
 		cvar "cg_forceModel"
-		rect 30 235 210 20
+		rect 30 265 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -170,7 +184,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Draw Team Overlay:"
 		cvar "cg_drawTeamOverlay"
-		rect 30 255 210 20
+		rect 30 285 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -185,7 +199,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Show Time:"
 		cvar "cg_drawTimer"
-		rect 30 275 210 20
+		rect 30 305 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -201,7 +215,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "cg_followMode"
 		cvarFloatList { "First-person" 0 "Orbit" 1 }
-		rect 30 295 210 20
+		rect 30 325 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -218,7 +232,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Voices Off:"
 		cvar "cg_NoVoiceChats"
-		rect 245 75 210 20
+		rect 245 85 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -232,7 +246,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Taunts Off:"
 		cvar "cg_noTaunt"
-		rect 245 95 210 20
+		rect 245 105 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -246,7 +260,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Voice Text Off:"
 		cvar "cg_noVoiceText"
-		rect 245 115 210 20
+		rect 245 125 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -260,7 +274,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Team Chats Only:"
 		cvar "cg_teamChatsOnly"
-		rect 245 135 210 20
+		rect 245 145 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -275,7 +289,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "In Game Video:"
 		cvar "r_inGameVideo"
-		rect 245 155 210 20
+		rect 245 165 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -291,7 +305,7 @@ itemDef {
 		text "Statusbar:"
 		cvar "cg_hudfiles"
 		cvarStrList { Normal "ui/hud.txt" Small "ui/hud2.txt" }
-		rect 245 175 210 20
+		rect 245 185 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -306,7 +320,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Auto Download:"
 		cvar "cl_allowDownload"
-		rect 245 195 210 20
+		rect 245 205 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -322,7 +336,7 @@ itemDef {
 		text "TVD Download:"
 		cvar "cl_tvDownload"
 		cvarFloatList { "Off" 0 "Decline" 1 "Accept" 2 }
-		rect 245 215 210 20
+		rect 245 225 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -340,7 +354,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "cg_damageEffect"
 		cvarFloatList { "Classic" 0 "Modern" 1 }
-		rect 245 235 210 20
+		rect 245 245 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -356,7 +370,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "com_blood"
 		cvarFloatList { "Off" 0 "Classic" 1 "Modern" 2 }
-		rect 245 255 210 20
+		rect 245 265 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -371,7 +385,7 @@ itemDef {
 		text "Damage Numbers:"
 		type ITEM_TYPE_YESNO
 		cvar "cg_damagePlums"
-		rect 245 275 210 20
+		rect 245 285 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20

@@ -541,6 +541,28 @@ static void Slider_Init( menuslider_s *s )
 
 /*
 =================
+Slider_ArrowStep
+
+Team Arena inches sliders by a fraction of their range (ui_shared.c,
+Item_Slider_HandleKey: range/40 per arrow). The classic whole-unit step
+here predates fractional-range sliders (VR options: 0..1 and the like),
+where one unit spans the entire track and the thumbstick's synthesized
+arrow keys slam the value to an end. Legacy integer-range sliders keep
+unit steps - their callbacks scale or index by whole notches.
+=================
+*/
+static float Slider_ArrowStep( const menuslider_s *s )
+{
+	float range = s->maxvalue - s->minvalue;
+
+	if ( range < 3.0f )
+		return range / 40.0f;
+
+	return 1.0f;
+}
+
+/*
+=================
 Slider_Key
 =================
 */
@@ -571,23 +593,27 @@ static sfxHandle_t Slider_Key( menuslider_s *s, int key )
 		case K_LEFTARROW:
 			if (s->curvalue > s->minvalue)
 			{
-				s->curvalue--;
+				s->curvalue -= Slider_ArrowStep( s );
+				if (s->curvalue < s->minvalue)
+					s->curvalue = s->minvalue;
 				sound = menu_move_sound;
 			}
 			else
 				sound = menu_buzz_sound;
-			break;			
+			break;
 
 		case K_KP_RIGHTARROW:
 		case K_RIGHTARROW:
 			if (s->curvalue < s->maxvalue)
 			{
-				s->curvalue++;
+				s->curvalue += Slider_ArrowStep( s );
+				if (s->curvalue > s->maxvalue)
+					s->curvalue = s->maxvalue;
 				sound = menu_move_sound;
 			}
 			else
 				sound = menu_buzz_sound;
-			break;			
+			break;
 
 		default:
 			// key not handled

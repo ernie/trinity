@@ -113,12 +113,13 @@ UI_NetworkOptionsMenu_Init
 ===============
 */
 static void UI_NetworkOptionsMenu_Init( void ) {
-	int		y;
-	int		rate;
+	int			y;
+	int			rate;
 
 	memset( &networkOptionsInfo, 0, sizeof(networkOptionsInfo) );
 
 	UI_NetworkOptionsMenu_Cache();
+
 	networkOptionsInfo.menu.wrapAround = qtrue;
 	networkOptionsInfo.menu.fullscreen = qtrue;
 
@@ -186,7 +187,8 @@ static void UI_NetworkOptionsMenu_Init( void ) {
 	networkOptionsInfo.network.style				= UI_RIGHT;
 	networkOptionsInfo.network.color				= color_red;
 
-	y = 240 - 1 * (BIGCHAR_HEIGHT+2);
+	// content column (1 row) centered on the frame
+	y = 242 - ( 1 * (BIGCHAR_HEIGHT+2) ) / 2;
 	networkOptionsInfo.rate.generic.type		= MTYPE_SPINCONTROL;
 	networkOptionsInfo.rate.generic.name		= "Data Rate:";
 	networkOptionsInfo.rate.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;

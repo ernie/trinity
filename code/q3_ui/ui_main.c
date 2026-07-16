@@ -30,6 +30,7 @@ DLLEXPORT intptr_t vmMain( int command, int arg0, int arg1 ) {
 		return 0;
 
 	case UI_SHUTDOWN:
+		UI_VR_Shutdown();
 		UI_Shutdown();
 		return 0;
 
@@ -105,9 +106,23 @@ UI_RegisterCvars
 void UI_RegisterCvars( void ) {
 	int			i;
 	cvarTable_t	*cv;
+	const char	*defaultString;
 
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
-		trap_Cvar_Register( cv->vmCvar, cv->cvarName, cv->defaultString, cv->cvarFlags );
+		defaultString = cv->defaultString;
+		// crosshair target names are HUD clutter in a headset: default them
+		// off under VR (ui registers this cvar before cgame loads), stock on
+		// flatscreen
+		if ( vrActive && cv->vmCvar == &ui_drawCrosshairNames ) {
+			defaultString = "0";
+		}
+		trap_Cvar_Register( cv->vmCvar, cv->cvarName, defaultString, cv->cvarFlags );
+	}
+
+	// favorites address book: server1..server64 must be archived to survive
+	// restarts, and 64 slots outgrew the X-macro table
+	for ( i = 1 ; i <= MAX_FAVORITESERVERS ; i++ ) {
+		trap_Cvar_Register( NULL, va( "server%d", i ), "", CVAR_ARCHIVE );
 	}
 }
 

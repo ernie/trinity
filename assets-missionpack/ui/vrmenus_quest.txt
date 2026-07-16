@@ -1,0 +1,6 @@
+// VR menu defs (Quest) - loaded by the UI only when vr_platform is "quest"
+//
+{
+	loadMenu { "ui/vroptions_quest.menu" }
+	loadMenu { "ui/ingame_vroptions_quest.menu" }
+}

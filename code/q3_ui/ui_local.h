@@ -12,8 +12,51 @@
 #define UI_API_VERSION	4
 #include "keycodes.h"
 #include "../game/bg_public.h"
+#include "../game/vr_shared.h"
 
 typedef void (*voidfunc_f)(void);
+
+// VR API bootstrap (vr_ui.c) — extension interface discovered by name
+extern vr_shared_t	vr_state;
+extern vr_shared_t	*vr;
+extern qboolean		vrActive;
+
+#ifdef Q3_VM
+extern qboolean	(*trap_GetValue)( char *value, int valueSize, const char *key );
+extern void		(*trap_VR_RegisterState)( void *state, int stateSize, int apiVersion );
+extern void		(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
+extern void		(*trap_VKeyboard_Show)( void );
+extern void		(*trap_VKeyboard_Hide)( void );
+extern qboolean	(*trap_VKeyboard_IsActive)( void );
+extern qboolean	(*trap_VKeyboard_HandleKey)( int key );
+#else
+qboolean	trap_GetValue( char *value, int valueSize, const char *key );
+void		trap_VR_RegisterState( void *state, int stateSize, int apiVersion );
+void		trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height );
+void		trap_VKeyboard_Show( void );
+void		trap_VKeyboard_Hide( void );
+qboolean	trap_VKeyboard_IsActive( void );
+qboolean	trap_VKeyboard_HandleKey( int key );
+extern int	dll_com_trapGetValue;
+extern int	dll_trap_VR_RegisterState;
+extern int	dll_trap_HapticEvent;
+extern int	dll_trap_VKeyboard_Show;
+extern int	dll_trap_VKeyboard_Hide;
+extern int	dll_trap_VKeyboard_IsActive;
+extern int	dll_trap_VKeyboard_HandleKey;
+#endif
+
+// Unified VR options menu (ui_vroptions.c + page files) — presence-gated on UI_VR_Platform
+void UI_VROptionsMenu( void );
+void UI_VROptions_Cache( void );
+void UI_VRComfortMenu( void );
+void UI_VRComfort_Cache( void );
+void UI_VRControlsMenu( void );
+void UI_VRControls_Cache( void );
+void UI_VRHudMenu( void );
+void UI_VRHud_Cache( void );
+void UI_VRMirrorMenu( void );
+void UI_VRMirror_Cache( void );
 
 #define EXTERN_UI_CVAR
 	#include "ui_cvar.h"
@@ -244,6 +287,10 @@ extern void			MField_Draw( mfield_t *edit, int x, int y, int style, vec4_t color
 extern void			MenuField_Init( menufield_s* m );
 extern void			MenuField_Draw( menufield_s *f );
 extern sfxHandle_t	MenuField_Key( menufield_s* m, int* key );
+void			VirtualKeyboard_Show( menufield_s *field );
+void			VirtualKeyboard_Hide( void );
+qboolean		VirtualKeyboard_IsActive( void );
+qboolean		VirtualKeyboard_Key( int key );
 
 //
 // ui_menu.c
@@ -354,7 +401,7 @@ extern void SpecifyServer_Cache( void );
 //
 // ui_servers2.c
 //
-#define MAX_FAVORITESERVERS 16
+#define MAX_FAVORITESERVERS 64
 
 extern void UI_ArenaServersMenu( void );
 extern void ArenaServers_Cache( void );
@@ -420,11 +467,17 @@ typedef struct {
 
 	animation_t		animations[MAX_ANIMATIONS];
 
+	qboolean		fixedlegs;		// true if legs yaw is always the same as torso yaw
+	qboolean		fixedtorso;		// true if torso never changes yaw
+
 	qhandle_t		weaponModel;
 	qhandle_t		barrelModel;
 	qhandle_t		flashModel;
 	vec3_t			flashDlightColor;
 	int				muzzleFlashTime;
+
+	vec3_t			color1;
+	byte			c1RGBA[4];
 
 	// currently in use drawing parms
 	vec3_t			viewAngles;
@@ -593,6 +646,7 @@ void			trap_R_AddRefEntityToScene( const refEntity_t *re );
 void			trap_R_AddPolyToScene( qhandle_t hShader , int numVerts, const polyVert_t *verts );
 void			trap_R_AddLightToScene( const vec3_t org, float intensity, float r, float g, float b );
 void			trap_R_RenderScene( const refdef_t *fd );
+void			trap_R_ModelBounds( clipHandle_t model, vec3_t mins, vec3_t maxs );
 void			trap_R_SetColor( const float *rgba );
 void			trap_R_DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader );
 void			trap_UpdateScreen( void );
@@ -756,5 +810,7 @@ void UI_SignupMenu( void );
 //
 void RankStatus_Cache( void );
 void UI_RankStatusMenu( void );
+
+#include "vr_ui.h"
 
 #endif

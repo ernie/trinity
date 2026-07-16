@@ -1,0 +1,841 @@
+#include "ui/menudef.h"
+
+{
+\\ VR OPTIONS (PC) - self-contained sidebar menu \\
+
+menuDef {
+	name "vroptions_menu"
+	visible 0
+	fullscreen 1
+	rect 0 0 640 480
+	background "menuback_a"
+	focusColor 1 .75 0 1
+	style 1
+	border 1
+	onOpen { setitemcolor fadebox backcolor 0 0 0 1 ;
+		fadeout fadebox ;
+		hide back_alt ; show back ; hide grpmessage ;
+		hide grpVR ; show comfort ; uiScript vrMirrorSetup }
+	onEsc { close vroptions_menu ; open setup_menu }
+
+// SIDEBAR //
+
+itemDef {
+	name solid_box
+	style 1
+	rect 4 2 178 426
+	border 1
+	bordersize 1
+	bordercolor .5 .5 .5 .5
+	backcolor 0 0 .75 .25
+	visible 1
+	decoration
+	mouseEnter { setcolor backcolor .75 0 0 .5 }
+	mouseExit { setcolor backcolor 0 0 .75 .25 }
+	}
+
+itemDef {
+	name sb_comfort
+	text "Comfort"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 100 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; hide grpVR ; show comfort }
+	mouseEnter { setitemcolor sb_comfort forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_comfort forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_controls
+	text "Controls"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 150 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; hide grpVR ; show controls }
+	mouseEnter { setitemcolor sb_controls forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_controls forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_hud
+	text "HUD & Display"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 200 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; hide grpVR ; show hud }
+	mouseEnter { setitemcolor sb_hud forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_hud forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_mirror
+	text "Desktop Mirror"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 250 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; hide grpVR ; show mirror ; uiScript vrMirrorSetup }
+	mouseEnter { setitemcolor sb_mirror forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_mirror forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_console
+	text "Console"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 300 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; exec "toggleconsole" }
+	mouseEnter { setitemcolor sb_console forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_console forecolor 1 1 1 1 }
+	}
+
+// CONTENT PANEL //
+
+itemDef {
+	name window
+	rect 186 2 450 426
+	style WINDOW_STYLE_FILLED
+	border 1
+	bordercolor .5 .5 .5 .5
+	backcolor 0 0 0 .25
+	visible 1
+	decoration
+	}
+
+// COMFORT GROUP //
+
+itemDef {
+	name comfort
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "Comfort Vignette:"
+	cvarfloat "vr_comfortVignette" 0.2 0 1
+	rect 301 139 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name comfort
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "Height Adjust:"
+	cvarfloat "vr_heightAdjust" 0.2 0 1
+	rect 301 161 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name comfort
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "SP 6DoF Movement:"
+	cvar "vr_6dof"
+	rect 301 183 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	mouseEnter { show msg_sixdof }
+	mouseExit { hide msg_sixdof }
+	}
+itemDef {
+	name comfort
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Roll When Hit:"
+	cvar "vr_rollWhenHit"
+	rect 301 205 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name comfort
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Smooth Follow:"
+	cvar "cg_smoothFollow"
+	rect 301 227 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name comfort
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "Haptic Intensity:"
+	cvarfloat "vr_hapticIntensity" 1.0 0 1
+	rect 301 249 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name comfort
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "bHaptics Support:"
+	cvar "vr_bhaptics"
+	rect 301 271 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name msg_sixdof
+	group grpVR
+	text "Physical head movement controls in-game movement (SP only)"
+	rect 301 300 340 20
+	textalign ITEM_ALIGN_CENTER
+	textalignx 170
+	textaligny 14
+	textscale .25
+	forecolor 1 .75 0 1
+	visible 0
+	decoration
+	}
+
+// CONTROLS GROUP //
+
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Railgun Scope:"
+	cvar "vr_weaponScope"
+	rect 301 40 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Two-Handed Weapons:"
+	cvar "vr_twoHandedWeapons"
+	cvarFloatList { "Disabled" 0 "Enabled (Basic)" 1 "Enabled (VR Gun Stock)" 2 }
+	rect 301 62 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Direction Mode:"
+	cvar "vr_directionMode"
+	cvarFloatList { "HMD (Default)" 0 "Off-hand Controller" 1 }
+	rect 301 84 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Turning Mode:"
+	cvar "vr_snapturn"
+	cvarFloatList { "Smooth Turning" 0 "45 Degrees" 45 "90 Degrees" 90 }
+	rect 301 106 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "Smooth turn speed:"
+	cvarfloat "sensitivity" 100 50 150
+	rect 301 128 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	cvarTest "vr_snapturn"
+	disableCvar { "45" ; "90" }
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Quick U-Turn:"
+	cvar "vr_uturn"
+	rect 301 150 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	action { uiScript update "vr_uturn" }
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Right-Handed:"
+	cvar "vr_righthanded"
+	rect 301 172 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Switch Thumbsticks:"
+	cvar "vr_switchThumbsticks"
+	rect 301 194 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	action { uiScript update "vr_switchThumbsticks" }
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "Trigger Sensitivity:"
+	cvarfloat "vr_triggerSensitivity" 0.5 0.1 0.9
+	rect 301 216 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "Weapon Pitch:"
+	cvarfloat "vr_weaponPitch" 0 -25 5
+	rect 301 238 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Weapon Wheel Mode:"
+	cvar "vr_weaponSelectorMode"
+	cvarFloatList { "VR Style / Pointing" 0 "Classic / Thumbstick" 1 }
+	rect 301 260 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Control Schema:"
+	cvar "vr_controlSchema"
+	cvarFloatList { "Weapon Wheel on Grip" 0 "Weapon Wheel on Stick" 1 "Weapon Wheel Disabled" 2 }
+	rect 301 282 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	action { uiScript update "vr_controlSchema" }
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Weapon Adjustment:"
+	cvar "vr_weaponAdjust"
+	rect 301 304 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Simple Items (Weapon Wheel):"
+	cvar "cg_weaponSelectorSimple2DIcons"
+	rect 301 326 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Autoswitch Weapons:"
+	cvar "cg_autoswitch"
+	rect 301 348 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Send Roll Angle:"
+	cvar "vr_sendRollToServer"
+	rect 301 370 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+
+// HUD & DISPLAY GROUP //
+
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "HUD Mode:"
+	cvar "vr_hudDrawStatus"
+	cvarFloatList { "Off" 0 "Floating" 1 "Fixed to View" 2 }
+	rect 301 95 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	action { uiScript update "vr_hudDrawStatus" }
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "HUD Depth:"
+	cvarfloat "vr_hudDepth" 1 0 5
+	rect 301 117 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "HUD Scale:"
+	cvarfloat "vr_hudScale" 1.0 0.5 2.0
+	rect 301 139 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "HUD Vertical Position:"
+	cvarfloat "vr_hudYOffset" 0 -200 200
+	rect 301 161 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Virtual screen mode:"
+	cvar "vr_virtualScreenMode"
+	cvarFloatList { "Fixed" 0 "Follow" 1 }
+	rect 301 183 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Draw HUD On Weapon Wheel:"
+	cvar "vr_weaponSelectorWithHud"
+	rect 301 205 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Show Item In Hand:"
+	cvar "vr_showItemInHand"
+	rect 301 227 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Show Console Messages:"
+	cvar "vr_showConsoleMessages"
+	rect 301 249 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Laser Sight:"
+	cvar "vr_lasersight"
+	rect 301 271 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Supersampling:"
+	cvar "vr_superSampling"
+	cvarFloatList { "0.5" 0.5 "0.6" 0.6 "0.7" 0.7 "0.8" 0.8 "0.9" 0.9 "1.0" 1.0 "1.1" 1.1 "1.2" 1.2 "1.3" 1.3 "1.4" 1.4 "1.5" 1.5 "1.75" 1.75 "2.0" 2.0 }
+	rect 301 293 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Virtual screen shape:"
+	cvar "vr_virtualScreenShape"
+	cvarFloatList { "Curved" 0 "Flat" 1 }
+	rect 301 315 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+
+// DESKTOP MIRROR GROUP //
+
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Mode:"
+	cvar "ui_vrDesktopMode"
+	cvarFloatList { "Off" 0 "Windowed" 1 "Fullscreen" 2 }
+	rect 301 146 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	text "Resolution:"
+	rect 301 168 128 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	decoration
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_TEXT
+	cvar "ui_vrDesktopRes"
+	rect 434 168 200 20
+	textalign ITEM_ALIGN_LEFT
+	textalignx 0
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	action { uiScript vrMirrorNextRes }
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Content type:"
+	cvar "vr_desktopContentType"
+	cvarFloatList { "Left eye" 0 "Right eye" 1 "Both eyes" 2 }
+	rect 301 190 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Content fit:"
+	cvar "vr_desktopContentFit"
+	cvarFloatList { "Fit / Contain" 0 "Fill / Crop" 1 }
+	rect 301 212 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Menu style:"
+	cvar "vr_desktopMenuStyle"
+	cvarFloatList { "Desktop view" 0 "VR view" 1 }
+	rect 301 234 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	text "Apply"
+	type 1
+	textscale .333
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 377 264 100 24
+	textalign ITEM_ALIGN_CENTER
+	textalignx 50
+	textaligny 18
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; uiScript vrMirrorApply }
+	mouseEnter { setcolor backcolor .1 .37 .1 1 }
+	mouseExit { setcolor backcolor .37 .1 .1 1 }
+	}
+
+// BACK BAR //
+
+itemDef {
+	name gotobar
+	style 2
+	rect 0 430 640 30
+	textscale 0.4
+	textalign 0
+	textalignx 60
+	textaligny 21
+	border 4
+	bordercolor 0.5 0.5 0.5 0.5
+	bordersize 2
+	backcolor 0 0 .75 0.5
+	visible 1
+	mouseEnter { setcolor backcolor .75 0 0 .5 }
+	mouseExit { setcolor backcolor 0 0 .75 .5 }
+	decoration
+	}
+
+itemDef {
+	name back
+	style 3
+	background "ui/assets/backarrow.tga"
+	rect 16 424 50 50
+	visible 1
+	action { close vroptions_menu ; open setup_menu }
+	mouseEnter { hide back ; show back_alt ; show message_back }
+	}
+
+itemDef {
+	name back_alt
+	style WINDOW_STYLE_SHADER
+	background "ui/assets/backarrow_alt.tga"
+	rect 14 422 54 54
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 0
+	type ITEM_TYPE_BUTTON
+	action { close vroptions_menu ; open setup_menu }
+	mouseExit { hide back_alt ; show back ; hide message_back }
+	}
+
+itemDef {
+	name message_back
+	group grpmessage
+	style 0
+	rect 320 430 128 30
+	textstyle 1
+	textalign 1
+	textalignx 0
+	textaligny 25
+	textscale .4
+	text "Back to Setup Menu"
+	forecolor 1 1 1 1
+	decoration
+	visible 0
+	}
+
+itemDef {
+	name fadebox
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/fadebox.tga"
+	forecolor 0 0 0 1
+	backcolor 0 0 0 1
+	rect 0 0 640 480
+	visible 1
+	decoration
+	}
+
+}
+
+}

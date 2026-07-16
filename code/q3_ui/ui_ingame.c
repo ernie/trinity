@@ -157,7 +157,7 @@ void InGame_MenuInit( void ) {
 	s_ingame.frame.height				= 332;//256;
 
 	//y = 96;
-	y = 88;
+	y = 106; // center the 10-row block on the frame (240)
 	s_ingame.team.generic.type			= MTYPE_PTEXT;
 	s_ingame.team.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_ingame.team.generic.x				= 320;

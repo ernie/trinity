@@ -177,15 +177,20 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 
 	Menu_Cache();
 
+	// see what information we should display
+	trap_GetClientState( &cstate );
+
+	// During CA_LOADING/CA_PRIMED, don't draw UI connect screen - just show cgame loading screen
+	if (cstate.connState == CA_LOADING || cstate.connState == CA_PRIMED) {
+		return;
+	}
+
 	if ( !overlay ) {
 		// draw the dialog background
 		UI_SetColor( color_white );
 		// fill whole screen, not just 640x480 virtual rectangle
-		trap_R_DrawStretchPic( 0, 0, uis.glconfig.vidWidth, uis.glconfig.vidHeight, 0, 0, 1, 1, uis.menuBackShader );
+		UI_VR_FillScreen( uis.menuBackShader );
 	}
-
-	// see what information we should display
-	trap_GetClientState( &cstate );
 
 	info[0] = '\0';
 	if( trap_GetConfigString( CS_SERVERINFO, info, sizeof(info) ) ) {

@@ -46,6 +46,9 @@ GAME OPTIONS MENU
 #define ID_DAMAGEPLUMS			142
 #define ID_FOLLOWMODE			143
 #define ID_TVDOWNLOAD			144
+#define ID_CROSSHAIRSIZE		145
+#define ID_CROSSHAIRHEALTH		146
+#define ID_DRAWFFABACKGROUND	147
 
 #define	NUM_CROSSHAIRS			10
 
@@ -58,16 +61,19 @@ typedef struct {
 	menubitmap_s		framer;
 
 	menulist_s			crosshair;
+	menuslider_s		crosshairsize;
 	menulist_s			crosshaircolor;
+	menuradiobutton_s	crosshairhealth;
 	menuradiobutton_s	simpleitems;
 	menuradiobutton_s	brass;
 	menuradiobutton_s	wallmarks;
-	menuradiobutton_s	dynamiclights;
+	menulist_s			dynamiclights;
 	menuradiobutton_s	identifytarget;
 	menuradiobutton_s	highqualitysky;
 	menuradiobutton_s	synceveryframe;
 	menuradiobutton_s	forcemodel;
 	menulist_s			drawteamoverlay;
+	menulist_s			drawffabackground;
 	menulist_s			damageeffect;
 	menulist_s			blood;
 	menuradiobutton_s	damageplums;
@@ -94,6 +100,13 @@ static const char *teamoverlay_names[] =
 	NULL
 };
 
+static const char *hudbackground_names[] =
+{
+	"Team",
+	"Always",
+	NULL
+};
+
 static const char *damageeffect_names[] =
 {
 	"Classic",
@@ -116,6 +129,15 @@ static const char *followmode_names[] =
 	NULL
 };
 
+static const char *dynamiclights_names[] =
+{
+	"Off",
+	"Low",
+	"Medium",
+	"High",
+	NULL
+};
+
 static const char *tvdownload_names[] =
 {
 	"Off",
@@ -135,27 +157,30 @@ static void Preferences_SetMenuItems( void ) {
 	}
 	s_preferences.crosshaircolor.curvalue = gamecodetoui[c];
 
+	s_preferences.crosshairsize.curvalue	= trap_Cvar_VariableValue( "cg_crosshairSize" ) / 16.0f;
+	s_preferences.crosshairhealth.curvalue	= trap_Cvar_VariableValue( "cg_crosshairHealth" ) != 0;
+
 	s_preferences.simpleitems.curvalue		= trap_Cvar_VariableValue( "cg_simpleItems" ) != 0;
 	s_preferences.brass.curvalue			= trap_Cvar_VariableValue( "cg_brassTime" ) != 0;
 	s_preferences.wallmarks.curvalue		= trap_Cvar_VariableValue( "cg_marks" ) != 0;
 	s_preferences.identifytarget.curvalue	= trap_Cvar_VariableValue( "cg_drawCrosshairNames" ) != 0;
-	s_preferences.dynamiclights.curvalue	= trap_Cvar_VariableValue( "r_dynamiclight" ) != 0;
+	// r_dynamiclight is the master switch and r_dlightMode picks the quality
+	// behind it, so one row folds both into a single off/low/medium/high step
+	if ( trap_Cvar_VariableValue( "r_dynamiclight" ) == 0 ) {
+		s_preferences.dynamiclights.curvalue	= 0;
+	} else {
+		s_preferences.dynamiclights.curvalue	= Com_Clamp( 1, 3, trap_Cvar_VariableValue( "r_dlightMode" ) + 1 );
+	}
 	s_preferences.highqualitysky.curvalue	= trap_Cvar_VariableValue ( "r_fastsky" ) == 0;
 	s_preferences.synceveryframe.curvalue	= trap_Cvar_VariableValue( "r_swapinterval" ) != 0;
 	s_preferences.forcemodel.curvalue		= trap_Cvar_VariableValue( "cg_forcemodel" ) != 0;
 	s_preferences.drawteamoverlay.curvalue	= Com_Clamp( 0, 3, trap_Cvar_VariableValue( "cg_drawTeamOverlay" ) );
+	s_preferences.drawffabackground.curvalue = Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_drawFFABackground" ) );
 	s_preferences.damageeffect.curvalue		= trap_Cvar_VariableValue( "cg_damageEffect" ) != 0;
 	s_preferences.blood.curvalue			= Com_Clamp( 0, 2, trap_Cvar_VariableValue( "com_blood" ) );
 	s_preferences.damageplums.curvalue		= trap_Cvar_VariableValue( "cg_damagePlums" ) != 0;
 	s_preferences.followmode.curvalue		= Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_followMode" ) );
 	s_preferences.allowdownload.curvalue	= trap_Cvar_VariableValue( "cl_allowDownload" ) != 0;
-
-	{
-		char buf[16];
-		trap_Cvar_VariableStringBuffer( "cl_tvDownload", buf, sizeof(buf) );
-		s_preferences.hasTvDownload = ( buf[0] != '\0' );
-		s_preferences.tvdownload.curvalue = Com_Clamp( 0, 2, atoi( buf ) );
-	}
 }
 
 
@@ -171,6 +196,14 @@ static void Preferences_Event( void* ptr, int notification ) {
 			s_preferences.crosshair.curvalue = 0;
 		}
 		trap_Cvar_SetValue( "cg_drawCrosshair", s_preferences.crosshair.curvalue );
+		break;
+
+	case ID_CROSSHAIRSIZE:
+		trap_Cvar_SetValue( "cg_crosshairSize", s_preferences.crosshairsize.curvalue * 16.0f );
+		break;
+
+	case ID_CROSSHAIRHEALTH:
+		trap_Cvar_SetValue( "cg_crosshairHealth", s_preferences.crosshairhealth.curvalue );
 		break;
 
 	case ID_SIMPLEITEMS:
@@ -193,8 +226,13 @@ static void Preferences_Event( void* ptr, int notification ) {
 		break;
 
 	case ID_DYNAMICLIGHTS:
-		trap_Cvar_SetValue( "r_dynamiclight", s_preferences.dynamiclights.curvalue );
-		break;		
+		trap_Cvar_SetValue( "r_dynamiclight", s_preferences.dynamiclights.curvalue != 0 );
+		// leave the mode alone when switching off so the chosen quality
+		// survives a trip through Off and back
+		if ( s_preferences.dynamiclights.curvalue != 0 ) {
+			trap_Cvar_SetValue( "r_dlightMode", s_preferences.dynamiclights.curvalue - 1 );
+		}
+		break;
 
 	case ID_IDENTIFYTARGET:
 		trap_Cvar_SetValue( "cg_drawCrosshairNames", s_preferences.identifytarget.curvalue );
@@ -210,6 +248,10 @@ static void Preferences_Event( void* ptr, int notification ) {
 
 	case ID_DRAWTEAMOVERLAY:
 		trap_Cvar_SetValue( "cg_drawTeamOverlay", s_preferences.drawteamoverlay.curvalue );
+		break;
+
+	case ID_DRAWFFABACKGROUND:
+		trap_Cvar_SetValue( "cg_drawFFABackground", s_preferences.drawffabackground.curvalue );
 		break;
 
 	case ID_ALLOWDOWNLOAD:
@@ -374,10 +416,22 @@ static void CrosshairColor_Draw( void *self ) {
 
 static void Preferences_MenuInit( void ) {
 	int				y;
+	int				rows;
+	qboolean		vrEnabled;
 
 	memset( &s_preferences, 0 ,sizeof(preferences_t) );
 
 	Preferences_Cache();
+
+	vrEnabled = ( UI_VR_Platform() != VRP_NONE );
+
+	// resolve the optional TVD download row before layout so it can be counted
+	{
+		char buf[16];
+		trap_Cvar_VariableStringBuffer( "cl_tvDownload", buf, sizeof(buf) );
+		s_preferences.hasTvDownload = ( buf[0] != '\0' );
+		s_preferences.tvdownload.curvalue = Com_Clamp( 0, 2, atoi( buf ) );
+	}
 
 	s_preferences.menu.wrapAround = qtrue;
 	s_preferences.menu.fullscreen = qtrue;
@@ -405,7 +459,17 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.framer.width  	   = 256;
 	s_preferences.framer.height  	   = 334;
 
-	y = 96;	// recentered after dropping the Mode control (frees one BIGCHAR_HEIGHT row)
+	// center the option column on the frame center (y=242): the count runs from
+	// Crosshair through Automatic Downloading, less the VR-gated Sync Every Frame
+	// row and plus the TVD Download row when cl_tvDownload is set
+	rows = 19;
+	if ( vrEnabled ) {
+		rows--;
+	}
+	if ( s_preferences.hasTvDownload ) {
+		rows++;
+	}
+	y = 224 - ( rows - 2 ) * 8;
 	s_preferences.crosshair.generic.type		= MTYPE_TEXT;
 	s_preferences.crosshair.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT|QMF_NODEFAULTINIT|QMF_OWNERDRAW;
 	s_preferences.crosshair.generic.x			= PREFERENCES_X_POS;
@@ -420,6 +484,17 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.crosshair.generic.right		= PREFERENCES_X_POS + 48;
 
 	y += BIGCHAR_HEIGHT+4;
+	s_preferences.crosshairsize.generic.type		= MTYPE_SLIDER;
+	s_preferences.crosshairsize.generic.name		= "Crosshair Size:";
+	s_preferences.crosshairsize.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.crosshairsize.generic.callback	= Preferences_Event;
+	s_preferences.crosshairsize.generic.id			= ID_CROSSHAIRSIZE;
+	s_preferences.crosshairsize.generic.x			= PREFERENCES_X_POS;
+	s_preferences.crosshairsize.generic.y			= y;
+	s_preferences.crosshairsize.minvalue			= 0.5f;
+	s_preferences.crosshairsize.maxvalue			= 1.5f;
+
+	y += BIGCHAR_HEIGHT;
 	s_preferences.crosshaircolor.generic.type		= MTYPE_SPINCONTROL;
 	s_preferences.crosshaircolor.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT|QMF_NODEFAULTINIT|QMF_OWNERDRAW;
 	s_preferences.crosshaircolor.generic.x			= PREFERENCES_X_POS;
@@ -433,6 +508,15 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.crosshaircolor.generic.left		= PREFERENCES_X_POS - ( ( strlen(s_preferences.crosshaircolor.generic.name) + 1 ) * SMALLCHAR_WIDTH );
 	s_preferences.crosshaircolor.generic.right		= PREFERENCES_X_POS + SMALLCHAR_WIDTH + 128;
 	s_preferences.crosshaircolor.numitems			= 7;
+
+	y += BIGCHAR_HEIGHT;
+	s_preferences.crosshairhealth.generic.type     = MTYPE_RADIOBUTTON;
+	s_preferences.crosshairhealth.generic.name	   = "Crosshair Health Tint:";
+	s_preferences.crosshairhealth.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.crosshairhealth.generic.callback = Preferences_Event;
+	s_preferences.crosshairhealth.generic.id       = ID_CROSSHAIRHEALTH;
+	s_preferences.crosshairhealth.generic.x	       = PREFERENCES_X_POS;
+	s_preferences.crosshairhealth.generic.y	       = y;
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.simpleitems.generic.type        = MTYPE_RADIOBUTTON;
@@ -462,13 +546,14 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.brass.generic.y	              = y;
 
 	y += BIGCHAR_HEIGHT;
-	s_preferences.dynamiclights.generic.type      = MTYPE_RADIOBUTTON;
+	s_preferences.dynamiclights.generic.type      = MTYPE_SPINCONTROL;
 	s_preferences.dynamiclights.generic.name	  = "Dynamic Lights:";
 	s_preferences.dynamiclights.generic.flags     = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_preferences.dynamiclights.generic.callback  = Preferences_Event;
 	s_preferences.dynamiclights.generic.id        = ID_DYNAMICLIGHTS;
 	s_preferences.dynamiclights.generic.x	      = PREFERENCES_X_POS;
 	s_preferences.dynamiclights.generic.y	      = y;
+	s_preferences.dynamiclights.itemnames         = dynamiclights_names;
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.identifytarget.generic.type     = MTYPE_RADIOBUTTON;
@@ -488,14 +573,17 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.highqualitysky.generic.x	      = PREFERENCES_X_POS;
 	s_preferences.highqualitysky.generic.y	      = y;
 
-	y += BIGCHAR_HEIGHT;
-	s_preferences.synceveryframe.generic.type     = MTYPE_RADIOBUTTON;
-	s_preferences.synceveryframe.generic.name	  = "Sync Every Frame:";
-	s_preferences.synceveryframe.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_preferences.synceveryframe.generic.callback = Preferences_Event;
-	s_preferences.synceveryframe.generic.id       = ID_SYNCEVERYFRAME;
-	s_preferences.synceveryframe.generic.x	      = PREFERENCES_X_POS;
-	s_preferences.synceveryframe.generic.y	      = y;
+	// swap-interval is the runtime's business under VR; the list closes the gap
+	if ( !vrEnabled ) {
+		y += BIGCHAR_HEIGHT;
+		s_preferences.synceveryframe.generic.type     = MTYPE_RADIOBUTTON;
+		s_preferences.synceveryframe.generic.name	  = "Sync Every Frame:";
+		s_preferences.synceveryframe.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+		s_preferences.synceveryframe.generic.callback = Preferences_Event;
+		s_preferences.synceveryframe.generic.id       = ID_SYNCEVERYFRAME;
+		s_preferences.synceveryframe.generic.x	      = PREFERENCES_X_POS;
+		s_preferences.synceveryframe.generic.y	      = y;
+	}
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.forcemodel.generic.type     = MTYPE_RADIOBUTTON;
@@ -515,6 +603,16 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.drawteamoverlay.generic.x	       = PREFERENCES_X_POS;
 	s_preferences.drawteamoverlay.generic.y	       = y;
 	s_preferences.drawteamoverlay.itemnames			= teamoverlay_names;
+
+	y += BIGCHAR_HEIGHT;
+	s_preferences.drawffabackground.generic.type     = MTYPE_SPINCONTROL;
+	s_preferences.drawffabackground.generic.name	 = "HUD Background:";
+	s_preferences.drawffabackground.generic.flags	 = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.drawffabackground.generic.callback = Preferences_Event;
+	s_preferences.drawffabackground.generic.id       = ID_DRAWFFABACKGROUND;
+	s_preferences.drawffabackground.generic.x	     = PREFERENCES_X_POS;
+	s_preferences.drawffabackground.generic.y	     = y;
+	s_preferences.drawffabackground.itemnames		 = hudbackground_names;
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.damageeffect.generic.type       = MTYPE_SPINCONTROL;
@@ -591,16 +689,21 @@ static void Preferences_MenuInit( void ) {
 	Menu_AddItem( &s_preferences.menu, &s_preferences.framer );
 
 	Menu_AddItem( &s_preferences.menu, &s_preferences.crosshair );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.crosshairsize );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.crosshaircolor );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.crosshairhealth );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.simpleitems );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.wallmarks );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.brass );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.dynamiclights );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.identifytarget );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.highqualitysky );
-	Menu_AddItem( &s_preferences.menu, &s_preferences.synceveryframe );
+	if ( !vrEnabled ) {
+		Menu_AddItem( &s_preferences.menu, &s_preferences.synceveryframe );
+	}
 	Menu_AddItem( &s_preferences.menu, &s_preferences.forcemodel );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.drawteamoverlay );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.drawffabackground );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageeffect );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.blood );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageplums );

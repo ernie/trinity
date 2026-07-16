@@ -54,25 +54,7 @@ UI_CVAR( ui_drawCrosshairNames, "cg_drawCrosshairNames", "1", CVAR_ARCHIVE )
 UI_CVAR( ui_marks, "cg_marks", "1", CVAR_ARCHIVE )
 UI_CVAR( ui_blood, "com_blood", "2", CVAR_ARCHIVE_ND )	// so the menu can read/persist it before cgame loads
 
-UI_CVAR( ui_server1, "server1", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server2, "server2", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server3, "server3", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server4, "server4", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server5, "server5", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server6, "server6", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server7, "server7", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server8, "server8", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server9, "server9", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server10, "server10", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server11, "server11", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server12, "server12", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server13, "server13", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server14, "server14", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server15, "server15", "", CVAR_ARCHIVE )
-UI_CVAR( ui_server16, "server16", "", CVAR_ARCHIVE )
-
-
-UI_CVAR( ui_cdkeychecked, "ui_cdkeychecked", "0", CVAR_ROM )
+UI_CVAR( ui_cdkeychecked, "ui_cdkeychecked", "1", CVAR_ROM )
 
 UI_CVAR( ui_trinitySigil, "ui_trinitySigil", "1", CVAR_ARCHIVE )
 

@@ -48,6 +48,8 @@ typedef struct {
 
 static displayOptionsInfo_t	displayOptionsInfo;
 
+static qboolean				displayOptions_vr;
+
 
 /*
 =================
@@ -83,7 +85,9 @@ static void UI_DisplayOptionsMenu_Event( void* ptr, int event ) {
 		break;
 	
 	case ID_SCREENSIZE:
-		trap_Cvar_SetValue( "cg_viewsize", displayOptionsInfo.screensize.curvalue * 10 );
+		if ( !displayOptions_vr ) {
+			trap_Cvar_SetValue( "cg_viewsize", displayOptionsInfo.screensize.curvalue * 10 );
+		}
 		break;
 
 	case ID_HDRCALIB:
@@ -108,6 +112,9 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	memset( &displayOptionsInfo, 0, sizeof(displayOptionsInfo) );
 
 	UI_DisplayOptionsMenu_Cache();
+
+	displayOptions_vr = ( UI_VR_Platform() != VRP_NONE );
+
 	displayOptionsInfo.menu.wrapAround = qtrue;
 	displayOptionsInfo.menu.fullscreen = qtrue;
 
@@ -175,7 +182,14 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.network.style				= UI_RIGHT;
 	displayOptionsInfo.network.color				= color_red;
 
-	y = 240 - 2 * (BIGCHAR_HEIGHT+2);
+	// content column centered on the frame: Brightness + gap + HDR Calibration
+	// link (3 slots) under VR, plus the Screen Size row (4 slots) on flatscreen
+	if( displayOptions_vr ) {
+		y = 242 - ( 3 * (BIGCHAR_HEIGHT+2) ) / 2;
+	}
+	else {
+		y = 242 - ( 4 * (BIGCHAR_HEIGHT+2) ) / 2;
+	}
 	displayOptionsInfo.brightness.generic.type		= MTYPE_SLIDER;
 	displayOptionsInfo.brightness.generic.name		= "Brightness:";
 	displayOptionsInfo.brightness.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -185,20 +199,22 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.brightness.generic.y			= y;
 	displayOptionsInfo.brightness.minvalue			= 5;
 	displayOptionsInfo.brightness.maxvalue			= 20;
-	if( !uis.glconfig.deviceSupportsGamma ) {
-		displayOptionsInfo.brightness.generic.flags |= QMF_GRAYED;
-	}
+	// the brightness slider sets r_gamma, which is always valid, so the row
+	// is never grayed
 
-	y += BIGCHAR_HEIGHT+2;
-	displayOptionsInfo.screensize.generic.type		= MTYPE_SLIDER;
-	displayOptionsInfo.screensize.generic.name		= "Screen Size:";
-	displayOptionsInfo.screensize.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	displayOptionsInfo.screensize.generic.callback	= UI_DisplayOptionsMenu_Event;
-	displayOptionsInfo.screensize.generic.id		= ID_SCREENSIZE;
-	displayOptionsInfo.screensize.generic.x			= 400;
-	displayOptionsInfo.screensize.generic.y			= y;
-	displayOptionsInfo.screensize.minvalue			= 3;
-    displayOptionsInfo.screensize.maxvalue			= 10;
+	// Screen Size is a flatscreen-only control; the runtime owns the view under VR
+	if( !displayOptions_vr ) {
+		y += BIGCHAR_HEIGHT+2;
+		displayOptionsInfo.screensize.generic.type		= MTYPE_SLIDER;
+		displayOptionsInfo.screensize.generic.name		= "Screen Size:";
+		displayOptionsInfo.screensize.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+		displayOptionsInfo.screensize.generic.callback	= UI_DisplayOptionsMenu_Event;
+		displayOptionsInfo.screensize.generic.id		= ID_SCREENSIZE;
+		displayOptionsInfo.screensize.generic.x			= 400;
+		displayOptionsInfo.screensize.generic.y			= y;
+		displayOptionsInfo.screensize.minvalue			= 3;
+		displayOptionsInfo.screensize.maxvalue			= 10;
+	}
 
 	y += BIGCHAR_HEIGHT+2;
 	y += BIGCHAR_HEIGHT+2;	// extra gap to separate the link from the sliders
@@ -234,12 +250,16 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.sound );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.network );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.brightness );
-	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.screensize );
+	if( !displayOptions_vr ) {
+		Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.screensize );
+	}
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.hdrcalib );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.back );
 
 	displayOptionsInfo.brightness.curvalue  = trap_Cvar_VariableValue("r_gamma") * 10;
-	displayOptionsInfo.screensize.curvalue  = trap_Cvar_VariableValue( "cg_viewsize")/10;
+	if( !displayOptions_vr ) {
+		displayOptionsInfo.screensize.curvalue  = trap_Cvar_VariableValue( "cg_viewsize")/10;
+	}
 }
 
 
