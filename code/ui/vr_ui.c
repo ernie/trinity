@@ -4,6 +4,7 @@
 // field-proven cgame bootstrap (vr_cgame.c).
 #include "ui_local.h"
 #include "../game/vr_shared.h"
+#include "../game/vr_trap.h"
 
 const char vr_api_sentinel[] = VR_API_SENTINEL;
 
@@ -60,59 +61,23 @@ void UI_VR_Init( void ) {
 	dll_com_trapGetValue = atoi( ext );
 #endif
 
-	if ( !trap_GetValue( ext, sizeof( ext ), "trap_VR_RegisterState" ) )
+	if ( !VR_RESOLVE( trap_VR_RegisterState, ext ) )
 		return;
-
-#ifdef Q3_VM
-	trap_VR_RegisterState = (void*)~atoi( ext );
-#else
-	dll_trap_VR_RegisterState = atoi( ext );
-#endif
 
 	vr_state.structSize = sizeof( vr_state );
 	vr_state.apiVersion = VR_API_VERSION;
 	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_VERSION );
 	vrActive = qtrue;
 
-	if ( trap_GetValue( ext, sizeof( ext ), "trap_HapticEvent" ) ) {
-#ifdef Q3_VM
-		trap_HapticEvent = (void*)~atoi( ext );
-#else
-		dll_trap_HapticEvent = atoi( ext );
-#endif
+	if ( VR_RESOLVE( trap_HapticEvent, ext ) )
 		hasHapticEvent = qtrue;
-	}
 
 	// virtual keyboard traps ship as a set; require all four
-	if ( trap_GetValue( ext, sizeof( ext ), "trap_VKeyboard_Show" ) ) {
-#ifdef Q3_VM
-		trap_VKeyboard_Show = (void*)~atoi( ext );
-#else
-		dll_trap_VKeyboard_Show = atoi( ext );
-#endif
-		if ( trap_GetValue( ext, sizeof( ext ), "trap_VKeyboard_Hide" ) ) {
-#ifdef Q3_VM
-			trap_VKeyboard_Hide = (void*)~atoi( ext );
-#else
-			dll_trap_VKeyboard_Hide = atoi( ext );
-#endif
-			if ( trap_GetValue( ext, sizeof( ext ), "trap_VKeyboard_IsActive" ) ) {
-#ifdef Q3_VM
-				trap_VKeyboard_IsActive = (void*)~atoi( ext );
-#else
-				dll_trap_VKeyboard_IsActive = atoi( ext );
-#endif
-				if ( trap_GetValue( ext, sizeof( ext ), "trap_VKeyboard_HandleKey" ) ) {
-#ifdef Q3_VM
-					trap_VKeyboard_HandleKey = (void*)~atoi( ext );
-#else
-					dll_trap_VKeyboard_HandleKey = atoi( ext );
-#endif
-					hasVKeyboard = qtrue;
-				}
-			}
-		}
-	}
+	if ( VR_RESOLVE( trap_VKeyboard_Show, ext ) &&
+	     VR_RESOLVE( trap_VKeyboard_Hide, ext ) &&
+	     VR_RESOLVE( trap_VKeyboard_IsActive, ext ) &&
+	     VR_RESOLVE( trap_VKeyboard_HandleKey, ext ) )
+		hasVKeyboard = qtrue;
 
 	// engine cursor-registration replacement: the UI owns the menu cursor
 	vr->menuCursorActive = qtrue;

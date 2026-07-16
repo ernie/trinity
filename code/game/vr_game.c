@@ -2,6 +2,7 @@
 #include "g_local.h"
 #include "vr_bg.h"
 #include "vr_game.h"
+#include "vr_trap.h"
 
 // VR shared-state mirror. The engine's VR-aware QVM ladder scans each
 // module's .qvm for this sentinel, so the game module carries its own copy.
@@ -44,13 +45,7 @@ void G_VR_Init( void ) {
 		dll_com_trapGetValue = atoi( ext );
 #endif
 
-		if ( trap_GetValue( ext, sizeof( ext ), "trap_VR_RegisterState" ) ) {
-#ifdef Q3_VM
-			trap_VR_RegisterState = (void*)~atoi( ext );
-#else
-			dll_trap_VR_RegisterState = atoi( ext );
-#endif
-
+		if ( VR_RESOLVE( trap_VR_RegisterState, ext ) ) {
 			vr_state.structSize = sizeof( vr_state );
 			vr_state.apiVersion = VR_API_VERSION;
 			trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_VERSION );

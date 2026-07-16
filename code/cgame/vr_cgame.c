@@ -3,6 +3,7 @@
 #include "cg_local.h"
 #include "../game/vr_bg.h"
 #include "../game/vr_shared.h"
+#include "../game/vr_trap.h"
 
 const char vr_api_sentinel[] = VR_API_SENTINEL;
 
@@ -47,68 +48,25 @@ void CG_VR_Init( void ) {
 	dll_com_trapGetValue = atoi( ext );
 #endif
 
-	if ( !trap_GetValue( ext, sizeof( ext ), "trap_VR_RegisterState" ) )
+	if ( !VR_RESOLVE( trap_VR_RegisterState, ext ) )
 		return;
-
-#ifdef Q3_VM
-	trap_VR_RegisterState = (void*)~atoi( ext );
-#else
-	dll_trap_VR_RegisterState = atoi( ext );
-#endif
 
 	vr_state.structSize = sizeof( vr_state );
 	vr_state.apiVersion = VR_API_VERSION;
 	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_VERSION );
 	vrActive = qtrue;
 
-	if ( trap_GetValue( ext, sizeof( ext ), "trap_R_BeginPostBloom2D" ) ) {
-#ifdef Q3_VM
-		trap_R_BeginPostBloom2D = (void*)~atoi( ext );
-#else
-		dll_trap_R_BeginPostBloom2D = atoi( ext );
-#endif
+	if ( VR_RESOLVE( trap_R_BeginPostBloom2D, ext ) )
 		hasPostBloom2D = qtrue;
-	}
-	if ( trap_GetValue( ext, sizeof( ext ), "trap_R_EndPostBloom2D" ) ) {
-#ifdef Q3_VM
-		trap_R_EndPostBloom2D = (void*)~atoi( ext );
-#else
-		dll_trap_R_EndPostBloom2D = atoi( ext );
-#endif
-	}
+	VR_RESOLVE( trap_R_EndPostBloom2D, ext );
 
-	if ( trap_GetValue( ext, sizeof( ext ), "trap_R_HUDBufferStart" ) ) {
-#ifdef Q3_VM
-		trap_R_HUDBufferStart = (void*)~atoi( ext );
-#else
-		dll_trap_R_HUDBufferStart = atoi( ext );
-#endif
-	}
-	if ( trap_GetValue( ext, sizeof( ext ), "trap_R_HUDBufferEnd" ) ) {
-#ifdef Q3_VM
-		trap_R_HUDBufferEnd = (void*)~atoi( ext );
-#else
-		dll_trap_R_HUDBufferEnd = atoi( ext );
-#endif
-	}
-#ifdef Q3_VM
-	if ( trap_R_HUDBufferStart && trap_R_HUDBufferEnd ) {
+	VR_RESOLVE( trap_R_HUDBufferStart, ext );
+	VR_RESOLVE( trap_R_HUDBufferEnd, ext );
+	if ( VR_HAVE( trap_R_HUDBufferStart ) && VR_HAVE( trap_R_HUDBufferEnd ) )
 		hasHUDBuffer = qtrue;
-	}
-#else
-	if ( dll_trap_R_HUDBufferStart && dll_trap_R_HUDBufferEnd ) {
-		hasHUDBuffer = qtrue;
-	}
-#endif
 
-	if ( trap_GetValue( ext, sizeof( ext ), "trap_HapticEvent" ) ) {
-#ifdef Q3_VM
-		trap_HapticEvent = (void*)~atoi( ext );
-#else
-		dll_trap_HapticEvent = atoi( ext );
-#endif
+	if ( VR_RESOLVE( trap_HapticEvent, ext ) )
 		hasHapticEvent = qtrue;
-	}
 
 	if ( vrActive ) {
 		char buf[16];
@@ -2411,13 +2369,8 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 		}
 	}
 
-#ifdef Q3_VM
-	if ( hasPostBloom2D && trap_R_EndPostBloom2D )
+	if ( hasPostBloom2D && VR_HAVE( trap_R_EndPostBloom2D ) )
 		trap_R_EndPostBloom2D();
-#else
-	if ( hasPostBloom2D && dll_trap_R_EndPostBloom2D )
-		trap_R_EndPostBloom2D();
-#endif
 
 	return qtrue;
 }
