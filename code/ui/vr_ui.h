@@ -1,6 +1,6 @@
 // Vendored VR API - Team Arena UI module hooks (vr_ui). Bootstrap, menu-cursor
 // lifecycle, haptic wrapper, and virtual-keyboard traps. Dormancy-safe: on a
-// flatscreen host UI_VR_Init leaves the mirror zeroed and vrActive false;
+// flatscreen engine UI_VR_Init leaves the mirror zeroed and vrActive false;
 // the haptic/vkeyboard wrappers no-op.
 #ifndef VR_UI_H
 #define VR_UI_H

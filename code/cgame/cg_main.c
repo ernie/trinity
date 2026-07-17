@@ -1105,7 +1105,6 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.bloodMarkShader = trap_R_RegisterShader( "bloodMark" );
 
 	//Used for the weapon selector
-	cgs.media.smallSphereModel = trap_R_RegisterModel("models/powerups/health/small_sphere.md3");
 
 	// register the inline models
 	cgs.numInlineModels = trap_CM_NumInlineModels();
@@ -1993,7 +1992,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );
 
-	cg.deathCamTime = -1;
+	CG_VR_DeathCamReset();
 	cgs.voteCaller = -1;
 	cgs.teamVoteCaller[0] = cgs.teamVoteCaller[1] = -1;
 

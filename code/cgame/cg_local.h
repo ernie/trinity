@@ -537,10 +537,6 @@ typedef struct {
 
 	qboolean	renderingThirdPerson;		// during deaths, chasecams, etc
 
-	qboolean	drawingHUD;			// inside VR HUD-buffer 2D pass
-	qboolean	drawingZoomedHUD;	// inside weapon-zoom minimal HUD pass
-	float		worldscale;			// vr_worldscale mirror, refreshed each frame
-
 	// prediction state
 	qboolean	hyperspace;				// true if prediction has hit a trigger_teleport
 	playerState_t	predictedPlayerState;
@@ -573,7 +569,6 @@ typedef struct {
 	// view rendering
 	refdef_t	refdef;
 	vec3_t		refdefViewAngles;		// will be converted to refdef.viewaxis
-	vec3_t		vr_vieworigin;			// last first-person view origin (VR)
 
 	// zoom key
 	qboolean	zoomed;
@@ -690,12 +685,6 @@ typedef struct {
 	int			weaponAnimation;
 	int			weaponAnimationTime;
 
-	int                     weaponSelectorSelection;
-	int   		weaponSelectorTime;
-	vec3_t		weaponSelectorAngles;
-	vec3_t		weaponSelectorOrigin;
-	vec3_t		weaponSelectorOffset;
-
 	// blend blobs
 	int			damageTime;
 	float		damageX, damageY, damageValue;
@@ -745,11 +734,6 @@ typedef struct {
 
 	qboolean		skipDFshaders;
 
-	// VR HUD portrait head smoothing (independent of the first-person view above)
-	float			vrPortraitPitch;		// smoothed portrait head pitch (absolute world)
-	float			vrPortraitYaw;			// smoothed portrait-space head yaw (180 = facing viewer, plus head offset off weapon aim)
-	qboolean		vrPortraitInitialized;	// set once first valid target is computed
-
 	// Follow camera orbit state
 	vec3_t			orbitAngles;			// yaw, pitch for orbit camera
 	float			orbitDistance;			// current distance from player
@@ -757,17 +741,7 @@ typedef struct {
 	int				orbitLastCmdAngles[3];	// previous frame's cmd.angles
 	qboolean		orbitInitialized;		// set once orbit state has been seeded
 
-	// smooth follow camera control (spherical coordinates)
-	float			smoothFollow_distance;          // current radius from player
-	float			smoothFollow_distanceTarget;    // target radius (smoothly lerped to)
-	float			smoothFollow_yaw;               // horizontal angle around player
-	float			smoothFollow_pitch;             // vertical angle (elevation)
-	float			smoothFollow_hmdYawOffset;      // HMD yaw captured at recenter
-	qboolean		smoothFollow_initialized;       // set once camera state has been seeded
 	int				followLastClientNum;	// detect followed-player changes
-
-	// death cam grace period
-	int				deathCamTime;			// cg.time when death cam activated, -1 = inactive
 
 	// Free-fly camera state (TV / demo)
 	vec3_t			freeFlyOrigin;
@@ -945,15 +919,11 @@ typedef struct {
 	qhandle_t	blueKamikazeShader;
 #endif
 
-	qhandle_t	smallSphereModel;
-
 	// weapon effect models
 	qhandle_t	bulletFlashModel;
 	qhandle_t	ringFlashModel;
 	qhandle_t	dishFlashModel;
 	qhandle_t	lightningExplosionModel;
-
-	qhandle_t	reticleShader;
 
 	// weapon effect shaders
 	qhandle_t	railExplosionShader;
@@ -1942,10 +1912,6 @@ extern int dll_trap_R_HUDBufferEnd;
 extern int dll_trap_HapticEvent;
 #endif
 
-void CG_DrawScreen2D( void );
-void CG_DrawCrosshair3D( void );
-void CG_Draw2D( stereoFrame_t stereoFrame );
-void CG_Draw2DMinimal( stereoFrame_t stereoView );
-void CG_WarmupEvents( void );
-
+#include "vr_host_config.h"
+#include "vr_host.h"
 #include "vr_cgame.h"

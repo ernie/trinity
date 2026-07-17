@@ -1,6 +1,6 @@
 // VR API bootstrap for the baseq3 UI module. Name-resolves the extension traps
 // and registers the vr_shared_t mirror so the UI runs VR-aware under the VR
-// engine, and degrades to normal mouse mode on a flatscreen host. Mirrors the
+// engine, and degrades to normal mouse mode on a flatscreen engine. Mirrors the
 // field-proven cgame bootstrap (vr_cgame.c).
 #include "ui_local.h"
 #include "../game/vr_shared.h"
@@ -100,7 +100,7 @@ void UI_VRHaptic( const char *description, int position, int channel, int intens
 	trap_HapticEvent( description, position, channel, intensity, yaw, height );
 }
 
-// Virtual keyboard wrappers; dormant on a flatscreen host.
+// Virtual keyboard wrappers; dormant on a flatscreen engine.
 
 void UI_VKeyboardShow( void ) {
 	if ( !vrActive )

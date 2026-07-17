@@ -32,7 +32,7 @@ BG_VR_UpdateViewAngles
 delta_angles compensation; pitch/roll come raw from the command. Returns qtrue
 after applying the full circular clamp for the 6DOF client; qfalse leaves the
 stock loop to run (dormant mirror: use_6dof reads 0, so this is qfalse on
-flatscreen hosts and for every other client).
+flatscreen engines and for every other client).
 ============
 */
 qboolean BG_VR_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
@@ -66,29 +66,27 @@ qboolean BG_VR_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd ) {
 
 /*
 ============
-BG_VR_PmovePhysics
+BG_VR_PmoveFriction / BG_VR_PmoveAccelerate
 
-6DoF (single-player only): the body must track the HMD instantly.
-Clone the active mode and override only the two movement coefficients
-so every downstream pm_mode-> read stays identical to the server.
-Recomputed every tick on purpose - use_6dof can toggle mid-session
-(e.g. the SP intermission podium), so this must never be cached.
-(Full-struct copy; the movement fields are the struct prefix if a
-future profiler ever justifies a movement-only clone.)
-Identity transform when the mirror is dormant or the ps isn't the VR client.
+6DoF (single-player only): the body must track the HMD instantly, so ground
+friction and acceleration are overridden while every other movement number
+stays identical to the server's. Value transforms over the host's own
+movement config - the drop needs no knowledge of how the host stores it.
+Recomputed every tick on purpose: use_6dof can toggle mid-session (e.g. the
+SP intermission podium), so these must never be cached. Identity transforms
+when the mirror is dormant or the ps isn't the VR client.
 ============
 */
-const modeConfig_t *BG_VR_PmovePhysics( const playerState_t *ps, const modeConfig_t *mode ) {
-	static modeConfig_t vr6dof;
+static qboolean BG_VR_Is6DOFClient( const playerState_t *ps ) {
+	return ( vr->clientNum == ps->clientNum && vr->use_6dof ) ? qtrue : qfalse;
+}
 
-	if ( !( vr->clientNum == ps->clientNum && vr->use_6dof ) ) {
-		return mode;
-	}
+float BG_VR_PmoveFriction( const playerState_t *ps, float stockFriction ) {
+	return BG_VR_Is6DOFClient( ps ) ? 10.0f : stockFriction;
+}
 
-	vr6dof = *mode;
-	vr6dof.friction         = 10.0f;
-	vr6dof.groundAccelerate = 1000.0f;
-	return &vr6dof;
+float BG_VR_PmoveAccelerate( const playerState_t *ps, float stockAccelerate ) {
+	return BG_VR_Is6DOFClient( ps ) ? 1000.0f : stockAccelerate;
 }
 
 /*

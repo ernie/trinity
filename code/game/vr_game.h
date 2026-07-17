@@ -1,6 +1,6 @@
 // Vendored VR API - game-module hooks (vr_game). Bootstrap, head-bit codec,
 // 6DOF aim/muzzle overrides, and config-mirror writes. Every hook is
-// dormancy-safe: on a flatscreen host G_VR_Init leaves the mirror zeroed and
+// dormancy-safe: on a flatscreen engine G_VR_Init leaves the mirror zeroed and
 // g_vrActive false, predicates return qfalse, transforms leave stock values.
 #ifndef VR_GAME_H
 #define VR_GAME_H

@@ -1,6 +1,6 @@
 // VR API bootstrap for the Team Arena UI module. Name-resolves the extension
 // traps and registers the vr_shared_t mirror so the UI runs VR-aware under the
-// VR engine, and degrades to normal mouse mode on a flatscreen host. Mirrors the
+// VR engine, and degrades to normal mouse mode on a flatscreen engine. Mirrors the
 // field-proven cgame bootstrap (vr_cgame.c).
 #include "ui_local.h"
 #include "../game/vr_shared.h"
@@ -100,7 +100,7 @@ void UI_VRHaptic( const char *description, int position, int channel, int intens
 	trap_HapticEvent( description, position, channel, intensity, yaw, height );
 }
 
-// Virtual keyboard wrappers; dormant on a flatscreen host.
+// Virtual keyboard wrappers; dormant on a flatscreen engine.
 
 void UI_VKeyboardShow( void ) {
 	if ( !vrActive )
@@ -183,7 +183,7 @@ UI_VR_LoadMenus
 
 Loads the VR options pages when running under a VR engine. Platform-variant
 pages are selected by UI_VR_Platform(), which applies the two-gate rule: a
-dormant mirror (flatscreen host) or an unrecognized vr_platform value both
+dormant mirror (flatscreen engine) or an unrecognized vr_platform value both
 collapse to VRP_NONE, and no VR pages are parsed either way.
 ===============
 */

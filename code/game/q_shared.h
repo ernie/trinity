@@ -280,7 +280,6 @@ typedef vec_t vec3_t[3];
 typedef vec_t vec4_t[4];
 typedef vec_t vec5_t[5];
 
-typedef vec_t matrix4x4[4][4];
 
 typedef	int	fixed4_t;
 typedef	int	fixed8_t;

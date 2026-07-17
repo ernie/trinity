@@ -14,6 +14,60 @@ static int probeFrame = 0;
 static int lastEchoSent = 0;
 static int echoFailures = 0;
 
+// 4x4 matrix for the world-oriented entity math below (drop-local type).
+typedef vec_t vr_matrix4x4[4][4];
+#define vr_matrix4x4 vr_matrix4x4
+
+// VR module state, formerly cg_t/cgs_t fields. The drop owns all of it;
+// hosts read through the accessors and reset through the call-outs at the
+// bottom of this file.
+static float    vrc_worldscale;
+static vec3_t   vrc_vieworigin;              // last first-person view origin
+static int      vrc_deathCamTime = -1;       // cg.time death cam began, -1 inactive
+static int      vrc_followLastClientNum = -1;
+static float    vrc_smoothFollow_distance;
+static float    vrc_smoothFollow_distanceTarget;
+static float    vrc_smoothFollow_yaw;
+static float    vrc_smoothFollow_pitch;
+static float    vrc_smoothFollow_hmdYawOffset;
+static qboolean vrc_smoothFollow_initialized;
+static int      vrc_weaponSelectorSelection;
+static int      vrc_weaponSelectorTime;      // wheel open timestamp, 0 closed
+static vec3_t   vrc_weaponSelectorAngles;
+static vec3_t   vrc_weaponSelectorOrigin;
+static vec3_t   vrc_weaponSelectorOffset;
+static qboolean vrc_drawingHUD;              // inside the HUD-buffer 2D pass
+static qboolean vrc_drawingZoomedHUD;        // inside the zoom minimal-HUD pass
+static float    vrc_portraitPitch;
+static float    vrc_portraitYaw;
+static qboolean vrc_portraitInitialized;
+static qhandle_t vrc_reticleShader;
+static qhandle_t vrc_hudShader;
+static qhandle_t vrc_smallSphereModel;
+
+// Drop-owned vmCvars, registered in CG_VR_Init and refreshed in CG_VR_Frame;
+// no host cvar-table entries are required.
+static vmCvar_t cg_vrApiProbe;
+static vmCvar_t cg_debugWeaponAiming;
+static vmCvar_t cg_weaponSelectorSimple2DIcons;
+static vmCvar_t cg_firstPersonBodyScale;
+static vmCvar_t cg_smoothFollow;
+
+// Optional host features, routed through one gate each (vr_host_config.h).
+static void VR_HostWarmupEvents( void ) {
+#if VR_HOST_HAS_WARMUP_EVENTS
+	CG_WarmupEvents();
+#endif
+}
+
+static qboolean VR_HostTVPlayback( void ) {
+#if VR_HOST_HAS_TV
+	return cgs.tvPlayback;
+#else
+	return qfalse;
+#endif
+}
+
 #ifdef Q3_VM
 void	(*trap_R_BeginPostBloom2D)( void );
 void	(*trap_R_EndPostBloom2D)( void );
@@ -30,6 +84,17 @@ int dll_trap_HapticEvent;
 
 void CG_VR_Init( void ) {
 	char ext[64];
+
+	// drop-owned cvars: registered before the dormancy early-outs so archived
+	// values persist and the probe toggle works on flatscreen engines too
+	trap_Cvar_Register( &cg_vrApiProbe, "cg_vrApiProbe", "0", 0 );
+	trap_Cvar_Register( &cg_debugWeaponAiming, "cg_debugWeaponAiming", "0", CVAR_ARCHIVE );
+	trap_Cvar_Register( &cg_weaponSelectorSimple2DIcons, "cg_weaponSelectorSimple2DIcons", "0", CVAR_ARCHIVE );
+	trap_Cvar_Register( &cg_firstPersonBodyScale, "cg_firstPersonBodyScale", "0", CVAR_ARCHIVE );
+	trap_Cvar_Register( &cg_smoothFollow, "cg_smoothFollow", "0", CVAR_ARCHIVE );
+
+	vrc_deathCamTime = -1;
+	vrc_followLastClientNum = -1;
 
 	// keep the sentinel referenced so the toolchain retains it in the data segment
 	if ( vr_api_sentinel[0] != 'T' )
@@ -82,6 +147,12 @@ void CG_VR_Init( void ) {
 }
 
 void CG_VR_Frame( void ) {
+	trap_Cvar_Update( &cg_vrApiProbe );
+	trap_Cvar_Update( &cg_debugWeaponAiming );
+	trap_Cvar_Update( &cg_weaponSelectorSimple2DIcons );
+	trap_Cvar_Update( &cg_firstPersonBodyScale );
+	trap_Cvar_Update( &cg_smoothFollow );
+
 	if ( vrActive && vr->scoreboardCursorActive ) {
 		cgs.cursorX = vr->scoreboardCursorX;
 		cgs.cursorY = vr->scoreboardCursorY;
@@ -91,7 +162,7 @@ void CG_VR_Frame( void ) {
 		char buf[32];
 
 		trap_Cvar_VariableStringBuffer( "vr_worldscale", buf, sizeof( buf ) );
-		cg.worldscale = atof( buf );
+		vrc_worldscale = atof( buf );
 	}
 
 	if ( vrActive ) {
@@ -210,23 +281,53 @@ void CG_VR_RegisterMedia( void ) {
 			CG_RegisterWeapon( i );
 		}
 
-		cgs.media.reticleShader = trap_R_RegisterShader( "gfx/weapon/scope" );
+		vrc_reticleShader = trap_R_RegisterShader( "gfx/weapon/scope" );
 
 		//HUD
-		cgs.media.hudShader = trap_R_RegisterShader( "sprites/vr/hud" );
+		vrc_hudShader = trap_R_RegisterShader( "sprites/vr/hud" );
+
+		// weapon-wheel hover blob (re-registered here so the drop needs no
+		// host media-table entry; the engine caches the handle)
+		vrc_smallSphereModel = trap_R_RegisterModel( "models/powerups/health/small_sphere.md3" );
 	}
 }
 
 void CG_VR_Shutdown( void ) {
 	if ( vrActive ) {
+#if VR_HOST_HAS_TV
 		// an active scrub must fully unwind here: restore menuYaw and release
 		// the lock, or the engine keeps suppressing input in the next session
 		if ( cgs.tvScrubActive ) {
 			vr->menuYawLocked = qfalse;
 			vr->menuYaw = cgs.tvScrubSavedMenuYaw;
 		}
+#endif
 		vr->scoreboardCursorActive = qfalse;
 	}
+}
+
+// ---- Host accessors and reset call-outs (drop state, host call sites) -----
+
+// Death-cam timer re-arm: the host calls this wherever the local player
+// (re)spawns or a new gamestate begins.
+void CG_VR_DeathCamReset( void ) {
+	vrc_deathCamTime = -1;
+}
+
+// HUD-portrait EMA re-seed: the host calls this when the portrait's subject
+// changes (e.g. the crosshair-target face swaps).
+void CG_VR_PortraitReset( void ) {
+	vrc_portraitInitialized = qfalse;
+}
+
+// qtrue while the zoom minimal-HUD pass is drawing (host layout reads).
+qboolean CG_VR_DrawingZoomedHUD( void ) {
+	return vrc_drawingZoomedHUD;
+}
+
+// The zoom scope mask shader; 0 until media registration (host zoom draw).
+qhandle_t CG_VR_ReticleShader( void ) {
+	return vrc_reticleShader;
 }
 
 // cg_view.c per-frame view-pipeline hooks: FOV override, forced third-person
@@ -312,7 +413,7 @@ VRFM_QUERY matches either third-person mode (spectator/demo UI query).
 */
 qboolean CG_VR_IsThirdPersonFollow( VR_FollowMode followMode )
 {
-	qboolean isFollowing = (cg.snap->ps.pm_flags & PMF_FOLLOW) || cg.demoPlayback || cgs.tvPlayback;
+	qboolean isFollowing = (cg.snap->ps.pm_flags & PMF_FOLLOW) || cg.demoPlayback || VR_HostTVPlayback();
 
 	if (followMode == VRFM_QUERY)
 	{
@@ -349,13 +450,13 @@ Initialize or recenter smooth follow camera behind the player
 ===============
 */
 static void CG_InitSmoothFollow( void ) {
-	cg.smoothFollow_distance = 200.0f;
-	cg.smoothFollow_distanceTarget = 200.0f;
-	cg.smoothFollow_yaw = cg.snap->ps.viewangles[YAW] + 180.0f;
-	cg.smoothFollow_pitch = 0.0f;
-	cg.smoothFollow_hmdYawOffset = vr->hmdorientation[YAW];
-	cg.smoothFollow_initialized = qtrue;
-	cg.followLastClientNum = cg.snap->ps.clientNum;
+	vrc_smoothFollow_distance = 200.0f;
+	vrc_smoothFollow_distanceTarget = 200.0f;
+	vrc_smoothFollow_yaw = cg.snap->ps.viewangles[YAW] + 180.0f;
+	vrc_smoothFollow_pitch = 0.0f;
+	vrc_smoothFollow_hmdYawOffset = vr->hmdorientation[YAW];
+	vrc_smoothFollow_initialized = qtrue;
+	vrc_followLastClientNum = cg.snap->ps.clientNum;
 }
 
 /*
@@ -374,11 +475,11 @@ static void CG_OffsetVRThirdPersonView( void ) {
 	if (CG_VR_IsThirdPersonFollow(VRFM_QUERY))
 	{
 		int currentClient = cg.snap->ps.clientNum;
-		if (cg.followLastClientNum != currentClient)
+		if (vrc_followLastClientNum != currentClient)
 		{
 			vr->recenter_follow_camera = qtrue;
 		}
-		cg.followLastClientNum = currentClient;
+		vrc_followLastClientNum = currentClient;
 	}
 
 	//Follow mode 1
@@ -407,7 +508,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 			}
 
 			// Initialize on first use
-			if (!cg.smoothFollow_initialized) {
+			if (!vrc_smoothFollow_initialized) {
 				CG_InitSmoothFollow();
 			}
 
@@ -437,26 +538,26 @@ static void CG_OffsetVRThirdPersonView( void ) {
 			dt = ft / 1000.0f;
 
 			// Yaw: rotate around player (left/right on primary stick)
-			cg.smoothFollow_yaw += yawInput * 180.0f * dt;
+			vrc_smoothFollow_yaw += yawInput * 180.0f * dt;
 
 			// Pitch: move up/down on sphere surface (up/down on primary stick)
-			cg.smoothFollow_pitch += pitchInput * 120.0f * dt;
+			vrc_smoothFollow_pitch += pitchInput * 120.0f * dt;
 			// FIXME: It would be great to allow near-vertical rotation, but
 			// doing so makes it obvious that moving forward/backward with the
 			// HMD isn't getting closer to the player, but moving along the game's
 			// Y axis. Which is kinda nauseating, no matter how good your VR legs are.
-			if (cg.smoothFollow_pitch > 45.0f) cg.smoothFollow_pitch = 45.0f;
-			if (cg.smoothFollow_pitch < 0.0f) cg.smoothFollow_pitch = 0.0f;
+			if (vrc_smoothFollow_pitch > 45.0f) vrc_smoothFollow_pitch = 45.0f;
+			if (vrc_smoothFollow_pitch < 0.0f) vrc_smoothFollow_pitch = 0.0f;
 
 			// Distance: adjust target (up = closer, down = farther)
-			cg.smoothFollow_distanceTarget -= distanceInput * 120.0f * dt;
-			if (cg.smoothFollow_distanceTarget < 40.0f) cg.smoothFollow_distanceTarget = 40.0f;
-			if (cg.smoothFollow_distanceTarget > 512.0f) cg.smoothFollow_distanceTarget = 512.0f;
+			vrc_smoothFollow_distanceTarget -= distanceInput * 120.0f * dt;
+			if (vrc_smoothFollow_distanceTarget < 40.0f) vrc_smoothFollow_distanceTarget = 40.0f;
+			if (vrc_smoothFollow_distanceTarget > 512.0f) vrc_smoothFollow_distanceTarget = 512.0f;
 
 			// Compute camera direction
 			// Negate pitch because AngleVectors uses forward[2] = -sin(pitch),
 			// but our pitch convention is positive = camera above player
-			VectorSet(orbitAngles, -cg.smoothFollow_pitch, cg.smoothFollow_yaw, 0.0f);
+			VectorSet(orbitAngles, -vrc_smoothFollow_pitch, vrc_smoothFollow_yaw, 0.0f);
 			AngleVectors(orbitAngles, forward, right, up);
 
 			VectorCopy(cg.refdef.vieworg, playerEye);
@@ -471,33 +572,33 @@ static void CG_OffsetVRThirdPersonView( void ) {
 				float effectiveTarget;
 				float factor;
 
-				VectorMA(playerEye, cg.smoothFollow_distanceTarget, forward, testPos);
+				VectorMA(playerEye, vrc_smoothFollow_distanceTarget, forward, testPos);
 				CG_Trace(&trace, playerEye, mins, maxs, testPos,
 					cg.predictedPlayerState.clientNum, MASK_SOLID);
 
-				safeDistance = trace.fraction * cg.smoothFollow_distanceTarget;
-				effectiveTarget = (safeDistance < cg.smoothFollow_distanceTarget)
-					? safeDistance : cg.smoothFollow_distanceTarget;
+				safeDistance = trace.fraction * vrc_smoothFollow_distanceTarget;
+				effectiveTarget = (safeDistance < vrc_smoothFollow_distanceTarget)
+					? safeDistance : vrc_smoothFollow_distanceTarget;
 
 				// Lerp distance - faster when pulling in for walls
-				if (cg.smoothFollow_distance > effectiveTarget) {
+				if (vrc_smoothFollow_distance > effectiveTarget) {
 					factor = 16.0f * dt;  // pull in quickly to avoid clipping
 				} else {
 					factor = 8.0f * dt;   // push out gently
 				}
 				if (factor > 1.0f) factor = 1.0f;
-				cg.smoothFollow_distance += (effectiveTarget - cg.smoothFollow_distance) * factor;
+				vrc_smoothFollow_distance += (effectiveTarget - vrc_smoothFollow_distance) * factor;
 			}
 
 			// Final camera position at the lerped distance
-			VectorMA(playerEye, cg.smoothFollow_distance, forward, camPos);
+			VectorMA(playerEye, vrc_smoothFollow_distance, forward, camPos);
 
-			VectorCopy(camPos, cg.vr_vieworigin);
+			VectorCopy(camPos, vrc_vieworigin);
 
 			// Point camera at player
-			VectorSubtract(playerEye, cg.vr_vieworigin, lookDir);
+			VectorSubtract(playerEye, vrc_vieworigin, lookDir);
 			vectoangles(lookDir, vr->clientviewangles);
-			vr->clientviewangles[YAW] -= cg.smoothFollow_hmdYawOffset;
+			vr->clientviewangles[YAW] -= vrc_smoothFollow_hmdYawOffset;
 		}
 		else
 		{
@@ -512,7 +613,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 			}
 
 			//Check to see if the followed player has moved far enough away to mean we should update our location
-			VectorSubtract(cg.refdef.vieworg, cg.vr_vieworigin, current);
+			VectorSubtract(cg.refdef.vieworg, vrc_vieworigin, current);
 			current[2] = 0;
 			if (needsRecenter || VectorLength(current) > 400)
 			{
@@ -522,16 +623,16 @@ static void CG_OffsetVRThirdPersonView( void ) {
 				float currentWorldYaw;
 				float snapTurn;
 
-				VectorCopy(cg.refdef.vieworg, cg.vr_vieworigin);
+				VectorCopy(cg.refdef.vieworg, vrc_vieworigin);
 
 				//Move behind the player
 				VectorCopy(cg.snap->ps.viewangles, angles);
 				angles[PITCH] = 0;
 				AngleVectors( angles, forward, right, up );
-				VectorMA( cg.vr_vieworigin, -60, forward, cg.vr_vieworigin );
+				VectorMA( vrc_vieworigin, -60, forward, vrc_vieworigin );
 
 				// Rotate view to face player
-				VectorSubtract(cg.refdef.vieworg, cg.vr_vieworigin, lookDir);
+				VectorSubtract(cg.refdef.vieworg, vrc_vieworigin, lookDir);
 				vectoangles(lookDir, targetAngles);
 
 				// Current world yaw
@@ -551,8 +652,8 @@ static void CG_OffsetVRThirdPersonView( void ) {
 		scale *= SPECTATOR2_WORLDSCALE_MULTIPLIER;
 
 		// Start grace period on first frame of death cam
-		if (CG_VR_IsDeathCam() && cg.deathCamTime == -1) {
-			cg.deathCamTime = cg.time;
+		if (CG_VR_IsDeathCam() && vrc_deathCamTime == -1) {
+			vrc_deathCamTime = cg.time;
 		}
 
 		// Handle camera recentering when B button is pressed or followed player changes
@@ -565,16 +666,16 @@ static void CG_OffsetVRThirdPersonView( void ) {
 			float snapTurn;
 
 			// Reset camera to followed player's position
-			VectorCopy(cg.refdef.vieworg, cg.vr_vieworigin);
+			VectorCopy(cg.refdef.vieworg, vrc_vieworigin);
 
 			// Move camera behind and slightly above the player
 			VectorCopy(cg.snap->ps.viewangles, angles);
 			angles[PITCH] = 0;
 			AngleVectors(angles, forward, right, up);
-			VectorMA(cg.vr_vieworigin, -180, forward, cg.vr_vieworigin);
+			VectorMA(vrc_vieworigin, -180, forward, vrc_vieworigin);
 
 			// Calculate rotation needed to point at player
-			VectorSubtract(cg.refdef.vieworg, cg.vr_vieworigin, lookDir);
+			VectorSubtract(cg.refdef.vieworg, vrc_vieworigin, lookDir);
 			vectoangles(lookDir, targetAngles);
 
 			// Current world yaw
@@ -592,7 +693,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 			vr->recenter_follow_camera = qfalse;
 		}
 
-		if (!vr->virtual_screen && (!CG_VR_IsDeathCam() || cg.time - cg.deathCamTime >= 500))
+		if (!vr->virtual_screen && (!CG_VR_IsDeathCam() || cg.time - vrc_deathCamTime >= 500))
 		{
 			//Move camera if the user is pushing thumbstick
 			vec3_t angles, forward, right, up;
@@ -602,8 +703,8 @@ static void CG_OffsetVRThirdPersonView( void ) {
 			deltaYaw = (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)) ? 0.0f : SHORT2ANGLE(cg.predictedPlayerState.delta_angles[YAW]);
 			angles[YAW] += deltaYaw + (vr->clientviewangles[YAW] - vr->hmdorientation[YAW]);
 			AngleVectors(angles, forward, right, up);
-			VectorMA(cg.vr_vieworigin, vr->thumbstick_location[THUMB_LEFT][1] * 5.0f, forward, cg.vr_vieworigin);
-			VectorMA(cg.vr_vieworigin, vr->thumbstick_location[THUMB_LEFT][0] * 5.0f, right, cg.vr_vieworigin);
+			VectorMA(vrc_vieworigin, vr->thumbstick_location[THUMB_LEFT][1] * 5.0f, forward, vrc_vieworigin);
+			VectorMA(vrc_vieworigin, vr->thumbstick_location[THUMB_LEFT][0] * 5.0f, right, vrc_vieworigin);
 		}
 	}
 
@@ -611,7 +712,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 	CG_ConvertFromVR(position, NULL, position);
 	position[2] -= PLAYER_HEIGHT;
 	VectorScale(position, scale, position);
-	VectorAdd(cg.vr_vieworigin, position, cg.refdef.vieworg);
+	VectorAdd(vrc_vieworigin, position, cg.refdef.vieworg);
 }
 
 /*
@@ -762,7 +863,7 @@ qboolean CG_VR_OffsetView( void ) {
 		}
 
 		//Reset this in case we die or follow
-		VectorCopy(cg.refdef.vieworg, cg.vr_vieworigin);
+		VectorCopy(cg.refdef.vieworg, vrc_vieworigin);
 	}
 
 	return qtrue;
@@ -936,7 +1037,7 @@ qboolean CG_VR_ViewAxis( void ) {
 // VR-protocol head rendering: the follow predicate, predicted head-stat
 // interpolation, and the first-person follow head view EMA (cg_predict.c/
 // cg_view.c/cg_draw.c call sites). EF-gated or self-gating, NOT
-// vrActive-gated: flatscreen hosts render VR players' heads too.
+// vrActive-gated: flatscreen engines render VR players' heads too.
 
 /*
 ===============
@@ -1248,7 +1349,7 @@ static void SinCos( float radians, float *sine, float *cosine )
 #endif
 }
 
-static void Matrix4x4_Concat (matrix4x4 out, matrix4x4 in1, matrix4x4 in2)
+static void Matrix4x4_Concat (vr_matrix4x4 out, vr_matrix4x4 in1, vr_matrix4x4 in2)
 {
     out[0][0] = in1[0][0] * in2[0][0] + in1[0][1] * in2[1][0] + in1[0][2] * in2[2][0] + in1[0][3] * in2[3][0];
     out[0][1] = in1[0][0] * in2[0][1] + in1[0][1] * in2[1][1] + in1[0][2] * in2[2][1] + in1[0][3] * in2[3][1];
@@ -1268,7 +1369,7 @@ static void Matrix4x4_Concat (matrix4x4 out, matrix4x4 in1, matrix4x4 in2)
     out[3][3] = in1[3][0] * in2[0][3] + in1[3][1] * in2[1][3] + in1[3][2] * in2[2][3] + in1[3][3] * in2[3][3];
 }
 
-static void Matrix4x4_CreateFromEntity( matrix4x4 out, const vec3_t angles, const vec3_t origin, float scale )
+static void Matrix4x4_CreateFromEntity( vr_matrix4x4 out, const vec3_t angles, const vec3_t origin, float scale )
 {
     float	angle, sr, sp, sy, cr, cp, cy;
 
@@ -1450,7 +1551,7 @@ void CG_ConvertFromVR(vec3_t in, vec3_t offset, vec3_t out)
 	vrSpace[0] = -r[0];
 	vrSpace[1] = -r[1];
 
-	VectorScale(vrSpace, cg.worldscale, temp);
+	VectorScale(vrSpace, vrc_worldscale, temp);
 
 	if (offset) {
 		VectorAdd(temp, offset, out);
@@ -1469,7 +1570,7 @@ static void CG_CalculateVRPositionInWorld( vec3_t in_position,  vec3_t in_offset
 		offset[1] = 0; // up/down is index 1 in this case
 		CG_ConvertFromVR(offset, cg.refdef.vieworg, origin);
 		origin[2] -= PLAYER_HEIGHT;
-		origin[2] += in_position[1] * cg.worldscale;
+		origin[2] += in_position[1] * vrc_worldscale;
 	}
 	else
 	{
@@ -1479,7 +1580,7 @@ static void CG_CalculateVRPositionInWorld( vec3_t in_position,  vec3_t in_offset
 		offset[1] = 0; // up/down is index 1 in this case
 		CG_ConvertFromVR(offset, cg.refdef.vieworg, origin);
 		origin[2] -= PLAYER_HEIGHT;
-		origin[2] += in_position[1] * cg.worldscale;
+		origin[2] += in_position[1] * vrc_worldscale;
 	}
 
 	VectorCopy(in_orientation, angles);
@@ -1514,16 +1615,16 @@ void CG_CalculateVRWeaponPosition( vec3_t origin, vec3_t angles )
 //Selects the currently selected weapon (if one _is_ selected)
 void CG_WeaponSelectorSelect_f( void )
 {
-	cg.weaponSelectorTime = 0;
+	vrc_weaponSelectorTime = 0;
 
-	if (cg.weaponSelectorSelection == WP_NONE || cg.weaponSelect == cg.weaponSelectorSelection)
+	if (vrc_weaponSelectorSelection == WP_NONE || cg.weaponSelect == vrc_weaponSelectorSelection)
 	{
 		return;
 	}
 
 	cg.weaponSelectTime = cg.time;
-	cg.weaponSelect = cg.weaponSelectorSelection;
-	cg.weaponSelectorSelection = WP_NONE;
+	cg.weaponSelect = vrc_weaponSelectorSelection;
+	vrc_weaponSelectorSelection = WP_NONE;
 }
 
 static float length(float x, float y)
@@ -1558,12 +1659,12 @@ void CG_DrawWeaponSelector( void )
 	int weaponId;
 	char cvarBuf[16];
 
-	if (cg.weaponSelectorTime == 0)
+	if (vrc_weaponSelectorTime == 0)
 	{
-		cg.weaponSelectorTime = cg.time;
-		VectorCopy(vr->weaponangles, cg.weaponSelectorAngles);
-		VectorCopy(vr->weaponposition, cg.weaponSelectorOrigin);
-		VectorCopy(vr->weaponoffset, cg.weaponSelectorOffset);
+		vrc_weaponSelectorTime = cg.time;
+		VectorCopy(vr->weaponangles, vrc_weaponSelectorAngles);
+		VectorCopy(vr->weaponposition, vrc_weaponSelectorOrigin);
+		VectorCopy(vr->weaponoffset, vrc_weaponSelectorOffset);
 	}
 
 	// trinity cgame has no trap_Cvar_VariableValue; read via string buffer
@@ -1575,9 +1676,9 @@ void CG_DrawWeaponSelector( void )
 
 	if (selectorMode == WS_HMD) // HMD locked
 	{
-		VectorCopy(vr->hmdorientation, cg.weaponSelectorAngles);
-		VectorCopy(vr->hmdposition, cg.weaponSelectorOrigin);
-		VectorClear(cg.weaponSelectorOffset);
+		VectorCopy(vr->hmdorientation, vrc_weaponSelectorAngles);
+		VectorCopy(vr->hmdposition, vrc_weaponSelectorOrigin);
+		VectorClear(vrc_weaponSelectorOffset);
 		trap_Cvar_VariableStringBuffer( "vr_currentHudDepth", cvarBuf, sizeof( cvarBuf ) );
 		// Distance formula: depth 0-5 maps to 9-54 units (matches HUD distance)
 		dist = (atof( cvarBuf ) + 1) * 9;
@@ -1586,16 +1687,16 @@ void CG_DrawWeaponSelector( void )
 		scale = 0.05f + 0.03f * atof( cvarBuf );
 	}
 
-	frac = (cg.time - cg.weaponSelectorTime) / 100.0f;
+	frac = (cg.time - vrc_weaponSelectorTime) / 100.0f;
 	if (frac > 1.0f)
 	{
 		frac = 1.0f;
 	}
 
 	CG_CalculateVRWeaponPosition(controllerOrigin, controllerAngles);
-	VectorSubtract(vr->weaponposition, cg.weaponSelectorOrigin, controllerOffset);
+	VectorSubtract(vr->weaponposition, vrc_weaponSelectorOrigin, controllerOffset);
 
-	CG_CalculateVRPositionInWorld(cg.weaponSelectorOrigin, cg.weaponSelectorOffset, cg.weaponSelectorAngles, wheelOrigin, wheelAngles);
+	CG_CalculateVRPositionInWorld(vrc_weaponSelectorOrigin, vrc_weaponSelectorOffset, vrc_weaponSelectorAngles, wheelOrigin, wheelAngles);
 
 	// Zero out roll so "up" on the wheel is always world-relative, not controller-roll-relative
 	wheelAngles[ROLL] = 0;
@@ -1664,7 +1765,7 @@ void CG_DrawWeaponSelector( void )
 		VectorScale( blob.axis[2], scale - 0.01f, blob.axis[2] );
 		blob.nonNormalizedAxes = qtrue;
 		blob.renderfx = RF_FIRST_PERSON;
-		blob.hModel = cgs.media.smallSphereModel;
+		blob.hModel = vrc_smallSphereModel;
 		trap_R_AddRefEntityToScene( &blob );
 
 		if (selectorMode == WS_CONTROLLER)
@@ -1717,9 +1818,9 @@ void CG_DrawWeaponSelector( void )
 				length = VectorLength(diff);
 				if (length <= 1.4f && frac == 1.0f && selectable)
 				{
-					if (cg.weaponSelectorSelection != weaponId)
+					if (vrc_weaponSelectorSelection != weaponId)
 					{
-						cg.weaponSelectorSelection = weaponId;
+						vrc_weaponSelectorSelection = weaponId;
 						CG_VRHaptic("selector_icon", 0, 0, 100, 0, 0);
 					}
 
@@ -1741,9 +1842,9 @@ void CG_DrawWeaponSelector( void )
 				    (length(vr->thumbstick_location[thumb][0], vr->thumbstick_location[thumb][1]) > 0.5f) &&
 				    selectable)
 				{
-					if (cg.weaponSelectorSelection != weaponId)
+					if (vrc_weaponSelectorSelection != weaponId)
 					{
-						cg.weaponSelectorSelection = weaponId;
+						vrc_weaponSelectorSelection = weaponId;
 						CG_VRHaptic("selector_icon", 0, 0, 100, 0, 0);
 					}
 
@@ -1751,12 +1852,12 @@ void CG_DrawWeaponSelector( void )
 				}
 			}
 
-			if (cg.weaponSelectorSelection == weaponId)
+			if (vrc_weaponSelectorSelection == weaponId)
 			{
 				refEntity_t		sprite;
 				memset( &sprite, 0, sizeof( sprite ) );
 				VectorCopy( iconOrigin, sprite.origin );
-				sprite.origin[2] += 2.5f + (0.5f * sin(DEG2RAD(AngleNormalize360((cg.time - cg.weaponSelectorTime)/4))));
+				sprite.origin[2] += 2.5f + (0.5f * sin(DEG2RAD(AngleNormalize360((cg.time - vrc_weaponSelectorTime)/4))));
 				sprite.reType = RT_SPRITE;
 				sprite.renderfx = RF_FIRST_PERSON;
 				sprite.customShader = cgs.media.friendShader;
@@ -1791,7 +1892,7 @@ void CG_DrawWeaponSelector( void )
 					iconAngles[ROLL] = -90.0f;
 				}
 
-				weaponScale = ((scale+0.02f)*frac) + (cg.weaponSelectorSelection == weaponId ? 0.04f : 0);
+				weaponScale = ((scale+0.02f)*frac) + (vrc_weaponSelectorSelection == weaponId ? 0.04f : 0);
 
 				AnglesToAxis(iconAngles, ent.axis);
 				VectorScale(ent.axis[0], weaponScale, ent.axis[0]);
@@ -1830,7 +1931,7 @@ void CG_DrawWeaponSelector( void )
 				barrel.hModel = cg_weapons[weaponId].barrelModel;
 				barrel.renderfx = RF_OVERBRIGHT | RF_FIRST_PERSON;
 				VectorClear(barrelAngles);
-				barrelAngles[ROLL] = AngleNormalize360((cg.time - cg.weaponSelectorTime) * 0.9f);
+				barrelAngles[ROLL] = AngleNormalize360((cg.time - vrc_weaponSelectorTime) * 0.9f);
 				AnglesToAxis(barrelAngles, barrel.axis);
 				CG_PositionRotatedEntityOnTag(&barrel, &ent, cg_weapons[weaponId].weaponModel, "tag_barrel");
 				if (!selectable)
@@ -1852,7 +1953,7 @@ void CG_DrawWeaponSelector( void )
 				sprite.reType = RT_SPRITE;
 				sprite.renderfx = RF_FIRST_PERSON;
 				sprite.customShader = cg_weapons[weaponId].weaponIcon;
-				sprite.radius = sRadius * 0.9f * (cg.weaponSelectorSelection == weaponId ? 1.1f : 1.0);
+				sprite.radius = sRadius * 0.9f * (vrc_weaponSelectorSelection == weaponId ? 1.1f : 1.0);
 				sprite.shaderRGBA.rgba[0] = 255;
 				sprite.shaderRGBA.rgba[1] = 255;
 				sprite.shaderRGBA.rgba[2] = 255;
@@ -1865,7 +1966,7 @@ void CG_DrawWeaponSelector( void )
 				sprite.reType = RT_SPRITE;
 				sprite.renderfx = RF_FIRST_PERSON;
 				sprite.customShader = cgs.media.selectShader;
-				sprite.radius = sRadius * (cg.weaponSelectorSelection == weaponId ? 1.1f : 1.0);
+				sprite.radius = sRadius * (vrc_weaponSelectorSelection == weaponId ? 1.1f : 1.0);
 				sprite.shaderRGBA.rgba[0] = 255;
 				sprite.shaderRGBA.rgba[1] = 255;
 				sprite.shaderRGBA.rgba[2] = 255;
@@ -1893,7 +1994,7 @@ void CG_DrawWeaponSelector( void )
 	//Only reset selection if using controller pointer
 	if (!selected && selectorMode == WS_CONTROLLER)
 	{
-		cg.weaponSelectorSelection = WP_NONE;
+		vrc_weaponSelectorSelection = WP_NONE;
 	}
 
 	// In case was invoked by thumbstick axis and thumbstick is centered
@@ -1901,7 +2002,7 @@ void CG_DrawWeaponSelector( void )
 	if (vr->weapon_select_autoclose && frac > 0.25f) {
 		if (thumbstickValue < 0.1f) {
 			if (selected) {
-				cg.weaponSelect = cg.weaponSelectorSelection;
+				cg.weaponSelect = vrc_weaponSelectorSelection;
 			}
 			vr->weapon_select = qfalse;
 			vr->weapon_select_autoclose = qfalse;
@@ -1973,7 +2074,7 @@ qboolean CG_VR_WeaponHandPose( vec3_t origin, vec3_t angles, float *scale ) {
 			vec3_t offset;
 			vec3_t adjust;
 			vec3_t temp_offset;
-			matrix4x4 m1, m2, m3;
+			vr_matrix4x4 m1, m2, m3;
 			vec3_t zero;
 			vec3_t forward, right, up;
 			VectorClear(temp_offset);
@@ -2049,7 +2150,7 @@ otherwise the bracketed op is skipped and content still draws to screen.
 qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 	vec3_t baseOrg;
 	float  heightOffset = 0.0f;
-	float  worldscale = cg.worldscale;
+	float  worldscale = vrc_worldscale;
 
 	if ( !vrActive ) {
 		return qfalse;
@@ -2237,7 +2338,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 
 			ent.radius = radius;
 			ent.invert = qtrue;
-			ent.customShader = cgs.media.hudShader;
+			ent.customShader = vrc_hudShader;
 
 			trap_R_AddRefEntityToScene(&ent);
 		}
@@ -2269,7 +2370,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 		// being shown (native CG_DrawHUD2D gate: outer PERS_TEAM != SPECTATOR,
 		// inner !cg.showScores && stats[STAT_HEALTH] > 0).
 		selectorHidesHud = qfalse;
-		if ( cg.weaponSelectorTime != 0 &&
+		if ( vrc_weaponSelectorTime != 0 &&
 			cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR &&
 			cg.snap->ps.stats[STAT_HEALTH] > 0 &&
 			!cg.showScores ) {
@@ -2285,41 +2386,41 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 		if (vr->weapon_zoomed)
 		{
 			// Weapon zoomed: render minimal HUD with scaled coordinates
-			cg.drawingHUD = qtrue;
-			cg.drawingZoomedHUD = qtrue;
-			CG_WarmupEvents();
+			vrc_drawingHUD = qtrue;
+			vrc_drawingZoomedHUD = qtrue;
+			VR_HostWarmupEvents();
 			CG_PushHUDAnchors();
 			CG_Draw2DMinimal( STEREO_CENTER );
 			CG_PopHUDAnchors();
-			cg.drawingZoomedHUD = qfalse;
-			cg.drawingHUD = qfalse;
+			vrc_drawingZoomedHUD = qfalse;
+			vrc_drawingHUD = qfalse;
 		}
 		else if (hudStatus == 2 && !vr->virtual_screen)
 		{
 			// HUD mode 2: render directly to main swapchain with stereo parallax
-			cg.drawingHUD = qtrue;
+			vrc_drawingHUD = qtrue;
 			trap_R_HUDBufferStart( qfalse );
-			CG_WarmupEvents();
+			VR_HostWarmupEvents();
 			if ( !selectorHidesHud ) {
 				CG_PushHUDAnchors();
 				CG_Draw2D( STEREO_CENTER );
 				CG_PopHUDAnchors();
 			}
 			trap_R_HUDBufferEnd();
-			cg.drawingHUD = qfalse;
+			vrc_drawingHUD = qfalse;
 		}
 
 		if (!vr->weapon_zoomed && (!vr->virtual_screen || vr->first_person_following))
 		{
 			if (hudStatus != 0)
 			{
-				cg.drawingHUD = qtrue;
+				vrc_drawingHUD = qtrue;
 
 				if (hudStatus == 2 && vr->first_person_following)
 				{
 					// HUD mode 2 in first person following: direct-to-screen with stereo offset
 					trap_R_HUDBufferStart( qfalse );
-					CG_WarmupEvents();
+					VR_HostWarmupEvents();
 					if ( !selectorHidesHud ) {
 						CG_PushHUDAnchors();
 						CG_Draw2D( STEREO_CENTER );
@@ -2333,7 +2434,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 					// discipline is unchanged by the selector gate below - it still
 					// clears even when the content draw is skipped.
 					trap_R_HUDBufferStart( qtrue );
-					CG_WarmupEvents();
+					VR_HostWarmupEvents();
 					if ( !selectorHidesHud ) {
 						CG_PushHUDAnchors();
 						CG_Draw2D( STEREO_CENTER );
@@ -2342,7 +2443,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 					trap_R_HUDBufferEnd();
 				}
 
-				cg.drawingHUD = qfalse;
+				vrc_drawingHUD = qfalse;
 			}
 			else
 			{
@@ -2489,7 +2590,7 @@ void CG_WeaponAdjust_Enter( void ) {
 	// Dismiss weapon wheel and weapon stabilisation from the grip hold that got us here
 	vr->weapon_select = qfalse;
 	vr->weapon_stabilised = qfalse;
-	cg.weaponSelectorTime = 0;
+	vrc_weaponSelectorTime = 0;
 
 	vr->weapon_adjust = qtrue;
 	weaponAdjustParam = 0;
@@ -2772,7 +2873,7 @@ qboolean CG_VR_AdjustFrom640( float *x, float *y, float *w, float *h )
 
 		//If using floating HUD and we are drawing it, double coordinates since the HUD
 		//buffer is now 1280x960 instead of 640x480
-		if ( hudDrawStatus == 1 && cg.drawingHUD && !cg.drawingZoomedHUD)
+		if ( hudDrawStatus == 1 && vrc_drawingHUD && !vrc_drawingZoomedHUD)
 		{
 			*x *= 2.0f;
 			*y *= 2.0f;
@@ -2781,7 +2882,7 @@ qboolean CG_VR_AdjustFrom640( float *x, float *y, float *w, float *h )
 			return qtrue;
 		}
 
-		if (cg.drawingZoomedHUD)
+		if (vrc_drawingZoomedHUD)
 		{
 			// Weapon zoomed HUD: scaled down and centered, similar to HUD mode 2
 			// Use 1:1 square layout (640x640) to push top/bottom elements away from center
@@ -2804,7 +2905,7 @@ qboolean CG_VR_AdjustFrom640( float *x, float *y, float *w, float *h )
 			*x += (effectiveWidth - (640 * screenXScale)) / 2.0f;
 			*y += (effectiveHeight - (640 * screenYScale)) / 2.0f;
 		}
-		else if (!cg.drawingHUD)
+		else if (!vrc_drawingHUD)
 		{
 			float screenXScale = vrXScale;
 			float screenYScale = vrYScale;
@@ -2969,7 +3070,7 @@ precision, already interpolated). Returns qtrue when VR head data is present
 (current player, followed player, or demo), qfalse otherwise so callers fall
 back to the legacy idle-bob.
 
-NOTE: EF-gated inside, deliberately NOT vrActive-gated - flatscreen hosts
+NOTE: EF-gated inside, deliberately NOT vrActive-gated - flatscreen engines
 must still render a VR player's real head orientation when spectating/demo
 playback.
 =================
@@ -2979,26 +3080,26 @@ qboolean CG_VR_PortraitHeadAngles( vec3_t angles ) {
 	float			targetPitch, targetYaw, alpha;
 
 	if ( !( ps->eFlags & EF_VR_PLAYER ) ) {
-		cg.vrPortraitInitialized = qfalse;
+		vrc_portraitInitialized = qfalse;
 		return qfalse;
 	}
 
 	targetYaw   = 180.0f + (float)ps->stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f;
 	targetPitch = (float)ps->stats[STAT_VR_HEAD_PITCH] / 182.04f;
 
-	if ( !cg.vrPortraitInitialized || cg.nextFrameTeleport ) {
-		cg.vrPortraitYaw   = targetYaw;
-		cg.vrPortraitPitch = targetPitch;
-		cg.vrPortraitInitialized = qtrue;
+	if ( !vrc_portraitInitialized || cg.nextFrameTeleport ) {
+		vrc_portraitYaw   = targetYaw;
+		vrc_portraitPitch = targetPitch;
+		vrc_portraitInitialized = qtrue;
 	} else {
 		// tau ~30ms: smooths quantization steps without perceptible lag
 		alpha = (float)cg.frametime / ( (float)cg.frametime + 30.0f );
-		cg.vrPortraitYaw   += alpha * AngleSubtract( targetYaw,   cg.vrPortraitYaw );
-		cg.vrPortraitPitch += alpha * AngleSubtract( targetPitch, cg.vrPortraitPitch );
+		vrc_portraitYaw   += alpha * AngleSubtract( targetYaw,   vrc_portraitYaw );
+		vrc_portraitPitch += alpha * AngleSubtract( targetPitch, vrc_portraitPitch );
 	}
 
-	angles[PITCH] = cg.vrPortraitPitch;
-	angles[YAW]   = cg.vrPortraitYaw;
+	angles[PITCH] = vrc_portraitPitch;
+	angles[YAW]   = vrc_portraitYaw;
 	angles[ROLL]  = ps->viewangles[ROLL];	// full precision, applied directly
 	return qtrue;
 }
@@ -3203,7 +3304,7 @@ CG_VR_PlayerHeadAngles
 CG_VR_PlayerHeadReset
 
 CG_PlayerAngles' EF_VR_PLAYER regions, moved verbatim. EF-gated inside, NOT
-vrActive-gated: flatscreen hosts render VR players' heads too. PlayerHeadLerp
+vrActive-gated: flatscreen engines render VR players' heads too. PlayerHeadLerp
 caches the interpolated head pitch/yaw offset from angles2 in per-entity
 module storage (formerly playerEntity_t.vrHeadPitch/vrHeadYawOffset);
 PlayerHeadAngles consumes it after the torso hierarchy is unwound, remapping

@@ -35,6 +35,12 @@ actually do the work: files in, build wired, server side, client side, UI, then
 verify. Read `VR_PROTOCOL.md` alongside it for layer 2's wire format and
 engine side.
 
+One word is used precisely throughout: **the host** is your mod tree — the
+code that hosts the vendored drop. What the drop needs from the host is a
+small explicit contract, declared in `vr_host.h` and configured in
+`vr_host_config.h` (Step 1). The program that loads your QVMs is always
+called the *engine*, never the host.
+
 ## How the call-outs behave
 
 The call-outs you add are **unconditional**: never wrapped in `#ifdef` or a
@@ -72,6 +78,14 @@ Copy these modules into the matching directories of your tree (paths relative to
 - **`game/vr_trap.h`**: the `VR_RESOLVE` binding macro every bootstrap uses to
   look traps up by name (Step 3). Header-only; included by `vr_game.c`,
   `vr_cgame.c`, and both `vr_ui.c`.
+- **`cgame/vr_host.h`**: the host contract — every function, export, and
+  header edit the drop consumes from *your* tree beyond stock 1.32, declared
+  in one place with its rationale (Appendix E walks it). If your tree
+  satisfies this header, the drop compiles.
+- **`cgame/vr_host_config.h`**: the **one file in the drop you are meant to
+  edit**. It declares which optional host features exist (`VR_HOST_HAS_TV`,
+  `VR_HOST_HAS_WARMUP_EVENTS` — a stock tree sets both to 0) and is where a
+  stock tree maps small contract gaps (`#define Q_sscanf sscanf`).
 - **`game/vr_platform.c` / `vr_platform.h`**: the platform query
   (`UI_VR_Platform`, Appendix A) that double-gates VR-only UI rows on live
   registration plus the `vr_platform` cvar. Compiles into cgame and both UI
@@ -121,9 +135,10 @@ Add the copied sources to your build's module lists.
 | baseq3 VR menu C files | baseq3 UI |
 
 `vr_bg.c` lands in every module because the mirror and the shared movement hooks
-are needed everywhere. `vr_shared.h` / `vr_safe_types.h` / `vr_trap.h` are
-headers; they carry no compile line; just make them reachable on the include
-path of every module.
+are needed everywhere. `vr_shared.h` / `vr_safe_types.h` / `vr_trap.h` /
+`vr_host.h` / `vr_host_config.h` are headers; they carry no compile line; just
+make them reachable on the include path of every module (this tree includes
+the host pair from the tail of `cg_local.h`, just before `vr_cgame.h`).
 
 **The one dual-link case:** `vr_uishared.c` must compile into *both* the
 missionpack cgame and the missionpack UI; it has to link everywhere
@@ -136,15 +151,15 @@ stacks on baseq3 and never sees them, so ship your own copies with your mod.
 
 > **Build and check.** Compile now, before adding a single call-out. Two stock
 > additions are needed this early: the two stat enum entries from Step 4, which
-> the vendored sources reference by name, and the host-tree prerequisites in
-> **Appendix E** — the struct fields, helpers, and header edits the vendored
-> sources compile against. This tree already carries all of Appendix E, so here
-> the drop builds with the enum entries alone; a mod tracking stock 1.32
-> sources must work through that appendix first, and its first `make` here is
-> the honest inventory of what remains. Once the drop builds with none of the
-> call-outs placed, the modules are just dormant code, and any remaining
-> failure is a file-list or include-path problem — far cheaper to find before
-> the call-outs are in.
+> the vendored sources reference by name, and the `vr_host.h` contract —
+> the handful of functions, exports, and header edits the drop consumes from
+> your tree, walked in **Appendix E**. This tree already satisfies the
+> contract, so here the drop builds with the enum entries alone; a mod
+> tracking stock 1.32 sources works through Appendix E first, and its first
+> `make` is the honest inventory of what remains. Once the drop builds with
+> none of the call-outs placed, the modules are just dormant code, and any
+> remaining failure is a file-list or include-path problem — far cheaper to
+> find before the call-outs are in.
 
 ---
 
@@ -309,14 +324,19 @@ loop:
  	for (i=0 ; i<3 ; i++) {
 ```
 
-The other two `vr_bg` call-outs: in `PmoveSingle`, pass the physics mode through
-`BG_VR_PmovePhysics( pm->ps, pm_mode )` (it returns the mode unchanged when
-dormant, the 6DOF mode when active); and in `BG_PlayerStateToEntityState` (two
-sites), call `BG_VR_HeadToEntityState( ps, s )` to derive the head orientation
-for demos and first-person follow.
+The other `vr_bg` call-outs: in `PmoveSingle`, run your ground friction and
+acceleration through the two value transforms —
+`BG_VR_PmoveFriction( pm->ps, friction )` and
+`BG_VR_PmoveAccelerate( pm->ps, accelerate )` — wherever your movement
+constants live (stock: the `pm_friction` / `pm_accelerate` globals; this tree:
+a clone of its mode config). Dormant, they return your value untouched; for
+the 6DOF client they return the tracking coefficients. And in
+`BG_PlayerStateToEntityState` (two sites), call
+`BG_VR_HeadToEntityState( ps, s )` to derive the head orientation for demos
+and first-person follow.
 
 > **Build and check.** Rebuild game and cgame. Nothing visible changes yet on a
-> flatscreen host (the protocol hooks idle until an entity carries
+> flatscreen engine (the protocol hooks idle until an entity carries
 > `EF_VR_PLAYER`; every other hook is dormant), but a VR client connecting to a
 > server running this game will now be flagged `EF_VR_PLAYER` and its head data
 > will flow. You verify the visible result in Step 8's probe.
@@ -346,7 +366,7 @@ HUD-sprite media, Appendix C), `CG_VR_Frame()` at the very top of
 **The one whole-frame fork.** `CG_VR_DrawFrame` is the only place the drop takes
 over an entire subsystem. It returns `qtrue` when it has fully drawn the VR frame
 (scene submit plus 2D/HUD inside the post-bloom and HUD-buffer brackets) and the
-caller returns; on a flatscreen host it returns `qfalse` and your stock tail
+caller returns; on a flatscreen engine it returns `qfalse` and your stock tail
 runs. Place it in `CG_DrawActive`, just before the stock "draw 3D view":
 
 ```diff
@@ -537,6 +557,15 @@ one of four shapes:
   screen (console-command path, draw path, and shutdown unwind). All of them are
   accessors, never raw `vr->` reads, and all are dormancy-safe like every other
   call-out.
+- **Drop-state resets and reads.** The drop keeps its camera and HUD state
+  internal; four small functions cross the boundary. Call
+  `CG_VR_DeathCamReset()` wherever the local player (re)spawns or a new
+  gamestate begins (this tree: the `CG_Init` seed and `CG_Respawn`), and
+  `CG_VR_PortraitReset()` where your HUD portrait's subject changes. For your
+  own drawing, `CG_VR_DrawingZoomedHUD()` is qtrue inside the zoom
+  minimal-HUD pass (this tree positions the status bar with it), and
+  `CG_VR_ReticleShader()` returns the zoom scope mask shader for a host-drawn
+  scope. Dormant, the resets no-op and the reads return qfalse/0.
 
 Two placement details are worth stating outright:
 
@@ -639,7 +668,7 @@ come along for free.
 
 > **Build, run, and read the probe.** Set `cg_vrApiProbe 1` and connect a VR
 > client. The probe draws an overlay at the top-left: the first line reads
-> `VR API ACTIVE` (or `ABSENT` on a flatscreen host), and the second line is the
+> `VR API ACTIVE` (or `ABSENT` on a flatscreen engine), and the second line is the
 > sync round-trip check: it prints `PASS` while the engine is echoing the
 > mirror back correctly each frame and `FAIL` if a sync is dropped. Below those,
 > it prints live HMD position/orientation, weapon angles, FOV, thumbsticks, and
@@ -695,7 +724,7 @@ vrPlatform_t UI_VR_Platform( void ) {
 ```
 
 Requiring live registration first is what keeps VR-only menu rows off a
-flatscreen host. Team Arena's `UI_VR_LoadMenus()` is double-gated the same way.
+flatscreen engine. Team Arena's `UI_VR_LoadMenus()` is double-gated the same way.
 
 ## Appendix B: Bootstrap trap keys
 
@@ -730,9 +759,11 @@ never crashes.
 | laser-sight beam | drawn via `CG_LaserSight`, gated by `vr_lasersight` | No beam renders |
 | VR menu files / manifests | the settings UI | Console-only settings (every toggle is still a cvar) |
 
-Those two shaders are the only assets `CG_VR_RegisterMedia` registers directly;
-the laser beam draws through the stock `CG_LaserSight` helper. Comfort vignettes
-are cvar-driven (`vr_comfortVignette`) and rendered engine-side.
+`CG_VR_RegisterMedia` registers those two shaders (plus the weapon-wheel hover
+sphere, `models/powerups/health/small_sphere.md3`) itself — the host needs no
+media-table entries. The laser beam draws through the host's `CG_LaserSight`
+(`vr_host.h`). Comfort vignettes are cvar-driven (`vr_comfortVignette`) and
+rendered engine-side.
 
 ## Appendix D: Differences between the two UIs
 
@@ -750,22 +781,36 @@ Deliberate differences, noted so the two `vr_ui.c` files don't surprise you:
   carry a client/entity number; the others rely on the local-player gate already
   at their call site (Step 5, note 2).
 
-## Appendix E: Host-tree prerequisites
+## Appendix E: The host contract (`vr_host.h`)
 
-The vendored sources compile against more than stock 1.32 declares. This tree
-already carries all of it — which is why Step 2's build check passes here with
-just the two stat entries — but a mod tracking stock sources must bring its
-tree up to this list first. It is honest, one-time work of several hundred
-lines; nothing here changes when you take a new drop. The reference for every
-item is this repo's own source: diff the named file against your stock copy
-and take the delta.
+Everything the drop consumes from your tree beyond stock 1.32 is declared in
+`vr_host.h`; this appendix is its narrative. The drop carries its own VR
+state, cvars, and media internally — no `cg_t`/`cgs_t` fields, no cvar-table
+entries, and no media-struct entries are required of the host. What remains:
 
-**Renderer contract (`cgame/tr_types.h`).** Four additions: `RF_WORLD_ORIENTED`,
-`RT_LASERSIGHT`, `refEntity_t.invert`, and `refdef_t.isHUD`. The two struct
-fields are **tail-appended and must stay last**: the stock prefix is what
-keeps the layout compatible with engines that do not know the field. A
-mid-struct insertion compiles clean and corrupts rendering at run time — this
-ecosystem has shipped exactly that bug once; do not re-derive it.
+**Seven host functions.** Declared with their contracts in `vr_host.h`:
+`CG_DrawScreen2D`, `CG_Draw2DMinimal`, `CG_PushHUDAnchors` /
+`CG_PopHUDAnchors`, `CG_GetViewable4x3Dimensions`, `CG_GetProjectionCenter`,
+and `CG_LaserSight`. A plain-4:3, no-frills host can implement the geometry
+pair as `640/480` and `320/240` and draw nothing in `CG_DrawScreen2D`; the
+anchor pair may be empty on a host with no widescreen anchoring. Take this
+tree's implementations if you want the full behavior.
+
+**Six stock exports.** Functions that are `static` in stock 1.32 and must
+lose it: `CG_Draw2D`, `CG_DrawCrosshair3D`, `CG_WeaponSelectable`,
+`CG_CalculateWeaponPosition`, `CG_OffsetFirstPersonView`, and `CG_TrailItem`
+(which also gains offset/scale parameters — see `vr_host.h`). The one that is
+real work is `CG_Draw2D`: this tree restructured it into an exported,
+stereo-aware form split from `CG_DrawScreen2D` and `CG_Draw2DMinimal`, and
+that split is what lets the whole-frame fork bracket your 2D correctly.
+
+**Renderer contract (`cgame/tr_types.h`).** `RF_OVERBRIGHT`,
+`RF_WORLD_ORIENTED`, `RT_LASERSIGHT`, `refEntity_t.invert`, and
+`refdef_t.isHUD`. The two struct fields are **tail-appended and must stay
+last**: the stock prefix is what keeps the layout compatible with engines
+that do not know the field. A mid-struct insertion compiles clean and
+corrupts rendering at run time — this ecosystem has shipped exactly that bug
+once; do not re-derive it.
 
 **Syscall plumbing.** The `dll_*` trap-number variables and QVM/native
 trampolines for every Appendix B trap, in all four `*_syscalls.c`, plus their
@@ -773,29 +818,19 @@ declarations at the tail of each `*_local.h`. Mechanical — copy the blocks
 from this tree's syscall files. Float arguments cross the DLL boundary
 through `PASSFLOAT`; miss it and native builds pass garbage.
 
-**cgame substrate.** `vr_cgame.c` consumes host state and helpers stock cgame
-lacks: the `cg.worldscale` / `cg.drawingHUD` / smooth-follow / weapon-selector
-field families on `cg_t`, the reticle and HUD media handles, a handful of
-vmCvars (`cg_vrApiProbe` among them), and the drawing helpers
-(`CG_DrawScreen2D`, `CG_Draw2DMinimal`, the HUD-anchor push/pop set,
-`CG_LaserSight`). The single largest item is restructuring `CG_Draw2D` from a
-static single-target function into the exported, stereo-aware form this tree
-has — that split is what lets the whole-frame fork bracket your 2D correctly.
-A few stock-`static` functions also need exporting (`CG_WeaponSelectable`,
-`CG_CalculateWeaponPosition`, the first/third-person view-offset pair, …);
-the linker hands you the exact list.
+**Small pieces.** `Q_sscanf` (stock trees: `#define Q_sscanf sscanf` in
+`vr_host_config.h`); the two stat enum entries (Step 4); the tunables
+`PLAYER_HEIGHT` / `SPECTATOR_WORLDSCALE_MULTIPLIER` /
+`SPECTATOR2_WORLDSCALE_MULTIPLIER`, which default in `vr_host.h` and may be
+predefined by the host.
 
-**game-module physics config.** `BG_VR_PmovePhysics` speaks this tree's
-`bg_mode.h` config type at its `PmoveSingle` call site. A mod without that
-system passes its own movement constants through an equivalent shim; this is
-the one place the drop still leans on a host-specific type.
+**UI substrate.** baseq3: the `uis.scale` / `uis.biasX` / `uis.biasY` /
+`uis.cursorScaleR` / `uis.screenXmin…Ymax` uniform-scale fields this tree
+added to `uiStatic_t` (stock carries only `xscale` / `yscale` / `bias`). Team
+Arena: the `vrMenuMove` member on `displayContextDef_t`, wired to the drop's
+menu-hover hook.
 
-**UI substrate.** baseq3: the `uis.biasX` / `uis.biasY` / `uis.screenXmin…`
-uniform-scale fields this tree added to `uiStatic_t` (stock carries only
-`xscale` / `yscale` / `bias`). Team Arena: the `vrMenuMove` member on
-`displayContextDef_t` and one `menudef.h` keyword.
-
-If a symbol is still unresolved after this list, find it in this tree — the
-tree itself is the complete inventory, and Step 2's failing build output is
-your work list.
+If a symbol is still unresolved after `vr_host.h` is satisfied, it is a bug
+in the contract — report it; Step 2's failing build output is otherwise your
+complete work list.
 

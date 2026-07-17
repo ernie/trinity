@@ -1834,7 +1834,7 @@ static void CG_DrawLowerRight( void ) {
 
 	// Minimal (zoomed) HUD doesn't draw the status bar, so don't reserve
 	// space for it — anchor scores/powerups to the actual bottom edge.
-	y = cg.drawingZoomedHUD ? cgs.screenYmax + 1 : cgs.screenYmax + 1 - STATUSBAR_HEIGHT;
+	y = CG_VR_DrawingZoomedHUD() ? cgs.screenYmax + 1 : cgs.screenYmax + 1 - STATUSBAR_HEIGHT;
 
 	if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 2 ) {
 		y = CG_DrawTeamOverlay( y, qtrue, qfalse );
@@ -4370,7 +4370,7 @@ void CG_ResetSeekState( void ) {
 
 	// Force VR head-tracking EMAs to re-seed from the new timeline
 	CG_VR_FollowHeadViewReset();
-	cg.vrPortraitInitialized = qfalse;
+	CG_VR_PortraitReset();
 }
 
 
@@ -4598,11 +4598,14 @@ static void CG_DrawWeapReticle( void )
 		float bottomEdge = Y_HEIGHT * (1.0f - indentY);
 
 		// center
-		if ( cgs.media.reticleShader ) {
-			trap_R_DrawStretchPic( x, y, w, h, 0, 0, 1, 1, cgs.media.reticleShader );    // tl
-			trap_R_DrawStretchPic( x + w, y, w, h, 1, 0, 0, 1, cgs.media.reticleShader );  // tr
-			trap_R_DrawStretchPic( x, y + h, w, h, 0, 1, 1, 0, cgs.media.reticleShader );    // bl
-			trap_R_DrawStretchPic( x + w, y + h, w, h, 1, 1, 0, 0, cgs.media.reticleShader );  // br
+		{
+			qhandle_t reticle = CG_VR_ReticleShader();
+			if ( reticle ) {
+				trap_R_DrawStretchPic( x, y, w, h, 0, 0, 1, 1, reticle );    // tl
+				trap_R_DrawStretchPic( x + w, y, w, h, 1, 0, 0, 1, reticle );  // tr
+				trap_R_DrawStretchPic( x, y + h, w, h, 0, 1, 1, 0, reticle );    // bl
+				trap_R_DrawStretchPic( x + w, y + h, w, h, 1, 1, 0, 0, reticle );  // br
+			}
 		}
 
 		CG_FillRect( leftEdge, centerY - hairThick/2.66f, hairLength, hairThick * 0.75f, light_color );                 // left

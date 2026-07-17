@@ -1,6 +1,6 @@
 // Vendored VR API - cgame module hooks (vr_cgame). Bootstrap, config mirror,
 // haptic wrapper, and the conformance probe overlay. Dormancy-safe: on a
-// flatscreen host CG_VR_Init leaves the mirror zeroed and vrActive false;
+// flatscreen engine CG_VR_Init leaves the mirror zeroed and vrActive false;
 // the haptic wrapper and probe draw no-op.
 #ifndef VR_CGAME_H
 #define VR_CGAME_H
@@ -40,7 +40,7 @@ void CG_VR_ComputeWeaponAngles( void );
 qboolean CG_VR_ViewAxis( void );
 
 // VR-protocol head rendering (cg_predict.c/cg_view.c/cg_draw.c call sites).
-// EF-gated or self-gating, NOT vrActive-gated: flatscreen hosts render VR
+// EF-gated or self-gating, NOT vrActive-gated: flatscreen engines render VR
 // players' heads too. Reset re-seeds the follow EMA (tv_seek_sync).
 qboolean CG_VR_IsVRFollow( void );
 void CG_VR_InterpolateHeadStats( playerState_t *out, const playerState_t *prev, const playerState_t *next, float f );
@@ -86,7 +86,7 @@ void CG_CalculateVRWeaponPosition( vec3_t origin, vec3_t angles );
 // CG_DrawActive frame-tail dispatch (cg_draw.c's former CG_DrawActiveVR):
 // scene submit plus 2D/HUD drawing inside the post-bloom / HUD-buffer
 // brackets. qtrue: VR frame fully drawn, caller returns; qfalse: flatscreen
-// host, caller runs the stock tail. stereoView is unused (the body hardcodes
+// engine, caller runs the stock tail. stereoView is unused (the body hardcodes
 // STEREO_CENTER - pre-existing).
 qboolean CG_VR_DrawFrame( stereoFrame_t stereoView );
 
@@ -121,13 +121,20 @@ int CG_VR_ChatOffsetX( void );
 int CG_VR_ChatOffsetY( void );
 
 // cg_draw.c / cg_newdraw.c HUD portrait head angles for VR players. EF-gated
-// inside, NOT vrActive-gated: flatscreen hosts still need to render a VR
+// inside, NOT vrActive-gated: flatscreen engines still need to render a VR
 // player's real head orientation (spectating/demo playback).
 qboolean CG_VR_PortraitHeadAngles( vec3_t angles );
 
 // Standardized single-value cvar read/write accessors.
 float CG_VR_CvarValue( const char *name );
 void CG_VR_CvarSet( const char *name, float value );
+
+// Drop-state accessors and reset call-outs (the VR state these touch lives
+// inside vr_cgame.c; hosts read and re-arm it only through these).
+void CG_VR_DeathCamReset( void );          // local player (re)spawn / new gamestate
+void CG_VR_PortraitReset( void );          // HUD portrait subject changed
+qboolean CG_VR_DrawingZoomedHUD( void );   // inside the zoom minimal-HUD pass
+qhandle_t CG_VR_ReticleShader( void );     // zoom scope mask, 0 until media loads
 
 // cg_players.c embodiment hooks: first-person body pose/visibility, off-hand
 // item suppression/pose (CG_TrailItem's VR branch), the off-hand holdable
@@ -147,7 +154,7 @@ qboolean CG_VR_OffHandCarriesFlag( centity_t *cent );
 qboolean CG_VR_FollowedPlayerSprite( centity_t *cent );
 
 // cg_players.c CG_PlayerAngles hooks: the EF_VR_PLAYER head/torso orientation
-// regions. EF-gated inside, NOT vrActive-gated: flatscreen hosts render VR
+// regions. EF-gated inside, NOT vrActive-gated: flatscreen engines render VR
 // players' heads too. PlayerHeadLerp caches the interpolated head pitch/yaw
 // offset in per-entity module storage (formerly playerEntity_t.vrHead*);
 // PlayerHeadAngles consumes it. TorsoYaw/TorsoPitch return qtrue when the VR

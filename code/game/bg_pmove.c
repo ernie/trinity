@@ -1904,9 +1904,16 @@ void trap_SnapVector( float *v );
 void PmoveSingle (pmove_t *pmove) {
 	pm = pmove;
 
-	// pull this frame's tuning from the mode table
-	pm_mode = Mode_GetConfig( pm->pmove_mode );
-	pm_mode = BG_VR_PmovePhysics( pm->ps, pm_mode );
+	// pull this frame's tuning from the mode table, then let the VR drop
+	// transform the 6DoF movement coefficients (identity when dormant); the
+	// clone keeps every downstream pm_mode-> read consistent
+	{
+		static modeConfig_t vrPmoveMode;
+		vrPmoveMode = *Mode_GetConfig( pm->pmove_mode );
+		vrPmoveMode.friction = BG_VR_PmoveFriction( pm->ps, vrPmoveMode.friction );
+		vrPmoveMode.groundAccelerate = BG_VR_PmoveAccelerate( pm->ps, vrPmoveMode.groundAccelerate );
+		pm_mode = &vrPmoveMode;
+	}
 
 	// this counter lets us debug movement problems with a journal
 	// by setting a conditional breakpoint fot the previous frame

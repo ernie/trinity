@@ -3945,7 +3945,7 @@ static void UI_Update(const char *name) {
 		}
 	} else if (Q_stricmp(name, "ui_glCustom") == 0) {
 		// the preset tuples split on the VR mirror: VR-tuned values under
-		// VR, the stock tables on a flatscreen host
+		// VR, the stock tables on a flatscreen engine
 		if (vrActive) {
 			switch (val) {
 				case 0:	// high quality
@@ -4113,7 +4113,7 @@ static void UI_UpdateHDRAvail( void ) {
 
 // ROM availability cvar for menu-script cvarTest gating (ui_hdrAvail's
 // pattern): reflects the negotiated VR mirror, never a raw archived cvar,
-// so a flatscreen host always reads 0
+// so a flatscreen engine always reads 0
 static void UI_UpdateVRActive( void ) {
 	trap_Cvar_Set( "ui_vrActive", vrActive ? "1" : "0" );
 }

@@ -19,7 +19,6 @@
 #endif
 
 CG_CVAR( cg_ignore, "cg_ignore", "0", 0 ) // used for debugging
-CG_CVAR( cg_vrApiProbe, "cg_vrApiProbe", "0", 0 ) // VR API conformance probe overlay
 CG_CVAR( cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE )
 CG_CVAR( cg_drawGun, "cg_drawGun", "1", CVAR_ARCHIVE )
 CG_CVAR( cg_zoomFov, "cg_zoomfov", "22.5", CVAR_ARCHIVE )
@@ -35,9 +34,7 @@ CG_CVAR( cg_drawViewers, "cg_drawViewers", "1", CVAR_ARCHIVE )
 CG_CVAR( cg_drawFPS, "cg_drawFPS", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_drawSnapshot, "cg_drawSnapshot", "0", CVAR_ARCHIVE  )
 CG_CVAR( cg_draw3dIcons, "cg_draw3dIcons", "1", CVAR_ARCHIVE )
-CG_CVAR( cg_debugWeaponAiming, "cg_debugWeaponAiming", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_weaponbob, "cg_weaponbob", "0", CVAR_ARCHIVE )
-CG_CVAR( cg_weaponSelectorSimple2DIcons, "cg_weaponSelectorSimple2DIcons", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_drawIcons, "cg_drawIcons", "1", CVAR_ARCHIVE )
 CG_CVAR( cg_drawAmmoWarning, "cg_drawAmmoWarning", "1", CVAR_ARCHIVE )
 CG_CVAR( cg_drawAttacker, "cg_drawAttacker", "0", CVAR_ARCHIVE_ND )
@@ -82,7 +79,6 @@ CG_CVAR( cg_tracerWidth, "cg_tracerwidth", "1", CVAR_CHEAT )
 CG_CVAR( cg_tracerLength, "cg_tracerlength", "100", CVAR_CHEAT )
 CG_CVAR( cg_thirdPersonRange, "cg_thirdPersonRange", "40", CVAR_CHEAT )
 CG_CVAR( cg_thirdPersonAngle, "cg_thirdPersonAngle", "0", CVAR_CHEAT )
-CG_CVAR( cg_firstPersonBodyScale, "cg_firstPersonBodyScale", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_thirdPerson, "cg_thirdPerson", "0", 0 )
 CG_CVAR( cg_teamChatTime, "cg_teamChatTime", "3000", CVAR_ARCHIVE  )
 CG_CVAR( cg_teamChatHeight, "cg_teamChatHeight", "0", CVAR_ARCHIVE  )
@@ -93,7 +89,6 @@ CG_CVAR( cg_deferPlayers, "cg_deferPlayers", "0", CVAR_ARCHIVE )
 #else
 CG_CVAR( cg_deferPlayers, "cg_deferPlayers", "1", CVAR_ARCHIVE )
 #endif
-CG_CVAR( cg_smoothFollow, "cg_smoothFollow", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_drawTeamOverlay, "cg_drawTeamOverlay", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_teamOverlayUserinfo, "teamoverlay", "0", CVAR_ROM | CVAR_USERINFO )
 CG_CVAR( cg_stats, "cg_stats", "0", 0 )
