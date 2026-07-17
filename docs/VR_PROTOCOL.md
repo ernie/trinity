@@ -283,7 +283,9 @@ Their numeric values are per-game (the enum has a conditional entry under
 `MISSIONPACK`), which is safe because the engine never interprets stat
 indices; only the mod's own pack and unpack must agree. Tail placement means
 old demos and version-skewed clients read zeros out of the new slots instead
-of misreading another stat.
+of misreading another stat. The rule is append-only, not VR-last: stats the
+mod adds later belong after these two, at the then-current tail, and the
+same zeros-for-old-readers property carries forward.
 
 `EF_VR_PLAYER` uses bit 10 (`0x00000400`), which is shared with `EF_MOVER_STOP`.
 This is safe because `EF_MOVER_STOP` only applies to mover entities (doors,

@@ -64,8 +64,18 @@ Copy these modules into the matching directories of your tree (paths relative to
 - **`game/vr_shared.h`** and **`game/vr_safe_types.h`**: the mirror ABI
   (`vr_shared_t`) and the QVM-safe enums it uses. Included everywhere; hand-synced
   from the engine; do not edit. The mirror only ever grows at its tail with a
-  `VR_API_VERSION` bump, and the engine rejects a module whose mirror size or
-  version doesn't match, so a stale copy fails loudly rather than subtly.
+  `VR_API_MINOR` bump (layout changes bump `VR_API_MAJOR`), and the engine
+  rejects a module whose size or version it cannot meet, so a stale copy fails
+  loudly rather than subtly. The gate catches version and size skew only: a
+  hand-*reordered* layout under an unchanged version is exactly the silent
+  corruption the never-edit rule and the Step 8 probe exist to catch.
+- **`game/vr_trap.h`**: the `VR_RESOLVE` binding macro every bootstrap uses to
+  look traps up by name (Step 3). Header-only; included by `vr_game.c`,
+  `vr_cgame.c`, and both `vr_ui.c`.
+- **`game/vr_platform.c` / `vr_platform.h`**: the platform query
+  (`UI_VR_Platform`, Appendix A) that double-gates VR-only UI rows on live
+  registration plus the `vr_platform` cvar. Compiles into cgame and both UI
+  targets; the game module has no use for it.
 - **`game/vr_bg.c` / `vr_bg.h`**: the shared movement and entity-state hooks
   (6DOF view-angle compensation, the dead-view predicate, the 6DOF physics
   mode, head-angle unpack) and the `EF_VR_PLAYER` definition. Named with the
@@ -104,14 +114,16 @@ Add the copied sources to your build's module lists.
 | `vr_bg.c` | game **and** cgame **and** both UI targets (every module) |
 | `vr_game.c` | game |
 | `vr_cgame.c` | cgame |
+| `vr_platform.c` | cgame **and** both UI targets (not game) |
 | `q3_ui/vr_ui.c` | baseq3 UI |
 | `ui/vr_ui.c` | missionpack UI |
 | `ui/vr_uishared.c` | missionpack cgame **and** missionpack UI |
 | baseq3 VR menu C files | baseq3 UI |
 
 `vr_bg.c` lands in every module because the mirror and the shared movement hooks
-are needed everywhere. `vr_shared.h` / `vr_safe_types.h` are headers; they carry
-no compile line; just make them reachable on the include path of every module.
+are needed everywhere. `vr_shared.h` / `vr_safe_types.h` / `vr_trap.h` are
+headers; they carry no compile line; just make them reachable on the include
+path of every module.
 
 **The one dual-link case:** `vr_uishared.c` must compile into *both* the
 missionpack cgame and the missionpack UI; it has to link everywhere
@@ -122,13 +134,17 @@ Team Arena's `.menu` files and `vrmenus_*` manifests live in the missionpack
 asset pak, which only loads under `fs_game missionpack`. A third-party `fs_game`
 stacks on baseq3 and never sees them, so ship your own copies with your mod.
 
-> **Build and check.** Compile now, before adding a single call-out. One stock
-> addition is needed this early: the two stat enum entries from Step 4, which
-> the vendored sources reference by name. With those in, the drop compiles and
-> links cleanly with none of the call-outs placed; the modules are just dormant
-> code. If it doesn't build here, it's a file-list or include-path problem, not
-> an integration problem, and it's far cheaper to fix before the call-outs are
-> in.
+> **Build and check.** Compile now, before adding a single call-out. Two stock
+> additions are needed this early: the two stat enum entries from Step 4, which
+> the vendored sources reference by name, and the host-tree prerequisites in
+> **Appendix E** — the struct fields, helpers, and header edits the vendored
+> sources compile against. This tree already carries all of Appendix E, so here
+> the drop builds with the enum entries alone; a mod tracking stock 1.32
+> sources must work through that appendix first, and its first `make` here is
+> the honest inventory of what remains. Once the drop builds with none of the
+> call-outs placed, the modules are just dormant code, and any remaining
+> failure is a file-list or include-path problem — far cheaper to find before
+> the call-outs are in.
 
 ---
 
@@ -158,15 +174,44 @@ stale layout:
 
 ```c
 vr_state.structSize = sizeof( vr_state );
-vr_state.apiVersion = VR_API_VERSION;
-trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_VERSION );
+vr_state.apiVersion = VR_API_MAJOR;
+trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_MAJOR, VR_API_MINOR );
 ```
 
-`VR_API_VERSION` is `1` and the sentinel string is `"TRINITY_VR_API/1"`. The
-dormancy signal is **registration**: a module that never resolved
-`trap_VR_RegisterState` reports itself inactive (`G_VR_Active()` on the server,
-the `vrActive` flag in the client and UI). Appendix B lists the individual trap
-keys and which are optional.
+Registration is the module's version advertisement: the major.minor pair it
+was compiled against. The engine enforces the same rule here as at load — it
+runs a module whose major matches and whose minor it can meet or exceed, and
+drops anything else with `VR API incompatible`. For native builds, which are
+never sentinel-scanned, this registration check is the only version gate, so
+advertise honestly: the pair you compiled against, not the pair you tested on.
+
+The API is versioned major.minor: `VR_API_MAJOR` / `VR_API_MINOR` (currently
+`1.0`) build the sentinel string `"TRINITY_VR_API/1.0"`, which the vendored
+files embed in each module as the `vr_api_sentinel[]` array. The engine finds
+it by scanning the raw `.qvm` image for that string — there is no export or
+symbol — so a module built from the drop carries it automatically, but a
+hand-rolled bootstrap must keep the array *and* its self-reference (which
+stops the toolchain dead-stripping it) or the engine will treat the QVM as
+flatscreen-only. A VR engine runs a QVM whose major matches and whose minor it
+can meet or exceed; anything else is refused at load with `VR API
+incompatible`. The dormancy signal is **registration**: a module that never
+resolved `trap_VR_RegisterState` reports itself inactive (`G_VR_Active()` on
+the server, the `vrActive` flag in the client and UI). Appendix B lists the
+individual trap keys.
+
+Two consequences of the load gate are worth knowing before you first test.
+The engine gates each module **independently**, and a QVM with no sentinel is
+not an error: it is skipped with a single console line and the engine falls
+back to its own bundled native module. Forget to compile the drop into one of
+your three modules and the other two run alongside *someone else's* rules —
+loudly in the console, silently in-game. All three modules carry the drop;
+there is no cgame-only integration. Second, the mirror's write rules are
+enforced by the engine, not the compiler: each sync commits back only the
+blocks your module owns (the block comments in `vr_shared.h`), so a write to
+an engine-owned field compiles fine and is silently reverted at the next
+sync-in. "Module writes are local-transient" in the struct comment means
+exactly that; custom code that wants to change engine state goes through
+cvars or traps, never the mirror.
 
 ---
 
@@ -234,6 +279,14 @@ this addition is part of making the drop compile. Everything else the protocol
 once asked of stock files ships in the drop: `EF_VR_PLAYER` is defined in
 `vr_bg.h`, and the per-client head angles live in module state inside
 `vr_game.c`.
+
+Two cautions on the enum itself. "Tail" means append-only, not VR-last:
+entries your mod adds *later* belong after these two, exactly as this tree's
+own later additions follow them — each addition lands at the then-current
+tail and the zeros-for-old-readers property holds for all of them. And
+`ps->stats` has a hard ceiling of 16 slots (`MAX_STATS`); a mod already near
+it will overflow into `persistant[]` with no compiler warning, so count
+before you append.
 
 **Shared movement (`vr_bg`).** The physics hooks sit in `bg_pmove.c`. Two of
 them land in `PM_UpdateViewAngles`: `BG_VR_DeadViewLocked` replaces the stock
@@ -574,6 +627,12 @@ the screens. Those couplings are:
 - **The desktop-mirror Apply.** `vr_desktopMode` together with
   `r_customdesktopwidth` / `r_customdesktopheight` are staged, then applied with a
   `vid_restart` on confirm, mirroring the menu's staged Apply.
+- **Reachable VR menus are fullscreen.** The engine's laser pointer can land
+  a click anywhere on the virtual screen; a non-fullscreen menu treats a
+  click outside its own rect as out-of-bounds and dismisses (or falls through
+  to whatever sits beneath). Every shipped VR screen sets `fullscreen 1` for
+  this reason; a replacement that doesn't will misbehave under laser input
+  with no error anywhere.
 
 The straightforward path is to take the shipped screens as-is; then the couplings
 come along for free.
@@ -641,19 +700,23 @@ flatscreen host. Team Arena's `UI_VR_LoadMenus()` is double-gated the same way.
 ## Appendix B: Bootstrap trap keys
 
 `trap_GetValue(value, valueSize, key)` returns non-zero and writes the resolved
-address into `value` when the engine supports `key`.
+trap number into `value` when the engine answers for `key`. Only one key is a
+gate: if `trap_VR_RegisterState` does not resolve, the module stays dormant and
+nothing else is attempted. Every other key below is part of the **required v1
+contract** — an engine that answers the handshake provides all of them — so
+the vendored bootstraps bind them unconditionally, discard the resolve result,
+and the hooks call them without guards. There are no per-feature capability
+flags. An engine that answered the handshake but dropped a v1 trap would be
+out of contract; growing the set with *new* traps is what a `VR_API_MINOR`
+bump is for.
 
-| Key | Modules | Required? | Capability on success |
-|-----|---------|-----------|-----------------------|
-| `trap_VR_RegisterState` | all | **Required** (no key, no VR) | sets `vrActive` / `g_vrActive` |
-| `trap_R_BeginPostBloom2D` / `trap_R_EndPostBloom2D` | cgame | optional | `hasPostBloom2D` (needs both) |
-| `trap_R_HUDBufferStart` / `trap_R_HUDBufferEnd` | cgame | optional | `hasHUDBuffer` (needs both) |
-| `trap_HapticEvent` | cgame, both UI | optional | `hasHapticEvent` |
-| `trap_VKeyboard_Show` / `_Hide` / `_IsActive` / `_HandleKey` | both UI | optional | `hasVKeyboard` (needs **all four**) |
-
-The paired and grouped keys are all-or-nothing: a partial keyboard interface is
-treated as no keyboard, and one HUD-buffer key without the other is treated as no
-HUD buffer. A feature whose trap is unresolved simply never fires.
+| Key | Modules |
+|-----|---------|
+| `trap_VR_RegisterState` | all (**the gate**: its resolve sets `vrActive` / `g_vrActive`) |
+| `trap_R_BeginPostBloom2D` / `trap_R_EndPostBloom2D` | cgame |
+| `trap_R_HUDBufferStart` / `trap_R_HUDBufferEnd` | cgame |
+| `trap_HapticEvent` | cgame, both UI |
+| `trap_VKeyboard_Show` / `_Hide` / `_IsActive` / `_HandleKey` | both UI |
 
 ## Appendix C: Asset dependencies
 
@@ -663,7 +726,7 @@ never crashes.
 | Asset | Used by | Without it |
 |-------|---------|-----------|
 | `gfx/weapon/scope` | `CG_VR_RegisterMedia`, zoom scope mask | Zoom still works, no reticle |
-| `sprites/vr/hud` | `CG_VR_RegisterMedia`, in-world HUD panel (HUD mode 1) | Mode 1 also needs `hasHUDBuffer`; HUD mode 2 unaffected |
+| `sprites/vr/hud` | `CG_VR_RegisterMedia`, in-world HUD panel (HUD mode 1) | Mode 1's panel doesn't draw; HUD mode 2 unaffected |
 | laser-sight beam | drawn via `CG_LaserSight`, gated by `vr_lasersight` | No beam renders |
 | VR menu files / manifests | the settings UI | Console-only settings (every toggle is still a cvar) |
 
@@ -686,4 +749,53 @@ Deliberate differences, noted so the two `vr_ui.c` files don't surprise you:
 - **Event-hook identity.** Only `CG_VR_OnTeleport` and `CG_VR_OnHitByMissile`
   carry a client/entity number; the others rely on the local-player gate already
   at their call site (Step 5, note 2).
+
+## Appendix E: Host-tree prerequisites
+
+The vendored sources compile against more than stock 1.32 declares. This tree
+already carries all of it — which is why Step 2's build check passes here with
+just the two stat entries — but a mod tracking stock sources must bring its
+tree up to this list first. It is honest, one-time work of several hundred
+lines; nothing here changes when you take a new drop. The reference for every
+item is this repo's own source: diff the named file against your stock copy
+and take the delta.
+
+**Renderer contract (`cgame/tr_types.h`).** Four additions: `RF_WORLD_ORIENTED`,
+`RT_LASERSIGHT`, `refEntity_t.invert`, and `refdef_t.isHUD`. The two struct
+fields are **tail-appended and must stay last**: the stock prefix is what
+keeps the layout compatible with engines that do not know the field. A
+mid-struct insertion compiles clean and corrupts rendering at run time — this
+ecosystem has shipped exactly that bug once; do not re-derive it.
+
+**Syscall plumbing.** The `dll_*` trap-number variables and QVM/native
+trampolines for every Appendix B trap, in all four `*_syscalls.c`, plus their
+declarations at the tail of each `*_local.h`. Mechanical — copy the blocks
+from this tree's syscall files. Float arguments cross the DLL boundary
+through `PASSFLOAT`; miss it and native builds pass garbage.
+
+**cgame substrate.** `vr_cgame.c` consumes host state and helpers stock cgame
+lacks: the `cg.worldscale` / `cg.drawingHUD` / smooth-follow / weapon-selector
+field families on `cg_t`, the reticle and HUD media handles, a handful of
+vmCvars (`cg_vrApiProbe` among them), and the drawing helpers
+(`CG_DrawScreen2D`, `CG_Draw2DMinimal`, the HUD-anchor push/pop set,
+`CG_LaserSight`). The single largest item is restructuring `CG_Draw2D` from a
+static single-target function into the exported, stereo-aware form this tree
+has — that split is what lets the whole-frame fork bracket your 2D correctly.
+A few stock-`static` functions also need exporting (`CG_WeaponSelectable`,
+`CG_CalculateWeaponPosition`, the first/third-person view-offset pair, …);
+the linker hands you the exact list.
+
+**game-module physics config.** `BG_VR_PmovePhysics` speaks this tree's
+`bg_mode.h` config type at its `PmoveSingle` call site. A mod without that
+system passes its own movement constants through an equivalent shim; this is
+the one place the drop still leans on a host-specific type.
+
+**UI substrate.** baseq3: the `uis.biasX` / `uis.biasY` / `uis.screenXmin…`
+uniform-scale fields this tree added to `uiStatic_t` (stock carries only
+`xscale` / `yscale` / `bias`). Team Arena: the `vrMenuMove` member on
+`displayContextDef_t` and one `menudef.h` keyword.
+
+If a symbol is still unresolved after this list, find it in this tree — the
+tree itself is the complete inventory, and Step 2's failing build output is
+your work list.
 
