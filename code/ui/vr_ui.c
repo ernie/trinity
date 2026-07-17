@@ -14,7 +14,7 @@ qboolean vrActive = qfalse;
 
 #ifdef Q3_VM
 qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
-void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiVersion );
+void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
 void	(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
 void	(*trap_VKeyboard_Show)( void );
 void	(*trap_VKeyboard_Hide)( void );
@@ -67,7 +67,7 @@ void UI_VR_Init( void ) {
 
 	vr_state.structSize = sizeof( vr_state );
 	vr_state.apiVersion = VR_API_MAJOR;
-	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_MAJOR );
+	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_MAJOR, VR_API_MINOR );
 	vrActive = qtrue;
 
 	// The rest of the VR trap set is part of the v1 contract, so a registered

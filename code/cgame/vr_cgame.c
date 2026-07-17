@@ -53,7 +53,7 @@ void CG_VR_Init( void ) {
 
 	vr_state.structSize = sizeof( vr_state );
 	vr_state.apiVersion = VR_API_MAJOR;
-	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_MAJOR );
+	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_MAJOR, VR_API_MINOR );
 	vrActive = qtrue;
 
 	// The rest of the VR trap set is part of the v1 contract, so a registered

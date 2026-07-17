@@ -382,8 +382,8 @@ qboolean trap_GetValue( char *value, int valueSize, const char *key ) {
 	return syscall( dll_com_trapGetValue, value, valueSize, key );
 }
 
-void trap_VR_RegisterState( void *state, int stateSize, int apiVersion ) {
-	syscall( dll_trap_VR_RegisterState, state, stateSize, apiVersion );
+void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor ) {
+	syscall( dll_trap_VR_RegisterState, state, stateSize, apiMajor, apiMinor );
 }
 
 void trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height ) {

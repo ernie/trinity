@@ -441,8 +441,8 @@ void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float or
 	syscall( dll_trap_R_ProjectDecal, origin, PASSFLOAT(size), PASSFLOAT(reach), PASSFLOAT(orientation), hShader, rgba, lifeTime );
 }
 
-void trap_VR_RegisterState( void *state, int stateSize, int apiVersion ) {
-	syscall( dll_trap_VR_RegisterState, state, stateSize, apiVersion );
+void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor ) {
+	syscall( dll_trap_VR_RegisterState, state, stateSize, apiMajor, apiMinor );
 }
 
 void trap_R_BeginPostBloom2D( void ) {

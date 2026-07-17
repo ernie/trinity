@@ -1091,7 +1091,7 @@ void	trap_SnapVector( float *v );
 extern qboolean	(*trap_GetValue)( char *value, int valueSize, const char *key );
 #else
 qboolean trap_GetValue( char *value, int valueSize, const char *key );
-void trap_VR_RegisterState( void *state, int stateSize, int apiVersion );
+void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
 extern int dll_com_trapGetValue;
 extern int dll_trap_VR_RegisterState;
 #endif

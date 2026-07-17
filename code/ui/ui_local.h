@@ -18,7 +18,7 @@ extern qboolean		vrActive;
 
 #ifdef Q3_VM
 extern qboolean	(*trap_GetValue)( char *value, int valueSize, const char *key );
-extern void		(*trap_VR_RegisterState)( void *state, int stateSize, int apiVersion );
+extern void		(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
 extern void		(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
 extern void		(*trap_VKeyboard_Show)( void );
 extern void		(*trap_VKeyboard_Hide)( void );
@@ -26,7 +26,7 @@ extern qboolean	(*trap_VKeyboard_IsActive)( void );
 extern qboolean	(*trap_VKeyboard_HandleKey)( int key );
 #else
 qboolean	trap_GetValue( char *value, int valueSize, const char *key );
-void		trap_VR_RegisterState( void *state, int stateSize, int apiVersion );
+void		trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
 void		trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height );
 void		trap_VKeyboard_Show( void );
 void		trap_VKeyboard_Hide( void );
