@@ -16,4 +16,11 @@
 // (CG_WarmupEvents). 0: the drop never calls it and it need not exist.
 #define VR_HOST_HAS_WARMUP_EVENTS 1
 
+// Optional: the weapon wheel's default set - what "*" and an empty
+// cg_weaponSelectorWeapons expand to - in the cvar's token language ("*"
+// here means the built-in set; "!name" hides a weapon from a later "*").
+// Unset: the built-in set (every weapon except the gauntlet and the
+// grappling hook).
+//#define VR_WHEEL_DEFAULT_WEAPONS "*"
+
 #endif // VR_HOST_CONFIG_H

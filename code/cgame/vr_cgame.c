@@ -55,6 +55,7 @@ static qhandle_t vrc_smallSphereModel;
 static vmCvar_t cg_vrApiProbe;
 static vmCvar_t cg_debugWeaponAiming;
 static vmCvar_t cg_weaponSelectorSimple2DIcons;
+static vmCvar_t cg_weaponSelectorWeapons;
 static vmCvar_t cg_firstPersonBodyScale;
 static vmCvar_t cg_smoothFollow;
 
@@ -95,6 +96,10 @@ void CG_VR_Init( void ) {
 	trap_Cvar_Register( &cg_vrApiProbe, "cg_vrApiProbe", "0", 0 );
 	trap_Cvar_Register( &cg_debugWeaponAiming, "cg_debugWeaponAiming", "0", CVAR_ARCHIVE );
 	trap_Cvar_Register( &cg_weaponSelectorSimple2DIcons, "cg_weaponSelectorSimple2DIcons", "0", CVAR_ARCHIVE );
+	// deliberately not archived: the value is weapon-set-relative, and an
+	// archived list would leak into other mods' first-run configs through
+	// the search path. A customized list belongs in autoexec.cfg.
+	trap_Cvar_Register( &cg_weaponSelectorWeapons, "cg_weaponSelectorWeapons", "", 0 );
 	trap_Cvar_Register( &cg_firstPersonBodyScale, "cg_firstPersonBodyScale", "0", CVAR_ARCHIVE );
 	trap_Cvar_Register( &cg_smoothFollow, "cg_smoothFollow", "0", CVAR_ARCHIVE );
 
@@ -333,6 +338,22 @@ qboolean CG_VR_DrawingZoomedHUD( void ) {
 // The zoom scope mask shader; 0 until media registration (host zoom draw).
 qhandle_t CG_VR_ReticleShader( void ) {
 	return vrc_reticleShader;
+}
+
+/*
+============
+CG_VR_ClientIsVR
+
+Whether the server flagged this client as a VR player - the vr\ field of
+the player configstring, written by G_VR_ClientIsVR. Host convenience for
+marking VR players on the scoreboard or HUD; reads the local gamestate.
+============
+*/
+qboolean CG_VR_ClientIsVR( int clientNum ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return qfalse;
+	}
+	return atoi( Info_ValueForKey( CG_ConfigString( CS_PLAYERS + clientNum ), "vr" ) ) ? qtrue : qfalse;
 }
 
 // cg_view.c per-frame view-pipeline hooks: FOV override, forced third-person
@@ -1637,6 +1658,139 @@ static float length(float x, float y)
 	return sqrt(x * x + y * y);
 }
 
+// cg_weaponSelectorWeapons: the weapons the selector offers, in wheel order
+// (the last entry lands at the top slot). Tokens are weapon_t values or
+// item classnames with or without the weapon_ prefix; "*" expands the
+// default set in place, and "!name" hides a weapon from later tokens and
+// "*" expansions (exclusions come before the "*" they filter). Unknown and
+// duplicate tokens are dropped, so listing a weapon before "*" promotes it
+// out of the default order. Empty (the default) is "*": every weapon
+// except the gauntlet and the grappling hook, in weapon_t order.
+static int vrc_wheelSlots[WP_NUM_WEAPONS];
+static int vrc_wheelSlotCount = 0;
+
+static int VR_WheelWeaponForToken( const char *token )
+{
+	int i;
+
+	if ( token[0] >= '0' && token[0] <= '9' ) {
+		i = atoi( token );
+		if ( i > WP_NONE && i < WP_NUM_WEAPONS ) {
+			return i;
+		}
+		return WP_NONE;
+	}
+	for ( i = 1; bg_itemlist[i].classname; ++i ) {
+		if ( bg_itemlist[i].giType != IT_WEAPON ) {
+			continue;
+		}
+		if ( !Q_stricmp( token, bg_itemlist[i].classname ) ||
+		     ( !Q_stricmpn( bg_itemlist[i].classname, "weapon_", 7 ) &&
+		       !Q_stricmp( token, bg_itemlist[i].classname + 7 ) ) ) {
+			return bg_itemlist[i].giTag;
+		}
+	}
+	return WP_NONE;
+}
+
+static void VR_WheelAppendBuiltins( qboolean *seen )
+{
+	int weaponId;
+
+	for ( weaponId = 1; weaponId < WP_NUM_WEAPONS; ++weaponId ) {
+		if ( weaponId == WP_GAUNTLET || weaponId == WP_GRAPPLING_HOOK ) {
+			continue;
+		}
+		if ( seen[weaponId] ) {
+			continue;
+		}
+		seen[weaponId] = qtrue;
+		vrc_wheelSlots[vrc_wheelSlotCount++] = weaponId;
+	}
+}
+
+// Adds or hides one non-"*" token. "!name" marks the weapon hidden so no
+// later token or "*" expansion adds it.
+static void VR_WheelAddToken( const char *token, qboolean *seen )
+{
+	int weaponId;
+
+	if ( token[0] == '!' ) {
+		weaponId = VR_WheelWeaponForToken( token + 1 );
+		if ( weaponId != WP_NONE ) {
+			seen[weaponId] = qtrue;
+		}
+		return;
+	}
+	weaponId = VR_WheelWeaponForToken( token );
+	if ( weaponId == WP_NONE || seen[weaponId] ) {
+		return;
+	}
+	seen[weaponId] = qtrue;
+	vrc_wheelSlots[vrc_wheelSlotCount++] = weaponId;
+}
+
+// The default set "*" expands to. A host may define
+// VR_WHEEL_DEFAULT_WEAPONS in vr_host_config.h (same token language;
+// "*" there means the built-in set) to set its own default; otherwise
+// the built-in set applies.
+static void VR_WheelAppendDefaults( qboolean *seen )
+{
+#ifdef VR_WHEEL_DEFAULT_WEAPONS
+	char buf[MAX_STRING_CHARS];
+	char *p;
+	char *token;
+
+	Q_strncpyz( buf, VR_WHEEL_DEFAULT_WEAPONS, sizeof( buf ) );
+	p = buf;
+	while ( 1 ) {
+		token = COM_Parse( &p );
+		if ( !token[0] ) {
+			break;
+		}
+		if ( !Q_stricmp( token, "*" ) ) {
+			VR_WheelAppendBuiltins( seen );
+			continue;
+		}
+		VR_WheelAddToken( token, seen );
+	}
+	if ( vrc_wheelSlotCount == 0 ) {
+		VR_WheelAppendBuiltins( seen );
+	}
+#else
+	VR_WheelAppendBuiltins( seen );
+#endif
+}
+
+static void VR_ParseWheelWeapons( void )
+{
+	char buf[MAX_STRING_CHARS];
+	char *p;
+	char *token;
+	qboolean seen[WP_NUM_WEAPONS];
+
+	vrc_wheelSlotCount = 0;
+	memset( seen, 0, sizeof( seen ) );
+
+	trap_Cvar_VariableStringBuffer( "cg_weaponSelectorWeapons", buf, sizeof( buf ) );
+	p = buf;
+	while ( 1 ) {
+		token = COM_Parse( &p );
+		if ( !token[0] ) {
+			break;
+		}
+		if ( !Q_stricmp( token, "*" ) ) {
+			VR_WheelAppendDefaults( seen );
+			continue;
+		}
+		VR_WheelAddToken( token, seen );
+	}
+
+	if ( vrc_wheelSlotCount == 0 ) {
+		VR_WheelAppendDefaults( seen );
+	}
+}
+
 void CG_DrawWeaponSelector( void )
 {
 	int selectorMode;
@@ -1654,11 +1808,7 @@ void CG_DrawWeaponSelector( void )
 	float thumbstickValue;
 	float x;
 	float y;
-#ifdef MISSIONPACK
-	float wheelIconAngles[WP_NUM_WEAPONS] = {0.0f, 45.0f, 90.0f, 120.0f, 150.0f, 180.0f, 210.0f, 240.0f, 270.0f, 300.0f, 330.0f, 360.0f, 390.0f};
-#else
-	float wheelIconAngles[WP_NUM_WEAPONS] = {0.0f, 45.0f, 90.0f, 135.0f, 180.0f, 225.0f, 270.0f, 315.0f, 360.0f, 390.0f};
-#endif
+	float wheelIconAngles[WP_NUM_WEAPONS + 2];
 	qboolean selected;
 	int angleIndex;
 	int weaponId;
@@ -1667,9 +1817,24 @@ void CG_DrawWeaponSelector( void )
 	if (vrc_weaponSelectorTime == 0)
 	{
 		vrc_weaponSelectorTime = cg.time;
+		VR_ParseWheelWeapons();
 		VectorCopy(vr->weaponangles, vrc_weaponSelectorAngles);
 		VectorCopy(vr->weaponposition, vrc_weaponSelectorOrigin);
 		VectorCopy(vr->weaponoffset, vrc_weaponSelectorOffset);
+	}
+
+	// Consistent spacing over the slot list: the top slot sits at 360;
+	// entries [0] and [count+1] are the hit-test boundary sentinels for
+	// the first and last slots (half a spacing beyond each).
+	{
+		float spacing = 360.0f / vrc_wheelSlotCount;
+		int i;
+		wheelIconAngles[0] = 0.0f;
+		for (i = 1; i <= vrc_wheelSlotCount; ++i)
+		{
+			wheelIconAngles[i] = i * spacing;
+		}
+		wheelIconAngles[vrc_wheelSlotCount + 1] = 360.0f + spacing;
 	}
 
 	// trinity cgame has no trap_Cvar_VariableValue; read via string buffer
@@ -1785,16 +1950,9 @@ void CG_DrawWeaponSelector( void )
 	}
 
 	selected = qfalse;
-	angleIndex = 0;
-	for (weaponId = 1; weaponId < WP_NUM_WEAPONS; ++weaponId)
+	for (angleIndex = 1; angleIndex <= vrc_wheelSlotCount; ++angleIndex)
 	{
-		if (weaponId == WP_GRAPPLING_HOOK || weaponId == WP_GAUNTLET)
-		{
-			continue;
-		}
-
-		//increment now we know we aren't looking at an invalid weapon id
-		++angleIndex;
+		weaponId = vrc_wheelSlots[angleIndex - 1];
 
 		CG_RegisterWeapon(weaponId);
 
@@ -1892,10 +2050,6 @@ void CG_DrawWeaponSelector( void )
 				iconAngles[PITCH] = 10;
 				iconAngles[YAW] = wheelAngles[YAW] - 145.0f;
 				iconAngles[ROLL] = 0;
-				if (weaponId == WP_GAUNTLET)
-				{
-					iconAngles[ROLL] = -90.0f;
-				}
 
 				weaponScale = ((scale+0.02f)*frac) + (vrc_weaponSelectorSelection == weaponId ? 0.04f : 0);
 

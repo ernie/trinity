@@ -135,6 +135,7 @@ void CG_VR_DeathCamReset( void );          // local player (re)spawn / new games
 void CG_VR_PortraitReset( void );          // HUD portrait subject changed
 qboolean CG_VR_DrawingZoomedHUD( void );   // inside the zoom minimal-HUD pass
 qhandle_t CG_VR_ReticleShader( void );     // zoom scope mask, 0 until media loads
+qboolean CG_VR_ClientIsVR( int clientNum ); // server-flagged VR player (vr\ configstring field)
 
 // cg_players.c embodiment hooks: first-person body pose/visibility, off-hand
 // item suppression/pose (CG_TrailItem's VR branch), the off-hand holdable
