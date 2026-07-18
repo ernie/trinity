@@ -91,6 +91,21 @@ float BG_VR_PmoveAccelerate( const playerState_t *ps, float stockAccelerate ) {
 
 /*
 ============
+BG_VR_DriftIdle
+
+Whether the footsteps idle clause widens for this player: analog sticks and
+roomscale drift produce tiny velocities that must not advance the walk cycle.
+Keyed on EF_VR_PLAYER so the server, prediction, and every client agree per
+player; the flag is never set on flatscreen engines, so stock behavior there
+is untouched.
+============
+*/
+qboolean BG_VR_DriftIdle( const playerState_t *ps ) {
+	return ( ps->eFlags & EF_VR_PLAYER ) ? qtrue : qfalse;
+}
+
+/*
+============
 BG_VR_HeadToEntityState
 
 Unpack VR head angles from stats for demo playback of the local player.

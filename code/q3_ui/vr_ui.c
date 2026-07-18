@@ -295,8 +295,9 @@ UI_VR_FillScreen
 
 Whole-framebuffer fill for full-bleed screens (connect/loading).
 Deliberately bypasses the 640x480 transform: in VR the framebuffer
-must be covered edge-to-edge; on flatscreen this matches the stock
-full-window stretch.
+must be covered edge-to-edge. VR-only - callers gate on vrActive and
+keep the stock aspect-preserving 640x480 draw when dormant (stock
+pillarboxes wide windows; this fill would paint the bars).
 ================
 */
 void UI_VR_FillScreen( qhandle_t shader ) {

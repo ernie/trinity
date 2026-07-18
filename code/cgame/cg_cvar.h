@@ -18,6 +18,10 @@
 	#define CG_CVAR_PLATFORM( vmCvar, platformMask, defaultString ) { & vmCvar, platformMask, defaultString },
 #endif
 
+// Several stock defaults are deliberately different here, on every platform
+// (not VR-gated): cg_drawAttacker 0, cg_drawCrosshairNames 0, cg_scorePlums 0,
+// cg_smoothClients 1, cg_oldRocket 0, cg_trueLightning 1.
+
 CG_CVAR( cg_ignore, "cg_ignore", "0", 0 ) // used for debugging
 CG_CVAR( cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE )
 CG_CVAR( cg_drawGun, "cg_drawGun", "1", CVAR_ARCHIVE )

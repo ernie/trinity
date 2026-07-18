@@ -34,10 +34,6 @@ static float UI_GetProjectionCenterYOffset( void )
 	float tanDown;
 	float tanHeight;
 
-	if ( vr == NULL ) {
-		return 0.0f;
-	}
-
 	tanUp = tan( vr->fov_angle_up );
 	tanDown = tan( vr->fov_angle_down );
 	tanHeight = tanUp - tanDown;

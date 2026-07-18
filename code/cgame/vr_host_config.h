@@ -17,8 +17,13 @@
 #define VR_HOST_HAS_WARMUP_EVENTS 1
 
 // Optional: the weapon wheel's default set - what "*" and an empty
-// cg_weaponSelectorWeapons expand to - in the cvar's token language ("*"
-// here means the built-in set; "!name" hides a weapon from a later "*").
+// cg_weaponSelectorWeapons expand to - in the cvar's token language.
+// Tokens are whitespace-separated (commas are not separators); a token is
+// a weapon_t number or an item classname with or without the weapon_
+// prefix ("rocketlauncher", "weapon_railgun", "5"). "*" expands the
+// default set ("*" here means the built-in set); "!name" hides a weapon
+// from later mentions and expansions; first mention wins. A list of only
+// exclusions means the default set minus those weapons.
 // Unset: the built-in set (every weapon except the gauntlet and the
 // grappling hook).
 //#define VR_WHEEL_DEFAULT_WEAPONS "*"

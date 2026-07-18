@@ -188,8 +188,14 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 	if ( !overlay ) {
 		// draw the dialog background
 		UI_SetColor( color_white );
-		// fill whole screen, not just 640x480 virtual rectangle
-		UI_VR_FillScreen( uis.menuBackShader );
+		// VR covers the framebuffer edge-to-edge; on flatscreen keep the
+		// stock aspect-preserving draw (the fill would paint the pillarbox
+		// bars - a flatscreen visual change, not harmless overdraw)
+		if ( vrActive ) {
+			UI_VR_FillScreen( uis.menuBackShader );
+		} else {
+			UI_DrawHandlePic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, uis.menuBackShader );
+		}
 	}
 
 	info[0] = '\0';

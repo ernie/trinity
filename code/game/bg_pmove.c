@@ -1432,10 +1432,22 @@ static void PM_Footsteps( void ) {
 		return;
 	}
 
-	// if not trying to move, or barely moving - analog sticks and roomscale
-	// drift produce tiny velocities that must not advance the walk cycle
-	if (( !pm->cmd.forwardmove && !pm->cmd.rightmove ) ||
-		( xyspeed < 10 )) {
+	// if not trying to move
+	if ( !pm->cmd.forwardmove && !pm->cmd.rightmove ) {
+		if (  xyspeed < 5 ) {
+			pm->ps->bobCycle = 0;	// start at beginning of cycle again
+			if ( pm->ps->pm_flags & PMF_DUCKED ) {
+				PM_ContinueLegsAnim( LEGS_IDLECR );
+			} else {
+				PM_ContinueLegsAnim( LEGS_IDLE );
+			}
+		}
+		return;
+	}
+
+	// VR players: analog sticks and roomscale drift produce tiny velocities
+	// that must not advance the walk cycle
+	if ( BG_VR_DriftIdle( pm->ps ) && xyspeed < 10 ) {
 		pm->ps->bobCycle = 0;	// start at beginning of cycle again
 		if ( pm->ps->pm_flags & PMF_DUCKED ) {
 			PM_ContinueLegsAnim( LEGS_IDLECR );
@@ -1444,7 +1456,7 @@ static void PM_Footsteps( void ) {
 		}
 		return;
 	}
-	
+
 
 	footstep = qfalse;
 

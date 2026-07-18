@@ -1322,9 +1322,9 @@ void CG_NewClientInfo( int clientNum ) {
 	v = Info_ValueForKey( configstring, "skill" );
 	newInfo.botSkill = atoi( v );
 
-	// VR player
-	v = Info_ValueForKey( configstring, "vr" );
-	newInfo.vrPlayer = atoi( v ) ? qtrue : qfalse;
+	// VR player - the drop owns the wire format on both ends (G_VR_ClientIsVR
+	// writes it, CG_VR_ClientIsVR reads it); draw sites use this cached copy
+	newInfo.vrPlayer = CG_VR_ClientIsVR( clientNum );
 
 	// VOIP enabled
 	v = Info_ValueForKey( configstring, "voip" );
