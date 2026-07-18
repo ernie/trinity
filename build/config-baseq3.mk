@@ -14,6 +14,4 @@ QA_CFLAGS = -DQAGAME
 CG_CFLAGS = -DCGAME -I$(CGDIR)
 UI_CFLAGS = -DQ3UI -I$(UIDIR)
 
-EXTRA_ASSETS = ../assets-baseq3/*
-
 include srcs.mk

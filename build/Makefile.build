@@ -37,9 +37,17 @@ dirs:
 
 .PHONY: all dirs
 
-ASSET_FILES = $(wildcard ../assets/*) $(wildcard ../assets/**/*) $(wildcard $(EXTRA_ASSETS)) $(wildcard $(EXTRA_ASSETS)/**/*)
+# Asset edits at any depth must retrigger the pack, but make has no recursive
+# wildcard and prerequisite lists cannot hold spaced filenames - so probe
+# mtimes with find and force the pack when any asset is newer than the pk3.
+ifneq ($(shell find ../assets ../assets-$(CONFIG) -type f -newer $(DISTDIR)/$(PK3) -print -quit 2>/dev/null),)
+ASSETS_FORCE = FORCE
+endif
 
-$(DISTDIR)/$(PK3): $(STAGING)/vm/qagame.qvm $(STAGING)/vm/cgame.qvm $(STAGING)/vm/ui.qvm $(ASSET_FILES)
+FORCE:
+.PHONY: FORCE
+
+$(DISTDIR)/$(PK3): $(STAGING)/vm/qagame.qvm $(STAGING)/vm/cgame.qvm $(STAGING)/vm/ui.qvm $(ASSETS_FORCE)
 	echo $(VERSION) > $(STAGING)/trinity.ver
 	rm -f $(DISTDIR)/$(PK3)
 	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm trinity.ver
