@@ -855,7 +855,9 @@ through `PASSFLOAT`; miss it and native builds pass garbage.
 `vr_host_config.h`); the two stat enum entries (Step 4); the tunables
 `PLAYER_HEIGHT` / `SPECTATOR_WORLDSCALE_MULTIPLIER` /
 `SPECTATOR2_WORLDSCALE_MULTIPLIER`, which default in `vr_host.h` and may be
-predefined by the host.
+predefined by the host; and `cgs.cursorX` / `cgs.cursorY` become `float`
+(stock: `int`) — `CG_VR_ScoreboardCursor` writes the cursor through
+`float *`, the cgame twin of the UI-substrate cursor fields below.
 
 **UI substrate.** baseq3: the `uis.scale` / `uis.biasX` / `uis.biasY` /
 `uis.cursorScaleR` / `uis.screenXmin…Ymax` uniform-scale fields this tree

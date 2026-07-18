@@ -96,7 +96,9 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //   state the drop uses lives as module state inside vr_cgame.c; the host
 //   reads what it needs through accessors (CG_VR_DrawingZoomedHUD,
 //   CG_VR_ReticleShader) and resets drop state through call-outs
-//   (CG_VR_DeathCamReset, CG_VR_PortraitReset).
+//   (CG_VR_DeathCamReset, CG_VR_PortraitReset). One field-shape change:
+//   cgs.cursorX/cursorY become float (stock: int) -
+//   CG_VR_ScoreboardCursor writes the cursor through float *.
 // * baseq3 UI (q3_ui): the uniform-scale uiStatic_t fields
 //   scale/biasX/biasY/cursorScaleR/screenXmin..Ymax replace stock
 //   xscale/yscale/bias, and uis.cursorx/uis.cursory become float (stock:
