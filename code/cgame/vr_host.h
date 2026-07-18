@@ -106,6 +106,7 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //   Appendix E).
 // * Team Arena UI: displayContextDef_t gains
 //   void (*vrMenuMove)(void); wire it to the drop's UI_VR_OnMenuMove /
-//   CG_VR_OnMenuMove.
+//   CG_VR_OnMenuMove. Its cursorx/cursory also become float (stock: int)
+//   - UI_VR_CursorOverride writes the cursor through float *.
 
 #endif // VR_HOST_H

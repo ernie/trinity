@@ -865,7 +865,8 @@ added to `uiStatic_t` (stock carries only `xscale` / `yscale` / `bias`) — and
 `uis.cursorx` / `uis.cursory` become `float` (stock: `int`), because
 `UI_VR_CursorOverride` writes the cursor through `float *`. Team Arena: the
 `vrMenuMove` member on `displayContextDef_t`, wired to the drop's menu-hover
-hook.
+hook — and that struct's `cursorx` / `cursory` become `float` for the same
+cursor-override reason.
 
 If a symbol is still unresolved after `vr_host.h` is satisfied, it is a bug
 in the contract — report it; Step 2's failing build output is otherwise your
