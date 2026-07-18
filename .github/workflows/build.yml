@@ -87,6 +87,11 @@ jobs:
       - name: Sync the drop from this checkout
         run: cd template && ./sync-vr-drop.sh ../trinity
 
+      # Non-fatal: a non-empty list means this change touched the drop and the
+      # template repo needs a matching resync commit.
+      - name: Report template drift
+        run: cd template && git status --porcelain
+
       - name: Build the template QVMs
         run: cd template && make
 
