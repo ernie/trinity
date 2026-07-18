@@ -99,7 +99,9 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //   (CG_VR_DeathCamReset, CG_VR_PortraitReset).
 // * baseq3 UI (q3_ui): the uniform-scale uiStatic_t fields
 //   scale/biasX/biasY/cursorScaleR/screenXmin..Ymax replace stock
-//   xscale/yscale/bias (see Appendix E).
+//   xscale/yscale/bias, and uis.cursorx/uis.cursory become float (stock:
+//   int) - UI_VR_CursorOverride writes the cursor through float * (see
+//   Appendix E).
 // * Team Arena UI: displayContextDef_t gains
 //   void (*vrMenuMove)(void); wire it to the drop's UI_VR_OnMenuMove /
 //   CG_VR_OnMenuMove.
