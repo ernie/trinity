@@ -60,3 +60,35 @@ jobs:
             - `pak8t.pk3` → `baseq3`
             - `pak3t.pk3` → `missionpack`
             - `zzz-trinity-announcer.pk3` → `baseq3`
+
+  # Canary: sync the vendored VR drop from THIS checkout over the stock-ioq3
+  # reference template and build its QVMs. A Trinity-substrate dependency
+  # leaking into a vendored file compiles fine here (the substrate exists)
+  # and only fails against a stock tree - this job is that stock tree.
+  template-canary:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout trinity
+        uses: actions/checkout@v7
+        with:
+          path: trinity
+
+      - name: Checkout the stock-ioq3 template
+        uses: actions/checkout@v7
+        with:
+          repository: ernie/trinity-vr-mod-template
+          path: template
+          submodules: recursive
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential p7zip-full
+
+      - name: Sync the drop from this checkout
+        run: cd template && ./sync-vr-drop.sh ../trinity
+
+      - name: Build the template QVMs
+        run: cd template && make
+
+      - name: Check the pk3s exist
+        run: ls -l template/dist/zzz-vrtemplate.pk3 template/dist/zzz-vrtemplate-mp.pk3
