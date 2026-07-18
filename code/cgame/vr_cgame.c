@@ -18,6 +18,11 @@ static int echoFailures = 0;
 typedef vec_t vr_matrix4x4[4][4];
 #define vr_matrix4x4 vr_matrix4x4
 
+// refEntity_t.shaderRGBA is byte[4] in stock ioq3 and Quake3e's color4ub_t
+// union in this tree; both are four bytes at the field's address. The drop
+// writes through this accessor so it compiles against either shape.
+#define VR_ENT_RGBA( e ) ( (byte *)&(e).shaderRGBA )
+
 // VR module state, formerly cg_t/cgs_t fields. The drop owns all of it;
 // hosts read through the accessors and reset through the call-outs at the
 // bottom of this file.
@@ -1862,10 +1867,10 @@ void CG_DrawWeaponSelector( void )
 				sprite.renderfx = RF_FIRST_PERSON;
 				sprite.customShader = cgs.media.friendShader;
 				sprite.radius = 0.5f;
-				sprite.shaderRGBA.rgba[0] = 255;
-				sprite.shaderRGBA.rgba[1] = 255;
-				sprite.shaderRGBA.rgba[2] = 255;
-				sprite.shaderRGBA.rgba[3] = 255;
+				VR_ENT_RGBA( sprite )[0] = 255;
+				VR_ENT_RGBA( sprite )[1] = 255;
+				VR_ENT_RGBA( sprite )[2] = 255;
+				VR_ENT_RGBA( sprite )[3] = 255;
 				trap_R_AddRefEntityToScene( &sprite );
 			}
 
@@ -1904,13 +1909,13 @@ void CG_DrawWeaponSelector( void )
 					clientInfo_t *ci = &cgs.clientinfo[cg.predictedPlayerState.clientNum];
 					if( cg_entities[cg.predictedPlayerState.clientNum].pe.railFireTime + 1500 > cg.time ) {
 						int colorScale = 255 * ( cg.time - cg_entities[cg.predictedPlayerState.clientNum].pe.railFireTime ) / 1500;
-						ent.shaderRGBA.rgba[0] = ( ci->c1RGBA[0] * colorScale ) >> 8;
-						ent.shaderRGBA.rgba[1] = ( ci->c1RGBA[1] * colorScale ) >> 8;
-						ent.shaderRGBA.rgba[2] = ( ci->c1RGBA[2] * colorScale ) >> 8;
-						ent.shaderRGBA.rgba[3] = 255;
+						VR_ENT_RGBA( ent )[0] = ( ci->c1RGBA[0] * colorScale ) >> 8;
+						VR_ENT_RGBA( ent )[1] = ( ci->c1RGBA[1] * colorScale ) >> 8;
+						VR_ENT_RGBA( ent )[2] = ( ci->c1RGBA[2] * colorScale ) >> 8;
+						VR_ENT_RGBA( ent )[3] = 255;
 					}
 					else {
-						Byte4Copy( ci->c1RGBA, ent.shaderRGBA.rgba );
+						Byte4Copy( ci->c1RGBA, VR_ENT_RGBA( ent ) );
 					}
 				}
 
@@ -1954,10 +1959,10 @@ void CG_DrawWeaponSelector( void )
 				sprite.renderfx = RF_FIRST_PERSON;
 				sprite.customShader = cg_weapons[weaponId].weaponIcon;
 				sprite.radius = sRadius * 0.9f * (vrc_weaponSelectorSelection == weaponId ? 1.1f : 1.0);
-				sprite.shaderRGBA.rgba[0] = 255;
-				sprite.shaderRGBA.rgba[1] = 255;
-				sprite.shaderRGBA.rgba[2] = 255;
-				sprite.shaderRGBA.rgba[3] = 255;
+				VR_ENT_RGBA( sprite )[0] = 255;
+				VR_ENT_RGBA( sprite )[1] = 255;
+				VR_ENT_RGBA( sprite )[2] = 255;
+				VR_ENT_RGBA( sprite )[3] = 255;
 				trap_R_AddRefEntityToScene(&sprite);
 
 				//And now the selection background
@@ -1967,10 +1972,10 @@ void CG_DrawWeaponSelector( void )
 				sprite.renderfx = RF_FIRST_PERSON;
 				sprite.customShader = cgs.media.selectShader;
 				sprite.radius = sRadius * (vrc_weaponSelectorSelection == weaponId ? 1.1f : 1.0);
-				sprite.shaderRGBA.rgba[0] = 255;
-				sprite.shaderRGBA.rgba[1] = 255;
-				sprite.shaderRGBA.rgba[2] = 255;
-				sprite.shaderRGBA.rgba[3] = 255;
+				VR_ENT_RGBA( sprite )[0] = 255;
+				VR_ENT_RGBA( sprite )[1] = 255;
+				VR_ENT_RGBA( sprite )[2] = 255;
+				VR_ENT_RGBA( sprite )[3] = 255;
 				trap_R_AddRefEntityToScene( &sprite );
 
 				if (!selectable)
@@ -1981,10 +1986,10 @@ void CG_DrawWeaponSelector( void )
 					sprite.renderfx = RF_FIRST_PERSON;
 					sprite.customShader = cgs.media.noammoShader;
 					sprite.radius = sRadius;
-					sprite.shaderRGBA.rgba[0] = 255;
-					sprite.shaderRGBA.rgba[1] = 255;
-					sprite.shaderRGBA.rgba[2] = 255;
-					sprite.shaderRGBA.rgba[3] = 255;
+					VR_ENT_RGBA( sprite )[0] = 255;
+					VR_ENT_RGBA( sprite )[1] = 255;
+					VR_ENT_RGBA( sprite )[2] = 255;
+					VR_ENT_RGBA( sprite )[3] = 255;
 					trap_R_AddRefEntityToScene(&sprite);
 				}
 			}
