@@ -163,6 +163,39 @@ stacks on baseq3 and never sees them, so ship your own copies with your mod.
 
 ---
 
+## Building the QVMs
+
+Neither VR engine ships a QVM compiler. trinity-vr and trinity-quest load
+QVMs; they never produce them — your mod tree is the only source of QVMs,
+and this section is about the toolchain that turns it into them.
+
+**What this tree uses.** A vendored lcc 4.2 (`tools/q3lcc`, built as
+`q3lcc` / `q3cpp` / `q3rcc`) compiles each module's C into VM bytecode, and
+a fast q3asm fork with dead-code elimination and `.jts` jump-table support
+links it. Both live under `tools/` as submodules (`git submodule update
+--init` after cloning) and build with the host compiler. From the repo
+root, `make` builds the tools and then both paks: `dist/pak8t.pk3`
+(baseq3) and `dist/pak3t.pk3` (missionpack). The whole chain runs on a
+stock Ubuntu box — CI proves it with nothing beyond `build-essential` and
+`p7zip-full`. Stock ioq3's `code/tools` also works if you already build
+QVMs there; nothing in the drop requires this tree's forks.
+
+**Gotchas.** Three ways QVM builds bite people who are used to native
+ones. q3lcc is a C90 compiler with its own preprocessor, and that
+preprocessor can silently diverge from your native compiler's — the same
+translation unit can preprocess differently in ways no error reveals.
+Always test the QVM and native builds both; the dual-build design exists
+partly to force this. Missing runtime support symbols (a libc function
+`bg_lib` doesn't provide, a helper that didn't make the file list) surface
+at q3asm link time, not compile time — every `.asm` compiles clean and the
+failure arrives at the very end, so a clean per-file compile proves
+nothing about the link. And modern engines JIT their QVMs: undefined
+behavior the old interpreter shrugged off for years can crash or
+miscompile under a JIT — treat interpreter-era code as suspect, not
+proven.
+
+---
+
 ## Step 3: Know how a module wakes up
 
 You will not write this code (it lives in the vendored files), but you should
