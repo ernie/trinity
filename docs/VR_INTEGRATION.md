@@ -35,6 +35,14 @@ different: the head-tracking protocol hooks (Steps 4 and 5) gate on
 `EF_VR_PLAYER` instead, so VR players' heads render for everyone even on a
 flatscreen engine; with no VR player in view they too do nothing.
 
+A short list of placements is the sanctioned exception: they read the
+`vrActive` dormancy signal directly, because an unconditional call there
+would double-draw in VR or visibly change flatscreen rendering. They are
+the lightning-gun bolt origin, the flatscreen follow crosshair, and the
+flatscreen probe draw (Step 5); Team Arena's `ui_shared.c` transform fork
+and the connect-screen background fill in both UIs (Step 6). Each is
+flagged at its site; every other call-out stays unconditional.
+
 One rule protects this: **never edit the vendored `vr_*` files.** Every
 customization point is a documented seam — call-out placement, your own
 `CG_Draw2D` body, the public accessors. Editing a `vr_*` file forfeits clean
@@ -65,9 +73,15 @@ relative to `code/`):
   edit**. Declares which optional host features exist (`VR_HOST_HAS_TV`,
   `VR_HOST_HAS_WARMUP_EVENTS` — a stock tree sets both to 0), maps small
   contract gaps (`#define Q_sscanf sscanf`), and may set the weapon wheel's
-  default set (`VR_WHEEL_DEFAULT_WEAPONS`).
-- **`game/vr_platform.c` / `.h`**: the platform query (`UI_VR_Platform`,
-  Appendix A). Compiles into cgame and both UI targets, not game.
+  default set (`VR_WHEEL_DEFAULT_WEAPONS`). Its tokens are
+  whitespace-separated — commas are **not** separators. A token is a
+  `weapon_t` number or an item classname with or without the `weapon_`
+  prefix; `*` expands the default set; `!name` hides a weapon from later
+  mentions and expansions; first mention wins. A list containing only
+  exclusions means the default set minus those weapons.
+- **`game/vr_platform.c` / `.h`**: the platform query (`VR_Platform`; the
+  UI modules wrap it as `UI_VR_Platform` — Appendix A). Compiles into cgame
+  and both UI targets, not game.
 - **`game/vr_bg.c` / `.h`**: shared movement and entity-state hooks, and the
   `EF_VR_PLAYER` definition. Like the other `bg_*` files, it compiles into
   more than one module.
@@ -146,9 +160,14 @@ root, `make` builds the tools and then both paks: `dist/pak8t.pk3`
 (baseq3) and `dist/pak3t.pk3` (missionpack). The whole chain runs on a
 stock Ubuntu box — CI proves it with nothing beyond `build-essential` and
 `p7zip-full`. Stock ioq3's `code/tools` also works if you already build
-QVMs there; nothing in the drop requires this tree's forks.
+QVMs there; nothing in the drop requires this tree's forks. Adopting the
+forks carries one source-tree obligation: this q3asm scopes `static`
+symbols per file, so take this tree's `q_math.c` treatment too — the
+`Q3_VM` vector math defined out of line there, replacing stock's
+`__Q3_VM_MATH` header inlines — or every module's vector-math externs go
+unresolved at q3asm link time.
 
-**Gotchas.** Three ways QVM builds bite people who are used to native
+**Gotchas.** Four ways QVM builds bite people who are used to native
 ones. q3lcc is a C90 compiler with its own preprocessor, and that
 preprocessor can silently diverge from your native compiler's — the same
 translation unit can preprocess differently in ways no error reveals.
@@ -157,8 +176,10 @@ partly to force this. Missing runtime support symbols (a libc function
 `bg_lib` doesn't provide, a helper that didn't make the file list) surface
 at q3asm link time, not compile time — every `.asm` compiles clean and the
 failure arrives at the very end, so a clean per-file compile proves
-nothing about the link. And modern engines JIT their QVMs: undefined
-behavior the old interpreter shrugged off for years can crash or
+nothing about the link. q3lcc's preprocessor resolves `-I` paths relative
+to the main source file's directory, not your make cwd — write include
+flags relative to `code/<module>/`. And modern engines JIT their QVMs:
+undefined behavior the old interpreter shrugged off for years can crash or
 miscompile under a JIT — treat interpreter-era code as suspect, not
 proven.
 
@@ -251,8 +272,10 @@ The remaining server call-outs are one line each, at their obvious sites:
 
 - `ClientEndFrame` (g_active.c) → `G_VR_ClientEndFrame( client, ent )` copies
   the head angles onto the entity and packs the head stats.
-- `ClientUserinfoChanged` (g_client.c) → `G_VR_ClientIsVR( userinfo )`
-  value-gates the `vr\` configstring field.
+- `ClientUserinfoChanged` (g_client.c) → append `\vr\%s` with
+  `G_VR_ClientIsVR( userinfo ) ? "1" : "0"` to the **player** configstring
+  format only. Bots and vanilla servers simply omit the key; every reader
+  treats a missing key as not-VR.
 - `CalcMuzzlePointOrigin` (g_weapon.c) → `if ( !G_VR_MuzzlePoint( ent, ... ) )`
   wraps the stock muzzle math; `qtrue` means it wrote a 6DOF muzzle.
 - `FireWeapon` and `CheckGauntletAttack` (g_weapon.c) →
@@ -263,8 +286,11 @@ The remaining server call-outs are one line each, at their obvious sites:
 drop wraps the read: `CG_VR_ClientIsVR( clientNum )` in cgame reports what
 the server recorded, no clientinfo parsing required. Surfacing it is
 recommended: VR players aim and move differently, and a marker on the
-scoreboard or HUD tells everyone else what they are looking at (this tree
-draws a small icon on the scoreboard rows and the follow bar).
+scoreboard or HUD tells everyone else what they are looking at. This tree
+parses the flag once into clientinfo through `CG_VR_ClientIsVR`
+(cg_players.c, `CG_NewClientInfo`) and draws the scoreboard and follow-bar
+icons from the cached `ci->vrPlayer`; a host without clientinfo caching
+can call the accessor directly at its draw sites.
 
 One stock addition remains, because it cannot live in a vendored file: append
 the two head stats at the tail of your `statIndex_t` enum in `bg_public.h`:
@@ -306,14 +332,37 @@ compensation returns `qtrue` to skip the stock viewangle update:
  	for (i=0 ; i<3 ; i++) {
 ```
 
-In `PmoveSingle`, run your ground friction and acceleration through the two
-value transforms — `BG_VR_PmoveFriction( pm->ps, friction )` and
+Run your ground friction and acceleration through the two value transforms
+— `BG_VR_PmoveFriction( pm->ps, friction )` and
 `BG_VR_PmoveAccelerate( pm->ps, accelerate )` — wherever your movement
-constants live (stock: the `pm_friction` / `pm_accelerate` globals). Dormant
-they return your value untouched; for the 6DOF client they return the
-tracking coefficients. And in `BG_PlayerStateToEntityState` (two sites),
-call `BG_VR_HeadToEntityState( ps, s )` to derive the head orientation for
-demos and first-person follow.
+constants are consumed (stock: the `pm_friction` use in `PM_Friction` and
+the ground `pm_accelerate` use in `PM_WalkMove`). Dormant they return your
+value untouched; for the 6DOF client they return the tracking coefficients.
+
+In `PM_Footsteps`, keep stock's not-trying-to-move branch untouched and add
+a VR-only clause after it:
+
+```c
+	// VR players: analog sticks and roomscale drift produce tiny velocities
+	// that must not advance the walk cycle
+	if ( BG_VR_DriftIdle( pm->ps ) && xyspeed < 10 ) {
+		pm->ps->bobCycle = 0;	// start at beginning of cycle again
+		if ( pm->ps->pm_flags & PMF_DUCKED ) {
+			PM_ContinueLegsAnim( LEGS_IDLECR );
+		} else {
+			PM_ContinueLegsAnim( LEGS_IDLE );
+		}
+		return;
+	}
+```
+
+`BG_VR_DriftIdle` keys on `EF_VR_PLAYER`, so flatscreen behavior stays
+byte-for-byte stock and server and prediction agree per player.
+
+And in `BG_PlayerStateToEntityState` and
+`BG_PlayerStateToEntityStateExtraPolate` (one call each, after the
+`s->angles2[YAW]` assignment), call `BG_VR_HeadToEntityState( ps, s )` to
+derive the head orientation for demos and first-person follow.
 
 > **Build and check.** Rebuild game and cgame. Nothing visible changes on a
 > flatscreen engine, but a VR client connecting to a server running this
@@ -326,7 +375,7 @@ demos and first-person follow.
 
 The largest surface, but it decomposes into a bootstrap, one whole-frame
 fork, one scaling keystone, the head-tracking protocol hooks, and a long
-list of one-line call-outs in four shapes.
+list of one-line call-outs in five shapes.
 
 **Bootstrap.** `CG_VR_Init()` at the top of `CG_Init`:
 
@@ -337,8 +386,10 @@ list of one-line call-outs in four shapes.
 ```
 
 Pair it with `CG_VR_RegisterMedia()` in `CG_RegisterGraphics`,
-`CG_VR_Frame()` at the very top of `CG_DrawActiveFrame`, and
-`CG_VR_Shutdown()` in `CG_Shutdown`.
+`CG_VR_Frame()` near the top of `CG_DrawActiveFrame` — after
+`CG_UpdateCvars()`, before the loading-screen early-return and
+`CG_ProcessSnapshots()` (see placement note 1) — and `CG_VR_Shutdown()` in
+`CG_Shutdown`.
 
 **Console commands.** The engine drives the weapon selector and the
 weapon-adjust tool through cgame console commands; register the four drop
@@ -354,8 +405,8 @@ handlers in your `cg_consolecmds.c` command table:
 **The one whole-frame fork.** `CG_VR_DrawFrame` is the only place the drop
 takes over an entire subsystem: `qtrue` means it fully drew the VR frame and
 the caller returns; on a flatscreen engine it returns `qfalse` and your
-stock tail runs. Place it in `CG_DrawActive`, just before the stock "draw 3D
-view":
+stock tail runs. Place it in `CG_DrawActive`, immediately after
+`CG_TileClear()` and before the stock stereo-crosshair block:
 
 ```diff
  	// clear around the rendered view if sized down
@@ -365,8 +416,8 @@ view":
 +		return;
 +	}
  
- 	// draw 3D view
- 	trap_R_RenderScene( &cg.refdef );
+ 	if(stereoView != STEREO_CENTER)
+ 		CG_DrawCrosshair3D();
 ```
 
 Everything *above* the fork runs in VR too, so pre-scene additions go there
@@ -498,16 +549,38 @@ treatment as viewangles, at the end of `CG_InterpolatePlayerState`
  }
 ```
 
+`CG_VR_PredictedPlayerHead` feeds the local player's HMD orientation into
+the predicted player entity, so mirror and follow rendering see your own
+head. In `CG_AddPacketEntities` (cg_ents.c), immediately after the
+predicted player's `BG_PlayerStateToEntityState` call:
+
+```diff
+ 	// generate and add the entity from the playerstate
+ 	ps = &cg.predictedPlayerState;
+ 	BG_PlayerStateToEntityState( ps, &cg.predictedPlayerEntity.currentState, qfalse );
++
++	// Set VR head orientation for local player (mirrors) - see vr_cgame.c
++	CG_VR_PredictedPlayerHead();
++
+ 	CG_AddCEntity( &cg.predictedPlayerEntity );
+```
+
 The hooks keep their own state (per-entity head cache, follow EMA); if your
 mod can jump its timeline (demo seek, TV scrub), re-seed at the jump with
 `CG_VR_FollowHeadViewReset()` and `CG_VR_PlayerHeadReset()` — a mod that
 never seeks has no call site for either. The follow test is public as
 `CG_VR_IsVRFollow()`, qtrue while following a VR player, for your own
 drawing that should behave differently then (this tree aims the view weapon
-and 3D crosshair along the followed player's weapon direction).
+and 3D crosshair along the followed player's weapon direction). One of its
+placements is a sanctioned `vrActive` gate: the flatscreen follow crosshair
+in `CG_DrawActiveFrame` —
+`if ( !vrActive && !cg.renderingThirdPerson && CG_VR_IsVRFollow() )
+CG_DrawCrosshair3D();` after `CG_AddViewWeapon` — because in VR the draw
+tail's crosshair site already covers follow mode, and an unconditional call
+would double-blend.
 
 **Everything else** is a one-line call-out at its original site, in one of
-four shapes:
+five shapes:
 
 - **View, weapon, and embodiment gates.** The VR-only regions of the view
   code (`CG_VR_Fov`, `CG_VR_OffsetView`, `CG_VR_ViewAxis`, the intermission
@@ -515,24 +588,46 @@ four shapes:
   (`CG_VR_WeaponWheel`, `CG_VR_WeaponHandPose`, `CG_VR_HideViewWeapon`, …),
   and the embodiment hooks (`CG_VR_FirstPersonBody`, `CG_VR_OffHandItemPose`,
   …) are gate-for-hook swaps: stock code calls *through* them, so your own
-  customizations stay intact.
+  customizations stay intact. The same shape covers the scattered
+  aim and orientation call-outs: `CG_VR_CrosshairScanRay` (the
+  `CG_ScanForCrosshairEntity` aim ray), `CG_VR_WeaponMuzzleOrigin` (the
+  `EV_RAILTRAIL` muzzle), `CG_VR_FollowedPlayerSprite` (the followed-player marker in
+  `CG_PlayerSprites`), `CG_VR_ForceThirdPerson` (forces
+  `cg.renderingThirdPerson` in `CG_DrawActiveFrame`), and the value reads
+  `CG_VR_DamageRollScale` (the `CG_OffsetFirstPersonView` damage-kick roll)
+  and `CG_VR_ChatOffsetX/Y` (the missionpack chat paints in cg_newdraw.c).
 - **Suppression predicates.** `CG_VR_OwnsHudVisibility`,
   `CG_VR_Owns2DCrosshair`, `CG_VR_OwnsWeaponSelect`, `CG_VR_OwnsViewBob`,
   `CG_VR_SuppressDeadScoreboard`, and their siblings are `!CG_VR_Owns...()`
   terms you AND into an existing draw condition. Dormant they return
-  `qfalse` and your condition is unchanged.
+  `qfalse` and your condition is unchanged. `CG_VR_IsDeathCam` takes the
+  same shape as an OR-in early-out in `CG_DrawCrosshair3D`. The missionpack
+  HUD adds a positive twin, `CG_VR_HudVisible()` — the `vr_hudDrawStatus`
+  ladder's visibility answer, qtrue when dormant — at three sites:
+  `CG_OwnerDraw` and `CG_Draw2DMinimal` early-return when it is qfalse, and
+  `CG_Draw2D` composes it into the `Menu_PaintAll` condition,
+  `CG_VR_HudVisible() && ( CG_VR_OwnsHudVisibility() || cg_drawStatus.integer )`.
 - **Event hooks.** `CG_VR_OnFall`, `CG_VR_OnJump`, `CG_VR_OnTeleport`,
   `CG_VR_OnHitByMissile`, `CG_VR_OnWeaponFired`, and the rest wrap the
   haptic dispatch at each game event. Dormant they no-op.
-- **Server-interaction accessors.** Wire all three families. Voting:
-  `CG_VR_SetVoteActive(active)` and `CG_VR_VoteHolding()` in the vote-draw
-  path (controller hold-to-confirm). Spectating:
-  `CG_VR_SetScoreboardCursor(active)` and `CG_VR_ScoreboardCursor(&x, &y)`
-  feed the engine-computed pointer into the scoreboard for click-to-follow.
-  TV playback: `CG_VR_MenuYaw()`, `CG_VR_LockMenuYaw()`,
-  `CG_VR_UnlockMenuYaw()`, and `CG_VR_MenuPointerYaw()` coordinate the scrub
-  pointer's yaw with the virtual screen. All are accessors, never raw `vr->`
-  reads, and all are dormancy-safe.
+- **Server-interaction accessors.** Wire the families your tree has
+  features for. Voting (stock): `CG_VR_SetVoteActive(active)` and
+  `CG_VR_VoteHolding()` in the vote-draw path (controller hold-to-confirm).
+  The hold machinery itself is host code: take this tree's
+  `CG_ProcessVoteHold` (cg_draw.c) — it reads `CG_VR_VoteHolding()` each
+  frame, runs the hold timer, and dispatches the vote/teamvote commands —
+  and call it beside `CG_VR_SetVoteActive` from the vote-overlay block
+  `CG_Draw2D` reaches (this tree: `CG_DrawTVOverlay`, after
+  `CG_DrawVote`/`CG_DrawTeamVote`). Spectating: the scoreboard-cursor pair
+  — `CG_VR_SetScoreboardCursor(active)` arms the engine pointer,
+  `CG_VR_ScoreboardCursor(&x, &y)` reads it back into the missionpack
+  scoreboard — belongs to a clickable scoreboard; this tree carries one, a
+  stock mod has no call site for either. TV playback: `CG_VR_MenuYaw()`,
+  `CG_VR_LockMenuYaw(yaw)`, `CG_VR_UnlockMenuYaw(yaw)`, and
+  `CG_VR_MenuPointerYaw()` coordinate a scrub pointer with the virtual
+  screen — call sites exist only in a mod with TV/demo scrubbing (this
+  tree). All are accessors, never raw `vr->` reads, and all are
+  dormancy-safe.
 - **Drop-state resets and reads.** Call `CG_VR_DeathCamReset()` wherever the
   local player (re)spawns or a new gamestate begins (this tree: the `CG_Init`
   seed and `CG_Respawn`), and `CG_VR_PortraitReset()` where your HUD
@@ -541,13 +636,52 @@ four shapes:
   `CG_VR_ReticleShader()` returns the zoom scope mask shader. Dormant, the
   resets no-op and the reads return qfalse/0.
 
+Two sites are bigger than one line; take their shape from this tree:
+
+- **The lightning gun** (`CG_LightningBolt`, cg_weapons.c). Compute
+  `directView` as stock does, then fork on `vrActive && directView` — one
+  of the sanctioned `vrActive` gates: the bolt originates at the
+  controller-held weapon (`CG_CalculateVRWeaponPosition` supplies the
+  muzzle point and angles) and `CG_VR_OnWeaponFiring( weapon )` drives the
+  continuous-fire haptic each frame; the stock true-lightning math runs in
+  the other branch.
+- **The HUD portrait** (`CG_DrawStatusBarHead`, cg_draw.c; missionpack
+  twin `CG_DrawPlayerHead`, cg_newdraw.c).
+  `vr = CG_VR_PortraitHeadAngles( angles );` right after the function's
+  `VectorClear( angles )`: qtrue fills the real head orientation — gated on
+  `EF_VR_PLAYER` inside, not `vrActive`, so a flatscreen client still
+  portrays a followed VR player — and the damage kick becomes additive on
+  top (`angles[YAW] += cg.damageX * 45`); the stock random idle-bob
+  machinery runs only under `!vr`. Pair it with the `CG_VR_PortraitReset()`
+  call-out above.
+
+One more call-out pairs with Step 7: the probe's flatscreen half. The VR
+draw tail renders the probe inside the protected 2D bracket, so the host
+site is a sanctioned `vrActive` gate at the end of `CG_DrawActiveFrame`:
+
+```diff
+ 	// actually issue the rendering calls
+ 	CG_DrawActive( stereoView );
++
++	// VR API conformance probe overlay; when VR is active the draw tail
++	// renders it inside the protected 2D bracket instead
++	if ( !vrActive )
++		CG_VRProbe_Draw();
+```
+
+The families above are the reading guide, not the inventory; the
+authoritative call-out list is the diff itself — this tree's `cg_*` delta
+against stock, or the mod template's Step 5 commit.
+
 Two placement details:
 
 1. **Keep the weapon-adjust call out of `CG_VR_Frame`.** `CG_VR_Frame()`
    runs before `CG_ProcessSnapshots()` refreshes `cg.snap`. The per-frame
-   weapon-adjust step stays in `CG_DrawActiveFrame` after
-   `CG_ProcessSnapshots`, right before `CG_AddViewWeapon`, so it reads a
-   fresh snapshot; folding it into `CG_VR_Frame` would feed it a stale one.
+   weapon-adjust step, `CG_WeaponAdjustFrame()`, stays in
+   `CG_DrawActiveFrame` after `CG_ProcessSnapshots`, right before
+   `CG_AddViewWeapon`, so it reads a fresh snapshot; folding it into
+   `CG_VR_Frame` would feed it a stale one. The draw half,
+   `CG_WeaponAdjustDraw()`, sits at the tail of `CG_DrawScreen2D`.
 2. **Most event hooks keep their call-site identity gate.** A `void` hook
    like `CG_VR_OnFall(severity)` cannot re-derive which client the event
    belongs to, so it keeps the local-player gate already at the call site.
@@ -570,16 +704,38 @@ applies to both.
  	UI_RegisterCvars();
 ```
 
-The rest are one-liners at their sites: `UI_VR_Shutdown()` in `UI_Shutdown`;
-`UI_VR_KeyEvent(key)` first-chance in `UI_KeyEvent`; the stick-nav /
-cursor-override / hover-haptic trio in `UI_MouseEvent`; and
-`UI_VR_UpdateScale()` once per frame in `UI_Refresh`. baseq3 deliberately
-leaves stock `UI_AdjustFrom640` untouched and bakes the VR transform into
-`uis.scale`/`biasX`/`biasY` instead.
+The rest are one-liners at their sites: `UI_VR_Shutdown()` beside
+`UI_Shutdown` in vmMain's `UI_SHUTDOWN` case; `UI_VR_KeyEvent(key)`
+first-chance in `UI_KeyEvent`; in `UI_MouseEvent`, the
+`UI_VR_StickNavActive()` early-out,
+`UI_VR_CursorOverride( &uis.cursorx, &uis.cursory )`, the
+`UI_VKeyboardIsActive()` guard before the region test, and the
+`UI_VR_OnMenuMove()` hover haptic on focus change; `UI_VR_UpdateScale()`
+and the same cursor override once per frame in `UI_Refresh`; the cursor
+draw gated with `!UI_VR_HideCursor()`; and `UI_VR_CompensateModelFov` on
+every menu-model refdef — the ui_menu.c models and `UI_DrawPlayer` —
+keeping the origin math on the desired fov. The connect-screen background
+is a sanctioned `vrActive` gate in both UIs; baseq3's form:
 
-**Team Arena (`ui`).** Team Arena hooks `UI_AdjustFrom640` directly, at
-*two* sites — `ui_atoms.c` and `ui_shared.c` — both routed through
-`vr_uishared` so text and models transform identically in both links:
+```c
+	if ( vrActive ) {
+		UI_VR_FillScreen( uis.menuBackShader );
+	} else {
+		UI_DrawHandlePic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, uis.menuBackShader );
+	}
+```
+
+VR covers the physical framebuffer edge-to-edge so the letterbox outside
+the centered 4:3 box shows no stale eye-buffer content; flatscreen keeps
+the stock aspect-preserving draw, because the fill would visibly paint the
+pillarbox bars. baseq3 keeps `UI_AdjustFrom640` free of any VR branch — it
+bakes the VR transform into the `uis.scale`/`biasX`/`biasY` fields the
+function already applies (Appendix E).
+
+**Team Arena (`ui`).** Team Arena hooks the 640-space transform directly,
+at *two* sites, both routed through `vr_uishared` so text and models
+transform identically in both links. `ui_atoms.c`'s `UI_AdjustFrom640`
+takes the simple early-out:
 
 ```diff
  void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
@@ -588,13 +744,34 @@ leaves stock `UI_AdjustFrom640` untouched and bakes the VR transform into
 +	}
 ```
 
-The other call-outs live in `ui_main.c`: `UI_VR_Init()` / `UI_VR_Shutdown()`
-in `_UI_Init` / `_UI_Shutdown`; the keyboard traps and hover haptic wired
-into the display context; `UI_VR_LoadMenus()` to load the `vrmenus`
-manifest; and the two settings dispatchers `UI_VR_UpdateSettingsCvar(name,
-val)` and `UI_VR_RunMenuScript(name)` in the `Cvar_SetValue` and
-`RunMenuScript` handlers. `UI_VR_CompensateModelFov` is called from
-`Item_Model_Paint` in both links.
+`ui_shared.c`'s `AdjustFrom640` is more involved — one of the sanctioned
+`vrActive` forks: declare `extern qboolean vrActive;` at the top of the
+file, keep your stock body for `!vrActive`, try `UI_VR_AdjustFrom640`
+first, and keep a live in-world transform tail (`xscale`/`yscale` ÷ 2.75,
+centered) for the non-virtual-screen case — the missionpack cgame paints
+the VR HUD's `.menu` widgets through it during gameplay. Take this tree's
+`AdjustFrom640` fork; the `!vrActive` branch stays your stock body.
+
+The other call-outs live in `ui_main.c`: `UI_VR_Init()` at the top of
+`_UI_Init`; `UI_VR_Shutdown()` beside `_UI_Shutdown` in vmMain's
+`UI_SHUTDOWN` case;
+`UI_VR_CursorOverride( &uiInfo.uiDC.cursorx, &uiInfo.uiDC.cursory )` once
+per frame in `_UI_Refresh`, with the cursor draw gated behind
+`!UI_VKeyboardIsActive()` and `!UI_VR_HideCursor()`; in `_UI_MouseEvent`,
+the `UI_VR_StickNavActive()` early-out and the same cursor override; the
+hover haptic wired into the display context
+(`uiInfo.uiDC.vrMenuMove = &UI_VR_OnMenuMove`) alongside the four
+`vkeyboard*` members and `Menu_HandleKey`'s edit-field interception — a
+deeper insertion this tree carries for in-headset text entry (Appendix D);
+`UI_VR_LoadMenus()` after every `UI_LoadMenus` wave — both `_UI_Init` and
+`UI_Load`; the connect-screen background gated the same way as baseq3's
+(`if ( vrActive && menu->window.background )
+UI_VR_FillScreen( menu->window.background );` before the stock
+`Menu_Paint`); and the two settings dispatchers
+`UI_VR_UpdateSettingsCvar(name, val)` and `UI_VR_RunMenuScript(name)` in
+`UI_Update`'s else-if chain and `UI_RunMenuScript`'s command chain.
+`UI_VR_CompensateModelFov` is called from `Item_Model_Paint` in both links
+and from `UI_DrawPlayer`.
 
 Appendix D lists the deliberate differences between the two UIs.
 
@@ -622,11 +799,23 @@ the couplings behind the screens:
 - **Reachable VR menus are fullscreen.** The engine's laser pointer can land
   a click anywhere on the virtual screen; a non-fullscreen menu treats a
   click outside its own rect as out-of-bounds and dismisses. Every shipped
-  VR screen sets `fullscreen 1`; a replacement that doesn't will misbehave
-  under laser input with no error anywhere.
+  standalone VR screen sets `fullscreen 1` — the five q3_ui screens
+  (`menu.fullscreen = qtrue`) and Team Arena's `vroptions_*.menu`. The
+  in-game `ingame_vroptions_*.menu` panels are the deliberate exception:
+  `fullscreen 0` with `outOfBoundsClick`, so a click outside the panel
+  closes it back to the game. A replacement full-screen menu that omits
+  `fullscreen 1` will misbehave under laser input with no error anywhere.
 
 The straightforward path is to take the shipped screens as-is; the couplings
 come along for free.
+
+**Making them reachable.** baseq3: in `ui_setup.c`, the SETUP menu swaps
+its flatscreen CONTROLS entry for a VR OPTIONS entry when
+`UI_VR_Platform() != VRP_NONE` (VR binds live in VR OPTIONS; the keyboard
+binds page is flatscreen-only). Dormancy-safe: on a flatscreen engine the
+menu is stock. Team Arena needs no wiring — the `vrmenus` manifests packed
+into the missionpack pak are the only load path, and `UI_VR_LoadMenus`
+(Step 6) reads them.
 
 > **Build, run, and read the probe.** Set `cg_vrApiProbe 1` and connect a VR
 > client. The probe draws an overlay at the top-left: `VR API ACTIVE` (or
@@ -646,19 +835,22 @@ come along for free.
 Alongside the mirror, the drop reads and writes engine-owned `vr_*` cvars by
 name — a second, unversioned ABI whose contract is the *names*. Single-value
 reads and writes go through `CG_VR_CvarValue(name)` /
-`CG_VR_CvarSet(name, value)` (a string-buffer idiom; the QVM has no
-float-returning variable trap). A mod that rolls its own settings UI still
+`CG_VR_CvarSet(name, value)` (a string-buffer idiom; the cgame QVM has no
+float-returning cvar trap — the UI modules read through stock
+`trap_Cvar_VariableValue`). A mod that rolls its own settings UI still
 writes these names.
 
 | Cvar(s) | Class | Role |
 |---------|-------|------|
-| `vr_worldscale`, `vr_worldscaleScaler` | archived | World scale; read each frame in `CG_VR_Frame` and server-side in `vr_game.c` |
+| `vr_worldscale` | archived | World scale; read each frame in `CG_VR_Frame` and server-side in `vr_game.c` |
+| `vr_worldscaleScaler` | archived | Spectator/zoom scale factor; **written** each frame by the drop's view code (spectator multipliers, zoom coefficient) and read back for HUD-panel placement; the engine's renderers read it too |
 | `vr_hudDrawStatus`, `vr_hudDepth`, `vr_hudScale`, `vr_hudYOffset` | archived | HUD visibility preference and in-world placement |
 | `vr_currentHudDrawStatus`, `vr_currentHudDepth` | transient | Written by `CG_VR_Frame` for the renderer to read |
 | `vr_thirdPersonSpectator` | transient | Written each frame so the renderer drops sky in spectator views |
-| `vr_platform` | archived | `pc` / `quest`; read **only** through `UI_VR_Platform()` (see below) |
+| `vr_platform` | ROM (engine-set) | `pc` / `quest`; read **only** through `UI_VR_Platform()` (see below) |
 | `vr_6dof` | archived | Seeds `use_6dof` (singleplayer only) |
 | `vr_desktopMode` | archived | Desktop-mirror mode, staged/applied by the menu scripts |
+| `r_customdesktopwidth`, `r_customdesktopheight` | archived (PC engine only) | Desktop-mirror resolution, staged and written by the mirror Apply (Step 7); unregistered on other engines, where the writes are inert |
 | `vr_lasersight`, `vr_twoHandedWeapons`, `vr_showItemInHand`, `vr_rollWhenHit`, `vr_weaponAdjust`, `vr_weaponSelectorMode`, `vr_weaponSelectorWithHud` | archived | Gameplay/comfort toggles read by the client hooks |
 | `vr_uturn`, `vr_controlSchema`, `vr_switchThumbsticks` | archived | Control-scheme handlers (see Step 7) |
 | `vr_button_map_*` family | archived | Per-button remaps: `A`, `B`, `X`, `Y`, `PRIMARYGRIP`, `PRIMARYTHUMBSTICK`, and the `RTHUMB{FORWARD,BACK,LEFT,RIGHT}` set with their `_ALT` variants |
@@ -666,20 +858,32 @@ writes these names.
 There is no `vr_stabilised` cvar; weapon stabilization is a mirror flag, not
 a cvar.
 
-**Menu content must never read `vr_platform` raw.** It is archived, so a
-user who once ran a VR build still has `vr_platform "pc"` on disk under a
-flatscreen build. Key VR rows on `UI_VR_Platform()`, which returns
-`VRP_NONE` whenever the mirror is dormant regardless of the cvar:
+**Menu content must never read `vr_platform` raw.** The flatscreen engine
+never registers the cvar, so a stale value lingering in a user config (an
+older build, a hand-`seta`) must not impersonate a headset. Key VR rows on
+`UI_VR_Platform()`, which returns `VRP_NONE` whenever the mirror is dormant
+regardless of the cvar. The two-gate body lives in `VR_Platform`
+(`game/vr_platform.c`); each UI module wraps it:
 
 ```c
+vrPlatform_t VR_Platform( qboolean vrActive ) {
+	char buf[16];
+
+	if ( !vrActive ) {
+		return VRP_NONE;
+	}
+	trap_Cvar_VariableStringBuffer( "vr_platform", buf, sizeof( buf ) );
+	if ( !Q_stricmp( buf, "pc" ) ) {
+		return VRP_PC;
+	}
+	if ( !Q_stricmp( buf, "quest" ) ) {
+		return VRP_QUEST;
+	}
+	return VRP_NONE;
+}
+
 vrPlatform_t UI_VR_Platform( void ) {
-    char buf[16];
-    if ( !vrActive )
-        return VRP_NONE;
-    trap_Cvar_VariableStringBuffer( "vr_platform", buf, sizeof( buf ) );
-    if ( !Q_stricmp( buf, "pc" ) )    return VRP_PC;
-    if ( !Q_stricmp( buf, "quest" ) ) return VRP_QUEST;
-    return VRP_NONE;
+	return VR_Platform( vrActive );
 }
 ```
 
@@ -730,9 +934,11 @@ Deliberate differences, noted so the two `vr_ui.c` files don't surprise you:
   `Menu_HandleKey`'s edit-field path, because the `.menu` parser owns key
   dispatch.
 - **On-screen model transform.** baseq3 bakes the VR scale into
-  `uis.scale/biasX/biasY` once per frame and leaves `UI_AdjustFrom640`
-  stock. Team Arena hooks `UI_AdjustFrom640` directly, at two sites unified
-  through `vr_uishared`.
+  `uis.scale/biasX/biasY` once per frame and keeps `UI_AdjustFrom640` free
+  of any VR branch — its body simply applies those fields (rewritten from
+  stock's `xscale`/`yscale`/`bias` to the uniform-scale fields; see
+  Appendix E). Team Arena hooks the transform directly, at two sites
+  unified through `vr_uishared`.
 - **Event-hook identity.** Only `CG_VR_OnTeleport` and
   `CG_VR_OnHitByMissile` carry a client/entity number; the others rely on
   the local-player gate at their call site (Step 5, note 2).
@@ -778,11 +984,14 @@ mini-scene refdef your 2D pass renders. In stock that is one site —
 face, and every 3D icon. Menu model previews in the UI modules render
 into the virtual screen and do not take the flag.
 
-**Syscall plumbing.** The `dll_*` trap-number variables and QVM/native
-trampolines for every Appendix B trap, in all four `*_syscalls.c`, plus
-their declarations at the tail of each `*_local.h`. Mechanical — copy the
-blocks from this tree's syscall files. Float arguments cross the DLL
-boundary through `PASSFLOAT`; miss it and native builds pass garbage.
+**Syscall plumbing.** The QVM/native trampolines for every Appendix B trap
+live in all four `*_syscalls.c`, with declarations at the tail of each
+`*_local.h`; the `dll_*` trap-number variables and QVM function-pointer
+storage live in `cg_main.c` and `g_main.c` (the rest ships inside the
+vendored files — `vr_game.c`, `vr_cgame.c`, and the UI modules' storage
+entirely in `vr_ui.c`). Mechanical — copy the blocks from this tree's
+files. Float arguments cross the DLL boundary through `PASSFLOAT`; miss it
+and native builds pass garbage.
 
 **Small pieces.** `Q_sscanf` (stock trees: `#define Q_sscanf sscanf` in
 `vr_host_config.h`); the two stat enum entries (Step 4); the tunables
@@ -796,13 +1005,22 @@ gametype, not just `GT_TEAM` — the weapon wheel's selection marker draws
 through it.
 
 **UI substrate.** baseq3: the `uis.scale` / `uis.biasX` / `uis.biasY` /
-`uis.cursorScaleR` / `uis.screenXmin…Ymax` uniform-scale fields this tree
-added to `uiStatic_t` (stock carries only `xscale` / `yscale` / `bias`) — and
+`uis.cursorScaleR` / `uis.screenXmin…Ymax` uniform-scale fields on
+`uiStatic_t` **replace** stock's `xscale` / `yscale` / `bias`, and every
+consumer converts to them: `UI_AdjustFrom640`, `UI_MouseEvent`'s cursor
+scaling and clamps, and the three text painters (`UI_DrawBannerString2`,
+`UI_DrawProportionalString2`, `UI_DrawString2`). `UI_VideoCheck`
+recomputes the fields on resolution change — take this tree's function
+(`ui_main.c`) and its call sites in `UI_Init`, `UI_KeyEvent`, `UI_Refresh`,
+and the connect screen; under VR, `UI_VR_UpdateScale` overwrites the same
+fields each frame. `UI_DrawPlayer` (ui_players.c) recomputes its fov from
+the transformed rect, keeping the origin math on the desired fov. And
 `uis.cursorx` / `uis.cursory` become `float` (stock: `int`), because
 `UI_VR_CursorOverride` writes the cursor through `float *`. Team Arena: the
 `vrMenuMove` member on `displayContextDef_t`, wired to the drop's menu-hover
-hook — and that struct's `cursorx` / `cursory` become `float` for the same
-cursor-override reason.
+hook (the virtual-keyboard wiring adds the four `vkeyboard*` members —
+Step 6) — and that struct's `cursorx` / `cursory` become `float` for the
+same cursor-override reason.
 
 If a symbol is still unresolved after `vr_host.h` is satisfied, it is a bug
 in the contract — report it; Step 2's failing build output is otherwise your
