@@ -437,6 +437,10 @@ void trap_R_AddLinearLightToScene( const vec3_t start, const vec3_t end, float i
 	syscall( dll_trap_R_AddLinearLightToScene, start, end, PASSFLOAT(intensity), PASSFLOAT(r), PASSFLOAT(g), PASSFLOAT(b) );
 }
 
+void trap_R_AddSpritePolyToScene( qhandle_t hShader, const vec3_t origin, float width, float height, float rotation, const byte *rgba ) {
+	syscall( dll_trap_R_AddSpritePolyToScene, hShader, origin, PASSFLOAT(width), PASSFLOAT(height), PASSFLOAT(rotation), rgba );
+}
+
 void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime ) {
 	syscall( dll_trap_R_ProjectDecal, origin, PASSFLOAT(size), PASSFLOAT(reach), PASSFLOAT(orientation), hShader, rgba, lifeTime );
 }

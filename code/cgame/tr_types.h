@@ -25,6 +25,8 @@
 									// animation without needing to know the frame count
 #define RF_WORLD_ORIENTED	0x0400		// sprite uses entity axis instead of billboarding toward camera
 #define	RF_ANIMFRAME		2048	// index animMap by refEntity->frame, not time (R_animFrame ext)
+#define RF_VIEW_ORIENTED	0x1000		// sprite billboards on the full view axes (rolls with the
+										// HMD); without it sprites billboard horizon-locked
 
 // refdef flags
 #define RDF_NOWORLDMODEL	1		// used for player configuration screen

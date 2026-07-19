@@ -518,6 +518,15 @@ static void CG_EmitPolyVerts( const refEntity_t *re )
 	vec3_t		left, up;
 	int			i;
 
+	if ( spritePolyTrap ) {
+		// engine-oriented billboard: same poly batching, orientation
+		// resolved by the engine per view (the path below bakes this
+		// frame's view axes into the quad at add time)
+		trap_R_AddSpritePolyToScene( re->customShader, re->origin,
+			re->radius, re->radius, re->rotation, re->shaderRGBA.rgba );
+		return;
+	}
+
 	if ( re->rotation )
 	{
 		angle = M_PI * re->rotation / 180.0;
@@ -1075,11 +1084,9 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 	origin[2] += vertical_offset;
 
 	VectorSubtract(cg.refdef.vieworg, origin, dir);
-	if ( !CG_VR_DamagePlumAxis( re, dir, up, vec ) ) {
-		CrossProduct(dir, up, vec);
-		vec[2] = 0;  // Keep digits on same horizontal plane
-		VectorNormalize(vec);
-	}
+	CrossProduct(dir, up, vec);
+	vec[2] = 0;  // Keep digits on same horizontal plane
+	VectorNormalize(vec);
 
 	negative = qfalse;
 	if (damage < 0) {

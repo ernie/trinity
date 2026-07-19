@@ -172,9 +172,6 @@ void CG_VR_PlayerHeadReset( void );
 // entity state (mirror/follow rendering).
 void CG_VR_PredictedPlayerHead( void );
 
-// cg_localents.c: world-oriented damage-plum digit basis.
-qboolean CG_VR_DamagePlumAxis( refEntity_t *re, vec3_t dir, vec3_t up, vec3_t vec );
-
 // cg_consolecmds.c/cg_main.c/cg_draw.c/cg_newdraw.c trinity-feature VR state:
 // TV-scrub menu-yaw lock/restore, the spectator scoreboard cursor, hold-to-
 // vote, and the scrub pointer's controller-yaw source. All dormancy-safe:

@@ -2022,7 +2022,7 @@ void CG_DrawWeaponSelector( void )
 				VectorCopy( iconOrigin, sprite.origin );
 				sprite.origin[2] += 2.5f + (0.5f * sin(DEG2RAD(AngleNormalize360((cg.time - vrc_weaponSelectorTime)/4))));
 				sprite.reType = RT_SPRITE;
-				sprite.renderfx = RF_FIRST_PERSON;
+				sprite.renderfx = RF_FIRST_PERSON | RF_VIEW_ORIENTED;
 				sprite.customShader = cgs.media.friendShader;
 				sprite.radius = 0.5f;
 				VR_ENT_RGBA( sprite )[0] = 255;
@@ -2110,7 +2110,7 @@ void CG_DrawWeaponSelector( void )
 
 				VectorCopy(iconOrigin, sprite.origin);
 				sprite.reType = RT_SPRITE;
-				sprite.renderfx = RF_FIRST_PERSON;
+				sprite.renderfx = RF_FIRST_PERSON | RF_VIEW_ORIENTED;
 				sprite.customShader = cg_weapons[weaponId].weaponIcon;
 				sprite.radius = sRadius * 0.9f * (vrc_weaponSelectorSelection == weaponId ? 1.1f : 1.0);
 				VR_ENT_RGBA( sprite )[0] = 255;
@@ -2123,7 +2123,7 @@ void CG_DrawWeaponSelector( void )
 				memset( &sprite, 0, sizeof( sprite ) );
 				VectorCopy( iconBackground, sprite.origin );
 				sprite.reType = RT_SPRITE;
-				sprite.renderfx = RF_FIRST_PERSON;
+				sprite.renderfx = RF_FIRST_PERSON | RF_VIEW_ORIENTED;
 				sprite.customShader = cgs.media.selectShader;
 				sprite.radius = sRadius * (vrc_weaponSelectorSelection == weaponId ? 1.1f : 1.0);
 				VR_ENT_RGBA( sprite )[0] = 255;
@@ -2137,7 +2137,7 @@ void CG_DrawWeaponSelector( void )
 					memset(&sprite, 0, sizeof(sprite));
 					VectorCopy(iconForeground, sprite.origin);
 					sprite.reType = RT_SPRITE;
-					sprite.renderfx = RF_FIRST_PERSON;
+					sprite.renderfx = RF_FIRST_PERSON | RF_VIEW_ORIENTED;
 					sprite.customShader = cgs.media.noammoShader;
 					sprite.radius = sRadius;
 					VR_ENT_RGBA( sprite )[0] = 255;
@@ -2485,7 +2485,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 
 			memset(&ent, 0, sizeof(ent));
 			ent.reType = RT_SPRITE;
-			ent.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON;
+			ent.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON | RF_VIEW_ORIENTED;
 
 			if (worldOrientedSprite) {
 				// Use world-oriented rendering (fixed orientation, no billboarding)
@@ -3619,39 +3619,6 @@ void CG_VR_PredictedPlayerHead( void ) {
 	cg.predictedPlayerEntity.currentState.angles2[PITCH] = vr->hmdorientation[PITCH];
 	cg.predictedPlayerEntity.currentState.angles2[ROLL] = AngleSubtract(vr->hmdorientation[YAW], vr->weaponangles[YAW]);
 	cg.predictedPlayerEntity.currentState.eFlags |= EF_VR_PLAYER;
-}
-
-/*
-=================
-CG_VR_DamagePlumAxis
-
-World-oriented damage-plum digit basis for VR: axis[0] faces into the scene
-to keep the basis right-handed (a mirrored/left-handed basis inverts face
-culling and hides the one-sided digit shader). Normalizes dir and fills
-vec/re->axis; the caller's post-block code (VectorMA(origin, pos, vec,
-re->origin) and the digit render loop) only reads vec afterward, which both
-this branch and the stock non-VR branch fill identically in shape - dir
-itself is scratch and unread past this call.
-=================
-*/
-qboolean CG_VR_DamagePlumAxis( refEntity_t *re, vec3_t dir, vec3_t up, vec3_t vec ) {
-	if ( !vrActive ) {
-		return qfalse;
-	}
-
-	VectorNormalize(dir);
-
-	// World-oriented so digits don't roll with head tilt. axis[0] faces into the
-	// scene to keep the basis right-handed; a mirrored (left-handed) basis gets
-	// face culling inverted, hiding the one-sided digit shader.
-	re->renderfx |= RF_WORLD_ORIENTED;
-	VectorNegate(dir, re->axis[0]);
-	CrossProduct(dir, up, vec);
-	VectorNormalize(vec);
-	VectorCopy(vec, re->axis[1]);
-	CrossProduct(vec, dir, re->axis[2]);  // up, from forward and left
-
-	return qtrue;
 }
 
 /*

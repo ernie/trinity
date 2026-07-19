@@ -2638,10 +2638,6 @@ void CG_DrawCrosshair3D(void)
 		CG_CrosshairColorFromInt( cg_crosshairColor.integer, ent.shaderRGBA.rgba );
 	}
 
-	// ensure crosshair is aligned with world, not HMD/view
-	// Don't apply roll when rendering to virtual screen
-	ent.rotation = vr->virtual_screen ? 0 : vr->hmdorientation[ROLL];
-
 	trap_R_AddRefEntityToScene(&ent);
 }
 

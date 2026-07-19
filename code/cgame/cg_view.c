@@ -1085,7 +1085,7 @@ static void CG_DamageBlendBlob( void ) {
 
 	memset( &ent, 0, sizeof( ent ) );
 	ent.reType = RT_SPRITE;
-	ent.renderfx = RF_FIRST_PERSON;
+	ent.renderfx = RF_FIRST_PERSON | RF_VIEW_ORIENTED;
 
 	VectorMA( cg.refdef.vieworg, 8, cg.refdef.viewaxis[0], ent.origin );
 	VectorMA( ent.origin, cg.damageX * -8, cg.refdef.viewaxis[1], ent.origin );

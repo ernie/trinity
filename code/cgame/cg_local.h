@@ -1868,23 +1868,27 @@ extern  qboolean intShaderTime;
 extern  qboolean linearLight;
 extern  qboolean projectDecal;
 extern  qboolean animFrame;
+extern  qboolean spritePolyTrap;
 
 #ifdef Q3_VM
 extern qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 extern void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 extern void	(*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 extern void	(*trap_R_ProjectDecal)( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
+extern void	(*trap_R_AddSpritePolyToScene)( qhandle_t hShader, const vec3_t origin, float width, float height, float rotation, const byte *rgba );
 extern void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
 #else
 qboolean trap_GetValue( char *value, int valueSize, const char *key );
 void trap_R_AddRefEntityToScene2( const refEntity_t *re );
 void trap_R_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
+void trap_R_AddSpritePolyToScene( qhandle_t hShader, const vec3_t origin, float width, float height, float rotation, const byte *rgba );
 void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
 extern int dll_com_trapGetValue;
 extern int dll_trap_R_AddRefEntityToScene2;
 extern int dll_trap_R_AddLinearLightToScene;
 extern int dll_trap_R_ProjectDecal;
+extern int dll_trap_R_AddSpritePolyToScene;
 extern int dll_trap_VR_RegisterState;
 #endif
 

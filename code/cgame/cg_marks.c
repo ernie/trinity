@@ -574,6 +574,15 @@ void CG_AddParticleToScene (cparticle_t *p, vec3_t org, float alpha)
 		width = p->width + ( ratio * ( p->endwidth - p->width) );
 		height = p->height + ( ratio * ( p->endheight - p->height) );
 
+		if ( spritePolyTrap && p->pshader ) {
+			// engine-oriented billboard: batched like a poly, oriented by
+			// the engine per view (p->roll spins within that basis)
+			byte rgba[4];
+			rgba[0] = rgba[1] = rgba[2] = rgba[3] = 255;
+			trap_R_AddSpritePolyToScene( p->pshader, org, width, height, p->roll, rgba );
+			return;
+		}
+
 		if (p->roll) {
 			vectoangles( cg.refdef.viewaxis[0], rotate_ang );
 			rotate_ang[ROLL] += p->roll;
@@ -787,11 +796,23 @@ void CG_AddParticleToScene (cparticle_t *p, vec3_t org, float alpha)
 		float	alpha;
 
 		alpha = p->alpha;
-		
+
 		if ( cgs.glconfig.hardwareType == GLHW_RAGEPRO )
 			alpha = 1;
 
-		if (p->roll) 
+		if ( spritePolyTrap && p->pshader ) {
+			// engine-oriented billboard: batched like a poly, oriented by
+			// the engine per view (p->roll spins within that basis)
+			byte rgba[4];
+			rgba[0] = 111;
+			rgba[1] = 19;
+			rgba[2] = 9;
+			rgba[3] = (byte)( 255 * alpha );
+			trap_R_AddSpritePolyToScene( p->pshader, org, p->width, p->height, p->roll, rgba );
+			return;
+		}
+
+		if (p->roll)
 		{
 			vectoangles( cg.refdef.viewaxis[0], rotate_ang );
 			rotate_ang[ROLL] += p->roll;
@@ -978,6 +999,15 @@ void CG_AddParticleToScene (cparticle_t *p, vec3_t org, float alpha)
 		i = p->shaderAnim;
 		j = (int)floor(ratio * shaderAnimCounts[p->shaderAnim]);
 		p->pshader = shaderAnims[i][j];
+
+		if ( spritePolyTrap && p->pshader ) {
+			// engine-oriented billboard: batched like a poly, oriented by
+			// the engine per view (p->roll spins within that basis)
+			byte rgba[4];
+			rgba[0] = rgba[1] = rgba[2] = rgba[3] = 255;
+			trap_R_AddSpritePolyToScene( p->pshader, org, width, height, p->roll, rgba );
+			return;
+		}
 
 		if (p->roll) {
 			vectoangles( cg.refdef.viewaxis[0], rotate_ang );
