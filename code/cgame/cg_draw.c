@@ -2591,14 +2591,20 @@ void CG_DrawCrosshair3D(void)
 	trap_Cvar_VariableStringBuffer("r_zProj", rendererinfos, sizeof(rendererinfos));
 	zProj = atof(rendererinfos);
 	trap_Cvar_VariableStringBuffer("r_stereoSeparation", rendererinfos, sizeof(rendererinfos));
-	stereoSep = zProj / atof(rendererinfos);
+	stereoSep = atof(rendererinfos);
 
 	xmax = zProj * tan(cg.refdef.fov_x * M_PI / 360.0f);
 
 	// let the trace run through until a change in stereo separation of the crosshair becomes less than one pixel.
 	CG_CalculateVRWeaponPosition(origin, weaponangles);
 	AnglesToAxis(weaponangles, viewaxis);
-	maxdist = (cgs.glconfig.vidWidth * stereoSep * zProj / (2 * xmax)) * 1.5f;
+	if (stereoSep > 0.0f) {
+		maxdist = (cgs.glconfig.vidWidth * (zProj / stereoSep) * zProj / (2 * xmax)) * 1.5f;
+	} else {
+		// r_stereoSeparation 0 is settable (and archivable in old configs);
+		// use a fixed far trace instead of an infinite one
+		maxdist = 8192.0f;
+	}
 	VectorMA(origin, maxdist, viewaxis[0], endpos);
 	CG_Trace(&trace, origin, NULL, NULL, endpos, 0, MASK_SHOT);
 #if 0
@@ -4059,7 +4065,8 @@ void CG_Draw2D( stereoFrame_t stereoFrame )
 		return;
 	}
 
-	// cg_draw2D is flatscreen-only; VR HUD visibility is the vr_hudDrawStatus ladder's (A9)
+	// cg_draw2D is flatscreen-only; VR HUD visibility belongs to the
+	// vr_hudDrawStatus ladder (VR_INTEGRATION.md Appendix A)
 	if ( !CG_VR_OwnsHudVisibility() && cg_draw2D.integer == 0 ) {
 		return;
 	}
@@ -4095,8 +4102,8 @@ void CG_Draw2D( stereoFrame_t stereoFrame )
 			}
 
 #ifdef MISSIONPACK
-			// cg_drawStatus is flatscreen-only; VR HUD visibility is the
-			// vr_hudDrawStatus ladder's (A9) - see CG_VR_HudVisible/
+			// cg_drawStatus is flatscreen-only; VR HUD visibility belongs to
+			// the vr_hudDrawStatus ladder - see CG_VR_HudVisible/
 			// CG_VR_OwnsHudVisibility in vr_cgame.c
 			if ( CG_VR_HudVisible() && ( CG_VR_OwnsHudVisibility() || cg_drawStatus.integer ) ) {
 				Menu_PaintAll();

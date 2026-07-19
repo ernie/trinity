@@ -439,7 +439,13 @@ VRFM_QUERY matches either third-person mode (spectator/demo UI query).
 */
 qboolean CG_VR_IsThirdPersonFollow( VR_FollowMode followMode )
 {
-	qboolean isFollowing = (cg.snap->ps.pm_flags & PMF_FOLLOW) || cg.demoPlayback || VR_HostTVPlayback();
+	qboolean isFollowing;
+
+	// CG_VR_Frame runs during the loading screen, before the first snapshot
+	if ( !cg.snap ) {
+		return qfalse;
+	}
+	isFollowing = (cg.snap->ps.pm_flags & PMF_FOLLOW) || cg.demoPlayback || VR_HostTVPlayback();
 
 	if (followMode == VRFM_QUERY)
 	{
@@ -1787,7 +1793,13 @@ static void VR_ParseWheelWeapons( void )
 	}
 
 	if ( vrc_wheelSlotCount == 0 ) {
+		// Doubles as the implicit trailing "*" for exclusion-only lists:
+		// seen[] still carries the exclusions, so this appends the default
+		// set minus them.
 		VR_WheelAppendDefaults( seen );
+	}
+	if ( vrc_wheelSlotCount == 0 ) {
+		Com_Printf( "cg_weaponSelectorWeapons: every weapon excluded - the wheel is empty\n" );
 	}
 }
 
@@ -1821,6 +1833,12 @@ void CG_DrawWeaponSelector( void )
 		VectorCopy(vr->weaponangles, vrc_weaponSelectorAngles);
 		VectorCopy(vr->weaponposition, vrc_weaponSelectorOrigin);
 		VectorCopy(vr->weaponoffset, vrc_weaponSelectorOffset);
+	}
+
+	// An all-exclusions list legitimately yields zero slots - nothing to draw
+	if (vrc_wheelSlotCount < 1)
+	{
+		return;
 	}
 
 	// Consistent spacing over the slot list: the top slot sits at 360;
@@ -2235,7 +2253,7 @@ qboolean CG_VR_WeaponHandPose( vec3_t origin, vec3_t angles, float *scale ) {
 			vec3_t temp_offset;
 			vr_matrix4x4 m1, m2, m3;
 			vec3_t zero;
-			vec3_t forward, right, up;
+			vec3_t adjForward, adjRight, adjUp;
 			VectorClear(temp_offset);
 			VectorClear(adjust);
 
@@ -2258,13 +2276,13 @@ qboolean CG_VR_WeaponHandPose( vec3_t origin, vec3_t angles, float *scale ) {
 			Matrix4x4_ConvertToEntity(m3, angles, zero);
 
 			//Now move weapon closer to proper origin
-			AngleVectors( angles, forward, right, up );
-			VectorMA( origin, offset[2], forward, origin );
-			VectorMA( origin, offset[1], up, origin );
+			AngleVectors( angles, adjForward, adjRight, adjUp );
+			VectorMA( origin, offset[2], adjForward, origin );
+			VectorMA( origin, offset[1], adjUp, origin );
 			if (vr->right_handed) {
-				VectorMA(origin, offset[0], right, origin);
+				VectorMA(origin, offset[0], adjRight, origin);
 			} else {
-				VectorMA(origin, -offset[0], right, origin);
+				VectorMA(origin, -offset[0], adjRight, origin);
 			}
 		}
 	}
@@ -2301,9 +2319,9 @@ void CG_VR_WeaponHandFinish( refEntity_t *hand, float scale ) {
 CG_VR_DrawFrame
 
 VR draw tail: renders the 3D scene, then draws 2D overlays and the HUD
-inside the engine's post-bloom / HUD-buffer brackets. Optional engine
-traps are used only when the engine advertised them (has* presence flags);
-otherwise the bracketed op is skipped and content still draws to screen.
+inside the engine's post-bloom / HUD-buffer brackets. Only reachable when
+vrActive, and the v1 trap set is guaranteed by the RegisterState
+handshake, so the bracket traps are called unconditionally.
 =====================
 */
 qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
@@ -2398,7 +2416,9 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 		                   (cgs.gametype == GT_SINGLE_PLAYER);
 		// trinity cgame has no trap_Cvar_VariableValue; read via string buffer
 		trap_Cvar_VariableStringBuffer( "vr_currentHudDrawStatus", cvarBuf, sizeof( cvarBuf ) );
-		drawHUDSprite = ((atof( cvarBuf ) != 2.0f &&
+		// A missing sprites/vr/hud shader drops the panel entirely, never a
+		// default-shader quad (Appendix C's degrade contract)
+		drawHUDSprite = vrc_hudShader && ((atof( cvarBuf ) != 2.0f &&
 		                  !vr->weapon_zoomed && !vr->virtual_screen) || isSPIntermission);
 
 		if (drawHUDSprite)
@@ -2630,7 +2650,7 @@ a single gate-for-predicate swap.
 
 ==============================================================================
 */
-qboolean CG_VR_OwnsHudVisibility( void ) {	// A9: flatscreen HUD toggles don't apply in VR
+qboolean CG_VR_OwnsHudVisibility( void ) {	// flatscreen HUD toggles don't apply in VR (VR_INTEGRATION.md Appendix A)
 	return vrActive;
 }
 qboolean CG_VR_HudVisible( void ) {
