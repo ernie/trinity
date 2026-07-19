@@ -481,18 +481,16 @@ static void CG_AddMoveScaleFade( localEntity_t *le ) {
 
 	BG_EvaluateTrajectory( &le->pos, cg.time, re->origin );
 
-	// Blood trail gouts cull without freeing (they reappear as the gib carries
-	// them onward); everything else falls through to the inside-the-sprite free.
+	// Blood trail gouts also cull on screen coverage (see CG_BloodGoutCulled)
 	if ( re->customShader == cgs.media.bloodGoutShader && CG_BloodGoutCulled( re ) ) {
 		return;
 	}
 
-	// if the view would be "inside" the sprite, kill the sprite
-	// so it doesn't add too much overdraw
+	// if the view would be "inside" the sprite, skip the draw without freeing
+	// (overdraw guard); it draws again once the view pulls back
 	VectorSubtract( re->origin, cg.refdef.vieworg, delta );
 	len = VectorLength( delta );
 	if ( len < le->radius ) {
-		CG_FreeLocalEntity( le );
 		return;
 	}
 
@@ -604,12 +602,11 @@ static void CG_AddScaleFade( localEntity_t *le ) {
 	re->shaderRGBA.rgba[3] = 0xff * c * le->color[3];
 	re->radius = le->radius * ( 1.0 - c ) + 8;
 
-	// if the view would be "inside" the sprite, kill the sprite
-	// so it doesn't add too much overdraw
+	// if the view would be "inside" the sprite, skip the draw without freeing
+	// (overdraw guard); it draws again once the view pulls back
 	VectorSubtract( re->origin, cg.refdef.vieworg, delta );
 	len = VectorLengthSquared( delta );
 	if ( len < le->radius * le->radius ) {
-		CG_FreeLocalEntity( le );
 		return;
 	}
 #if 1
@@ -647,12 +644,11 @@ static void CG_AddFallScaleFade( localEntity_t *le ) {
 
 	re->radius = le->radius * ( 1.0 - c ) + 16;
 
-	// if the view would be "inside" the sprite, kill the sprite
-	// so it doesn't add too much overdraw
+	// if the view would be "inside" the sprite, skip the draw without freeing
+	// (overdraw guard); it draws again once the view pulls back
 	VectorSubtract( re->origin, cg.refdef.vieworg, delta );
 	len = VectorLengthSquared( delta );
 	if ( len < le->radius * le->radius ) {
-		CG_FreeLocalEntity( le );
 		return;
 	}
 #if 1
@@ -974,12 +970,11 @@ void CG_AddScorePlum( localEntity_t *le ) {
 
 	VectorMA(origin, -10.0f + 20 * sin(c * 2 * M_PI), vec, origin);
 
-	// if the view would be "inside" the sprite, kill the sprite
-	// so it doesn't add too much overdraw
+	// if the view would be "inside" the sprite, skip the draw without freeing
+	// (overdraw guard); it draws again once the view pulls back
 	VectorSubtract( origin, cg.refdef.vieworg, delta );
 	len = VectorLengthSquared( delta );
 	if ( len < 20*20 ) {
-		CG_FreeLocalEntity( le );
 		return;
 	}
 
@@ -1063,8 +1058,8 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 	VectorSubtract( origin, cg.refdef.vieworg, delta );
 	len = VectorLengthSquared( delta );
 	if ( len < 20*20 ) {
-		// if the view would be "inside" the sprite, kill the sprite
-		CG_FreeLocalEntity( le );
+		// view inside the sprite: skip the draw without freeing (overdraw
+		// guard); it draws again once the view pulls back
 		return;
 	}
 
