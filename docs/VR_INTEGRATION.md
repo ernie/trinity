@@ -972,11 +972,31 @@ sprite color explicitly (the sprite is vertex-modulated; map this tree's
 crosshair-color cvar to your own scheme, or plain white).
 
 **Renderer contract (`cgame/tr_types.h`).** `RF_OVERBRIGHT`,
-`RF_WORLD_ORIENTED`, `RT_LASERSIGHT`, `refEntity_t.invert`, and
-`refdef_t.isHUD`. The two struct fields are **tail-appended and must stay
-last**: the stock prefix is what keeps the layout compatible with engines
-that do not know the field. A mid-struct insertion compiles clean and
-corrupts rendering at run time.
+`RF_WORLD_ORIENTED`, `RF_VIEW_ORIENTED`, `RT_LASERSIGHT`,
+`refEntity_t.invert`, and `refdef_t.isHUD`. The two struct fields are
+**tail-appended and must stay last**: the stock prefix is what keeps the
+layout compatible with engines that do not know the field. A mid-struct
+insertion compiles clean and corrupts rendering at run time.
+
+Sprite orientation on VR engines is three-tier. The default billboard
+faces the eye with its up pinned to the world horizon — the engine owns
+that math. `RF_VIEW_ORIENTED` opts a sprite back into the full view axes
+for visor-class UI that should track the head (this tree: the in-world
+HUD sprite, the damage blend blob, the weapon-selector icons).
+`RF_WORLD_ORIENTED` pins the quad to `refEntity_t.axis` outright.
+Flatscreen engines ignore both bits. Do not counter-rotate sprites in
+cgame to fight head roll — delete any such compensation when porting;
+the engine's default tier already handles it.
+
+**Optional extension: `trap_R_AddSpritePolyToScene`.** Poly-batched
+billboard quads oriented by the engine per view — the batching of
+`trap_R_AddPolyToScene` without baking this frame's view axes into the
+verts (which is what makes cgame-built puff quads roll with the HMD).
+Resolved by name via `trap_GetValue` but OUTSIDE the v1 VR contract: it
+is a per-renderer capability like the blood-decal trap, so gate every
+call on the resolved flag and keep the stock poly path as the fallback,
+as this tree does in `CG_EmitPolyVerts` and the `cg_marks.c` particle
+types.
 
 `isHUD` is not just a declaration: set `refdef.isHUD = qtrue` on every
 mini-scene refdef your 2D pass renders. In stock that is one site —
