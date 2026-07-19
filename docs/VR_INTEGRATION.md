@@ -971,7 +971,9 @@ tree's implementation — it aims the trace from
 sprite color explicitly (the sprite is vertex-modulated; map this tree's
 crosshair-color cvar to your own scheme, or plain white).
 
-**Renderer contract (`cgame/tr_types.h`).** `RF_OVERBRIGHT`,
+**Renderer contract (`tr_types.h` — `code/renderercommon/` in a stock ioq3
+tree; this tree keeps a mod-local copy at `code/cgame/tr_types.h`).**
+`RF_OVERBRIGHT`,
 `RF_WORLD_ORIENTED`, `RF_VIEW_ORIENTED`, `RT_LASERSIGHT`,
 `refEntity_t.invert`, and `refdef_t.isHUD`. The two struct fields are
 **tail-appended and must stay last**: the stock prefix is what keeps the
