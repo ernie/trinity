@@ -77,7 +77,8 @@ jobs:
       - name: Checkout the stock-ioq3 template
         uses: actions/checkout@v7
         with:
-          repository: ernie/trinity-vr-mod-template
+          repository: ernie/quake3-vr-mod-template
+          ref: v1.0
           path: template
           submodules: recursive
 
