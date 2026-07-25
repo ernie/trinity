@@ -257,7 +257,7 @@ CG_StoreEvents
 Save events that may be dropped during prediction
 ===================
 */
-void CG_StoreEvent( entity_event_t evt, int eventParm, int entityNum ) 
+void CG_StoreEvent( entity_event_t evt, int eventParm, int entityNum )
 {
 	if ( eventStack >= MAX_PREDICTED_EVENTS )
 		return;
@@ -536,8 +536,9 @@ static void CG_TouchItem( centity_t *cent ) {
 		return;
 	}
 
-	// never pick an item up twice in a prediction
-	if ( cent->delaySpawn > cg.time ) { 
+	// never pick an item up twice, but a full re-predict has to re-apply the
+	// pickup it already made, so block only commands newer than that one
+	if ( cent->delaySpawn > cg.time && cg_pmove.cmd.serverTime > cent->pickupCommandTime ) {
 		return;
 	}
 
@@ -579,9 +580,13 @@ static void CG_TouchItem( centity_t *cent ) {
 	// don't touch it again this prediction
 	cent->miscTime = cg.time;
 
-	// delay next potential pickup for some time
-	cent->delaySpawn = cg.time + ( cg.meanPing > 0 ? cg.meanPing * 2 + 100 : 333 );
-	cent->delaySpawnPlayed = qfalse;
+	// delay next potential pickup for some time.  The window sizes how long the
+	// server could take to answer, so a replay must not re-arm it from cg.time
+	if ( cent->delaySpawn <= cg.time ) {
+		cent->delaySpawn = cg.time + ( cg.meanPing > 0 ? cg.meanPing * 2 + 100 : 333 );
+		cent->delaySpawnPlayed = qfalse;
+	}
+	cent->pickupCommandTime = cg_pmove.cmd.serverTime;
 
 	// if it's a weapon, give them some predicted ammo so the autoswitch will work
 	if ( item->giType == IT_WEAPON ) {
@@ -1019,6 +1024,12 @@ void CG_PredictPlayerState( void ) {
 	} else {
 		cg.predictedPlayerState = cg.snap->ps;
 		cg.physicsTime = cg.snap->serverTime;
+	}
+
+	// cgame does not run behind a fullscreen menu; the server ticked the gap and
+	// the snapshot already has it, so re-anchor instead of replaying it
+	if ( cg.timeResidual && cg.time - cg.oldTime > 500 ) {
+		cg.timeResidual = cg.predictedPlayerState.commandTime + 1000;
 	}
 
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;

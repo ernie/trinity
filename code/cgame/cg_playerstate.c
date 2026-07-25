@@ -274,6 +274,7 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 #endif
 	int	highScore, reward;
 	sfxHandle_t sfx;
+	qboolean decayed;
 
 	// don't play the sounds if the player just changed teams
 	if ( ps->persistant[PERS_TEAM] != ops->persistant[PERS_TEAM] ) {
@@ -320,8 +321,12 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 		trap_S_StartLocalSound( cgs.media.hitTeamSound, CHAN_LOCAL_SOUND );
 	}
 
-	// health changes of more than -1 should make pain sounds
-	if ( ps->stats[STAT_HEALTH] < ops->stats[STAT_HEALTH] - 1 ) {
+	// health changes of more than -1 should make pain sounds, except over-max
+	// decay that piled up while cgame was frozen behind a fullscreen menu
+	decayed = ( cg.time - cg.oldTime > 500 )
+		&& ops->stats[STAT_HEALTH] > ops->stats[STAT_MAX_HEALTH];
+
+	if ( !decayed && ps->stats[STAT_HEALTH] < ops->stats[STAT_HEALTH] - 1 ) {
 		if ( ps->stats[STAT_HEALTH] > 0 ) {
 			CG_PainEvent( &cg.predictedPlayerEntity, ps->stats[STAT_HEALTH] );
 		}

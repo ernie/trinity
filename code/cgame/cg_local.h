@@ -202,6 +202,7 @@ typedef struct centity_s {
 	int				miscTime;
 	int				delaySpawn;
 	qboolean		delaySpawnPlayed;
+	int				pickupCommandTime;	// usercmd that predicted the pickup, so a replay can re-apply it
 
 	int				snapShotTime;	// last time this entity was found in a snapshot
 
