@@ -858,7 +858,8 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 
 	for( i = 0; i < MAX_STATS; i++ ) {
 		// we can't predict some flags
-		if ( i == STAT_CLIENTS_READY /*|| i == STAT_MAX_HEALTH */ ) {
+		// VR head stats are server-authored presentation data Pmove never writes
+		if ( i == STAT_CLIENTS_READY || i == STAT_VR_HEAD_PITCH || i == STAT_VR_HEAD_YAW_OFFSET /*|| i == STAT_MAX_HEALTH */ ) {
 			for ( n = 0 ; n < NUM_SAVED_STATES; n++ ) {
 				cg.savedPmoveStates[ n ].stats[ i ] = ps->stats[ i ];
 			}
