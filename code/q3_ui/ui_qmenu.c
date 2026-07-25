@@ -1667,6 +1667,7 @@ sfxHandle_t Menu_DefaultKey( menuframework_s *m, int key )
 	sfxHandle_t		sound = 0;
 	menucommon_s	*item;
 	int				cursor_prev;
+	qboolean		mouseKey;
 
 	// menu system keys
 	switch ( key )
@@ -1680,9 +1681,15 @@ sfxHandle_t Menu_DefaultKey( menuframework_s *m, int key )
 	if (!m || !m->nitems)
 		return 0;
 
-	// route key stimulus to widget
+	// route key stimulus to widget.  A click may only actuate the control the
+	// pointer is over: the cursor stays parked on the last item it focused, so an
+	// ungated dispatch sends the click there from anywhere on screen.  This is the
+	// rule the K_MOUSE1 case below already applies.  Navigation keys are exempt,
+	// since arrows and thumbstick nav focus items the pointer is nowhere near.
+	mouseKey = ( key == K_MOUSE1 || key == K_MOUSE3 );
 	item = Menu_ItemAtCursor( m );
-	if (item && !(item->flags & (QMF_GRAYED|QMF_INACTIVE)))
+	if (item && !(item->flags & (QMF_GRAYED|QMF_INACTIVE))
+		&& (!mouseKey || (item->flags & QMF_HASMOUSEFOCUS)))
 	{
 		switch (item->type)
 		{

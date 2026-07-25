@@ -2771,6 +2771,16 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 		}
 	}
 
+	// Release the mouse capture on the button up that ends it.  Item_HandleKey is
+	// the only other place that clears it and needs an item already focused, which
+	// a live capture prevents, so an unpaired up strands it and freezes focus.
+	if (!down && (key == K_MOUSE1 || key == K_MOUSE2 || key == K_MOUSE3) && itemCapture) {
+		Item_StopCapture(itemCapture);
+		itemCapture = NULL;
+		captureFunc = NULL;
+		captureData = NULL;
+	}
+
 	if (menu == NULL) {
 		inHandler = qfalse;
 		return;
