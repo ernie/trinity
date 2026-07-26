@@ -10,6 +10,9 @@
 
 static	pmove_t		cg_pmove;
 
+// diagnostic: snapshots whose prediction was accepted since the last miss
+static	int			predictionStreak;
+
 static	int			cg_numSolidEntities;
 static	centity_t	*cg_solidEntities[MAX_ENTITIES_IN_SNAPSHOT];
 static	int			cg_numTriggerEntities;
@@ -1176,10 +1179,17 @@ void CG_PredictPlayerState( void ) {
 
 			// if no saved states matched
 			if ( error ) {
+				if ( cg_showmiss.integer > 1 ) {
+					CG_Printf( "clean predictions before miss: %i\n", predictionStreak );
+				}
+				predictionStreak = 0;
+
 				// do a full predict
 				cg.lastPredictedCommand = 0;
 				cg.stateTail = cg.stateHead;
 				predictCmd = current - CMD_BACKUP + 1;
+			} else {
+				predictionStreak++;
 			}
 		}
 		// keep track of the server time of the last snapshot so we
