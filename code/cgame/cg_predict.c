@@ -306,7 +306,7 @@ void CG_PlayDroppedEvents( playerState_t *ps, playerState_t *ops ) {
 		cent->currentState.eventParm = eventParms[ i ];
 		if ( cg_showmiss.integer ) 
 		{
-			CG_Printf( "Playing dropped event: %s %i", eventnames[ events[ i ] ], eventParms[ i ] );
+			CG_Printf( "Playing dropped event: %s %i\n", eventnames[ events[ i ] ], eventParms[ i ] );
 		}
 		CG_EntityEvent( cent, cent->lerpOrigin, eventParm2[ i ] );
 		cg.eventSequence++;
@@ -317,7 +317,7 @@ void CG_PlayDroppedEvents( playerState_t *ps, playerState_t *ops ) {
 }
 
 
-static void CG_AddArmor( const gitem_t *item, int quantity ) {
+static void CG_AddArmor( const gitem_t *item ) {
 	const modeConfig_t *gp = Mode_GetConfig( cgs.mode );
 	playerState_t *ps = &cg.predictedPlayerState;
 
@@ -472,42 +472,60 @@ static int CG_CheckArmor( int damage ) {
  
 
 static void CG_PickupPrediction( centity_t *cent, const gitem_t *item ) {
+	int quantity;
+
+	// a server that does not publish s.time2 awards the static amount, which is
+	// everything except a mapper "count" override
+	quantity = cent->currentState.time2;
+	if ( quantity == 0 ) {
+		quantity = item->quantity;
+	}
 
 	// health prediction
-	if ( item->giType == IT_HEALTH && cent->currentState.time2 > 0 ) {
+	if ( item->giType == IT_HEALTH && quantity > 0 ) {
 		int limit;
 
-		limit = cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ]; // soft limit
+#ifdef MISSIONPACK
+		// Guard holds the soft limit for every health item
+		if ( bg_itemlist[ cg.predictedPlayerState.stats[STAT_PERSISTANT_POWERUP] ].giTag == PW_GUARD ) {
+			limit = cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ];
+		} else
+#endif
 		if ( !Q_stricmp( item->classname, "item_health_small" ) || !Q_stricmp( item->classname, "item_health_mega" ) ) {
-			limit *= 2; // hard limit
+			limit = cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ] * 2; // hard limit
+		} else {
+			limit = cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ]; // soft limit
 		}
 
-		cg.predictedPlayerState.stats[STAT_HEALTH] += cent->currentState.time2;
+		cg.predictedPlayerState.stats[STAT_HEALTH] += quantity;
 		if ( cg.predictedPlayerState.stats[ STAT_HEALTH ] > limit ) {
 			cg.predictedPlayerState.stats[ STAT_HEALTH ] = limit;
 		}
 	}
 
-	// armor prediction
-	if ( item->giType == IT_ARMOR && cent->currentState.time2 > 0 ) {
-		CG_AddArmor( item, cent->currentState.time2 );
+	// armor prediction; both server paths award item->quantity and ignore count,
+	// so there is no quantity to gate on
+	if ( item->giType == IT_ARMOR ) {
+		CG_AddArmor( item );
 		return;
 	}
 
 	// ammo prediction
-	if ( item->giType == IT_AMMO && cent->currentState.time2 > 0 ) {
-		CG_AddAmmo( item->giTag, cent->currentState.time2 );
+	if ( item->giType == IT_AMMO && quantity > 0 ) {
+		CG_AddAmmo( item->giTag, quantity );
 		return;
 	}
 
 	// weapon prediction
-	if ( item->giType == IT_WEAPON && cent->currentState.time2 > 0 ) {
-		CG_AddWeapon( item->giTag, cent->currentState.time2, (cent->currentState.modelindex2 == 1) );
+	if ( item->giType == IT_WEAPON && quantity > 0 ) {
+		CG_AddWeapon( item->giTag, quantity, (cent->currentState.modelindex2 == 1) );
 		return;
 	}
 
-	// powerups prediction
-	if ( item->giType == IT_POWERUP && item->giTag >= PW_QUAD && item->giTag <= PW_FLIGHT ) {
+	// powerups prediction; no item->quantity fallback here, a stock server puts
+	// the remaining seconds in count and never publishes s.time2
+	if ( item->giType == IT_POWERUP && item->giTag >= PW_QUAD && item->giTag <= PW_FLIGHT
+		&& cent->currentState.time2 > 0 ) {
 		// round timing to seconds to make multiple powerup timers count in sync
 		if ( !cg.predictedPlayerState.powerups[ item->giTag ] ) {
 			cg.predictedPlayerState.powerups[ item->giTag ] = cg.predictedPlayerState.commandTime - ( cg.predictedPlayerState.commandTime % 1000 );
@@ -517,7 +535,7 @@ static void CG_PickupPrediction( centity_t *cent, const gitem_t *item ) {
 			}
 		}
 		cg.predictedPlayerState.powerups[ item->giTag ] += cent->currentState.time2 * 1000;
-	}	
+	}
 
 	// holdable prediction
 	if ( item->giType == IT_HOLDABLE ) {
