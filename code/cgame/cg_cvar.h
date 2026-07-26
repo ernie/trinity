@@ -87,7 +87,7 @@ CG_CVAR( cg_thirdPerson, "cg_thirdPerson", "0", 0 )
 CG_CVAR( cg_teamChatTime, "cg_teamChatTime", "3000", CVAR_ARCHIVE  )
 CG_CVAR( cg_teamChatHeight, "cg_teamChatHeight", "0", CVAR_ARCHIVE  )
 CG_CVAR( cg_forceModel, "cg_forceModel", "0", CVAR_ARCHIVE  )
-CG_CVAR( cg_predictItems, "cg_predictItems", "1", CVAR_ARCHIVE )
+CG_CVAR( cg_predictItems, "cg_predictItems", "1", CVAR_USERINFO | CVAR_ARCHIVE )
 #ifdef MISSIONPACK
 CG_CVAR( cg_deferPlayers, "cg_deferPlayers", "0", CVAR_ARCHIVE )
 #else
