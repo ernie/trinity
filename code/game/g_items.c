@@ -257,6 +257,46 @@ int Pickup_Holdable( gentity_t *ent, gentity_t *other ) {
 //======================================================================
 
 
+/*
+================
+G_ItemPickupQuantity
+
+The amount this item awards, resolved through the mode tables. Published in
+s.time2 so the client predicts the same number the pickup handlers award. A
+mapper "count" override wins, which is why this must be resolved server side.
+================
+*/
+int G_ItemPickupQuantity( const gentity_t *ent ) {
+	const modeConfig_t	*mc;
+	int					quantity;
+
+	if ( ent->count ) {
+		return ent->count;
+	}
+
+	if ( !ent->item ) {
+		return 0;
+	}
+
+	mc = Mode_GetConfig( g_mode.integer );
+
+	switch ( ent->item->giType ) {
+	case IT_AMMO:
+		quantity = Mode_GetAmmoBoxQuantity( mc, ent->item->giTag );
+		break;
+	case IT_WEAPON:
+		quantity = Mode_GetInitialAmmo( mc, ent->item->giTag, g_gametype.integer == GT_TOURNAMENT );
+		break;
+	default:
+		quantity = 0;
+		break;
+	}
+
+	// a zero table entry means the mode keeps the stock amount
+	return quantity ? quantity : ent->item->quantity;
+}
+
+
 static void Add_Ammo( gentity_t *ent, int weapon, int count )
 {
 	ent->client->ps.ammo[weapon] += count;
@@ -271,16 +311,7 @@ static void Add_Ammo( gentity_t *ent, int weapon, int count )
 
 static int Pickup_Ammo( gentity_t *ent, gentity_t *other )
 {
-	int		quantity;
-
-	if ( ent->count ) {
-		quantity = ent->count;
-	} else {
-		int boxQty = Mode_GetAmmoBoxQuantity( Mode_GetConfig( g_mode.integer ), ent->item->giTag );
-		quantity = boxQty ? boxQty : ent->item->quantity;
-	}
-
-	Add_Ammo( other, ent->item->giTag, quantity );
+	Add_Ammo( other, ent->item->giTag, G_ItemPickupQuantity( ent ) );
 
 	return SpawnTime( ent, qfalse ); // return RESPAWN_AMMO;
 }
@@ -294,13 +325,7 @@ static int Pickup_Weapon( gentity_t *ent, gentity_t *other ) {
 	if ( ent->count < 0 ) {
 		quantity = 0; // None for you, sir!
 	} else {
-		if ( ent->count ) {
-			quantity = ent->count;
-		} else {
-			qboolean isDuel = ( g_gametype.integer == GT_TOURNAMENT );
-			int initAmmo = Mode_GetInitialAmmo( Mode_GetConfig( g_mode.integer ), ent->item->giTag, isDuel );
-			quantity = initAmmo ? initAmmo : ent->item->quantity;
-		}
+		quantity = G_ItemPickupQuantity( ent );
 
 		// dropped items and teamplay weapons always have full ammo
 		if ( ! (ent->flags & FL_DROPPED_ITEM) && g_gametype.integer != GT_TEAM ) {
@@ -824,11 +849,7 @@ void FinishSpawningItem( gentity_t *ent ) {
 	ent->use = Use_Item;
 
 	// for pickup prediction
-	if ( ent->count ) {
-		ent->s.time2 = ent->count;
-	} else if ( ent->item ) {
-		ent->s.time2 = ent->item->quantity;	
-	}
+	ent->s.time2 = G_ItemPickupQuantity( ent );
 
 	if ( ent->spawnflags & 1 ) {
 		// suspended

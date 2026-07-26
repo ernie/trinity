@@ -109,7 +109,7 @@ void TossClientItems( gentity_t *self ) {
 		drop = Drop_Item( self, item, 0 );
 
 		// for pickup prediction
-		drop->s.time2 = item->quantity;
+		drop->s.time2 = G_ItemPickupQuantity( drop );
 	}
 
 	// drop all the powerups if not in teamplay
