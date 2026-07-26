@@ -684,6 +684,10 @@ static void CG_CheckTimers( void ) {
 		return;
 	}
 
+	// no prediction during intermission
+	if ( cg.snap->ps.pm_type == PM_INTERMISSION )
+		return;
+
 	// no armor/health/powerups prediction for dead bodies
 	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 )
 		return;

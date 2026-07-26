@@ -499,6 +499,10 @@ void ClientIntermissionThink( gclient_t *client ) {
 		// this used to be an ^1 but once a player says ready, it should stick
 		client->readyToExit = 1;
 	}
+
+	// Pmove is skipped here, so advance this ourselves or the client can never
+	// match a saved state against the snapshot
+	client->ps.commandTime = client->pers.cmd.serverTime;
 }
 
 
