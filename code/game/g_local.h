@@ -872,6 +872,8 @@ qboolean G_MapExist( const char *map );
 
 extern	level_locals_t	level;
 extern	gentity_t		g_entities[MAX_GENTITIES];
+extern	const vec3_t	playerMins;
+extern	const vec3_t	playerMaxs;
 
 #define	FOFS(x) ((intptr_t)&(((gentity_t *)0)->x))
 

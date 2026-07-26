@@ -192,7 +192,6 @@ __search:
 
 	VectorCopy( spot->s.angles, angles );
 	VectorCopy( spot->s.origin, origin );
-	origin[2] += 9.0f;
 
 	return spot;
 }
@@ -240,7 +239,6 @@ gentity_t *SelectInitialSpawnPoint( gentity_t *ent, vec3_t origin, vec3_t angles
 
 	VectorCopy( spot->s.angles, angles );
 	VectorCopy( spot->s.origin, origin );
-	origin[2] += 9.0f;
 
 	return spot;
 }

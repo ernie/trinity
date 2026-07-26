@@ -1297,7 +1297,6 @@ gentity_t *SelectCTFSpawnPoint( gentity_t *ent, team_t team, int teamstate, vec3
 					spot->timestamp = level.time;
 					VectorCopy( spot->s.origin, origin );
 					VectorCopy( spot->s.angles, angles );
-					origin[2] += 9.0f;
 					return spot;
 				}
 			}
@@ -1320,7 +1319,6 @@ gentity_t *SelectCTFSpawnPoint( gentity_t *ent, team_t team, int teamstate, vec3
 
 	VectorCopy( spot->s.origin, origin );
 	VectorCopy( spot->s.angles, angles );
-	origin[2] += 9.0f;
 
 	return spot;
 }

@@ -340,9 +340,11 @@ static void G_UpdateCvars( void ) {
 }
 
 
-static void G_LocateSpawnSpots( void ) 
+static void G_LocateSpawnSpots( void )
 {
 	gentity_t			*ent;
+	vec3_t				spawn_ground;
+	trace_t				tr;
 	int i, n;
 
 	level.spawnSpots[ SPAWN_SPOT_INTERMISSION ] = NULL;
@@ -408,6 +410,30 @@ static void G_LocateSpawnSpots( void )
 		}
 	}
 	level.numSpawnSpots = n;
+
+	// try to lower spawn spots onto the floor to minimize nasty bouncing and to
+	// give prediction a resting position instead of a fall
+	for ( i = 0; i < level.numSpawnSpots; i++ ) {
+		ent = level.spawnSpots[i];
+
+		// start from where stock spawned players, which is known safe and keeps a
+		// coplanar box from reading as startsolid
+		ent->s.origin[2] += 9.0f;
+
+		if ( ( trap_PointContents( ent->s.origin, ent->s.number )
+			& ~( CONTENTS_FOG | CONTENTS_TRANSLUCENT ) ) != 0 ) {
+			continue;	// suspect spot, keep the stock lift
+		}
+
+		VectorCopy( ent->s.origin, spawn_ground );
+		spawn_ground[2] -= 41.0f;
+		trap_Trace( &tr, ent->s.origin, playerMins, playerMaxs, spawn_ground,
+			ent->s.number, CONTENTS_SOLID | CONTENTS_PLAYERCLIP );
+		if ( !tr.startsolid && tr.fraction != 1.0f && tr.entityNum == ENTITYNUM_WORLD ) {
+			ent->s.origin[2] = ceil( tr.endpos[2] );
+		}
+		// every other path keeps the stock lift
+	}
 }
 
 
