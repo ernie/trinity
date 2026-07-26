@@ -456,13 +456,6 @@ float Mode_DamageArmorProtection( const modeConfig_t *mc, int armorType, qboolea
 	return Mode_ArmorProtection( mc, armorType );
 }
 
-// returns the max armor for a given armor tier
-int Mode_ArmorMax( const modeConfig_t *mc, int armorType ) {
-	if ( armorType >= ARMORTYPE_RA ) return mc->armorRAMax;
-	if ( armorType >= ARMORTYPE_YA ) return mc->armorYAMax;
-	return mc->armorGAMax;
-}
-
 qboolean Mode_CanGrabArmor( const modeConfig_t *mc, const gitem_t *item, const playerState_t *ps ) {
 	// GA (item_armor_jacket) is CPM-only
 	if ( item->quantity == 25 && !mc->armorTiered ) {

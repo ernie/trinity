@@ -336,12 +336,12 @@ static void CG_AddArmor( const gitem_t *item, int quantity ) {
 			pickupValue = gp->armorGAPickupValue;
 			maxArmor = gp->armorGAMax;
 		} else {
-			// shard
+			// shard: add value, cap at RA max (shards bypass tier caps in CPM)
 			if ( curArmor <= 0 ) {
 				ps->stats[STAT_ARMORTYPE] = ARMORTYPE_GA;
 			}
 			ps->stats[STAT_ARMOR] = curArmor + gp->armorShardValue;
-			maxArmor = Mode_ArmorMax( gp, ps->stats[STAT_ARMORTYPE] );
+			maxArmor = gp->armorRAMax;
 			if ( ps->stats[STAT_ARMOR] > maxArmor ) {
 				ps->stats[STAT_ARMOR] = maxArmor;
 			}
@@ -356,9 +356,18 @@ static void CG_AddArmor( const gitem_t *item, int quantity ) {
 		ps->stats[STAT_ARMOR] = converted;
 		ps->stats[STAT_ARMORTYPE] = newType;
 	} else {
+		int upperBound;
+#ifdef MISSIONPACK
+		if ( bg_itemlist[ ps->stats[STAT_PERSISTANT_POWERUP] ].giTag == PW_GUARD ) {
+			upperBound = ps->stats[STAT_MAX_HEALTH];
+		} else
+#endif
+		{
+			upperBound = ps->stats[STAT_MAX_HEALTH] * 2;
+		}
 		ps->stats[STAT_ARMOR] += item->quantity;
-		if ( ps->stats[STAT_ARMOR] > ps->stats[STAT_MAX_HEALTH]*2 )
-			ps->stats[STAT_ARMOR] = ps->stats[STAT_MAX_HEALTH]*2;
+		if ( ps->stats[STAT_ARMOR] > upperBound )
+			ps->stats[STAT_ARMOR] = upperBound;
 	}
 }
 
@@ -368,12 +377,10 @@ static void CG_AddAmmo( int weapon, int count )
 	if ( weapon == WP_GAUNTLET || weapon == WP_GRAPPLING_HOOK ) {
 		cg.predictedPlayerState.ammo[weapon] = -1;
 	} else {
+		int max = Mode_GetAmmoMax( Mode_GetConfig( cgs.mode ), weapon );
 		cg.predictedPlayerState.ammo[weapon] += count;
-		if ( weapon >= WP_MACHINEGUN && weapon <= WP_BFG ) {
-			int max = Mode_GetAmmoMax( Mode_GetConfig( cgs.mode ), weapon );
-			if ( cg.predictedPlayerState.ammo[weapon] > max ) {
-				cg.predictedPlayerState.ammo[weapon] = max;
-			}
+		if ( cg.predictedPlayerState.ammo[weapon] > max ) {
+			cg.predictedPlayerState.ammo[weapon] = max;
 		}
 	}
 }
@@ -510,8 +517,13 @@ static void CG_PickupPrediction( centity_t *cent, const gitem_t *item ) {
 	}	
 
 	// holdable prediction
-	if ( item->giType == IT_HOLDABLE && ( item->giTag == HI_TELEPORTER || item->giTag == HI_MEDKIT ) ) {
+	if ( item->giType == IT_HOLDABLE ) {
 		cg.predictedPlayerState.stats[ STAT_HOLDABLE_ITEM ] = item - bg_itemlist;
+#ifdef MISSIONPACK
+		if ( item->giTag == HI_KAMIKAZE ) {
+			cg.predictedPlayerState.eFlags |= EF_KAMIKAZE;
+		}
+#endif
 	}
 }
 

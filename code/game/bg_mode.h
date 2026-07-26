@@ -119,7 +119,6 @@ int Mode_GetAmmoMax( const modeConfig_t *mc, int weaponTag );
 int Mode_GetInitialAmmo( const modeConfig_t *mc, int weaponTag, qboolean isDuel );
 float Mode_ArmorProtection( const modeConfig_t *mc, int armorType );
 float Mode_DamageArmorProtection( const modeConfig_t *mc, int armorType, qboolean selfDamage );
-int Mode_ArmorMax( const modeConfig_t *mc, int armorType );
 int Mode_ConvertArmor( const modeConfig_t *mc, int armor, int fromType, int toType );
 qboolean Mode_CanGrabArmor( const modeConfig_t *mc, const gitem_t *item, const playerState_t *ps );
 
