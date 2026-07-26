@@ -726,6 +726,12 @@ static void CG_CheckTimers( void ) {
 	for ( i = 0 ; i < MAX_POWERUPS ; i++ ) {
 		if ( !cg.predictedPlayerState.powerups[ i ] )
 			continue;
+#ifdef MISSIONPACK
+		// these hold the last server frame time, not an expiry
+		if ( i >= PW_SCOUT && i <= PW_INVULNERABILITY ) {
+			continue;
+		}
+#endif
 		if ( cg.predictedPlayerState.powerups[ i ] < cg.predictedPlayerState.commandTime ) {
 			cg.predictedPlayerState.powerups[ i ] = 0;
 		}
@@ -826,10 +832,11 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 		}
 	}
 
-	if ( pps->externalEvent != ps->externalEvent ||
-		pps->externalEventParm != ps->externalEventParm ||
-		pps->externalEventTime != ps->externalEventTime ) {
-		return 10;
+	// only G_AddEvent writes these, never Pmove, so sync instead of comparing
+	for ( n = 0 ; n < NUM_SAVED_STATES; n++ ) {
+		cg.savedPmoveStates[ n ].externalEvent = ps->externalEvent;
+		cg.savedPmoveStates[ n ].externalEventParm = ps->externalEventParm;
+		cg.savedPmoveStates[ n ].externalEventTime = ps->externalEventTime;
 	}
 
 	if ( pps->clientNum != ps->clientNum ||
@@ -926,6 +933,15 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 	}
 
 	for ( i = 0; i < MAX_POWERUPS; i++ ) {
+#ifdef MISSIONPACK
+		// re-stamped with level.time every server frame, so sync instead
+		if ( i >= PW_SCOUT && i <= PW_INVULNERABILITY ) {
+			for ( n = 0 ; n < NUM_SAVED_STATES; n++ ) {
+				cg.savedPmoveStates[ n ].powerups[ i ] = ps->powerups[ i ];
+			}
+			continue;
+		}
+#endif
 		if( pps->powerups[ i ] != ps->powerups[ i ] ) {
 			if ( cg_showmiss.integer > 1 )
 				CG_Printf( "powerups[%i] %i => %i ", i, pps->powerups[i], ps->powerups[i] );
