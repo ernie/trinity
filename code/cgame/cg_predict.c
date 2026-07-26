@@ -676,6 +676,53 @@ static void CG_TouchTriggerPrediction( void ) {
 }
 
 
+/*
+===================
+CG_HealthAfterTick
+
+Health after one tick of the once-a-second timer, mirroring ClientTimerActions.
+Shared by the prediction and the resync check so the two cannot drift apart.
+===================
+*/
+static int CG_HealthAfterTick( const playerState_t *ps ) {
+	int health = ps->stats[ STAT_HEALTH ];
+	int maxhealth;
+
+	// regenerate
+#ifdef MISSIONPACK
+	if ( bg_itemlist[ ps->stats[STAT_PERSISTANT_POWERUP] ].giTag == PW_GUARD ) {
+		maxhealth = ps->stats[ STAT_MAX_HEALTH ] / 2;
+	} else
+#endif
+	if ( ps->powerups[ PW_REGEN ] ) {
+		maxhealth = ps->stats[ STAT_MAX_HEALTH ];
+	} else {
+		maxhealth = 0;
+	}
+
+	if ( maxhealth ) {
+		if ( health < maxhealth ) {
+			health += 15;
+			if ( health > maxhealth * 1.1 ) {
+				health = maxhealth * 1.1;
+			}
+		} else if ( health < maxhealth * 2 ) {
+			health += 5;
+			if ( health > maxhealth * 2 ) {
+				health = maxhealth * 2;
+			}
+		}
+	} else {
+		// count down health when over max
+		if ( health > ps->stats[ STAT_MAX_HEALTH ] ) {
+			health--;
+		}
+	}
+
+	return health;
+}
+
+
 static void CG_CheckTimers( void ) {
 	int i;
 
@@ -695,26 +742,9 @@ static void CG_CheckTimers( void ) {
 	// periodic tasks
 	if ( cg.timeResidual && cg.predictedPlayerState.commandTime >= cg.timeResidual && !cg.thisFrameTeleport ) {
 		cg.timeResidual += 1000;
-		if ( cg.predictedPlayerState.powerups[ PW_REGEN ] ) {
-			int maxhealth = cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ];
-			if ( cg.predictedPlayerState.stats[ STAT_HEALTH ] < maxhealth ) {
-				cg.predictedPlayerState.stats[ STAT_HEALTH ] += 15;
-				if ( cg.predictedPlayerState.stats[ STAT_HEALTH ] > maxhealth * 1.1 ) {
-					cg.predictedPlayerState.stats[ STAT_HEALTH ] = maxhealth * 1.1;
-				}
-				// TODO: add external EV_POWERUP_REGEN
-			} else if ( cg.predictedPlayerState.stats[ STAT_HEALTH ] < maxhealth * 2) {
-				cg.predictedPlayerState.stats[ STAT_HEALTH ] += 5;
-				if ( cg.predictedPlayerState.stats[ STAT_HEALTH ] > maxhealth * 2 ) {
-					cg.predictedPlayerState.stats[ STAT_HEALTH ] = maxhealth * 2;
-				}
-				// TODO: add external EV_POWERUP_REGEN
-			}
-		} else {
-			if ( cg.predictedPlayerState.stats[ STAT_HEALTH ] > cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ] ) {
-				cg.predictedPlayerState.stats[ STAT_HEALTH ]--;
-			}
-		}
+
+		cg.predictedPlayerState.stats[ STAT_HEALTH ] = CG_HealthAfterTick( &cg.predictedPlayerState );
+
 		// count down armor when over max (CPM: tiered armor never decays)
 		if ( !Mode_GetConfig( cgs.mode )->armorTiered
 			&& cg.predictedPlayerState.stats[ STAT_ARMOR ] > cg.predictedPlayerState.stats[ STAT_MAX_HEALTH ] ) {
@@ -865,8 +895,10 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 		return 14;
 	}
 
-	// health countdown?
-	if ( pps->stats[ STAT_HEALTH ] == ps->stats[ STAT_HEALTH ] + 1 && ps->stats[ STAT_HEALTH ] >= ps->stats[ STAT_MAX_HEALTH ] ) {
+	// health timer? one more tick landing on the server's value means we are
+	// simply a tick behind, whether that tick is decay or regeneration
+	if ( pps->stats[ STAT_HEALTH ] != ps->stats[ STAT_HEALTH ]
+		&& CG_HealthAfterTick( pps ) == ps->stats[ STAT_HEALTH ] ) {
 		cg.timeResidual = ps->commandTime + 1000;
 		for ( n = 0 ; n < NUM_SAVED_STATES; n++ ) {
 			cg.savedPmoveStates[ n ].stats[ STAT_HEALTH ] = ps->stats[ STAT_HEALTH ];
@@ -875,7 +907,7 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 	}
 	// armor countdown? (CPM: tiered armor never decays)
 	if ( !Mode_GetConfig( cgs.mode )->armorTiered
-		&& pps->stats[ STAT_ARMOR ] == ps->stats[ STAT_ARMOR ] - 1
+		&& pps->stats[ STAT_ARMOR ] == ps->stats[ STAT_ARMOR ] + 1
 		&& ps->stats[ STAT_ARMOR ] >= ps->stats[ STAT_MAX_HEALTH ] ) {
 		// we may need few frames to sync with client->timeResidual on server side
 		cg.timeResidual = ps->commandTime + 1000;
