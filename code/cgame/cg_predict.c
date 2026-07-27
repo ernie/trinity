@@ -855,7 +855,7 @@ static void CG_CheckTimers( void ) {
 }
 
 
-static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboolean *forceMove ) {
+static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboolean *forceMove, qboolean *resimulate ) {
 	vec3_t delta;
 	int i, n, v0, v1;
  
@@ -982,14 +982,16 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 	}
 
 	// health timer? one more tick landing on the server's value means we are
-	// simply a tick behind, whether that tick is decay or regeneration
+	// simply a tick behind, whether that tick is decay or regeneration.  Take the
+	// server's value for this command only.  The states after it were simulated
+	// from the old one, and depending on where our own tick landed they may
+	// already carry it, so neither assigning nor offsetting a value into them is
+	// right in both cases: re-run their commands instead.
 	if ( pps->stats[ STAT_HEALTH ] != ps->stats[ STAT_HEALTH ]
 		&& CG_HealthAfterTick( pps ) == ps->stats[ STAT_HEALTH ] ) {
 		cg.timeResidual = ps->commandTime + 1000;
-		for ( n = 0 ; n < NUM_SAVED_STATES; n++ ) {
-			cg.savedPmoveStates[ n ].stats[ STAT_HEALTH ] = ps->stats[ STAT_HEALTH ];
-		}
-
+		pps->stats[ STAT_HEALTH ] = ps->stats[ STAT_HEALTH ];
+		*resimulate = qtrue;
 	}
 	// armor countdown? (CPM: tiered armor never decays)
 	if ( !Mode_GetConfig( cgs.mode )->armorTiered
@@ -997,9 +999,8 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 		&& ps->stats[ STAT_ARMOR ] >= ps->stats[ STAT_MAX_HEALTH ] ) {
 		// we may need few frames to sync with client->timeResidual on server side
 		cg.timeResidual = ps->commandTime + 1000;
-		for ( n = 0 ; n < NUM_SAVED_STATES; n++ ) {
-			cg.savedPmoveStates[ n ].stats[ STAT_ARMOR ] = ps->stats[ STAT_ARMOR ];
-		}
+		pps->stats[ STAT_ARMOR ] = ps->stats[ STAT_ARMOR ];
+		*resimulate = qtrue;
 	}
 
 	for( i = 0; i < MAX_STATS; i++ ) {
@@ -1231,6 +1232,7 @@ void CG_PredictPlayerState( void ) {
 			int i;
 			int errorcode;
 			qboolean error = qtrue;
+			qboolean resimulate = qfalse;
 
 			// loop through the saved states queue
 			for( i = cg.stateHead; i != cg.stateTail; i = ( i + 1 ) % NUM_SAVED_STATES ) {
@@ -1240,7 +1242,7 @@ void CG_PredictPlayerState( void ) {
 					continue;
 				}
 				// make sure the state differences are acceptable
-				errorcode = CG_IsUnacceptableError( &cg.predictedPlayerState, &cg.savedPmoveStates[ i ], &moved );
+				errorcode = CG_IsUnacceptableError( &cg.predictedPlayerState, &cg.savedPmoveStates[ i ], &moved, &resimulate );
 				if ( errorcode ) {
 					if( cg_showmiss.integer > 1 )
 						CG_Printf( "errorcode %d at %d\n", errorcode, cg.time );
@@ -1252,8 +1254,10 @@ void CG_PredictPlayerState( void ) {
 				// advance the head
 				cg.stateHead = ( i + 1 ) % NUM_SAVED_STATES;
   
-				// set the next command to predict
-				predictCmd = cg.lastPredictedCommand + 1;
+				// set the next command to predict.  A timer resync corrected the
+				// state this snapshot describes, so everything simulated after it
+				// is stale: run those commands again instead of loading them back
+				predictCmd = resimulate ? 0 : cg.lastPredictedCommand + 1;
   
 				// a saved state matched, so flag it
 				error = qfalse;
