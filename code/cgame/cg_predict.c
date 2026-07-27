@@ -460,8 +460,10 @@ static void CG_AddWeapon( int weapon, int quantity, qboolean dropped )
 	
 	//ammo = quantity;
 
-	// dropped items and teamplay weapons always have full ammo
-	if ( !dropped && cgs.gametype != GT_TEAM ) {
+	if ( quantity < 0 ) {
+		quantity = 0; // None for you, sir! (mapper count -1)
+	} else if ( !dropped && cgs.gametype != GT_TEAM ) {
+		// dropped items and teamplay weapons always have full ammo
 		if ( cg.predictedPlayerState.ammo[ weapon ] < quantity ) {
 			quantity = quantity - cg.predictedPlayerState.ammo[ weapon ];
 		} else {
@@ -547,7 +549,7 @@ static void CG_PickupPrediction( centity_t *cent, const gitem_t *item ) {
 	}
 
 	// health prediction
-	if ( item->giType == IT_HEALTH && quantity > 0 ) {
+	if ( item->giType == IT_HEALTH && quantity != 0 ) {
 		int limit;
 
 #ifdef MISSIONPACK
@@ -576,13 +578,13 @@ static void CG_PickupPrediction( centity_t *cent, const gitem_t *item ) {
 	}
 
 	// ammo prediction
-	if ( item->giType == IT_AMMO && quantity > 0 ) {
+	if ( item->giType == IT_AMMO && quantity != 0 ) {
 		CG_AddAmmo( item->giTag, quantity );
 		return;
 	}
 
 	// weapon prediction
-	if ( item->giType == IT_WEAPON && quantity > 0 ) {
+	if ( item->giType == IT_WEAPON && quantity != 0 ) {
 		CG_AddWeapon( item->giTag, quantity, (cent->currentState.modelindex2 == 1) );
 		return;
 	}
@@ -685,14 +687,6 @@ static void CG_TouchItem( centity_t *cent ) {
 		cent->delaySpawnPlayed = qfalse;
 	}
 	cent->pickupCommandTime = cg_pmove.cmd.serverTime;
-
-	// if it's a weapon, give them some predicted ammo so the autoswitch will work
-	if ( item->giType == IT_WEAPON ) {
-		cg.predictedPlayerState.stats[ STAT_WEAPONS ] |= 1 << item->giTag;
-		if ( !cg.predictedPlayerState.ammo[ item->giTag ] ) {
-			cg.predictedPlayerState.ammo[ item->giTag ] = 1;
-		}
-	}
 }
 
 
