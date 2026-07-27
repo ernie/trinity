@@ -195,6 +195,7 @@ void CG_Respawn( void ) {
 	cg.weaponSelect = cg.snap->ps.weapon;
 
 	cg.timeResidual = cg.snap->ps.commandTime + 1000;
+	cg.tickCommandTime = 0;
 
 	// reset death cam grace period
 	CG_VR_DeathCamReset();

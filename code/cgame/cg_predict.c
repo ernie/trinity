@@ -811,6 +811,7 @@ static int CG_HealthAfterTick( const playerState_t *ps ) {
 
 static void CG_CheckTimers( void ) {
 	int i;
+	qboolean tick;
 
 	// no prediction for spectators
 	if ( cg.predictedPlayerState.pm_type == PM_SPECTATOR ) {
@@ -825,10 +826,25 @@ static void CG_CheckTimers( void ) {
 	if ( cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 )
 		return;
 
-	// periodic tasks
+	// periodic tasks.  A re-predict replays the command this ran on, but
+	// cg.timeResidual is not part of the playerstate and does not roll back with
+	// it, so the tick would simply vanish: record the command that ticked and
+	// re-apply it there, the way pickupCommandTime re-applies a taken item.  The
+	// health test refuses a record the snapshot has already accounted for; losing
+	// the tick is the old behavior, applying it twice would be worse.
+	tick = qfalse;
 	if ( cg.timeResidual && cg.predictedPlayerState.commandTime >= cg.timeResidual && !cg.thisFrameTeleport ) {
 		cg.timeResidual += 1000;
+		cg.tickCommandTime = cg.predictedPlayerState.commandTime;
+		cg.tickHealth = cg.predictedPlayerState.stats[ STAT_HEALTH ];
+		tick = qtrue;
+	} else if ( cg.tickCommandTime
+		&& cg.predictedPlayerState.commandTime == cg.tickCommandTime
+		&& cg.predictedPlayerState.stats[ STAT_HEALTH ] == cg.tickHealth ) {
+		tick = qtrue;	// replaying the command that ticked
+	}
 
+	if ( tick ) {
 		cg.predictedPlayerState.stats[ STAT_HEALTH ] = CG_HealthAfterTick( &cg.predictedPlayerState );
 
 		// count down armor when over max (CPM: tiered armor never decays)
@@ -990,6 +1006,7 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 	if ( pps->stats[ STAT_HEALTH ] != ps->stats[ STAT_HEALTH ]
 		&& CG_HealthAfterTick( pps ) == ps->stats[ STAT_HEALTH ] ) {
 		cg.timeResidual = ps->commandTime + 1000;
+		cg.tickCommandTime = 0;		// the snapshot carries this tick now
 		pps->stats[ STAT_HEALTH ] = ps->stats[ STAT_HEALTH ];
 		*resimulate = qtrue;
 	}
@@ -999,6 +1016,7 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 		&& ps->stats[ STAT_ARMOR ] >= ps->stats[ STAT_MAX_HEALTH ] ) {
 		// we may need few frames to sync with client->timeResidual on server side
 		cg.timeResidual = ps->commandTime + 1000;
+		cg.tickCommandTime = 0;		// the snapshot carries this tick now
 		pps->stats[ STAT_ARMOR ] = ps->stats[ STAT_ARMOR ];
 		*resimulate = qtrue;
 	}
@@ -1181,6 +1199,7 @@ void CG_PredictPlayerState( void ) {
 	// the snapshot already has it, so re-anchor instead of replaying it
 	if ( cg.timeResidual && cg.time - cg.oldTime > 500 ) {
 		cg.timeResidual = cg.predictedPlayerState.commandTime + 1000;
+		cg.tickCommandTime = 0;
 	}
 
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;

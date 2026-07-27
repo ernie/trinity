@@ -727,6 +727,8 @@ typedef struct {
 
 	int				meanPing;
 	int				timeResidual;
+	int				tickCommandTime;	// usercmd the once-a-second timer ran on, so a replay can re-apply it
+	int				tickHealth;			// health it ran on, so a record the snapshot already covers is refused
 	int				allowPickupPrediction;
 
 	int				followTime;
