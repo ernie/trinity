@@ -207,10 +207,9 @@ CG_CheckPlayerstateEvents
 ==============
 */
 extern int		eventStack;
-extern int		eventParm2[ MAX_PREDICTED_EVENTS ];
 
 static void CG_CheckPlayerstateEvents( const playerState_t *ps, const playerState_t *ops ) {
-	int			i, n;
+	int			i;
 	int			event;
 	centity_t	*cent;
 
@@ -222,8 +221,6 @@ static void CG_CheckPlayerstateEvents( const playerState_t *ps, const playerStat
 	}
 
 	cent = &cg.predictedPlayerEntity; // cg_entities[ ps->clientNum ];
-	n = eventStack - MAX_PS_EVENTS;
-	if ( n < 0 ) n  = 0;
 	// go through the predictable events buffer
 	for ( i = ps->eventSequence - MAX_PS_EVENTS ; i < ps->eventSequence ; i++ ) {
 		// if we have a new predictable event
@@ -238,9 +235,9 @@ static void CG_CheckPlayerstateEvents( const playerState_t *ps, const playerStat
 			cent->currentState.event = event;
 			cent->currentState.eventParm = ps->eventParms[ i & (MAX_PS_EVENTS-1) ];
 
-			CG_EntityEvent( cent, cent->lerpOrigin, eventParm2[ n++ ] );
-
-			cg.predictableEvents[ i & (MAX_PREDICTED_EVENTS-1) ] = event;
+			// i is this event's own sequence number, which is how the entity we
+			// predicted it against is recorded
+			CG_EntityEvent( cent, cent->lerpOrigin, CG_PredictedEventEntity( i ) );
 
 			cg.eventSequence++;
 		}

@@ -547,7 +547,6 @@ typedef struct {
 	vec3_t		predictedError;
 
 	int			eventSequence;
-	int			predictableEvents[MAX_PREDICTED_EVENTS];
 
 	float		stepChange;				// for stair up smoothing
 	int			stepTime;
@@ -1474,6 +1473,8 @@ void CG_PredictPlayerState( void );
 void CG_LoadDeferredPlayers( void );
 
 void CG_PlayDroppedEvents( playerState_t *ps, playerState_t *ops );
+void CG_ClearPredictedEvents( void );
+int CG_PredictedEventEntity( int eventSequence );
 
 //
 // cg_events.c

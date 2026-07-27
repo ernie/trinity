@@ -1993,6 +1993,7 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	memset( cg_entities, 0, sizeof(cg_entities) );
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );
+	CG_ClearPredictedEvents();
 
 	CG_VR_DeathCamReset();
 	cgs.voteCaller = -1;

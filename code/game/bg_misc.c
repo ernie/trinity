@@ -1276,7 +1276,7 @@ Handles the sequence numbers
 ===============
 */
 #ifdef CGAME
-void CG_StoreEvent( entity_event_t ev, int eventParm, int entityNum );
+void CG_StoreEvent( entity_event_t ev, int eventParm, int entityNum, int eventSequence );
 #endif
 
 void	trap_Cvar_VariableStringBuffer( const char *var_name, char *buffer, int bufsize );
@@ -1298,9 +1298,10 @@ void BG_AddPredictableEventToPlayerstate( entity_event_t newEvent, int eventParm
 #endif
 
 #ifdef CGAME
-	CG_StoreEvent( newEvent, eventParm, entityNum );
+	// the sequence about to be assigned below is what identifies this event later
+	CG_StoreEvent( newEvent, eventParm, entityNum, ps->eventSequence );
 #endif
-	
+
 	ps->events[ps->eventSequence & (MAX_PS_EVENTS-1)] = newEvent;
 	ps->eventParms[ps->eventSequence & (MAX_PS_EVENTS-1)] = eventParm;
 	ps->eventSequence++;

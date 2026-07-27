@@ -249,9 +249,60 @@ static void CG_InterpolatePlayerState( qboolean grabAngles ) {
 int				eventStack;
 entity_event_t	events[ MAX_PREDICTED_EVENTS ];
 int				eventParms[ MAX_PREDICTED_EVENTS ];
-int				eventParm2[ MAX_PREDICTED_EVENTS ]; // client entity index
+int				eventSeqs[ MAX_PREDICTED_EVENTS ];	// playerstate sequence of each stacked event
+
+// The entity an event was predicted against, keyed on the event's own
+// playerstate sequence.  The sequence is the only identifier the client and the
+// server agree on, and a stale slot identifies itself by holding a different
+// one, so an event this client never predicted cannot borrow another's entity.
+typedef struct {
+	int		sequence;
+	int		entityNum;
+} predictedEvent_t;
+
+static predictedEvent_t	predictedEvents[ MAX_PREDICTED_EVENTS ];
 
 void CG_AddFallDamage( int damage );
+
+/*
+===================
+CG_ClearPredictedEvents
+
+Nothing has been predicted yet.  Sequence 0 is a real event number, so the
+records cannot be left zeroed.
+===================
+*/
+void CG_ClearPredictedEvents( void ) {
+	int		i;
+
+	for ( i = 0; i < MAX_PREDICTED_EVENTS; i++ ) {
+		predictedEvents[ i ].sequence = -1;
+		predictedEvents[ i ].entityNum = -1;
+	}
+}
+
+
+/*
+===================
+CG_PredictedEventEntity
+
+The entity this client predicted the event at eventSequence against, or -1 for
+an event it predicted no entity for: anything the server authored, and anything
+predicted long enough ago that its record has been overwritten.  Both mean the
+same thing to a caller - no record, so nothing has been sounded for it here.
+===================
+*/
+int CG_PredictedEventEntity( int eventSequence ) {
+	const predictedEvent_t	*rec;
+
+	rec = &predictedEvents[ eventSequence & ( MAX_PREDICTED_EVENTS - 1 ) ];
+	if ( rec->sequence != eventSequence ) {
+		return -1;
+	}
+
+	return rec->entityNum;
+}
+
 
 /*
 ===================
@@ -260,8 +311,16 @@ CG_StoreEvents
 Save events that may be dropped during prediction
 ===================
 */
-void CG_StoreEvent( entity_event_t evt, int eventParm, int entityNum )
+void CG_StoreEvent( entity_event_t evt, int eventParm, int entityNum, int eventSequence )
 {
+	predictedEvent_t	*rec;
+
+	// record the entity before the stack test: the stack fills up within a single
+	// prediction pass, but the record has to outlive the pass that wrote it
+	rec = &predictedEvents[ eventSequence & ( MAX_PREDICTED_EVENTS - 1 ) ];
+	rec->sequence = eventSequence;
+	rec->entityNum = entityNum;
+
 	if ( eventStack >= MAX_PREDICTED_EVENTS )
 		return;
 
@@ -273,7 +332,7 @@ void CG_StoreEvent( entity_event_t evt, int eventParm, int entityNum )
 
 	events[ eventStack ] = evt;
 	eventParms[ eventStack ] = eventParm;
-	eventParm2[ eventStack ] = entityNum;
+	eventSeqs[ eventStack ] = eventSequence;
 	eventStack++;
 }
 
@@ -302,13 +361,19 @@ void CG_PlayDroppedEvents( playerState_t *ps, playerState_t *ops ) {
 	oldParam = cent->currentState.eventParm;
 
 	for ( i = 0; i < eventStack - MAX_PS_EVENTS ; i++ ) {
+		// a re-predict re-adds the events of every command it replays, and this
+		// stack cannot tell those from new ones.  cg.eventSequence is what cgame
+		// has already played, so anything below it has been heard once already
+		if ( eventSeqs[ i ] < cg.eventSequence ) {
+			continue;
+		}
 		cent->currentState.event = events[ i ];
 		cent->currentState.eventParm = eventParms[ i ];
 		if ( cg_showmiss.integer ) 
 		{
 			CG_Printf( "Playing dropped event: %s %i\n", eventnames[ events[ i ] ], eventParms[ i ] );
 		}
-		CG_EntityEvent( cent, cent->lerpOrigin, eventParm2[ i ] );
+		CG_EntityEvent( cent, cent->lerpOrigin, CG_PredictedEventEntity( eventSeqs[ i ] ) );
 		cg.eventSequence++;
 	}
 

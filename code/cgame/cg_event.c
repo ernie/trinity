@@ -536,6 +536,35 @@ void CG_PainEvent( centity_t *cent, int health ) {
 
 /*
 ==============
+CG_PredictedPickupEntity
+
+The item entity a pickup event was predicted against, or NULL when this client
+predicted no pickup for it.  entityNum comes from the playerstate event paths,
+which resolve it through the event's own sequence; every other caller passes -1,
+so another player's pickup can never match one of ours.
+
+The type test covers a recycled entity number: modelindex means something else
+on anything but an item, and nothing about a reused slot belongs to this event.
+==============
+*/
+static centity_t *CG_PredictedPickupEntity( int entityNum, int itemIndex ) {
+	centity_t	*ce;
+
+	if ( entityNum < 0 ) {
+		return NULL;
+	}
+
+	ce = cg_entities + entityNum;
+	if ( ce->currentState.eType != ET_ITEM || ce->currentState.modelindex != itemIndex ) {
+		return NULL;
+	}
+
+	return ce;
+}
+
+
+/*
+==============
 CG_EntityEvent
 
 An entity has an event value
@@ -780,14 +809,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 				break;
 			}
 
-			if ( entityNum >= 0 ) {
-				// our predicted entity
-				ce = cg_entities + entityNum;
-				if ( ce->delaySpawn > cg.time && ce->delaySpawnPlayed ) {
-					break; // delay item pickup
-				}
-			} else {
-				ce = NULL;
+			ce = CG_PredictedPickupEntity( entityNum, index );
+			if ( ce && ce->delaySpawn > cg.time && ce->delaySpawnPlayed ) {
+				break;	// already sounded when we predicted it
 			}
 
 			item = &bg_itemlist[ index ];
@@ -842,14 +866,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 				break;
 			}
 
-			if ( entityNum >= 0 ) {
-				// our predicted entity
-				ce = cg_entities + entityNum;
-				if ( ce->delaySpawn > cg.time && ce->delaySpawnPlayed ) {
-					break;
-				}
-			} else {
-				ce = NULL;
+			ce = CG_PredictedPickupEntity( entityNum, index );
+			if ( ce && ce->delaySpawn > cg.time && ce->delaySpawnPlayed ) {
+				break;
 			}
 
 			item = &bg_itemlist[ index ];
