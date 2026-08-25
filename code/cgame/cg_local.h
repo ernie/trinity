@@ -123,23 +123,6 @@
 #define GRAPPLE_DLIGHT_RADIUS_AMP	0.0f
 #define GRAPPLE_DLIGHT_PULSE_HZ		2.5f
 
-// the launcher and pad md3s ship at 1.2x the space the model-space constants
-// here and the arc geometry in cg_weapons.c are measured in; scaled at use so
-// every measured value keeps reading against the authored model
-#define GRAPPLE_MD3_SCALE	1.2f
-// the launcher's scale pivots on its grip x and its belly line z, not its
-// origin: a uniform scale can't keep both of a two-handed model's fists on
-// the gun, so each axis pins what its fist reads against - the rear fist the
-// grip post, the front fist the belly it cups.  A gun-space point maps as
-// p * SCALE + PIVOT * (1 - SCALE).  The pad still scales about its origin -
-// its origin rides the impact point
-#define GRAPPLE_GUN_PIVOT_X	-6.2f
-#define GRAPPLE_GUN_PIVOT_Z	-0.5f
-// seats the launcher forward of the mount in a wielder's fists (body draws
-// only - the view weapon frames through cg_gun_x instead); every attachment
-// (arcs, stow, tether feed) hangs off the gun refent, so they ride along
-#define GRAPPLE_GUN_SEAT_FWD	1.0f
-
 // SnapVectorTowards rounds the impact point toward the shooter, so the pad
 // lands a unit clear of what it hit; push it back along its own axis. Shared
 // by the anchored draw (cg_ents.c) and the fall spawn (cg_localents.c) so the
@@ -148,7 +131,11 @@
 
 // wall-bite scar half-width; the mark texture is painted to this same world
 // scale, so changing one without the other slides the gouges off the claws
-#define GRAPPLE_PAD_MARK_RADIUS	( 10 * GRAPPLE_MD3_SCALE )
+#define GRAPPLE_PAD_MARK_RADIUS	12
+
+// distinct scar art rather than rotations of one: the orientation is solved
+// onto the pad's rolled axes, so any spin walks the gouges off the claws
+#define GRAPPLE_PAD_MARK_VARIANTS	3
 
 // rolled about its line of travel in flight so it reads as gyroscopically
 // held; g_missile.c stamps s.time at impact so the anchored draw can pick up
@@ -169,6 +156,9 @@
 #define PAD_FALL_BOUNCE		0.25f	// restitution: a heavy chunk of machinery
 									//   hops once, modestly, and never litters
 #define PAD_FALL_SPIN_DAMP	0.5f	// spin kept per ground contact
+// contact speed that earns the hard landing; below it a floor contact's
+// rebound is under what CG_ReflectVelocity lets hop
+#define PAD_FALL_CLANK_SPEED	150
 #define PAD_FALL_DRIFT_MIN	20		// u/s of world-horizontal slide at release:
 #define PAD_FALL_DRIFT_MAX	60		//   the claws never let go on the same frame
 // the claws clear the rim by ~7.6 units, so modest deg/s already reads as
@@ -179,23 +169,25 @@
 #define PAD_FALL_SETTLE		600		// ms easing the nose toward straight down
 #define PAD_FALL_TIME		1250	// ms before it is gone; long enough to watch
 									//   it actually drop and bounce, not a blink
-#define PAD_FALL_HOLD		0.8f	// fraction at full alpha first
+#define PAD_FALL_HOLD		0.6f	// fraction at full alpha first; the
+									//   remainder is the dissolve
 
 // the pad materializes on the dock after a release (GRAPPLE_RELOAD)
-#define PAD_SEAT_TIME		330		// ms from release to seated
+#define PAD_SEAT_TIME		660		// ms from release to seated
 // 1.00 = fade-only, no growth; below 1.00 it grows from the boss
 #define PAD_SEAT_SCALE0		1.00f	// scale it grows from
 // no PAD_SEAT_CURVE: the intended 1.6 ease is baked as seat*sqrt(seat),
 // since pow() is not in the QVM libc
-#define PAD_SEAT_ALPHA		0.40f	// fraction of the window alpha finishes in; the
-									// claw fold is ease-out and front-loaded, so a
-									// late finish plays most of it translucent
+// the dissolve spans the whole window: what has arrived is already opaque, so
+// the spin and the fold read through it instead of waiting it out
+#define PAD_SEAT_ALPHA		1.00f	// fraction of the window the dissolve spans
+// must stay below PAD_SEAT_ALPHA, or the fold's remap divides by zero
+#define PAD_SEAT_FOLD		0.40f	// fraction of the window before the fold
 #define PAD_SEAT_SPIN		180		// deg the pad unwinds through as it forms
 #define PAD_SEAT_ARC_SPIKE	1.00f	// arc density push while seating
 #define PAD_SEAT_RESET		500		// ms gap that means a restart or a seek
 #define PAD_SEAT_FIRE_BOOST	3.0f	// ramp multiplier once the pad has launched
-#define PAD_BOSS_X0			( -3.80f * GRAPPLE_MD3_SCALE )	// the boss nose plane;
-										//   the seat scale pivots here
+#define PAD_BOSS_X0			-4.56f	// the boss nose plane; the seat scale pivots here
 
 typedef enum {
 	FOOTSTEP_NORMAL,
@@ -356,7 +348,7 @@ typedef enum {
 typedef enum {
 	LEF_PUFF_DONT_SCALE  = 0x0001,			// do not scale size over time
 	LEF_TUMBLE			 = 0x0002,			// tumble over time, used for ejecting shells
-	LEF_SOUND1			 = 0x0004,			// sound 1 for kamikaze
+	LEF_SOUND1			 = 0x0004,			// a once-only sound has played (kamikaze, the fallen pad)
 	LEF_SOUND2			 = 0x0008,			// sound 2 for kamikaze
 	LEF_NO_MARK			 = 0x0010,			// blood particle: do not leave a mark on impact
 	LEF_BLOOD_TRAIL		 = 0x0020			// gib trails blood across bounces (modern)
@@ -967,6 +959,7 @@ typedef struct {
 	qhandle_t	grapplePadFlyShader;
 	qhandle_t	grapplePadPullShader;
 	qhandle_t	grapplePadFadeShader;
+	qhandle_t	grapplePadUnformShader;
 
 	qhandle_t	friendShader;
 
@@ -1016,7 +1009,7 @@ typedef struct {
 	qhandle_t	burnMarkShader;
 	qhandle_t	holeMarkShader;
 	qhandle_t	energyMarkShader;
-	qhandle_t	grappleMarkShader;
+	qhandle_t	grappleMarkShader[GRAPPLE_PAD_MARK_VARIANTS];
 
 	// powerup shaders
 	qhandle_t	quadShader;
@@ -1108,8 +1101,8 @@ typedef struct {
 	sfxHandle_t	sfx_grapplebite;	// into a player; the world path is sfx_grapplehit
 	sfxHandle_t	sfx_grapplefree;	// the claw drawing out of a wall
 	sfxHandle_t	sfx_grappleseat;	// the pad reforming on the nose
-	sfxHandle_t	sfx_grappleclank;	// a released pad hits and hops
-	sfxHandle_t	sfx_grapplesettle;	// ...or comes to rest
+	sfxHandle_t	sfx_grappleclank[2];	// a released pad landing, soft then hard by contact speed
+	sfxHandle_t	sfx_grappleunform;	// ...and comes apart
 	sfxHandle_t	sfx_grapplearc[3];	// filament ignitions, faint to brightest
 	sfxHandle_t	sfx_ric1;
 	sfxHandle_t	sfx_ric2;
@@ -1623,7 +1616,7 @@ void CG_GrappleHookAxis( const centity_t *cent, vec3_t axis[3] );
 void CG_GrapplePadAnchorAxis( const vec3_t angles, int stamp, int num,
 		vec3_t axis[3] );
 void CG_AxisToAngles( vec3_t axis[3], vec3_t angles );
-void CG_GrapplePadMark( const vec3_t origin, vec3_t axis[3],
+void CG_GrapplePadMark( const vec3_t origin, vec3_t axis[3], int stamp, int num,
 		qboolean temporary );
 
 // grapple_pad.md3 poses: arms folded back along the body only after the
@@ -1673,6 +1666,8 @@ void CG_GrappleResetState( void );
 float CG_GrappleDlightScale( void );
 float CG_GrappleDlightRadius( float base );
 void CG_GrappleFade( byte *rgba, float pulse );
+void CG_GrapplePadForm( byte *rgba, float t );
+void CG_GrapplePadUnform( byte *rgba, float t );
 void CG_AddViewWeapon (playerState_t *ps);
 void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent, int team );
 void CG_DrawWeaponSelect( void );

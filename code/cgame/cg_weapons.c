@@ -862,6 +862,71 @@ void CG_GrappleFade( byte *rgba, float pulse ) {
 	rgba[2] = (byte)( rgba[2] * pulse );
 }
 
+// emission peak at the halfway point, so it reads as assembled, not faded in
+#define PAD_FORM_OVERSHOOT	1.55f
+
+/*
+==========================
+CG_GrapplePadRamp
+
+Both channels the pad transition shaders read, from one progress value: 0 is
+gone, 1 is fully there. Alpha is a dissolve threshold, not an opacity --
+alphaFunc tests texture alpha times alphaGen entity, so the ramp is packed
+into 128..255 and swept there; a full-range ramp is only half sweepable.
+==========================
+*/
+static void CG_GrapplePadRamp( byte *rgba, float t, qboolean unform ) {
+	float	env, room;
+	int		i, top;
+
+	if ( t < 0.0f ) {
+		t = 0.0f;
+	} else if ( t > 1.0f ) {
+		t = 1.0f;
+	}
+
+	if ( t < 0.5f ) {
+		env = ( t / 0.5f ) * PAD_FORM_OVERSHOOT;
+	} else {
+		env = PAD_FORM_OVERSHOOT
+			+ ( 1.0f - PAD_FORM_OVERSHOOT ) * ( ( t - 0.5f ) / 0.5f );
+	}
+
+	top = rgba[0];
+	if ( rgba[1] > top ) {
+		top = rgba[1];
+	}
+	if ( rgba[2] > top ) {
+		top = rgba[2];
+	}
+	// cap the gain at the brightest channel's headroom; clamping per channel
+	// would let the dim ones keep climbing and walk the hue toward white
+	if ( top > 0 ) {
+		room = 255.0f / top;
+		if ( env > room ) {
+			env = room;
+		}
+	}
+
+	for ( i = 0 ; i < 3 ; i++ ) {
+		rgba[i] = (byte)( rgba[i] * env );
+	}
+	// pad_unform inverts the alphaFunc rather than the ramp, so both sweep
+	// 128 up to 255 and it is t that flips here
+	if ( unform ) {
+		t = 1.0f - t;
+	}
+	rgba[3] = (byte)( 128 + t * 127.0f );
+}
+
+void CG_GrapplePadForm( byte *rgba, float t ) {
+	CG_GrapplePadRamp( rgba, t, qfalse );
+}
+
+void CG_GrapplePadUnform( byte *rgba, float t ) {
+	CG_GrapplePadRamp( rgba, t, qtrue );
+}
+
 // how far each end buries into what it meets, so neither reads as a gap close
 // up. Pad: just past its rear boss, or the cable spears into the puck's middle.
 // Launcher: shallow, since the solid emitter face has no bore to sink into
@@ -1052,27 +1117,25 @@ wash.
 No cull, like CG_GrappleTrail, so a segment sighted end-on thins to nothing.
 ==========================
 */
-// the three lit channels and the rail edge over each, measured off the gun
-// model's authored space - GRAPPLE_MD3_SCALE maps the finished polyline onto
-// the shipped model at the transform below
+// the three lit channels and the rail edge over each, measured off the gun model
 //   { floor center y, z, the floor's own across direction y, z,
 //     center y of the rail edge above it, half its run }
 static const float arcChannel[3][6] = {
-	{  0.000f, 2.772f, -1.0000f,  0.0000f,  0.00f, 0.50f },	// top flat
-	{  0.829f, 2.429f, -0.7071f,  0.7071f,  0.42f, 0.13f },	// +y upper facet
-	{ -0.829f, 2.429f, -0.7071f, -0.7071f, -0.42f, 0.13f }	// -y upper facet
+	{  0.0000f, 3.3264f, -1.0000f,  0.0000f,  0.000f, 0.600f },	// top flat
+	{  0.9948f, 2.9148f, -0.7071f,  0.7071f,  0.504f, 0.156f },	// +y upper facet
+	{ -0.9948f, 2.9148f, -0.7071f, -0.7071f, -0.504f, 0.156f }	// -y upper facet
 };
 
-#define ARC_RAIL_Z			3.30f		// rail beam underside, the shroud above
-#define ARC_FOOT_HALF		0.28f		// across the lit floor, inside its 0.30
+#define ARC_RAIL_Z			3.96f		// rail beam underside, the shroud above
+#define ARC_FOOT_HALF		0.336f		// across the lit floor, inside its 0.36
 
-// x windows the two feet wander in.  The lit floor runs 6.64-11.16 and the
-// beam's underside 7.00-10.70; both are pulled a hair inside, so a foot that
+// x windows the two feet wander in.  The lit floor runs 9.97-15.39 and the
+// beam's underside 10.40-14.84; both are pulled a hair inside, so a foot that
 // slides the whole way still ends on glass / on metal
-#define ARC_FOOT_X0			6.70f
-#define ARC_FOOT_X1			11.10f
-#define ARC_RAIL_X0			7.10f
-#define ARC_RAIL_X1			10.60f
+#define ARC_FOOT_X0			10.04f
+#define ARC_FOOT_X1			15.32f
+#define ARC_RAIL_X0			10.52f
+#define ARC_RAIL_X1			14.72f
 
 // the head's x pairs to the foot's, or back-to-front diagonals become the
 // common case instead of the rare one. Reach is the PRODUCT of four uniform
@@ -1090,13 +1153,13 @@ static const float arcChannel[3][6] = {
 #define ARC_LIFE_MAX		340			//    instance inside this window
 #define ARC_DELAY			190			// latest it may ignite in its cycle;
 										//    + LIFE_MAX must stay under CYCLE
-#define ARC_TRAVEL			9.0f		// units/sec a foot slides along its edge
+#define ARC_TRAVEL			10.8f		// units/sec a foot slides along its edge
 #define ARC_TRAVEL_MIN		0.35f		// ...and the slowest share of that
-#define ARC_ARCH			0.30f		// how far the first node lifts off the
+#define ARC_ARCH			0.36f		// how far the first node lifts off the
 										//    floor along the facet's own normal
-#define ARC_KINK			0.13f		// wander at the interior points
+#define ARC_KINK			0.156f		// wander at the interior points
 #define ARC_JAG_STEPS		3			// times the jag re-hashes over a life
-#define ARC_HALF_WIDTH		0.085f
+#define ARC_HALF_WIDTH		0.102f
 #define ARC_ALPHA			0.85f
 
 // two passes on the same polyline: a wide halo in the owner's color and a thin
@@ -1515,7 +1578,7 @@ static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 	vec3_t		pt[ARC_SEGMENTS + 1];
 	vec3_t		bowDir, jagDir, p;
 	const arcFactors_t	*fac;
-	float		gate, u, d, dLit, off, bow, jw, f;
+	float		r, gate, u, d, dLit, off, bow, jw, f;
 	float		haloAlpha, coreAlpha, ramp, density;
 	float		travel, dMin, dMax, bias, x;
 	int			i, s, c, m, salt, t, gen, tin, delay, ms, tLit, js, k;
@@ -1550,8 +1613,8 @@ static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 		gen = t / ARC_CYCLE;
 		tin = t - gen * ARC_CYCLE;
 
-		gate = ( density + ARC_GATE_BAND * 0.5f - CG_ArcRandom( gen, salt ) )
-			* ( 1.0f / ARC_GATE_BAND );
+		r = CG_ArcRandom( gen, salt );
+		gate = ( density + ARC_GATE_BAND * 0.5f - r ) * ( 1.0f / ARC_GATE_BAND );
 		if ( gate <= 0.0f ) {
 			continue;
 		}
@@ -1611,17 +1674,17 @@ static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 			continue;
 		}
 
-		// CG_TetherArcs runs once a frame under CG_AddPacketEntities; the core
-		// arcs run per view, and firing this from there would double every
-		// ignition on a map with a mirror.  The hash that sets the filament's
-		// brightness picks the sample, so the loudest crackle is the brightest
-		// arc and every witness agrees without syncing.
+		// once a frame here, never from the per-view core arcs, or a mirror
+		// doubles every ignition.  The gate hash ranks brightness too: the
+		// deepest third gets the tear, the fading edge the tick
 		if ( clientNum >= 0 && clientNum < MAX_CLIENTS
 				&& cg_tetherArcGen[ clientNum ][ i ] != gen ) {
-			int	pick = (int)( CG_ArcRandom( gen, salt + 3 ) * 3.0f );
+			int	pick = 2 - (int)( r * 3.0f / ( density + ARC_GATE_BAND * 0.5f ) );
 
 			cg_tetherArcGen[ clientNum ][ i ] = gen;
-			if ( pick > 2 ) {
+			if ( pick < 0 ) {
+				pick = 0;
+			} else if ( pick > 2 ) {
 				pick = 2;
 			}
 			if ( cgs.media.sfx_grapplearc[ pick ] ) {
@@ -1717,8 +1780,7 @@ static void CG_GrappleCoreArcs( const refEntity_t *gun, int clientNum, int act,
 	coreTint[3] = 255;
 
 	// the axis carries the model's scale, so filaments stay in proportion
-	hw = ARC_HALF_WIDTH * ARC_HALO_WIDTH_MULT * GRAPPLE_MD3_SCALE
-		* VectorLength( gun->axis[0] );
+	hw = ARC_HALF_WIDTH * ARC_HALO_WIDTH_MULT * VectorLength( gun->axis[0] );
 	coreHw = hw * ARC_CORE_WIDTH_FRAC;
 
 	// only brightness softens its coupling to the sound envelope, so pulling
@@ -1838,9 +1900,6 @@ static void CG_GrappleCoreArcs( const refEntity_t *gun, int clientNum, int act,
 				p[1] += kink[1] * chan[2];
 				p[2] += kink[1] * chan[3];
 			}
-			VectorScale( p, GRAPPLE_MD3_SCALE, p );
-			p[0] += GRAPPLE_GUN_PIVOT_X * ( 1.0f - GRAPPLE_MD3_SCALE );
-			p[2] += GRAPPLE_GUN_PIVOT_Z * ( 1.0f - GRAPPLE_MD3_SCALE );
 			VectorCopy( gun->origin, pt[s] );
 			for ( k = 0; k < 3; k++ ) {
 				VectorMA( pt[s], p[k], gun->axis[k], pt[s] );
@@ -1984,8 +2043,9 @@ void CG_RegisterWeapon( int weaponNum ) {
 		cgs.media.sfx_grapplebite = trap_S_RegisterSound( "sound/weapons/grapple/grbite.wav", qfalse );
 		cgs.media.sfx_grapplefree = trap_S_RegisterSound( "sound/weapons/grapple/grfree.wav", qfalse );
 		cgs.media.sfx_grappleseat = trap_S_RegisterSound( "sound/weapons/grapple/grseat.wav", qfalse );
-		cgs.media.sfx_grappleclank = trap_S_RegisterSound( "sound/weapons/grapple/grclank.wav", qfalse );
-		cgs.media.sfx_grapplesettle = trap_S_RegisterSound( "sound/weapons/grapple/grsettle.wav", qfalse );
+		cgs.media.sfx_grappleclank[0] = trap_S_RegisterSound( "sound/weapons/grapple/grclank1.wav", qfalse );
+		cgs.media.sfx_grappleclank[1] = trap_S_RegisterSound( "sound/weapons/grapple/grclank2.wav", qfalse );
+		cgs.media.sfx_grappleunform = trap_S_RegisterSound( "sound/weapons/grapple/grunform.wav", qfalse );
 		cgs.media.sfx_grapplearc[0] = trap_S_RegisterSound( "sound/weapons/grapple/arc_tick.wav", qfalse );
 		cgs.media.sfx_grapplearc[1] = trap_S_RegisterSound( "sound/weapons/grapple/arc_zap.wav", qfalse );
 		cgs.media.sfx_grapplearc[2] = trap_S_RegisterSound( "sound/weapons/grapple/arc_tear.wav", qfalse );
@@ -1997,6 +2057,7 @@ void CG_RegisterWeapon( int weaponNum ) {
 		cgs.media.grapplePadFlyShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_fly" );
 		cgs.media.grapplePadPullShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_pull" );
 		cgs.media.grapplePadFadeShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_fade" );
+		cgs.media.grapplePadUnformShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_unform" );
 
 		// all three are read at frame 0 wherever they are used, so they can
 		// never change: lerp them once instead of three times a frame
@@ -2659,9 +2720,6 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	}
 
 	CG_PositionEntityOnTag( &gun, parent, parent->hModel, "tag_weapon");
-	if ( weaponNum == WP_GRAPPLING_HOOK && !ps ) {
-		VectorMA( gun.origin, GRAPPLE_GUN_SEAT_FWD, gun.axis[0], gun.origin );
-	}
 
 	CG_AddWeaponWithPowerups( &gun, cent->currentState.powerups );
 
@@ -2675,7 +2733,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	if ( weaponNum == WP_GRAPPLING_HOOK
 			&& ( polyFxTrap || !( gun.renderfx & RF_THIRD_PERSON ) )
 			&& !( cent->currentState.powerups & ( 1 << PW_INVIS ) )
-			// filaments are 0.1u wide: sub-pixel past a few hundred units
+			// filaments are 0.2u wide: sub-pixel past a few hundred units
 			&& ( ( gun.renderfx & RF_FIRST_PERSON )
 				|| DistanceSquared( gun.origin, cg.refdef.vieworg ) < 256 * 256 ) ) {
 		CG_GrappleCoreArcs( &gun, cent->currentState.clientNum, grappleAct,
@@ -2811,14 +2869,10 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			RotatePointAroundVector( hook.axis[1], fwd, t1, roll );
 			RotatePointAroundVector( hook.axis[2], fwd, t2, roll );
 
-			// the claws hold the splay they last clamped with through the
-			// fade and fold to the stow pose only once it lands: the fold is
-			// the seat's one readable motion, so it plays fully opaque. The
-			// roll's cubic ease-out, remapped onto the post-fade remainder
-			// of the window. Stepped a frame at a time like the fall
-			// retract, so the rigid blades never lerp across more than one
-			// authored step
-			cf = ( seat - PAD_SEAT_ALPHA ) / ( 1.0f - PAD_SEAT_ALPHA );
+			// the claws hold their last clamp splay, then fold to stow;
+			// stepped a frame at a time so the rigid blades never lerp
+			// across more than one authored step
+			cf = ( seat - PAD_SEAT_FOLD ) / ( 1.0f - PAD_SEAT_FOLD );
 			if ( cf < 0 ) {
 				cf = 0;
 			}
@@ -2846,13 +2900,9 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			if ( a > 1.0f ) {
 				a = 1.0f;
 			}
-			// pad_fade's additive energy stages (glow/nrg1-3) read entity RGB,
-			// not entity alpha, for their strength; ramp both or the claws
-			// (which those stages cover) show up at full brightness at once
-			hook.shaderRGBA.rgba[0] = (byte)( hook.shaderRGBA.rgba[0] * a );
-			hook.shaderRGBA.rgba[1] = (byte)( hook.shaderRGBA.rgba[1] * a );
-			hook.shaderRGBA.rgba[2] = (byte)( hook.shaderRGBA.rgba[2] * a );
-			hook.shaderRGBA.rgba[3] = a * 0xff;
+			// pad_fade reads entity RGB for its energy stages and entity alpha
+			// as the dissolve threshold; one call has to drive both
+			CG_GrapplePadForm( hook.shaderRGBA.rgba, a );
 
 			// condensing out of the collar, not yet seated: pad_fade reads
 			// that alpha. Once seated this falls through unset, back to the

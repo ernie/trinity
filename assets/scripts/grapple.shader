@@ -201,23 +201,91 @@ models/weapons2/grapple/pad_pull
 	}
 }
 
-// mid-transition (falling away or materializing): translucent, rings outward at the idle pace.
-// Depth-only pass first: writes depth, no color, so the blended stages
-// that follow draw only the frontmost surface.
+// materializing: pad.tga's alpha is an arrival order, not an opacity, so
+// sweeping alphaGen entity travels a cut across the surface. The test is on
+// the product of the two, so the ramp is packed into 128..255.
+//
+// No depth prepass: it would write depth for the texels the cut removes, and
+// the additive stages behind depthFunc equal would light up holes.
+//
+// Those stages run hotter here than at idle, and their strength is their own
+// alphaGen rather than the entity's: rgbGen entity cannot flare a color that
+// already has a channel at 255, so cgame has no way to push them.
 models/weapons2/grapple/pad_fade
 {
 	nopicmip
 	surfaceparm nodlight
 	{
-		map $whiteimage
-		blendFunc GL_ZERO GL_ONE
+		map models/weapons2/grapple/pad.tga
+		alphaFunc GE128
+		alphaGen entity
+		rgbGen lightingDiffuse
 		depthwrite
 	}
 	{
-		map models/weapons2/grapple/pad.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-		rgbGen lightingDiffuse
+		// the leading edge: pad_ramp.tga is the same ramp scaled down, so it
+		// trips later than the diffuse and LT128 keeps only the strip between
+		// the two thresholds -- a band that travels with the cut
+		map models/weapons2/grapple/pad_ramp.tga
+		blendFunc GL_ONE GL_ONE
+		alphaFunc LT128
 		alphaGen entity
+		rgbGen entity
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_glow.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen const 0.4
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg1.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0 0.41667
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg2.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.667 0.41667
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg3.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.333 0.41667
+		depthFunc equal
+	}
+}
+
+// coming apart: the same dissolve with the test inverted, so the ramp's high
+// ground -- the claw tips and the rim -- clears first and the pad collapses
+// onto its hub. One ramp cannot run both ways off the same test.
+models/weapons2/grapple/pad_unform
+{
+	nopicmip
+	surfaceparm nodlight
+	{
+		map models/weapons2/grapple/pad.tga
+		alphaFunc LT128
+		alphaGen entity
+		rgbGen lightingDiffuse
+		depthwrite
+	}
+	{
+		// the trailing edge: what survives is below the sweep, so this needs
+		// the ramp scaled up instead, tripping just before the diffuse -- the
+		// band sits inside the vanishing boundary
+		map models/weapons2/grapple/pad_ramp_hi.tga
+		blendFunc GL_ONE GL_ONE
+		alphaFunc GE128
+		alphaGen entity
+		rgbGen entity
 		depthFunc equal
 	}
 	{
@@ -364,9 +432,10 @@ models/weapons2/grapple/gun_pull
 	}
 }
 
-// Anchor bite scar, stamped with the mark orientation solved onto the pad's
+// Anchor bite scars, stamped with the mark orientation solved onto the pad's
 // rolled axes (the claw layout is not 3-fold symmetric). Same darken-by-alpha
-// recipe as the stock gfx/damage marks.
+// recipe as the stock gfx/damage marks. Three of them because a rotation
+// would walk the gouges off the claws; cgame picks from the hook's stamp.
 gfx/damage/pad_mrk
 {
 	polygonOffset
@@ -376,6 +445,28 @@ gfx/damage/pad_mrk
 		rgbGen exactVertex
 		// this blend reads only alpha: the release fade must ride vertex
 		// alpha (stock bloodMark recipe) or the mark fade is inert
+		alphaGen vertex
+	}
+}
+
+gfx/damage/pad_mrk2
+{
+	polygonOffset
+	{
+		map gfx/damage/pad_mrk2.tga
+		blendFunc GL_ZERO GL_ONE_MINUS_SRC_ALPHA
+		rgbGen exactVertex
+		alphaGen vertex
+	}
+}
+
+gfx/damage/pad_mrk3
+{
+	polygonOffset
+	{
+		map gfx/damage/pad_mrk3.tga
+		blendFunc GL_ZERO GL_ONE_MINUS_SRC_ALPHA
+		rgbGen exactVertex
 		alphaGen vertex
 	}
 }

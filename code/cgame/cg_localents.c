@@ -391,11 +391,11 @@ dart instead of turning past it.
 */
 static void CG_AddGrapplePad( localEntity_t *le ) {
 	refEntity_t	*re = &le->refEntity;
-	vec3_t		newOrigin, ang, cleanOrigin, cleanOldOrigin;
+	vec3_t		newOrigin, ang, cleanOrigin, cleanOldOrigin, vel;
 	trace_t		trace;
 	float		t, u, c, retract, embed;
 	float		fpos;
-	int		fi;
+	int		fi, hard;
 
 	t = ( cg.time - le->startTime ) * 0.001f;
 
@@ -407,17 +407,17 @@ static void CG_AddGrapplePad( localEntity_t *le ) {
 			// delta is dwarfed by the gravity term and reads as no bounce.
 			// CG_ReflectVelocity parks weak floor rebounds TR_STATIONARY,
 			// which ends the hop: heavy machinery does not litter
+			// read before the reflect scrubs it
+			BG_EvaluateTrajectoryDelta( &le->pos, cg.time, vel );
+			hard = VectorLength( vel ) >= PAD_FALL_CLANK_SPEED;
 			CG_ReflectVelocity( le, &trace );
 
 			// past the hold the pad is fading out, and a ghost should not
 			// clatter
-			if ( t < PAD_FALL_TIME * PAD_FALL_HOLD * 0.001f ) {
-				sfxHandle_t	sfx = ( le->pos.trType == TR_STATIONARY )
-					? cgs.media.sfx_grapplesettle : cgs.media.sfx_grappleclank;
-
-				if ( sfx ) {
-					trap_S_StartSound( trace.endpos, ENTITYNUM_WORLD, CHAN_AUTO, sfx );
-				}
+			if ( t < PAD_FALL_TIME * PAD_FALL_HOLD * 0.001f
+					&& cgs.media.sfx_grappleclank[ hard ] ) {
+				trap_S_StartSound( trace.endpos, ENTITYNUM_WORLD, CHAN_AUTO,
+					cgs.media.sfx_grappleclank[ hard ] );
 			}
 
 			// ground contact scrubs spin; coming to rest stops it cold
@@ -480,14 +480,28 @@ static void CG_AddGrapplePad( localEntity_t *le ) {
 	if ( c < 0 ) {
 		c = 0;
 	}
-	re->shaderRGBA.rgba[0] = le->color[0] * c * 0xff;
-	re->shaderRGBA.rgba[1] = le->color[1] * c * 0xff;
-	re->shaderRGBA.rgba[2] = le->color[2] * c * 0xff;
-	re->shaderRGBA.rgba[3] = c * 0xff;
+	re->shaderRGBA.rgba[0] = le->color[0] * 0xff;
+	re->shaderRGBA.rgba[1] = le->color[1] * 0xff;
+	re->shaderRGBA.rgba[2] = le->color[2] * 0xff;
+	re->shaderRGBA.rgba[3] = 0xff;
 
-	// pad_fade's diffuse stage reads alphaGen entity, so the alpha write
-	// above dissolves it rather than needing a compensating shrink
-	re->customShader = cgs.media.grapplePadFadeShader;
+	// only while the cut is travelling: pad_unform runs hot and washes the
+	// whole surface, which would glow the pad the entire way down
+	if ( c < 1.0f ) {
+		// once, where the cut starts; landings past the hold stay silent, so
+		// a long drop's only mark is this
+		if ( !( le->leFlags & LEF_SOUND1 ) ) {
+			le->leFlags |= LEF_SOUND1;
+			if ( cgs.media.sfx_grappleunform ) {
+				trap_S_StartSound( re->origin, ENTITYNUM_WORLD, CHAN_AUTO,
+					cgs.media.sfx_grappleunform );
+			}
+		}
+		CG_GrapplePadUnform( re->shaderRGBA.rgba, c );
+		re->customShader = cgs.media.grapplePadUnformShader;
+	} else {
+		re->customShader = 0;		// the model's own shader: solid, idle glow
+	}
 
 	// re->origin/oldorigin hold the clean, un-embedded physics position
 	// everywhere except across this draw call: the same save/offset/draw/restore

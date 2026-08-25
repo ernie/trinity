@@ -1111,7 +1111,9 @@ static void CG_RegisterGraphics( void ) {
 	// wall marks
 	cgs.media.bulletMarkShader = trap_R_RegisterShader( "gfx/damage/bullet_mrk" );
 	cgs.media.burnMarkShader = trap_R_RegisterShader( "gfx/damage/burn_med_mrk" );
-	cgs.media.grappleMarkShader = trap_R_RegisterShader( "gfx/damage/pad_mrk" );
+	cgs.media.grappleMarkShader[0] = trap_R_RegisterShader( "gfx/damage/pad_mrk" );
+	cgs.media.grappleMarkShader[1] = trap_R_RegisterShader( "gfx/damage/pad_mrk2" );
+	cgs.media.grappleMarkShader[2] = trap_R_RegisterShader( "gfx/damage/pad_mrk3" );
 	cgs.media.holeMarkShader = trap_R_RegisterShader( "gfx/damage/hole_lg_mrk" );
 	cgs.media.energyMarkShader = trap_R_RegisterShader( "gfx/damage/plasma_mrk" );
 	cgs.media.shadowMarkShader = trap_R_RegisterShader( "markShadow" );

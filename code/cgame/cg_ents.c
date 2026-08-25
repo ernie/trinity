@@ -433,12 +433,16 @@ The wall-bite scar. The claw layout is not 3-fold symmetric (facets 1/4/6),
 so instead of the usual random spin the orientation is solved to land the
 mark's texture axes on the pad's rolled axes: the painted gouges sit under
 the real claws.
+
+The variant comes off the same stamp and number the orientation is solved
+from, so the anchored scar and the fading copy the release leaves behind match.
 ===============
 */
-void CG_GrapplePadMark( const vec3_t origin, vec3_t axis[3],
+void CG_GrapplePadMark( const vec3_t origin, vec3_t axis[3], int stamp, int num,
 		qboolean temporary ) {
 	vec3_t	outward, base, tang;
 	float	orient;
+	int		variant;
 
 	// CG_ImpactMark exempts temporary marks from cg_marks for shadows'
 	// sake; this one is a real mark, so gate it here
@@ -450,8 +454,14 @@ void CG_GrapplePadMark( const vec3_t origin, vec3_t axis[3],
 	CrossProduct( outward, base, tang );
 	orient = atan2( DotProduct( tang, axis[2] ),
 		DotProduct( base, axis[2] ) ) * ( 180.0f / M_PI );
-	CG_ImpactMark( cgs.media.grappleMarkShader, origin, outward, orient,
-		1, 1, 1, 1, qtrue, GRAPPLE_PAD_MARK_RADIUS, temporary );
+	// stamp alone repeats within a millisecond, number alone cycles in entity
+	// order; a foreign QVM's s.time can be negative, and C's % keeps that sign
+	variant = ( ( stamp >> 4 ) + num * 7 ) % GRAPPLE_PAD_MARK_VARIANTS;
+	if ( variant < 0 ) {
+		variant = 0;
+	}
+	CG_ImpactMark( cgs.media.grappleMarkShader[variant], origin, outward,
+		orient, 1, 1, 1, 1, qtrue, GRAPPLE_PAD_MARK_RADIUS, temporary );
 }
 
 /*
@@ -622,10 +632,7 @@ static void CG_Missile( centity_t *cent ) {
 			if ( a > 1.0f ) {
 				a = 1.0f;
 			}
-			ent.shaderRGBA.rgba[0] = (byte)( ent.shaderRGBA.rgba[0] * a );
-			ent.shaderRGBA.rgba[1] = (byte)( ent.shaderRGBA.rgba[1] * a );
-			ent.shaderRGBA.rgba[2] = (byte)( ent.shaderRGBA.rgba[2] * a );
-			ent.shaderRGBA.rgba[3] = a * 0xff;
+			CG_GrapplePadForm( ent.shaderRGBA.rgba, a );
 			ent.customShader = cgs.media.grapplePadFadeShader;
 		} else {
 			ent.customShader = cgs.media.grapplePadFlyShader;
@@ -661,7 +668,6 @@ static void CG_Missile( centity_t *cent ) {
 	} else {
 		CG_AddRefEntityWithPowerups( &ent, s1, TEAM_FREE );
 	}
-
 }
 
 /*
@@ -773,10 +779,17 @@ static void CG_Grapple( centity_t *cent ) {
 	// the claws splay, which hides it
 	CG_GrappleSeatSnap( s1->otherEntityNum );
 
-	// the anchored clank loop follows the player, not the anchor point
+	// the anchored clank loop follows the player, not the anchor point; the
+	// velocity gives witnesses doppler, never the listener, whose own source
+	// the mixer would clamp to max doppler
 	if ( cgs.media.sfx_grapplepull ) {
+		const float	*vel = vec3_origin;
+
+		if ( s1->otherEntityNum != cg.snap->ps.clientNum ) {
+			vel = cg_entities[ s1->otherEntityNum ].currentState.pos.trDelta;
+		}
 		trap_S_AddLoopingSound( s1->otherEntityNum, cg_entities[ s1->otherEntityNum ].lerpOrigin,
-			vec3_origin, cgs.media.sfx_grapplepull );
+			vel, cgs.media.sfx_grapplepull );
 	}
 
 	// the far end, on the hook's own entity number: loops are one per entnum
@@ -821,7 +834,8 @@ static void CG_Grapple( centity_t *cent ) {
 	// pad; the release event stamps the fading copy. No scar on a mover:
 	// mark polys are static world geometry and would be left hanging
 	if ( s1->otherEntityNum2 < MAX_CLIENTS && !s1->modelindex2 ) {
-		CG_GrapplePadMark( cent->lerpOrigin, ent.axis, qtrue );
+		CG_GrapplePadMark( cent->lerpOrigin, ent.axis, s1->time, s1->number,
+			qtrue );
 	}
 
 	VectorCopy( cent->lerpOrigin, ent.origin );

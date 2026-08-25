@@ -1082,20 +1082,18 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		// when the server reuses this hook's entity slot for it; time2 is the
 		// hook that actually died, so a same-snapshot next throw can't be undone
 		CG_GrappleLaunchEnded( es->otherEntityNum, es->time2 );
-		// this tent is SVF_BROADCAST so every client can retire the two keys
-		// above regardless of PVS, but that also means it reaches clients who
-		// never saw the release: only a witness draws its debris, scar and
-		// seat sound
+		// the tent is SVF_BROADCAST, so gate the seat on the wielder being
+		// in view (the pad re-forms on the gun, not at the anchor).
+		// CHAN_WEAPON so a re-fire's launch replaces it the way the ramp's
+		// boost cuts the animation; neither may move to CHAN_AUTO
+		if ( cgs.media.sfx_grappleseat && es->otherEntityNum < MAX_CLIENTS
+				&& ( es->otherEntityNum == cg.snap->ps.clientNum
+					|| cg_entities[ es->otherEntityNum ].currentValid ) ) {
+			trap_S_StartSound( NULL, es->otherEntityNum, CHAN_WEAPON,
+				cgs.media.sfx_grappleseat );
+		}
+		// only a witness draws the debris and the scar
 		if ( trap_R_inPVS( cg.refdef.vieworg, position ) ) {
-			// CHAN_WEAPON on purpose: a re-fire mid-materialize runs the ramp at
-			// PAD_SEAT_FIRE_BOOST and finishes in ~110ms against a 330ms sound.
-			// StartSound cannot be stopped, but a new sound on a channel replaces
-			// the one there, so the launch cuts this off when the animation does.
-			// Neither this nor the launch may move to CHAN_AUTO.
-			if ( cgs.media.sfx_grappleseat && es->otherEntityNum < MAX_CLIENTS ) {
-				trap_S_StartSound( NULL, es->otherEntityNum, CHAN_WEAPON,
-					cgs.media.sfx_grappleseat );
-			}
 			if ( es->eventParm ) {
 				// only an anchored release has a claw to draw out of anything
 				if ( cgs.media.sfx_grapplefree ) {
@@ -1114,7 +1112,8 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 
 					CG_GrapplePadAnchorAxis( es->angles, es->time,
 						es->time2, axis );
-					CG_GrapplePadMark( position, axis, qfalse );
+					CG_GrapplePadMark( position, axis, es->time, es->time2,
+						qfalse );
 				}
 			}
 		}
