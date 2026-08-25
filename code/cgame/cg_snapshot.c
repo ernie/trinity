@@ -154,7 +154,7 @@ static void CG_TransitionSnapshot( void ) {
 	cg_entities[ cg.snap->ps.clientNum ].interpolate = qfalse;
 
 	// TVD viewpoint switch: same frame, different POV.  Just swap entity
-	// data — no resets, no events, no player-state transition effects.
+	// data: no resets, no events, no player-state transition effects.
 	if ( cgs.tvPlayback && oldFrame
 			&& oldFrame->serverTime == cg.snap->serverTime ) {
 		for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {

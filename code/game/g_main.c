@@ -204,12 +204,12 @@ void G_RemapTeamShaders( void ) {
 	char string[1024];
 	float f = level.time * 0.001;
 	// Always emit a remap so the renderer's shader state is fully
-	// determined by the current g_redteam/g_blueteam values — never
+	// determined by the current g_redteam/g_blueteam values: never
 	// inherited from a prior team setting. For real clan names
 	// (Stroggs/Pagans/...) we point textures/ctf2/redteam01 at
 	// team_icon/<clan>_red. For color-word teams ("Red"/"Blue") the
 	// derived shader name (team_icon/Red_red) has no artwork, so we
-	// remap-to-self instead — the engine treats sh == sh2 as "clear the
+	// remap-to-self instead: the engine treats sh == sh2 as "clear the
 	// remap" (see RE_RemapShader, tr_shader.c), which lets our own
 	// trinity_teamicons.shader fallback take effect without spamming
 	// "new shader not found" warnings or requiring a vid_restart to
@@ -280,18 +280,18 @@ void G_RegisterCvars( void ) {
 	trap_Cvar_Register( NULL, "g_warmupEndTime", "0", CVAR_SERVERINFO );
 	trap_Cvar_Register( NULL, "g_levelStartTime", "0", CVAR_SERVERINFO );
 	trap_Cvar_Register( NULL, "g_levelTime", "0", CVAR_SERVERINFO );
-	// g_objStatus — per-gametype objective state. Outer grammar is
+	// g_objStatus: per-gametype objective state. Outer grammar is
 	// "TEAM|PLAYERS" where the pipe and PLAYERS tail are omitted when
 	// empty. TEAM format depends on g_gametype; PLAYERS is always a
 	// comma-separated list of "<clientNum>:<count>" entries with team
 	// attribution implied by each player's team in the status player list.
 	//
 	//   CTF       "<red_state>:<red_carrier>,<blue_state>:<blue_carrier>"
-	//             (no PLAYERS tail — carrier already in TEAM section)
+	//             (no PLAYERS tail: carrier already in TEAM section)
 	//   1FCTF     "<state>:<carrier>"  (single neutral flag, no tail)
 	//   Overload  "<red_hp>,<blue_hp>[|<cn>:<destroys>,...]"
 	//   Harvester "<red_skulls>,<blue_skulls>[|<cn>:<skulls_held>,...]"
-	//   FFA/TDM/1v1  ""  (empty — not applicable)
+	//   FFA/TDM/1v1  ""  (empty: not applicable)
 	//
 	// state codes (flag): 0 at base, 1 taken, 2 dropped.
 	// carrier: clientNum 0-63 or -1 when not held.
@@ -584,7 +584,7 @@ static void G_InitGame( int levelTime, int randomSeed, int restart ) {
 
 	// Seed warmup state before the cvar sync below: the zeroed struct
 	// reads as "match live", and SP_worldspawn's identical init runs
-	// too late — the stale "active" made the TV auto-recorder open on
+	// too late: the stale "active" made the TV auto-recorder open on
 	// empty arenas.
 	if ( g_gametype.integer != GT_SINGLE_PLAYER ) {
 		level.warmupTime = -1;
@@ -1407,7 +1407,7 @@ void LogExit( const char *string ) {
 		// Trailing reset: netname can end on any ^N code, and without
 		// the reset the dedicated-server console (G_LogPrintf fans out
 		// to G_Printf when g_dedicated) inherits that color for the
-		// next line's timestamp — most visibly during the /rcon rotate
+		// next line's timestamp: most visibly during the /rcon rotate
 		// scoreboard dump.
 		G_LogPrintf( "score: %i  ping: %i  team: %i  client: %i %s" S_COLOR_WHITE "\n", cl->ps.persistant[PERS_SCORE], ping, cl->sess.sessionTeam, level.sortedClients[i], cl->pers.netname );
 #ifdef MISSIONPACK
@@ -1611,7 +1611,7 @@ static void CheckExitRules( void ) {
 
 			// On timelimit in FFA/1v1, identify the winner by highest score
 			// and announce. Skipped for team games (no single-player winner).
-			// No ScoreIsTied() check needed — the tied case branched into
+			// No ScoreIsTied() check needed: the tied case branched into
 			// overtime earlier in this function, so reaching here implies
 			// a unique winner exists.
 			if ( g_gametype.integer == GT_FFA || g_gametype.integer == GT_TOURNAMENT ) {
@@ -2413,7 +2413,7 @@ static void G_RunFrame( int levelTime ) {
 
 	// Trinity handshake: send pending challenges and kick clients
 	// that don't respond to the protocol challenge within 10s.
-	// Identity verification (trinityVerified) is separate — set by
+	// Identity verification (trinityVerified) is separate: set by
 	// the trinity_auth_ok rcon, not by this loop.
 	if ( g_trinityHandshake.integer ) {
 		for ( i = 0; i < level.maxclients; i++ ) {

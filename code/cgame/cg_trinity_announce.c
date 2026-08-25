@@ -200,7 +200,7 @@ void CG_TrinityAnnounce_Play( char subtype, int clientNum ) {
 // Shortened reward defer during intermission. REWARD_TIME=3000 is the
 // visual fade window; the actual medal *audio* runs ~1.5s. During
 // intermission the medal display isn't drawing anyway (CG_Draw2D early-
-// returns), and the intermission-exit minimum is 5s — so we cap at the
+// returns), and the intermission-exit minimum is 5s: so we cap at the
 // audio duration to leave room for the team callout + a margin.
 #define TRINITY_ANNOUNCE_INTERMISSION_REWARD_MS	1500
 
@@ -213,7 +213,7 @@ void CG_TrinityAnnounce_Tick( void ) {
 	}
 
 	// Pace our own consecutive plays. trinityAnnounceTime == 0 means "never
-	// played" (cg is memset to 0 at init), not "played at time 0" — without
+	// played" (cg is memset to 0 at init), not "played at time 0": without
 	// this guard, a fresh-server join (level.time < SPACING_MS) would defer
 	// the first announcement spuriously. Same convention as CG_FadeColor.
 	if ( cg.trinityAnnounceTime > 0 &&
@@ -244,7 +244,7 @@ void CG_TrinityAnnounce_Tick( void ) {
 		return;
 	}
 
-	// Defer to the buffered-sound queue (CTF/score/lead callouts) — both
+	// Defer to the buffered-sound queue (CTF/score/lead callouts): both
 	// any pending entries and the 750ms recovery window after a recent play.
 	if ( cg.soundBufferIn != cg.soundBufferOut ) {
 		return;
@@ -271,7 +271,7 @@ Web-viewer presence (CS_TRINITY_VIEWERS)
 
 Tracker rcon's `trinity_watch <n>`; the game QVM mirrors n into the
 configstring. 0<->n flips present a moment: eye drawn above the stock
-centerprint (CG_DrawViewerMoment — not the reward stack, and clear of
+centerprint (CG_DrawViewerMoment: not the reward stack, and clear of
 the medal slot), callout played directly. Count moves while watched only
 refresh CG_DrawWebViewers. Initial gamestate values are cached silently
 in CG_SetConfigValues, so a late joiner gets the indicator without a

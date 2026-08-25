@@ -23,7 +23,7 @@ void Team_CheckObeliskAttacks( void ) {
 		obeliskAttackInfo_t *info = &teamgame.obeliskAttacks[i];
 		if ( info->lastAttackTime == 0 ) continue;
 		if ( level.time - info->lastAttackTime < OBELISK_ATTACK_QUIET_MS ) continue;
-		// Skip disconnected slots — pers.netname could already belong to
+		// Skip disconnected slots: pers.netname could already belong to
 		// the next occupant, and the tracker's player_leave handling
 		// keeps the indicator from sticking on the new player.
 		if ( level.clients[i].pers.connected != CON_CONNECTED ) {
@@ -55,7 +55,7 @@ void Team_ClearObeliskAttacker( int clientNum ) {
 void Team_InitGame( void ) {
 #ifdef MISSIONPACK
 	// SpawnObelisk runs in G_SpawnEntitiesFromString, before us via
-	// G_CheckTeamItems — preserve the populated pointers across memset.
+	// G_CheckTeamItems: preserve the populated pointers across memset.
 	gentity_t *redObeliskSave = teamgame.redObelisk;
 	gentity_t *blueObeliskSave = teamgame.blueObelisk;
 	int destroysSave[MAX_CLIENTS];
@@ -284,7 +284,7 @@ static void Team_SetFlagStatus( team_t team, flagStatus_t status ) {
 
 			redCarrier = Team_GetFlagCarrier( PW_REDFLAG );
 			blueCarrier = Team_GetFlagCarrier( PW_BLUEFLAG );
-			// Normalize FLAG_DROPPED (4) to 2 — matches ctfFlagStatusRemap.
+			// Normalize FLAG_DROPPED (4) to 2: matches ctfFlagStatusRemap.
 			redOut  = ( teamgame.redStatus  == FLAG_DROPPED ) ? 2 : teamgame.redStatus;
 			blueOut = ( teamgame.blueStatus == FLAG_DROPPED ) ? 2 : teamgame.blueStatus;
 			trap_Cvar_Set( "g_objStatus", va( "%d:%d,%d:%d",
@@ -1503,7 +1503,7 @@ void SetHarvesterStatus( void ) {
 
 // SetObeliskStatus rewrites g_objStatus from current obelisk HPs +
 // teamgame.obeliskDestroysPerClient tail. See g_main.c for grammar.
-// Health clamped to 0 — overkill leaves self->health negative until
+// Health clamped to 0: overkill leaves self->health negative until
 // g_combat.c clamps it post-die, but the cvar must read 0 for the UI.
 void SetObeliskStatus( void ) {
 	char buf[MAX_INFO_VALUE];
@@ -1643,7 +1643,7 @@ static void ObeliskDie( gentity_t *self, gentity_t *inflictor, gentity_t *attack
 	teamgame.redObeliskAttackedTime = 0;
 	teamgame.blueObeliskAttackedTime = 0;
 
-	// Terminal state — clear any attacker indicators for this obelisk's
+	// Terminal state: clear any attacker indicators for this obelisk's
 	// team. Sweep would fade them anyway after the quiet window, but
 	// proactive cleanup keeps the indicator from briefly persisting
 	// over the destroy moment.

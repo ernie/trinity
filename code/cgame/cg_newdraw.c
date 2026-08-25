@@ -1740,7 +1740,7 @@ void CG_MouseEvent(int x, int y) {
 		return;
 	}
 
-	// timeline scrub owns the cursor — just update position
+	// timeline scrub owns the cursor: just update position
 	if ( cgs.tvScrubActive ) {
 		cgs.cursorX += x * cgs.cursorScaleR;
 		if ( cgs.cursorX < cgs.screenXmin )

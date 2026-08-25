@@ -80,7 +80,7 @@ static void UI_HDRCalibration_Draw( void ) {
 	UI_FillRect( 0, 0, 640, 480, color_black );
 
 	// Dim the framework control labels (Slider/SpinControl read these globals) so
-	// only the test pattern is bright; restored right after — q3_ui draws serially.
+	// only the test pattern is bright; restored right after: q3_ui draws serially.
 	Vector4Copy( text_color_normal, savedNormal );
 	Vector4Copy( text_color_highlight, savedHigh );
 	Vector4Copy( text_color_disabled, text_color_normal );

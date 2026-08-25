@@ -274,7 +274,7 @@ static void UI_UpdateMenu_Init( void ) {
 	s_update.statusText.color			= color_white;
 	s_update.statusText.style			= UI_CENTER | UI_SMALLFONT;
 
-	// action buttons — progress bar is at 278, 16px tall, so buttons at 302
+	// action buttons: progress bar is at 278, 16px tall, so buttons at 302
 	y = 302;
 
 	s_update.download.generic.type		= MTYPE_PTEXT;

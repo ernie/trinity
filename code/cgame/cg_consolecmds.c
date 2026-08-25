@@ -741,7 +741,7 @@ void CG_VoteSubmit( qboolean yes ) {
 		cg.myTeamVote = yes ? 1 : -1;
 		trap_SendClientCommand( va( "teamvote %s", arg ) );
 	} else {
-		// no unvoted dialog — fall through to server
+		// no unvoted dialog: fall through to server
 		trap_SendClientCommand( va( "vote %s", arg ) );
 	}
 }

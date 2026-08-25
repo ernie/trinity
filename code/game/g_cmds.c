@@ -1906,7 +1906,7 @@ static void Cmd_TrinityHandshake_f( gentity_t *ent ) {
 		return;
 	}
 
-	// Protocol handshake completed. We do NOT set trinityVerified here —
+	// Protocol handshake completed. We do NOT set trinityVerified here,
 	// that flips only when the tracker confirms identity by emitting
 	// trinity_auth_ok via rcon. handshakeResponded is what the 10s
 	// timeout watches; setting it stops the timer from kicking us.
@@ -2001,7 +2001,7 @@ void ClientCommand( int clientNum ) {
 		return;
 	}
 
-	// Trinity protocol handshake — must dispatch during intermission too,
+	// Trinity protocol handshake: must dispatch during intermission too,
 	// otherwise the stock id chat fallback below eats it and we 10s-kick
 	// a client who happened to join while the match was at intermission.
 	if (Q_stricmp (cmd, "trinity_handshake") == 0) {

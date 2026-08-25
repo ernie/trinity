@@ -1,4 +1,4 @@
-// hand-synced from trinity-vr code/vrcommon/vr_shared.h — do not edit here
+// hand-synced from trinity-vr code/vrcommon/vr_shared.h: do not edit here
 #ifndef __VR_SHARED
 #define __VR_SHARED
 

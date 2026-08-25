@@ -1249,7 +1249,7 @@ void CG_NewClientInfo( int clientNum ) {
 
 	configstring = CG_ConfigString( clientNum + CS_PLAYERS );
 	if ( !configstring[0] ) {
-		// player disconnected — clear VOIP mute for this slot
+		// player disconnected: clear VOIP mute for this slot
 		if ( cgs.voipMuted[clientNum] ) {
 			cgs.voipMuted[clientNum] = qfalse;
 			trap_SendConsoleCommand( va( "voip unignore %i\n", clientNum ) );
@@ -1258,7 +1258,7 @@ void CG_NewClientInfo( int clientNum ) {
 		return;	// player just left
 	}
 
-	// new player in this slot — clear VOIP mute
+	// new player in this slot: clear VOIP mute
 	if ( !ci->infoValid && cgs.voipMuted[clientNum] ) {
 		cgs.voipMuted[clientNum] = qfalse;
 		trap_SendConsoleCommand( va( "voip unignore %i\n", clientNum ) );
@@ -1650,7 +1650,7 @@ static void CG_SwingAngles( float destination, float swingTolerance, float clamp
 	}
 
 	// When time is frozen (e.g. paused TVD playback), snap directly
-	// to the destination — frametime is 0 so swing can't converge.
+	// to the destination: frametime is 0 so swing can't converge.
 	if ( cg.frametime == 0 ) {
 		*angle = destination;
 		*swinging = qfalse;
@@ -1745,7 +1745,7 @@ static void CG_PlayerAngles( centity_t *cent, vec3_t legs[3], vec3_t torso[3], v
 
 	// NOTE: headAngles is a misnomer inherited from vanilla Q3, where the
 	// head/torso/legs shared a single aim direction (viewangles). In VR,
-	// headAngles actually represents weapon aim — the real head orientation
+	// headAngles actually represents weapon aim: the real head orientation
 	// comes from angles2 and is applied separately below.
 	VectorCopy( cent->lerpAngles, headAngles );
 	headAngles[YAW] = AngleMod( headAngles[YAW] );

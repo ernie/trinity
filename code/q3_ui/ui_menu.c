@@ -630,7 +630,7 @@ void UI_MainMenu( void ) {
 	s_main.mods.color					= color_red;
 	s_main.mods.style					= style;
 
-	// Account button — right-aligned, small bitmap font
+	// Account button: right-aligned, small bitmap font
 	s_main.login.generic.type			= MTYPE_PTEXT;
 	s_main.login.generic.flags			= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_main.login.generic.x				= 610;

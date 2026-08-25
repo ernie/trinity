@@ -11,7 +11,7 @@
 #include "ui_shared.h"
 #include "../game/vr_shared.h"
 
-// VR API bootstrap (vr_ui.c) — extension interface discovered by name
+// VR API bootstrap (vr_ui.c): extension interface discovered by name
 extern vr_shared_t	vr_state;
 extern vr_shared_t	*vr;
 extern qboolean		vrActive;

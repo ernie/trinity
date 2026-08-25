@@ -521,7 +521,7 @@ qboolean	ConsoleCommand( void ) {
 		     level.clients[clientNum].pers.connected == CON_CONNECTED ) {
 			gclient_t *cl = &level.clients[clientNum];
 			// Clear server-side verification. The announcement may have
-			// already fired — we don't try to un-announce, but tu\0 in
+			// already fired: we don't try to un-announce, but tu\0 in
 			// the configstring will reflect current truth for the
 			// scoreboard and any future UI.
 			cl->sess.trinityUserType = 0;
@@ -568,7 +568,7 @@ qboolean	ConsoleCommand( void ) {
 		int clientNum;
 		int userType;
 
-		// Bail on handshake-off servers — auth_ok is meaningless there
+		// Bail on handshake-off servers: auth_ok is meaningless there
 		// and the name-only announcement fallback handles those.
 		if ( !g_trinityHandshake.integer ) {
 			return qtrue;
@@ -589,7 +589,7 @@ qboolean	ConsoleCommand( void ) {
 		}
 
 		// Default user-type 1 (verified). Optional second arg from the
-		// tracker overrides — 2 means admin, higher reserved. We clamp
+		// tracker overrides: 2 means admin, higher reserved. We clamp
 		// negative values (defensive against malformed rcon) and pass
 		// higher values through unchanged so a future tracker emitting
 		// e.g. 3 still gets stored and projected to `tu\3` for any

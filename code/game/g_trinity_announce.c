@@ -28,7 +28,7 @@ static qboolean ShouldAnnounceJoin( gentity_t *ent ) {
 }
 
 // Queue an announcement. We DON'T emit inline because ClientBegin runs
-// during the new client's connection handshake — on a listen server
+// during the new client's connection handshake: on a listen server
 // (and likely on remote connects too), the local cgame isn't yet
 // subscribed to commands at that moment, so an inline broadcast goes
 // out to nobody. G_TrinityProcessAnnouncements drains the queue on the
@@ -83,7 +83,7 @@ static void G_TrinityBroadcastWinner( int clientNum ) {
 	G_BroadcastServerCommand( -1, va("tann w %d", clientNum) );
 }
 
-// No handshake gate here — team names come from the server's g_redteam/
+// No handshake gate here: team names come from the server's g_redteam/
 // g_blueteam cvars, not from user-controlled data, so the
 // verification dimension that motivates the player-name gate doesn't
 // apply.
@@ -110,7 +110,7 @@ void G_TrinityProcessAnnouncements( void ) {
 	// handshake doesn't miss announcements for clients that spawn during
 	// that window (e.g. the two duel bots in a missionpack tournament).
 	// Mirrors the gate in G_CheckMinimumPlayers (g_bot.c:534), which
-	// is why announcements driven by bot_minplayers already work — those
+	// is why announcements driven by bot_minplayers already work: those
 	// bots don't get added until after the same 2s mark.
 	if ( level.time - level.startTime < 2000 ) {
 		return;

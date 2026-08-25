@@ -529,7 +529,7 @@ static qboolean G_Clan_SkipBlock( char **p ) {
 ===============
 G_InitClans
 
-Runs every level init, bots or not — rotation must work on botless servers.
+Runs every level init, bots or not: rotation must work on botless servers.
 ===============
 */
 void G_InitClans( void ) {
@@ -731,7 +731,7 @@ static int G_ClanMemberIndex( int clanIdx, const char *name ) {
 ===============
 G_RotateClanBots
 
-Same-map cycles go through map_restart, which keeps bots — swap the
+Same-map cycles go through map_restart, which keeps bots: swap the
 outgoing clan's bots for the incoming roster so rotation turns the
 roster over, not just the team name. Queued ahead of ExitLevel's map
 command, so the kicks and adds land before the restart.

@@ -54,7 +54,7 @@ static vec4_t s_login_color_fail    = {1.00f, 0.00f, 0.00f, 1.00f};
 ===============
 Login_DrawPassword
 
-Custom ownerdraw for password field — masks characters with '*'.
+Custom ownerdraw for password field: masks characters with '*'.
 ===============
 */
 static void Login_DrawPassword( void *self ) {
@@ -94,7 +94,7 @@ static void Login_MenuDraw( void ) {
 			s_login.statusText.string = "Login successful!";
 			s_login.statusText.color = s_login_color_success;
 			s_login.loginState = LOGIN_STATE_IDLE;
-			// Dismiss after brief display — re-init will show logged-in view
+			// Dismiss after brief display: re-init will show logged-in view
 			UI_PopMenu();
 			UI_LoginMenu();
 			return;
@@ -173,7 +173,7 @@ void Login_MenuInit( void ) {
 	int				frameH = 330;
 	int				frameX = 320 - frameW / 2;
 	int				frameY = 240 - frameH / 2;
-	// label right edge and field left edge — centered pair
+	// label right edge and field left edge: centered pair
 	int				labelX = 255;
 	int				fieldX = 275;
 
@@ -314,7 +314,7 @@ void Login_MenuInit( void ) {
 		Menu_AddItem( &s_login.menu, (void*) &s_login.login );
 	}
 
-	// Back button — shared by both views, bottom-left corner
+	// Back button: shared by both views, bottom-left corner
 	s_login.back.generic.type		= MTYPE_BITMAP;
 	s_login.back.generic.name		= ART_BACK0;
 	s_login.back.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;

@@ -29,7 +29,7 @@ void G_WriteClientSessionData( gclient_t *client ) {
 	// serialized as either the 31-hex-char value or a single "-" sentinel
 	// when unset, so the column count stays fixed for the reader's
 	// Q_sscanf format. pendingAnnounceJoin is intentionally NOT serialized
-	// — it's an ephemeral G_RunFrame queue marker, not persistent state.
+	//: it's an ephemeral G_RunFrame queue marker, not persistent state.
 	s = va("%i %i %i %i %i %i %i %s %i %i %i %i",
 		client->sess.sessionTeam,
 		client->sess.spectatorTime,
@@ -119,14 +119,14 @@ void G_ReadClientSessionData( gclient_t *client ) {
 
 	// Restore trinity handshake state. Reject any nonce that isn't
 	// exactly 31 hex chars (the writer's format), falling back to "no
-	// nonce" — better to re-handshake than to trust a malformed value.
+	// nonce": better to re-handshake than to trust a malformed value.
 	client->sess.handshakeNonce[0] = '\0';
 	if ( nonceIn[0] != '-' && strlen( nonceIn ) == 31 ) {
 		Q_strncpyz( client->sess.handshakeNonce, nonceIn, sizeof( client->sess.handshakeNonce ) );
 	}
 	client->sess.handshakeTime = handshakeTimeIn;
 	client->sess.handshakeResponded = handshakeRespondedIn ? qtrue : qfalse;
-	// Clamp to non-negative — a manually-tampered cvar with a negative
+	// Clamp to non-negative: a manually-tampered cvar with a negative
 	// value should not project as a special enum state.
 	client->sess.trinityUserType = trinityUserTypeIn < 0 ? 0 : trinityUserTypeIn;
 	client->sess.announcedJoin = announcedJoinIn ? qtrue : qfalse;

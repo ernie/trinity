@@ -16,7 +16,7 @@
 
 typedef void (*voidfunc_f)(void);
 
-// VR API bootstrap (vr_ui.c) — extension interface discovered by name
+// VR API bootstrap (vr_ui.c): extension interface discovered by name
 extern vr_shared_t	vr_state;
 extern vr_shared_t	*vr;
 extern qboolean		vrActive;
@@ -46,7 +46,7 @@ extern int	dll_trap_VKeyboard_IsActive;
 extern int	dll_trap_VKeyboard_HandleKey;
 #endif
 
-// Unified VR options menu (ui_vroptions.c + page files) — presence-gated on UI_VR_Platform
+// Unified VR options menu (ui_vroptions.c + page files): presence-gated on UI_VR_Platform
 void UI_VROptionsMenu( void );
 void UI_VROptions_Cache( void );
 void UI_VRComfortMenu( void );
