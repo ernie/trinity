@@ -15,7 +15,7 @@ G_CVAR( g_cheats, "sv_cheats", "", 0, 0, qfalse, qfalse )
 
 //G_CVAR( g_restarted, "g_restarted", "0", CVAR_ROM, 0, qfalse, qfalse )
 G_CVAR( g_mapname, "mapname", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse )
-G_CVAR( sv_fps, "sv_fps", "30", CVAR_ARCHIVE, 0, qfalse, qfalse )
+G_CVAR( sv_fps, "sv_fps", "40", CVAR_ARCHIVE, 0, qfalse, qfalse )
 
 // latched vars
 G_CVAR( g_gametype, "g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH, 0, qfalse, qfalse )
