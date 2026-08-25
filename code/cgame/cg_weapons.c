@@ -683,6 +683,7 @@ static int CG_GrappleActivity( int clientNum ) {
 
 /*
 ==========================
+CG_GrappleLaunchCheck
 
 One launch sound per shot.  EV_FIRE_WEAPON repeats every 400ms while the button
 is held (which is why the weapon carries no flashSound), so the trigger is the
@@ -692,8 +693,36 @@ PAD_SEAT_RESET means the client was out of PVS rather than idle; replaying the
 launch on the frame he reappears would be a phantom.
 ==========================
 */
+typedef struct {
+	int		time;		// cg.time of the last update, 0 = never seen
+	int		act;
+} grappleLaunch_t;
 
+static grappleLaunch_t	cg_grappleLaunch[MAX_CLIENTS];
 
+static void CG_GrappleLaunchCheck( int clientNum, int act ) {
+	grappleLaunch_t	*g;
+	qboolean		out, wasOut;
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+	g = &cg_grappleLaunch[ clientNum ];
+	if ( g->time == cg.time ) {
+		return;			// already decided this frame
+	}
+
+	out = ( act == GRAPPLE_FLY || act == GRAPPLE_PULL );
+	wasOut = ( g->act == GRAPPLE_FLY || g->act == GRAPPLE_PULL );
+
+	if ( g->time && cg.time - g->time <= PAD_SEAT_RESET && out && !wasOut
+			&& cgs.media.sfx_grapplelaunch ) {
+		// CHAN_WEAPON cuts a running seat sound short on a re-fire mid-materialize
+		trap_S_StartSound( NULL, clientNum, CHAN_WEAPON, cgs.media.sfx_grapplelaunch );
+	}
+	g->act = act;
+	g->time = cg.time;
+}
 
 /*
 ==========================
@@ -2359,6 +2388,25 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		gun.shaderRGBA.rgba[3] = 255;
 	}
 
+	// the launcher's rgbGen entity emission stage needs the owner's tint in
+	// every view, breathed at the cadence of whichever loop is audible on the gun
+	grappleAct = GRAPPLE_IDLE;
+	grapplePulse = 1.0f;
+	if ( weaponNum == WP_GRAPPLING_HOOK ) {
+		grappleAct = CG_GrappleActivity( cent->currentState.clientNum );
+		CG_GrappleLaunchCheck( cent->currentState.clientNum, grappleAct );
+		grapplePulse = CG_GrappleEnvelope( grappleAct );
+		CG_GrappleOwnerRGBA( cent->currentState.clientNum, gun.shaderRGBA.rgba );
+		CG_GrappleFade( gun.shaderRGBA.rgba, grapplePulse );
+		// the state also picks the stream's direction and pace: base shader
+		// at idle, forward and faster in flight, reversed while reeling
+		if ( grappleAct == GRAPPLE_PULL ) {
+			gun.customShader = cgs.media.grappleGunPullShader;
+		} else if ( grappleAct == GRAPPLE_FLY ) {
+			gun.customShader = cgs.media.grappleGunFlyShader;
+		}
+	}
+
 	gun.hModel = weapon->weaponModel;
 	if (!gun.hModel) {
 		return;
@@ -3392,6 +3440,12 @@ void CG_MissileHitPlayer( int weapon, vec3_t origin, vec3_t dir, int entityNum )
 	case WP_PROX_LAUNCHER:
 #endif
 		CG_MissileHitWall( weapon, 0, origin, dir, IMPACTSOUND_FLESH );
+		break;
+	case WP_GRAPPLING_HOOK:
+		// on the victim's entity, so it travels with them under tow
+		if ( cgs.media.sfx_grapplebite ) {
+			trap_S_StartSound( NULL, entityNum, CHAN_AUTO, cgs.media.sfx_grapplebite );
+		}
 		break;
 	default:
 		break;
