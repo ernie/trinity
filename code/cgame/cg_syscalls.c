@@ -441,6 +441,10 @@ void trap_R_AddSpritePolyToScene( qhandle_t hShader, const vec3_t origin, float 
 	syscall( dll_trap_R_AddSpritePolyToScene, hShader, origin, PASSFLOAT(width), PASSFLOAT(height), PASSFLOAT(rotation), rgba );
 }
 
+void trap_R_AddPolysToScene2( qhandle_t hShader, int numVerts, const polyVert_t *verts, int numPolys, int renderfx ) {
+	syscall( dll_trap_R_AddPolysToScene2, hShader, numVerts, verts, numPolys, renderfx );
+}
+
 void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime ) {
 	syscall( dll_trap_R_ProjectDecal, origin, PASSFLOAT(size), PASSFLOAT(reach), PASSFLOAT(orientation), hShader, rgba, lifeTime );
 }

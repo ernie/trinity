@@ -25,6 +25,7 @@ qboolean projectDecal = qfalse;
 qboolean animFrame = qfalse;
 
 qboolean spritePolyTrap = qfalse;
+qboolean polyFxTrap = qfalse;
 
 #ifdef Q3_VM
 qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
@@ -32,6 +33,7 @@ void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 void (*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 void (*trap_R_ProjectDecal)( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
 void (*trap_R_AddSpritePolyToScene)( qhandle_t hShader, const vec3_t origin, float width, float height, float rotation, const byte *rgba );
+void (*trap_R_AddPolysToScene2)( qhandle_t hShader, int numVerts, const polyVert_t *verts, int numPolys, int renderfx );
 void (*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
 #else
 int dll_com_trapGetValue;
@@ -39,6 +41,7 @@ int dll_trap_R_AddRefEntityToScene2;
 int dll_trap_R_AddLinearLightToScene;
 int dll_trap_R_ProjectDecal;
 int dll_trap_R_AddSpritePolyToScene;
+int dll_trap_R_AddPolysToScene2;
 int dll_trap_VR_RegisterState;
 #endif
 
@@ -2031,6 +2034,10 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 			trap_R_AddSpritePolyToScene = (void*)~atoi( value );
 			spritePolyTrap = qtrue;
 		}
+		if ( trap_GetValue( value, sizeof( value ), "trap_R_AddPolysToScene2" ) ) {
+			trap_R_AddPolysToScene2 = (void*)~atoi( value );
+			polyFxTrap = qtrue;
+		}
 		if ( trap_GetValue( value, sizeof( value ), "R_animFrame" ) ) {
 			animFrame = qtrue;
 		}
@@ -2051,6 +2058,10 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 		if ( trap_GetValue( value, sizeof( value ), "trap_R_AddSpritePolyToScene" ) ) {
 			dll_trap_R_AddSpritePolyToScene = atoi( value );
 			spritePolyTrap = qtrue;
+		}
+		if ( trap_GetValue( value, sizeof( value ), "trap_R_AddPolysToScene2" ) ) {
+			dll_trap_R_AddPolysToScene2 = atoi( value );
+			polyFxTrap = qtrue;
 		}
 		if ( trap_GetValue( value, sizeof( value ), "R_animFrame" ) ) {
 			animFrame = qtrue;

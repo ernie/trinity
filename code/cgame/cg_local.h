@@ -123,6 +123,23 @@
 #define GRAPPLE_DLIGHT_RADIUS_AMP	0.0f
 #define GRAPPLE_DLIGHT_PULSE_HZ		2.5f
 
+// the launcher and pad md3s ship at 1.2x the space the model-space constants
+// here and the arc geometry in cg_weapons.c are measured in; scaled at use so
+// every measured value keeps reading against the authored model
+#define GRAPPLE_MD3_SCALE	1.2f
+// the launcher's scale pivots on its grip x and its belly line z, not its
+// origin: a uniform scale can't keep both of a two-handed model's fists on
+// the gun, so each axis pins what its fist reads against - the rear fist the
+// grip post, the front fist the belly it cups.  A gun-space point maps as
+// p * SCALE + PIVOT * (1 - SCALE).  The pad still scales about its origin -
+// its origin rides the impact point
+#define GRAPPLE_GUN_PIVOT_X	-6.2f
+#define GRAPPLE_GUN_PIVOT_Z	-0.5f
+// seats the launcher forward of the mount in a wielder's fists (body draws
+// only - the view weapon frames through cg_gun_x instead); every attachment
+// (arcs, stow, tether feed) hangs off the gun refent, so they ride along
+#define GRAPPLE_GUN_SEAT_FWD	1.0f
+
 // SnapVectorTowards rounds the impact point toward the shooter, so the pad
 // lands a unit clear of what it hit; push it back along its own axis. Shared
 // by the anchored draw (cg_ents.c) and the fall spawn (cg_localents.c) so the
@@ -131,7 +148,7 @@
 
 // wall-bite scar half-width; the mark texture is painted to this same world
 // scale, so changing one without the other slides the gouges off the claws
-#define GRAPPLE_PAD_MARK_RADIUS	10
+#define GRAPPLE_PAD_MARK_RADIUS	( 10 * GRAPPLE_MD3_SCALE )
 
 // rolled about its line of travel in flight so it reads as gyroscopically
 // held; g_missile.c stamps s.time at impact so the anchored draw can pick up
@@ -177,7 +194,8 @@
 #define PAD_SEAT_ARC_SPIKE	1.00f	// arc density push while seating
 #define PAD_SEAT_RESET		500		// ms gap that means a restart or a seek
 #define PAD_SEAT_FIRE_BOOST	3.0f	// ramp multiplier once the pad has launched
-#define PAD_BOSS_X0			-3.80f	// the boss nose plane; the seat scale pivots here
+#define PAD_BOSS_X0			( -3.80f * GRAPPLE_MD3_SCALE )	// the boss nose plane;
+										//   the seat scale pivots here
 
 typedef enum {
 	FOOTSTEP_NORMAL,
@@ -239,6 +257,11 @@ typedef struct {
 
 	vec3_t			muzzleOrigin;
 	int				muzzleTime;		// 0 until a drawn weapon has written the origin above
+
+	// the local first-person wielder's BODY gun (mirror-only) stashes its own
+	// tether tag here, feeding the mirror copy of the tether
+	vec3_t			bodyTetherOrigin;
+	int				bodyTetherTime;
 
 	// railgun trail spawning
 	vec3_t			railgunImpact;
@@ -2004,6 +2027,7 @@ extern  qboolean linearLight;
 extern  qboolean projectDecal;
 extern  qboolean animFrame;
 extern  qboolean spritePolyTrap;
+extern  qboolean polyFxTrap;
 
 #ifdef Q3_VM
 extern qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
@@ -2011,6 +2035,7 @@ extern void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 extern void	(*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 extern void	(*trap_R_ProjectDecal)( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
 extern void	(*trap_R_AddSpritePolyToScene)( qhandle_t hShader, const vec3_t origin, float width, float height, float rotation, const byte *rgba );
+extern void	(*trap_R_AddPolysToScene2)( qhandle_t hShader, int numVerts, const polyVert_t *verts, int numPolys, int renderfx );
 extern void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
 #else
 qboolean trap_GetValue( char *value, int valueSize, const char *key );
@@ -2018,12 +2043,14 @@ void trap_R_AddRefEntityToScene2( const refEntity_t *re );
 void trap_R_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
 void trap_R_AddSpritePolyToScene( qhandle_t hShader, const vec3_t origin, float width, float height, float rotation, const byte *rgba );
+void trap_R_AddPolysToScene2( qhandle_t hShader, int numVerts, const polyVert_t *verts, int numPolys, int renderfx );
 void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
 extern int dll_com_trapGetValue;
 extern int dll_trap_R_AddRefEntityToScene2;
 extern int dll_trap_R_AddLinearLightToScene;
 extern int dll_trap_R_ProjectDecal;
 extern int dll_trap_R_AddSpritePolyToScene;
+extern int dll_trap_R_AddPolysToScene2;
 extern int dll_trap_VR_RegisterState;
 #endif
 

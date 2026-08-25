@@ -880,14 +880,94 @@ void CG_GrappleFade( byte *rgba, float pulse ) {
 static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 		int clientNum, int act );
 
+/*
+==========================
+CG_TetherBeam
+
+One tether polyline from a muzzle to the pad.  Split from CG_GrappleTrail so
+the local wielder can draw it twice: the view-anchored beam the eye sees, and
+a body-anchored copy pinned to mirrors, where the view weapon isn't drawn.
+arcs is qfalse on the mirror copy - the arc machinery keys one-shot crackles
+per slot, and a second caller per frame would double them.
+==========================
+*/
+static void CG_TetherBeam( const vec3_t muzzle, const vec3_t origin, const byte *tint,
+		int owner, int act, int renderfx, qboolean arcs ) {
+	polyVert_t	v[4 * TETHER_PLANES];
+	vec3_t		start, dir, n, tmp;
+	float		len, s0, s1;
+	int			i, k;
+
+	VectorCopy( muzzle, start );
+
+	// only bail when too short to derive a direction; a bigger guard blanks
+	// the tether at the end of every pull, right when it's closest to view
+	if ( Distance( start, origin ) < TETHER_MIN_LENGTH )
+		return;
+
+	VectorSubtract( origin, start, dir );
+	len = VectorNormalize( dir );
+
+	// run the near end back down the bore rather than starting flush with its
+	// mouth, which shows an empty barrel behind the tether in first person
+	VectorMA( start, -TETHER_MUZZLE_OVERLAP, dir, start );
+	len += TETHER_MUZZLE_OVERLAP;
+
+	// no light grid sample: a tether that dimmed in shadow would read as chain
+
+	// S counts texture repeats, so a charge cycle spans the same world distance
+	// at any length.  Reversed while reeling, like the pad's rings
+	if ( act == GRAPPLE_PULL ) {
+		s0 = len / TETHER_PULSE_WAVELENGTH;
+		s1 = 0;
+	} else {
+		s0 = 0;
+		s1 = len / TETHER_PULSE_WAVELENGTH;
+	}
+
+	for ( k = 0 ; k < 4 * TETHER_PLANES ; k++ ) {
+		v[k].modulate[0] = tint[0];
+		v[k].modulate[1] = tint[1];
+		v[k].modulate[2] = tint[2];
+		v[k].modulate[3] = TETHER_PLANE_ALPHA;
+	}
+	for ( k = 0 ; k < 4 * TETHER_PLANES ; k += 4 ) {
+		v[k+0].st[0] = s0;	v[k+0].st[1] = 0;
+		v[k+1].st[0] = s1;	v[k+1].st[1] = 0;
+		v[k+2].st[0] = s1;	v[k+2].st[1] = 1;
+		v[k+3].st[0] = s0;	v[k+3].st[1] = 1;
+	}
+
+	// basis off the cable, not the view: a billboard is wrong in stereo and
+	// collapses end-on, where the near end sits
+	PerpendicularVector( n, dir );
+
+	for ( i = 0 ; i < TETHER_PLANES ; i++ ) {
+		VectorMA( start,  TETHER_HALF_WIDTH, n, v[4*i+0].xyz );
+		VectorMA( origin, TETHER_HALF_WIDTH, n, v[4*i+1].xyz );
+		VectorMA( origin, -TETHER_HALF_WIDTH, n, v[4*i+2].xyz );
+		VectorMA( start,  -TETHER_HALF_WIDTH, n, v[4*i+3].xyz );
+
+		RotatePointAroundVector( tmp, dir, n, TETHER_PLANE_STEP );
+		VectorCopy( tmp, n );
+	}
+	if ( polyFxTrap && renderfx ) {
+		trap_R_AddPolysToScene2( cgs.media.grappleTetherShader, 4, v, TETHER_PLANES, renderfx );
+	} else {
+		trap_R_AddPolysToScene( cgs.media.grappleTetherShader, 4, v, TETHER_PLANES );
+	}
+
+	if ( arcs ) {
+		CG_TetherArcs( start, dir, len, owner, act );
+	}
+}
+
 void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
 	static const byte stockTint[3] = { TETHER_TINT_R, TETHER_TINT_G, TETHER_TINT_B };
-	vec3_t			origin, start, dir, n, tmp;
-	polyVert_t		v[4 * TETHER_PLANES];
-	float			len, s0, s1;
+	vec3_t			origin, start;
 	entityState_t	*es;
 	const byte		*tint;
-	int				i, k, act, owner;
+	int				i, act, owner, fx;
 
 	es = &ent->currentState;
 
@@ -936,61 +1016,24 @@ void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
 		VectorCopy( cg_entities[ owner ].lerpOrigin, start );	// no live muzzle
 	}
 
-	// only bail when too short to derive a direction; a bigger guard blanks
-	// the tether at the end of every pull, right when it's closest to view
-	if ( Distance( start, origin ) < TETHER_MIN_LENGTH )
-		return;
+	act = CG_GrappleActivity( owner );
 
-	VectorSubtract( origin, start, dir );
-	len = VectorNormalize( dir );
-
-	// run the near end back down the bore rather than starting flush with its
-	// mouth, which shows an empty barrel behind the tether in first person
-	VectorMA( start, -TETHER_MUZZLE_OVERLAP, dir, start );
-	len += TETHER_MUZZLE_OVERLAP;
-
-	// no light grid sample: a tether that dimmed in shadow would read as chain
-
-	// S counts texture repeats, so a charge cycle spans the same world distance
-	// at any length.  Reversed while reeling, like the pad's rings
-	act = CG_GrappleActivity( es->otherEntityNum );
-	if ( act == GRAPPLE_PULL ) {
-		s0 = len / TETHER_PULSE_WAVELENGTH;
-		s1 = 0;
-	} else {
-		s0 = 0;
-		s1 = len / TETHER_PULSE_WAVELENGTH;
+	// the local first-person wielder draws twice: the view-anchored beam the
+	// eye sees, kept out of mirrors, and a copy from the body gun's own
+	// tether tag pinned to them - so a reflection's tether feeds from the
+	// reflected muzzle instead of a point hanging off the undrawn view weapon
+	fx = 0;
+	if ( polyFxTrap
+			&& cg_entities[ owner ].pe.bodyTetherTime
+			&& cg.time - cg_entities[ owner ].pe.bodyTetherTime <= TETHER_MUZZLE_STALE ) {
+		fx = RF_FIRST_PERSON;
 	}
 
-	for ( k = 0 ; k < 4 * TETHER_PLANES ; k++ ) {
-		v[k].modulate[0] = tint[0];
-		v[k].modulate[1] = tint[1];
-		v[k].modulate[2] = tint[2];
-		v[k].modulate[3] = TETHER_PLANE_ALPHA;
+	CG_TetherBeam( start, origin, tint, owner, act, fx, qtrue );
+	if ( fx ) {
+		CG_TetherBeam( cg_entities[ owner ].pe.bodyTetherOrigin, origin, tint,
+			owner, act, RF_THIRD_PERSON, qfalse );
 	}
-	for ( k = 0 ; k < 4 * TETHER_PLANES ; k += 4 ) {
-		v[k+0].st[0] = s0;	v[k+0].st[1] = 0;
-		v[k+1].st[0] = s1;	v[k+1].st[1] = 0;
-		v[k+2].st[0] = s1;	v[k+2].st[1] = 1;
-		v[k+3].st[0] = s0;	v[k+3].st[1] = 1;
-	}
-
-	// basis off the cable, not the view: a billboard is wrong in stereo and
-	// collapses end-on, where the near end sits
-	PerpendicularVector( n, dir );
-
-	for ( i = 0 ; i < TETHER_PLANES ; i++ ) {
-		VectorMA( start,  TETHER_HALF_WIDTH, n, v[4*i+0].xyz );
-		VectorMA( origin, TETHER_HALF_WIDTH, n, v[4*i+1].xyz );
-		VectorMA( origin, -TETHER_HALF_WIDTH, n, v[4*i+2].xyz );
-		VectorMA( start,  -TETHER_HALF_WIDTH, n, v[4*i+3].xyz );
-
-		RotatePointAroundVector( tmp, dir, n, TETHER_PLANE_STEP );
-		VectorCopy( tmp, n );
-	}
-	trap_R_AddPolysToScene( cgs.media.grappleTetherShader, 4, v, TETHER_PLANES );
-
-	CG_TetherArcs( start, dir, len, es->otherEntityNum, act );
 }
 
 /*
@@ -1009,7 +1052,9 @@ wash.
 No cull, like CG_GrappleTrail, so a segment sighted end-on thins to nothing.
 ==========================
 */
-// the three lit channels and the rail edge over each, measured off the gun model
+// the three lit channels and the rail edge over each, measured off the gun
+// model's authored space - GRAPPLE_MD3_SCALE maps the finished polyline onto
+// the shipped model at the transform below
 //   { floor center y, z, the floor's own across direction y, z,
 //     center y of the rail edge above it, half its run }
 static const float arcChannel[3][6] = {
@@ -1385,7 +1430,7 @@ more than the poly it carries, and one pass is eight of them.
 ==========================
 */
 static void CG_ArcStrip( vec3_t *pt, float hw, const byte *tint, float alpha,
-		qhandle_t shader ) {
+		qhandle_t shader, int renderfx ) {
 	vec3_t		mid, dir, right, viewDir, e1, e2;
 	polyVert_t	v[ARC_SEGMENTS * 2 * 4];
 	polyVert_t	*q;
@@ -1430,7 +1475,14 @@ static void CG_ArcStrip( vec3_t *pt, float hw, const byte *tint, float alpha,
 		}
 	}
 	if ( n ) {
-		trap_R_AddPolysToScene( shader, 4, v, n );
+		// view-gated when the engine offers it, so a first-person pass stays
+		// out of mirrors and a mirror-only pass out of the main view; engines
+		// without the trap get the plain everywhere-poly as before
+		if ( polyFxTrap && renderfx ) {
+			trap_R_AddPolysToScene2( shader, 4, v, n, renderfx );
+		} else {
+			trap_R_AddPolysToScene( shader, 4, v, n );
+		}
 	}
 }
 
@@ -1616,9 +1668,9 @@ static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 		haloAlpha = ARC_ALPHA * gate * fac->bright * sin( u * M_PI );
 		coreAlpha = ARC_CORE_ALPHA * gate * fac->bright * CG_ArcCoreEnvelope( u );
 		CG_ArcStrip( pt, TETHER_ARC_HALF_WIDTH, tint, haloAlpha,
-			cgs.media.grappleArcShader );
+			cgs.media.grappleArcShader, 0 );
 		CG_ArcStrip( pt, TETHER_ARC_HALF_WIDTH * ARC_CORE_WIDTH_FRAC,
-			coreTint, coreAlpha, cgs.media.grappleArcShader );
+			coreTint, coreAlpha, cgs.media.grappleArcShader, 0 );
 	}
 }
 
@@ -1665,7 +1717,8 @@ static void CG_GrappleCoreArcs( const refEntity_t *gun, int clientNum, int act,
 	coreTint[3] = 255;
 
 	// the axis carries the model's scale, so filaments stay in proportion
-	hw = ARC_HALF_WIDTH * ARC_HALO_WIDTH_MULT * VectorLength( gun->axis[0] );
+	hw = ARC_HALF_WIDTH * ARC_HALO_WIDTH_MULT * GRAPPLE_MD3_SCALE
+		* VectorLength( gun->axis[0] );
 	coreHw = hw * ARC_CORE_WIDTH_FRAC;
 
 	// only brightness softens its coupling to the sound envelope, so pulling
@@ -1785,6 +1838,9 @@ static void CG_GrappleCoreArcs( const refEntity_t *gun, int clientNum, int act,
 				p[1] += kink[1] * chan[2];
 				p[2] += kink[1] * chan[3];
 			}
+			VectorScale( p, GRAPPLE_MD3_SCALE, p );
+			p[0] += GRAPPLE_GUN_PIVOT_X * ( 1.0f - GRAPPLE_MD3_SCALE );
+			p[2] += GRAPPLE_GUN_PIVOT_Z * ( 1.0f - GRAPPLE_MD3_SCALE );
 			VectorCopy( gun->origin, pt[s] );
 			for ( k = 0; k < 3; k++ ) {
 				VectorMA( pt[s], p[k], gun->axis[k], pt[s] );
@@ -1792,8 +1848,10 @@ static void CG_GrappleCoreArcs( const refEntity_t *gun, int clientNum, int act,
 		}
 
 		// two passes over the SAME pt[] polyline; order doesn't matter under additive blending
-		CG_ArcStrip( pt, hw, tint, haloAlpha, shader );
-		CG_ArcStrip( pt, coreHw, coreTint, coreAlpha, shader );
+		CG_ArcStrip( pt, hw, tint, haloAlpha, shader,
+			gun->renderfx & ( RF_FIRST_PERSON | RF_THIRD_PERSON ) );
+		CG_ArcStrip( pt, coreHw, coreTint, coreAlpha, shader,
+			gun->renderfx & ( RF_FIRST_PERSON | RF_THIRD_PERSON ) );
 	}
 }
 
@@ -2601,16 +2659,21 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	}
 
 	CG_PositionEntityOnTag( &gun, parent, parent->hModel, "tag_weapon");
+	if ( weaponNum == WP_GRAPPLING_HOOK && !ps ) {
+		VectorMA( gun.origin, GRAPPLE_GUN_SEAT_FWD, gun.axis[0], gun.origin );
+	}
 
 	CG_AddWeaponWithPowerups( &gun, cent->currentState.powerups );
 
 	// invis already renders the gun through invisShader, but the arcs are separate
 	// polys that shader can't touch, so they need their own gate or an invisible
-	// carrier flickers owner-colored arcs as a permanent idle tell. RF_THIRD_PERSON
-	// needs the same gate: polys carry no renderfx, so the mirror-only BODY gun
-	// was throwing its arcs into the main view with no gun under them
+	// carrier flickers owner-colored arcs as a permanent idle tell. The
+	// RF_THIRD_PERSON body gun draws only in mirrors, and a plain poly draws
+	// everywhere - so its arcs are allowed only when the engine's view-gated
+	// polys can pin them to the mirror; without that trap they'd float in the
+	// main view with no gun under them
 	if ( weaponNum == WP_GRAPPLING_HOOK
-			&& !( gun.renderfx & RF_THIRD_PERSON )
+			&& ( polyFxTrap || !( gun.renderfx & RF_THIRD_PERSON ) )
 			&& !( cent->currentState.powerups & ( 1 << PW_INVIS ) )
 			// filaments are 0.1u wide: sub-pixel past a few hundred units
 			&& ( ( gun.renderfx & RF_FIRST_PERSON )
@@ -2824,6 +2887,21 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			VectorCopy( flash.origin, nonPredictedCent->pe.muzzleOrigin );
 		}
 		nonPredictedCent->pe.muzzleTime = cg.time;
+	} else if ( weaponNum == WP_GRAPPLING_HOOK && ( gun.renderfx & RF_THIRD_PERSON ) ) {
+		// the mirror-only body gun: its own tether tag feeds the mirror copy
+		// of the tether (CG_GrappleTrail), which the view-anchored beam above
+		// can't serve - the view weapon isn't drawn in mirrors
+		orientation_t	gunTether;
+		vec3_t			chainOrg;
+		int				i;
+
+		gunTether = weapon->gunTetherTag;
+		VectorCopy( gun.origin, chainOrg );
+		for ( i = 0; i < 3; i++ ) {
+			VectorMA( chainOrg, gunTether.origin[i], gun.axis[i], chainOrg );
+		}
+		VectorCopy( chainOrg, nonPredictedCent->pe.bodyTetherOrigin );
+		nonPredictedCent->pe.bodyTetherTime = cg.time;
 	}
 
 	if ( ps || cg.renderingThirdPerson || cent->currentState.number != cg.predictedPlayerState.clientNum ) {
