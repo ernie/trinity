@@ -28,6 +28,8 @@
 #define MFL_ACTIVEGRAPPLE				128		//bot is using the grapple hook
 #define MFL_GRAPPLERESET				256		//bot has reset the grapple
 #define MFL_WALK						512		//bot should walk slowly
+#define MFL_HOOKREADY					2048	//the grapple is in hand, raised, and not out: a route shot may press. MUST MATCH the engine's be_ai_move.h (1024 is the engine's own)
+#define MFL_HOOKOUT						8192	//our hook entity exists, flying or anchored. MUST MATCH the engine's be_ai_move.h
 // move result flags
 #define MOVERESULT_MOVEMENTVIEW			1		//bot uses view for movement
 #define MOVERESULT_SWIMVIEW				2		//bot uses view for swimming

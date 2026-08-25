@@ -640,10 +640,15 @@ void Weapon_GrapplingHook_Fire (gentity_t *ent)
 {
 	gentity_t	*hook;
 
-	if (!ent->client->hook) {
+	// a bot's press throws exactly one hook: a held trigger re-throwing the
+	// instant a miss frees it would keep botlib's "hook out" state alive
+	// forever. A player's held trigger still re-throws
+	if ( !ent->client->hook
+			&& !( ( ent->r.svFlags & SVF_BOT ) && ent->client->fireHeld ) ) {
 		hook = fire_grapple (ent, muzzle, forward);
 		hook->damage *= s_quadFactor;
 	}
+	ent->client->fireHeld = qtrue;
 }
 
 

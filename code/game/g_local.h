@@ -368,6 +368,7 @@ struct gclient_s {
 	int			lastKillTime;		// for multiple kill rewards
 
 	gentity_t	*hook;				// grapple hook if out
+	qboolean	fireHeld;			// for grapple
 
 	int			switchTeamTime;		// time the player switched teams
 

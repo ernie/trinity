@@ -994,6 +994,10 @@ void ClientThink_real( gentity_t *ent ) {
 
 	SendPendingPredictableEvents( &ent->client->ps );
 
+	if ( !( ent->client->ps.eFlags & EF_FIRING ) ) {
+		client->fireHeld = qfalse;		// for grapple
+	}
+
 	// use the snapped origin for linking so it matches client predicted versions
 	VectorCopy( ent->s.pos.trBase, ent->r.currentOrigin );
 

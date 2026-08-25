@@ -1613,6 +1613,25 @@ void BotSetupForMovement(bot_state_t *bs) {
 	if ((bs->cur_ps.pm_flags & PMF_TIME_WATERJUMP) && (bs->cur_ps.pm_time > 0)) {
 		initmove.or_moveflags |= MFL_WATERJUMP;
 	}
+	//set the grapple pull flag; botlib can't detect the anchored hook itself
+	//(ET_GRAPPLE, not the missile GrappleState looks for)
+	if (bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) {
+		initmove.or_moveflags |= MFL_GRAPPLEPULL;
+	}
+	//the hook is in hand, raised, and not already out: the only state a route
+	//shot may press from. A press during the raise launches a weapon change
+	//later, on whatever the view has drifted to by then, and a press with
+	//another hook out launches nothing until that hook frees. Botlib cannot
+	//read weapon state; its entity feed is tick-stale
+	if (bs->cur_ps.weapon == WP_GRAPPLING_HOOK && bs->cur_ps.weaponstate == WEAPON_READY
+			&& !g_entities[bs->client].client->hook) {
+		initmove.or_moveflags |= MFL_HOOKREADY;
+	}
+	//botlib's entity feed carries no owner, so it cannot tell our hook from
+	//another bot's; this is ours, flying or anchored
+	if (g_entities[bs->client].client->hook) {
+		initmove.or_moveflags |= MFL_HOOKOUT;
+	}
 	//set presence type
 	if (bs->cur_ps.pm_flags & PMF_DUCKED) initmove.presencetype = PRESENCE_CROUCH;
 	else initmove.presencetype = PRESENCE_NORMAL;
