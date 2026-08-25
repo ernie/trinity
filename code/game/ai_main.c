@@ -688,6 +688,20 @@ int NumBots(void) {
 
 /*
 ==============
+BotStateForClient
+
+The states are the AI's own; the game side only ever asks about one client at
+a time, so it asks rather than reaching into the table.
+==============
+*/
+bot_state_t *BotStateForClient(int client) {
+	if (client < 0 || client >= MAX_CLIENTS) return NULL;
+	if (!botstates[client] || !botstates[client]->inuse) return NULL;
+	return botstates[client];
+}
+
+/*
+==============
 BotTeamLeader
 ==============
 */

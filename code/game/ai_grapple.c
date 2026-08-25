@@ -142,6 +142,10 @@ static float BotGrappleCooldown(bot_state_t *bs) {
 			* (1.0f + 0.5f * random());
 }
 
+static qboolean BotGrappleMantleUp(bot_state_t *bs, playerState_t *ps);
+static void BotGrappleMantleSpend(bot_state_t *bs, qboolean ok);
+static void BotGrappleMantleRefuse(bot_state_t *bs, const char *why, int detail);
+
 /*
 ==================
 BotTacticalGrappleBegin
@@ -157,10 +161,15 @@ BotTacticalGrappleEnd
 ==================
 */
 static void BotTacticalGrappleEnd(bot_state_t *bs, qboolean whiff) {
+	//a mantle still running when the mode ends ended with it, whatever ended it
+	if (bs->grapplemantle_time > 0) BotGrappleMantleSpend(bs, BotGrappleMantleUp(bs, &bs->cur_ps));
 	bs->grapplemode = GRAPPLE_MODE_NONE;
 	bs->grapplehookent = 0;
 	bs->grapplepull_time = 0;
+	bs->grapplemantle_time = 0;
+	bs->grapplemantle_deckz = 0;
 	bs->grapplesettle_time = 0;
+	bs->grapplevault_time = 0;
 	bs->grappleretarget_time = 0;
 	//a whiff never engaged anything, so let the bot try again soon
 	bs->grapplenext_time = FloatTime() + (whiff ? GRAPPLE_SNOOZE : BotGrappleCooldown(bs));
@@ -876,6 +885,270 @@ qboolean BotGrappleSnapsAim(bot_state_t *bs) {
 
 /*
 ==================
+BotGrappleMantleUp
+
+Standing, with the feet at the deck the mantle went for.
+==================
+*/
+static qboolean BotGrappleMantleUp(bot_state_t *bs, playerState_t *ps) {
+	if (ps->groundEntityNum == ENTITYNUM_NONE) return qfalse;
+	return (ps->origin[2] + MINS_Z >= bs->grapplemantle_deckz - 4);
+}
+
+/*
+==================
+BotGrappleMantleSpend
+
+One attempt per pull, whatever the outcome.
+==================
+*/
+static void BotGrappleMantleSpend(bot_state_t *bs, qboolean ok) {
+	if (bot_grapple.integer >= 2) {
+		G_Printf("GRAPPLE-MANTLE end c%i %s dt %i\n", bs->client, ok ? "ok" : "fail",
+				(int)((FloatTime() - bs->grapplemantle_time) * 1000));
+	}
+	bs->grapplemantle_time = -1;
+}
+
+/*
+==================
+BotGrappleFrameRelease
+
+The frame half of the maneuvers. EA input only changes on a think, so a
+release decided there trails the moment by up to a whole think: a mantle's
+tow drags the body back off the lip the step just cleared, and a vault's
+knee bleeds the speed the climb was going to spend. Deciding on the think
+and acting on the frame is how the move state runs the tow itself.
+==================
+*/
+qboolean BotGrappleFrameRelease(int clientNum) {
+	bot_state_t *bs;
+	playerState_t *ps;
+
+	bs = BotStateForClient(clientNum);
+	if (!bs) return qfalse;
+	if (!g_entities[clientNum].client) return qfalse;
+	ps = &g_entities[clientNum].client->ps;
+	//the mantle's step: let go the frame the ground appears
+	if (bs->grapplemantle_time > 0 && BotGrappleMantleUp(bs, ps)) return qtrue;
+	//the vault: a lip anchor releases just before the knee's deceleration
+	//bleeds the tow, while the rise left in the climb still clears the lip.
+	//A save has no published release window, so the knee plus a frame of travel
+	//is the gate; an undershoot settles into a hang and the mantle runs
+	if (bs->grapplemode == GRAPPLE_MODE_SAVE && bs->grapplesavelip) {
+		//once let go, stay let go: the resent command still holds attack,
+		//and a single restored frame refires the hook into the face it just
+		//cleared. The think ends the save when it finds the hook gone
+		if (bs->grapplevault_time) return qtrue;
+		if ((ps->pm_flags & PMF_GRAPPLE_PULL)
+				&& ps->velocity[2] > 0
+				&& Distance(ps->origin, ps->grapplePoint) < GRAPPLE_MODEL_DECEL_KNEE + 20
+				&& ps->velocity[2] * ps->velocity[2] / 1600.0f
+					> ps->grapplePoint[2] - ps->origin[2] + 30) {
+			bs->grapplevault_time = FloatTime();
+			bs->grapplevault_deckz = ps->grapplePoint[2] + 6;
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+/*
+==================
+BotGrappleMantleFace
+
+The face is asked from the wall itself. The claws' embed angles carry the
+SHOT's pitch, not the surface's tilt (a save fired steeply up at a vertical
+wall would read as a ceiling by them), but that axis crossed the surface at
+the anchor by construction, so the trace rides it through the impact point
+(through, because an impact backs off the wall and a trace ENDING there
+reads clear) and the tilt comes off the plane it hits. A floor or a ceiling
+has no lip to climb onto, and a normal with no horizontal left leaves the
+maneuver no direction to work in.
+==================
+*/
+static qboolean BotGrappleMantleFace(bot_state_t *bs, gentity_t *hook, float *nz, vec3_t hn) {
+	trace_t tr;
+	vec3_t embed, start, end, normal;
+
+	AngleVectors(hook->s.angles, embed, NULL, NULL);
+	VectorMA(hook->r.currentOrigin, -8, embed, start);
+	VectorMA(hook->r.currentOrigin, 8, embed, end);
+	trap_Trace(&tr, start, NULL, NULL, end, bs->entitynum, MASK_SOLID);
+	if (tr.startsolid || tr.fraction >= 1.0f) {
+		BotGrappleMantleRefuse(bs, "probe", tr.startsolid ? -1 : 1);
+		return qfalse;
+	}
+	VectorCopy(tr.plane.normal, normal);
+	if (fabs(normal[2]) > 0.4f) {
+		BotGrappleMantleRefuse(bs, "tilt", (int) (normal[2] * 100));
+		return qfalse;
+	}
+	VectorSet(hn, normal[0], normal[1], 0);
+	if (VectorLength(hn) < 0.1f) return qfalse;
+	VectorNormalize(hn);
+	*nz = normal[2];
+	return qtrue;
+}
+
+/*
+==================
+BotGrappleMantlePitchSin
+
+The view IS the maneuver: PM_GrappleMove insets the tow target 16 units back
+along it, so aiming down and into the face lifts the target by 16*sin(pitch)
+and swings it out from the face by 16*cos(pitch): up and clear of the wall,
+not into it. This is the sine that parks the feet mid-step below a deck dz
+above the anchor (the settled body hangs 2 under the target and its feet 24
+under that), held short of the pitch where the press dies.
+==================
+*/
+static float BotGrappleMantlePitchSin(float dz) {
+	float s, top;
+
+	s = (dz + 17) / 16.0f;
+	//shallower than this and the target clears the wall instead of riding up it
+	if (s < 0.42f) s = 0.42f;
+	top = sin(DEG2RAD(GRAPPLE_MANTLE_PITCH_MAX));
+	if (s > top) s = top;
+	return s;
+}
+
+/*
+==================
+BotGrappleMantleRefuse
+
+Why a settled, unsafe hang did NOT mantle: the refusals are where the hangs
+that ride out the full hold come from, so each names its gate.
+==================
+*/
+static void BotGrappleMantleRefuse(bot_state_t *bs, const char *why, int detail) {
+	if (bot_grapple.integer < 2) return;
+	if (FloatTime() < bs->grapplemantlelog_time + 1) return;
+	bs->grapplemantlelog_time = FloatTime();
+	G_Printf("GRAPPLE-MANTLE refuse c%d %s %d\n", bs->client, why, detail);
+}
+
+/*
+==================
+BotGrappleMantleWanted
+
+Whether a settled hang is one step below a deck it could stand on. The 16-unit
+inset caps the lift, so the whole reach is the step: a deck outside it is not
+a mantle, it is a climb the tether cannot make.
+==================
+*/
+static qboolean BotGrappleMantleWanted(bot_state_t *bs, gentity_t *hook, float *deckz,
+									float *sinp, float *nz, vec3_t hn) {
+	vec3_t anchor, start, end, over, raised;
+	trace_t tr;
+	float dz, gap, hout;
+
+	if (!(bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL)) return qfalse;
+	if (hook->s.eType != ET_GRAPPLE) return qfalse;
+	//a yank's anchor is a moving player, and its view is not snapped: the
+	//commanded pitch would still be slewing when the budget ran out
+	if (bs->grapplemode == GRAPPLE_MODE_YANK) return qfalse;
+	VectorCopy(bs->cur_ps.grapplePoint, anchor);
+	//settled, inside the same arrive window a route tow is judged by, so the
+	//two agree on when a hang has stopped going anywhere. The velocity is
+	//COMMANDED (the tow writes 10x the remaining distance every frame), so
+	//a body pinned against a lip reads fast while going nowhere: what it
+	//MOVED since last think is the truth
+	if (Distance(bs->origin, anchor) > 48
+			|| (VectorLength(bs->cur_ps.velocity) > 40
+				&& Distance(bs->origin, bs->grapplehang_org) > 8)) {
+		VectorCopy(bs->origin, bs->grapplehang_org);
+		bs->grapplesettle_time = 0;
+		return qfalse;
+	}
+	VectorCopy(bs->origin, bs->grapplehang_org);
+	if (!bs->grapplesettle_time) bs->grapplesettle_time = FloatTime();
+	if (FloatTime() < bs->grapplesettle_time + GRAPPLE_MANTLE_SETTLE) return qfalse;
+	//the same predicate that pins the hang in the first place: where letting go
+	//is already fine there is nothing to salvage
+	if (BotGrappleReleaseSafe(bs)) return qfalse;
+	if (FloatTime() > bs->grapplepull_time + GRAPPLE_MAXHOLD) return qfalse;
+	if (!BotGrappleMantleFace(bs, hook, nz, hn)) return qfalse;
+	//the air over the lip has to be open, far enough past the face that the
+	//standing spot survives the tow's last tug back toward the anchor. Traced
+	//the way a bot's own pmove traces: a botclip brush capping the ledge is
+	//nothing to MASK_PLAYERSOLID and would then refuse the step
+	VectorMA(anchor, 2, hn, start);
+	start[2] += 10;
+	VectorMA(start, -32, hn, end);
+	trap_Trace(&tr, start, NULL, NULL, end, bs->entitynum, GRAPPLE_MANTLE_CLIP);
+	if (tr.startsolid || tr.fraction < 1.0f) {
+		BotGrappleMantleRefuse(bs, "lip", tr.startsolid ? -1 : (int) (tr.fraction * 100));
+		return qfalse;
+	}
+	//and there has to be a standable floor under it
+	VectorCopy(tr.endpos, over);
+	VectorCopy(over, end);
+	end[2] -= 42;
+	trap_Trace(&tr, over, NULL, NULL, end, bs->entitynum, GRAPPLE_MANTLE_CLIP);
+	if (tr.startsolid || tr.fraction >= 1.0f || tr.plane.normal[2] < 0.7f) {
+		BotGrappleMantleRefuse(bs, "floor", 0);
+		return qfalse;
+	}
+	*deckz = tr.endpos[2];
+	dz = *deckz - anchor[2];
+	//the pitch this deck asks for, and what it leaves for the step
+	*sinp = BotGrappleMantlePitchSin(dz);
+	gap = dz + 26 - 16 * (*sinp);
+	//the step lifts 18 and needs somewhere to lift from: outside that the deck
+	//is either out of reach or already underfoot
+	if (gap < 2 || gap > 18) {
+		BotGrappleMantleRefuse(bs, "gap", (int) gap);
+		return qfalse;
+	}
+	//the settled body hangs 16*cos(pitch) out from the face, the same inset
+	//PM_GrappleMove leaves the tow target at; floored so the trace never
+	//starts inside the face near the 85-degree pitch cap, where that thins
+	//to under 1.4 units
+	hout = 16 * sqrt(1 - (*sinp) * (*sinp));
+	if (hout < 2) hout = 2;
+	//the body's own path: flush against the face, raised by the step, across to
+	//the standing spot. This is the slide the step itself will attempt
+	VectorMA(anchor, hout, hn, raised);
+	raised[2] = anchor[2] + 16 * (*sinp) - 2 + 18;
+	VectorCopy(over, end);
+	end[2] = raised[2];
+	trap_Trace(&tr, raised, playerMins, playerMaxs, end, bs->entitynum, GRAPPLE_MANTLE_CLIP);
+	if (tr.startsolid || tr.fraction < 1.0f) {
+		BotGrappleMantleRefuse(bs, "path", 0);
+		return qfalse;
+	}
+	return qtrue;
+}
+
+/*
+==================
+BotGrappleMantleInputs
+
+Built, not solved: the direction comes straight from the sine the geometry
+picked. vectoangles rather than the aim helper, which jitters the view for a
+low-accuracy character, and the view is exact on the next command because the
+grapple is in hand.
+==================
+*/
+static void BotGrappleMantleInputs(bot_state_t *bs, float sinp, vec3_t hn) {
+	vec3_t want, into;
+
+	VectorScale(hn, -sqrt(1 - sinp * sinp), want);
+	want[2] = -sinp;
+	vectoangles(want, bs->ideal_viewangles);
+	//a single think without the trigger, or with another weapon, frees the hook
+	bs->weaponnum = WP_GRAPPLING_HOOK;
+	trap_EA_Attack(bs->client);
+	//the tow is what climbs the face; this only matters once the step has put
+	//ground under the feet
+	VectorNegate(hn, into);
+	trap_EA_Move(bs->client, into, 400);
+}
+
+/*
+==================
 BotTacticalGrappleFrame
 
 Runs after the AI node every think, so a node transition can never drop a
@@ -1023,7 +1296,49 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 	if (!bs->grapplepull_time) {
 		bs->grapplepull_time = FloatTime();
 		bs->grapplepull_health = bs->inventory[INVENTORY_HEALTH];
+		bs->grapplemantle_time = 0;
+		bs->grapplemantle_deckz = 0;
 		bs->grapplesettle_time = 0;
+	}
+	//lip anchors release frame-side (BotGrappleFrameRelease); a frame that
+	//already let go ends the save through the hook-gone path above
+	//a hang settled under a lip it could climb is salvageable: aim down so the
+	//tow target swings over the deck and let the step finish it. This sits ahead
+	//of every mode's ending so the attempt gets its budget whole, and it is a
+	//salvage, not a plan: one try per pull and the ending runs unchanged after
+	if (bs->grapplemantle_time >= 0) {
+		float deckz, sinp, nz;
+		vec3_t hn;
+
+		if (bs->grapplemantle_time > 0) {
+			if (BotGrappleMantleUp(bs, &bs->cur_ps)) {
+				BotTacticalGrappleEnd(bs, qfalse);
+				return;
+			}
+			if (FloatTime() < bs->grapplemantle_time + GRAPPLE_MANTLE_BUDGET
+					&& FloatTime() <= bs->grapplepull_time + GRAPPLE_MAXHOLD
+					&& hook->s.eType == ET_GRAPPLE
+					&& BotGrappleMantleFace(bs, hook, &nz, hn)) {
+				//the deck was measured once; the aim it asks for follows from it
+				sinp = BotGrappleMantlePitchSin(bs->grapplemantle_deckz - bs->cur_ps.grapplePoint[2]);
+				BotGrappleMantleInputs(bs, sinp, hn);
+				return;
+			}
+			BotGrappleMantleSpend(bs, qfalse);
+		}
+		else if (BotGrappleMantleWanted(bs, hook, &deckz, &sinp, &nz, hn)) {
+			bs->grapplemantle_time = FloatTime();
+			bs->grapplemantle_deckz = deckz;
+			if (bot_grapple.integer >= 2) {
+				G_Printf("GRAPPLE-MANTLE start c%i m%i rn %i dz %i gap %i pitch %i\n",
+						bs->client, bs->grapplemode, (int)(nz * 100),
+						(int)(deckz - bs->cur_ps.grapplePoint[2]),
+						(int)(deckz - bs->cur_ps.grapplePoint[2] + 26 - 16 * sinp),
+						(int)RAD2DEG(atan2(sinp, sqrt(1 - sinp * sinp))));
+			}
+			BotGrappleMantleInputs(bs, sinp, hn);
+			return;
+		}
 	}
 	wantrelease = qfalse;
 	whiff = qfalse;

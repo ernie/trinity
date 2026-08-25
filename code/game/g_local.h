@@ -865,6 +865,7 @@ qboolean BotAISetupClient(int client, struct bot_settings_s *settings, qboolean 
 int BotAIShutdownClient( int client, qboolean restart );
 int BotAIStartFrame( int time );
 void BotTestAAS(vec3_t origin);
+qboolean BotGrappleFrameRelease( int clientNum );
 
 
 // g_rotation.c

@@ -18,5 +18,8 @@ qboolean	BotGrappleRouteAvailable(bot_state_t *bs);
 qboolean	BotWantsEngagementRelease(bot_state_t *bs);
 qboolean	BotGrappleSnapsAim(bot_state_t *bs);
 qboolean	BotGrappleHookAboutToBite(gentity_t *hook);
+//also declared in g_local.h: the frame side of the maneuvers runs from
+//ClientThink_real, which cannot see a bot state
+qboolean	BotGrappleFrameRelease(int clientNum);
 
 #endif

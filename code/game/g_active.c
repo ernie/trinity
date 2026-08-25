@@ -839,6 +839,14 @@ void ClientThink_real( gentity_t *ent ) {
 		client->ps.speed *= 1.3;
 	}
 
+	// a bot's grapple maneuvers let go on the frame their moment arrives
+	// rather than on the next think: bot input only changes once a think,
+	// and a think of tow drags a mantle back off its deck or bleeds the
+	// speed a vault was going to spend
+	if ( ( ent->r.svFlags & SVF_BOT ) && BotGrappleFrameRelease( ent->s.number ) ) {
+		ucmd->buttons &= ~BUTTON_ATTACK;
+	}
+
 	// Let go of the hook if we aren't firing or are switching away.
 	// PM_BeginWeaponChange clears the predicted pull flag to match.
 	if ( client->hook &&

@@ -197,9 +197,18 @@ typedef struct bot_state_s
 	float hurt_time;								//when the last hit landed
 	int lastdamageevent;							//damageEvent counter seen last think, so a hit is an edge
 	int grapplepulled;								//pull bit seen last think
+	float grapplemantle_time;						//when a mantle began; 0 idle, -1 spent this pull
+	float grapplemantle_deckz;						//top of the deck a mantle is climbing onto
 	float grapplesettle_time;						//when the hang stopped moving, 0 when not settled
+	float grapplemantlelog_time;					//last mantle-refusal diagnostic, to rate-limit it
 	float grappleretarget_time;						//when a hanging save picked a new anchor; the
 													//hook it frees on purpose must not end the mode
+	vec3_t grapplehang_org;							//where the hang was last think: a pinned body
+													//reads high commanded speed while going nowhere
+	int grapplesavelip;								//the save's anchor hangs under a routable deck lip
+	float grapplevault_time;						//the frame side let the vault go; holds the trigger
+													//up until the ride ends
+	float grapplevault_deckz;						//top of the deck the vault is climbing onto
 	vec3_t aimtarget;
 	vec3_t enemyvelocity;							//enemy velocity 0.5 secs ago during battle
 	vec3_t enemyorigin;								//enemy origin 0.5 secs ago during battle
@@ -283,6 +292,8 @@ typedef struct bot_state_s
 void BotResetState(bot_state_t *bs);
 //returns the number of bots in the game
 int NumBots(void);
+//the bot state of a client, NULL when the client is not a bot that is playing
+bot_state_t *BotStateForClient(int client);
 //returns info about the entity
 void BotEntityInfo(int entnum, aas_entityinfo_t *info);
 //needed cross-file by the tactical grapple aim gate
