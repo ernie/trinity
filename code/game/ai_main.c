@@ -936,6 +936,13 @@ void BotUpdateInput(bot_state_t *bs, int time, int elapsed_time) {
 	if (bi.actionflags & ACTION_RESPAWN) {
 		if (bs->lastucmd.buttons & BUTTON_ATTACK) bi.actionflags &= ~(ACTION_RESPAWN|ACTION_ATTACK);
 	}
+	//the first weapon fired within two seconds of a tow ending
+	if (bot_grapple.integer >= 2 && (bi.actionflags & ACTION_ATTACK) && bi.weapon != WP_GRAPPLING_HOOK
+			&& bs->grapplerelease_time && FloatTime() - bs->grapplerelease_time <= 2.0) {
+		G_Printf("GRAPPLE-SHOT c%d w %d dt %d\n", bs->client, bi.weapon,
+				(int) ((FloatTime() - bs->grapplerelease_time) * 1000));
+		bs->grapplerelease_time = 0;
+	}
 	//the view slews like a player's; the command that fires a grapple at the
 	//world carries the exact angles, so only the one frame of slew between
 	//thinks is left
@@ -1421,11 +1428,18 @@ int BotAIStartFrame(int time) {
 	static int botlib_residual;
 	static int lastbotthink_time;
 	static qboolean skip[MAX_GENTITIES], *s;
+	static int bot_grapple_modcount = -1;
 
 	G_CheckBotSpawn();
 
 	trap_Cvar_Update(&bot_rocketjump);
 	trap_Cvar_Update(&bot_grapple);
+	//the cvar is registered after the library is set up, so this frame is
+	//the first place its value exists; the -1 seed forces the first mirror
+	if (bot_grapple.modificationCount != bot_grapple_modcount) {
+		bot_grapple_modcount = bot_grapple.modificationCount;
+		trap_BotLibVarSet("bot_grapple", va("%d", bot_grapple.integer));
+	}
 	trap_Cvar_Update(&bot_fastchat);
 	trap_Cvar_Update(&bot_nochat);
 	trap_Cvar_Update(&bot_testrchat);
@@ -1699,7 +1713,7 @@ int BotInitLibrary( void ) {
 
 	//game directory
 	trap_Cvar_VariableStringBuffer( "fs_game", buf, sizeof( buf ) );
-	if ( buf[0] ) 
+	if ( buf[0] )
 		trap_BotLibVarSet( "gamedir", buf );
 
 #ifdef MISSIONPACK

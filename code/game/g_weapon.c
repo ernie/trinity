@@ -647,6 +647,10 @@ void Weapon_GrapplingHook_Fire (gentity_t *ent)
 			&& !( ( ent->r.svFlags & SVF_BOT ) && ent->client->fireHeld ) ) {
 		hook = fire_grapple (ent, muzzle, forward);
 		hook->damage *= s_quadFactor;
+		if ( ( ent->r.svFlags & SVF_BOT ) && trap_Cvar_VariableIntegerValue( "bot_grapple" ) >= 2 ) {
+			G_Printf( "GRAPPLE-LAUNCH c%d t %d yaw %.2f pitch %.2f\n", ent->s.number, level.time,
+					ent->client->ps.viewangles[YAW], ent->client->ps.viewangles[PITCH] );
+		}
 	}
 	ent->client->fireHeld = qtrue;
 }

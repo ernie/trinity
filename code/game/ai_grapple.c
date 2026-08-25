@@ -179,6 +179,9 @@ static void BotTacticalGrappleBegin(bot_state_t *bs, int mode) {
 	//The reset ends any outstanding route tow and leaves the frame hook
 	//nothing to judge; the router replans from scratch on its next think
 	if (bs->ms) trap_BotResetMoveState(bs->ms);
+	if (bot_grapple.integer >= 2) {
+		G_Printf("GRAPPLE-TAC c%d mode %d t %d\n", bs->client, mode, level.time);
+	}
 }
 
 /*
@@ -189,6 +192,10 @@ BotTacticalGrappleEnd
 static void BotTacticalGrappleEnd(bot_state_t *bs, qboolean whiff) {
 	//a mantle still running when the mode ends ended with it, whatever ended it
 	if (bs->grapplemantle_time > 0) BotGrappleMantleSpend(bs, BotGrappleMantleUp(bs, &bs->cur_ps));
+	if (bot_grapple.integer >= 2 && bs->grapplemode != GRAPPLE_MODE_NONE) {
+		G_Printf("GRAPPLE-TAC c%d mode 0 from %d whiff %d t %d\n",
+				bs->client, bs->grapplemode, whiff, level.time);
+	}
 	bs->grapplemode = GRAPPLE_MODE_NONE;
 	bs->grapplehookent = 0;
 	bs->grapplepull_time = 0;
