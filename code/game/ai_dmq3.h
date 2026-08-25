@@ -20,6 +20,7 @@ void BotDeathmatchAI(bot_state_t *bs, float thinktime);
 void BotFreeWaypoints(bot_waypoint_t *wp);
 //choose a weapon
 void BotChooseWeapon(bot_state_t *bs);
+void BotHonorMovementWeapon(bot_state_t *bs, bot_moveresult_t *moveresult);
 //setup movement stuff
 void BotSetupForMovement(bot_state_t *bs);
 //update the inventory
@@ -68,6 +69,8 @@ float BotFeelingBad(bot_state_t *bs);
 int BotWantsToRetreat(bot_state_t *bs);
 //returns true if the bot wants to chase
 int BotWantsToChase(bot_state_t *bs);
+//returns true if a walkable route to the chase spot exists
+qboolean BotChaseRoutable(bot_state_t *bs, int areanum);
 //returns true if the bot wants to help
 int BotWantsToHelp(bot_state_t *bs);
 //returns true if the bot can and wants to rocketjump

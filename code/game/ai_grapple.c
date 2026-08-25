@@ -113,6 +113,19 @@ int BotTacticalGrappleActive(bot_state_t *bs) {
 
 /*
 ==================
+BotGrappleRouteAvailable
+
+Whether the router may plan grapple travel. Not while a maneuver owns the
+hook: BotTravel_Grapple would read the tactical pull as its own tow and arm
+a route release window on it.
+==================
+*/
+qboolean BotGrappleRouteAvailable(bot_state_t *bs) {
+	return BotGrappleAvailable(bs) && !BotTacticalGrappleActive(bs);
+}
+
+/*
+==================
 BotGrappleCooldown
 
 Appetite reads as frequency; the dice roll it replaces skipped good chances
@@ -540,6 +553,169 @@ void BotCheckTacticalGrapple(bot_state_t *bs, aas_entityinfo_t *entinfo) {
 
 /*
 ==================
+BotGrappleMoverAimPoint
+
+Anchors on the top face only: an underside hook is a hang, not a ride. The
+face test also decides when a ride is possible at all, since the bot can only
+see a top it is already above.
+==================
+*/
+static qboolean BotGrappleMoverAimPoint(bot_state_t *bs, int entnum, vec3_t aimpoint) {
+	gentity_t *e;
+	trace_t tr;
+	vec3_t top, pred, delta;
+	float dist, t;
+
+	if (entnum < MAX_CLIENTS || entnum >= level.num_entities) return qfalse;
+	e = &g_entities[entnum];
+	if (!e->inuse || e->s.eType != ET_MOVER) return qfalse;
+	if (e->s.pos.trType == TR_STATIONARY && e->s.apos.trType == TR_STATIONARY) return qfalse;
+	//just under the top face, so a descending ray terminates on the surface to stand on
+	top[0] = (e->r.absmin[0] + e->r.absmax[0]) * 0.5f;
+	top[1] = (e->r.absmin[1] + e->r.absmax[1]) * 0.5f;
+	top[2] = e->r.absmax[2] - 1;
+	//validate against the pose the trace can see, then lead the shot from that point
+	trap_Trace(&tr, bs->eye, NULL, NULL, top, bs->entitynum, MASK_SHOT);
+	if (tr.startsolid || tr.allsolid) return qfalse;
+	if (tr.entityNum != entnum) return qfalse;
+	if (tr.plane.normal[2] < 0.7f) return qfalse;
+	dist = Distance(bs->eye, top);
+	t = dist / GRAPPLE_MODEL_FIRE_SPEED;
+	BG_EvaluateTrajectory(&e->s.pos, level.time + (int)(t * 1000), pred);
+	VectorSubtract(pred, e->r.currentOrigin, delta);
+	VectorAdd(top, delta, aimpoint);
+	return qtrue;
+}
+
+/*
+==================
+BotFindGrappleMover
+
+The route already picked the mover; this just resolves it to an entity, so
+nearest-with-a-standable-top is enough.
+==================
+*/
+static int BotFindGrappleMover(bot_state_t *bs) {
+	int i, best;
+	float dist, bestdist;
+	vec3_t center, aimpoint;
+	gentity_t *e;
+
+	best = -1;
+	bestdist = GRAPPLE_RIDE_MAXDIST + 1;
+	for (i = MAX_CLIENTS; i < level.num_entities; i++) {
+		e = &g_entities[i];
+		if (!e->inuse || e->s.eType != ET_MOVER) continue;
+		if (e->s.pos.trType == TR_STATIONARY && e->s.apos.trType == TR_STATIONARY) continue;
+		VectorAdd(e->r.absmin, e->r.absmax, center);
+		VectorScale(center, 0.5f, center);
+		dist = Distance(bs->eye, center);
+		if (dist < GRAPPLE_RIDE_MINDIST || dist > GRAPPLE_RIDE_MAXDIST) continue;
+		if (dist >= bestdist) continue;
+		if (!BotGrappleMoverAimPoint(bs, i, aimpoint)) continue;
+		bestdist = dist;
+		best = i;
+	}
+	return best;
+}
+
+/*
+==================
+BotCheckGrappleRide
+
+Boards a mover the route already runs through, instead of standing at the
+boarding point waiting for it. Riding what botlib chose is goal-directed for
+free, and lands the bot where the reachability expects it.
+==================
+*/
+void BotCheckGrappleRide(bot_state_t *bs, bot_moveresult_t *moveresult) {
+	int mover;
+
+	if (!BotGrappleAvailable(bs)) return;
+	if (bs->grapplemode != GRAPPLE_MODE_NONE) return;
+	if (bs->settings.skill < 3) return;
+	if (bs->grapplenext_time > FloatTime()) return;
+	if (g_entities[bs->client].client->hook) return;
+	if (bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) return;
+	//the one state worth shortcutting: parked at the boarding point, mover away
+	if (!(moveresult->flags & MOVERESULT_WAITING)) return;
+	if (moveresult->type != RESULTTYPE_WAITFORFUNCBOBBING) return;
+	//don't rescan every think
+	bs->grapplenext_time = FloatTime() + GRAPPLE_SNOOZE;
+	mover = BotFindGrappleMover(bs);
+	if (mover < 0) return;
+	BotTacticalGrappleBegin(bs, GRAPPLE_MODE_RIDE);
+	//claim the weapon slot before the node's consumers read it
+	bs->weaponnum = WP_GRAPPLING_HOOK;
+	bs->grappleent = mover;
+	bs->grapplehookent = 0;
+	bs->grapplestart_time = FloatTime();
+	bs->grapplepull_time = 0;
+}
+
+/*
+==================
+BotCheckGrappleSpeed
+
+A player on a long straight run hooks something ahead and above and lets go
+with the speed. Seek_LTG only: the leg has to be the route's, not a fight's.
+==================
+*/
+void BotCheckGrappleSpeed(bot_state_t *bs, bot_moveresult_t *moveresult) {
+	static const vec3_t up = { 0, 0, 1 };
+	vec3_t dir, end, hang, vel;
+	bsp_trace_t bsptr;
+	aas_clientmove_t move;
+	float dist;
+
+	//a leg is only a leg while it is being walked: a gap in the calls means
+	//the bot was doing something else, and the heading it left proves nothing
+	if (FloatTime() > bs->legcheck_time + 0.25f) bs->legstart_time = 0;
+	bs->legcheck_time = FloatTime();
+	//track the run: a direction held for half a second is a leg
+	if (VectorLengthSquared(moveresult->movedir) < 0.01f) {
+		bs->legstart_time = 0;
+		return;
+	}
+	VectorCopy(moveresult->movedir, dir);
+	dir[2] = 0;
+	VectorNormalize(dir);
+	if (!bs->legstart_time || DotProduct(dir, bs->legdir) < 0.94f) {	//20 degrees
+		VectorCopy(dir, bs->legdir);
+		bs->legstart_time = FloatTime();
+	}
+	if (!BotGrappleAvailable(bs)) return;
+	if (bs->grapplemode != GRAPPLE_MODE_NONE) return;
+	if (bs->settings.skill < 4) return;
+	if (bs->grapplenext_time > FloatTime()) return;
+	if (g_entities[bs->client].client->hook) return;
+	if (bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) return;
+	if (bs->cur_ps.groundEntityNum == ENTITYNUM_NONE) return;
+	if (FloatTime() < bs->legstart_time + 0.5f) return;
+	//an anchor ahead and above the leg
+	VectorScale(bs->legdir, cos(DEG2RAD(GRAPPLE_SPEED_PITCH)), dir);
+	VectorMA(dir, sin(DEG2RAD(GRAPPLE_SPEED_PITCH)), up, dir);
+	VectorMA(bs->eye, GRAPPLE_SPEED_MAXDIST, dir, end);
+	BotAI_Trace(&bsptr, bs->eye, NULL, NULL, end, bs->entitynum, MASK_SHOT);
+	if (bsptr.fraction >= 1 || (bsptr.surface.flags & SURF_SKY)) return;
+	dist = GRAPPLE_SPEED_MAXDIST * bsptr.fraction;
+	if (dist < GRAPPLE_SPEED_MINDIST) return;
+	//the swing has to end somewhere safe: from the hang under the anchor,
+	//carrying the leg's speed
+	VectorMA(bsptr.endpos, -48, dir, hang);
+	VectorScale(bs->legdir, GRAPPLE_SPEED_RELEASE, vel);
+	if (BotGrapplePredictArc(bs, hang, vel, GRAPPLE_AIRCONTROL, &move) != GRAPPLE_ARC_SAFE) return;
+	BotTacticalGrappleBegin(bs, GRAPPLE_MODE_SPEED);
+	bs->weaponnum = WP_GRAPPLING_HOOK;
+	VectorCopy(bsptr.endpos, bs->grapplesavepoint);
+	bs->grappleent = ENTITYNUM_WORLD;
+	bs->grapplehookent = 0;
+	bs->grapplestart_time = FloatTime();
+	bs->grapplepull_time = 0;
+}
+
+/*
+==================
 BotGrappleOutDamagesSwap
 
 Is the tether killing faster than whatever the bot would raise instead?
@@ -760,6 +936,21 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 			bs->weaponnum = WP_GRAPPLING_HOOK;
 			BotGrappleAimAtEnemy(bs, &entinfo, aimpoint);
 		}
+		else if (bs->grapplemode == GRAPPLE_MODE_RIDE) {
+			if (!BotGrappleMoverAimPoint(bs, bs->grappleent, aimpoint)) {
+				BotTacticalGrappleEnd(bs, qfalse);
+				return;
+			}
+			bs->weaponnum = WP_GRAPPLING_HOOK;
+			BotGrappleAimDir(bs, aimpoint);
+		}
+		else {
+			//a speed hook's anchor is a world point too, and the run it was
+			//picked from is still under the bot
+			bs->weaponnum = WP_GRAPPLING_HOOK;
+			VectorCopy(bs->grapplesavepoint, aimpoint);
+			BotGrappleAimDir(bs, aimpoint);
+		}
 		if (bs->grapplemode == GRAPPLE_MODE_SAVE) {
 			align = GRAPPLE_ALIGN_SAVE;
 			//at flight speed anchors cross the window faster than the slew
@@ -804,6 +995,16 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 				}
 				targetdist = Distance(bs->origin, entinfo.origin);
 			}
+			else {
+				mover = &g_entities[bs->grappleent];
+				if (!mover->inuse || mover->s.eType != ET_MOVER) {
+					BotTacticalGrappleEnd(bs, qtrue);
+					return;
+				}
+				VectorAdd(mover->r.absmin, mover->r.absmax, center);
+				VectorScale(center, 0.5f, center);
+				targetdist = Distance(bs->origin, center);
+			}
 			if (hookdist > targetdist + GRAPPLE_WHIFF_SLACK) {
 				BotTacticalGrappleEnd(bs, qtrue);
 				return;
@@ -833,6 +1034,28 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 			whiff = qtrue;
 		}
 	}
+	else if (bs->grapplemode == GRAPPLE_MODE_RIDE) {
+		//wiring lands seconds after impact (CAPTURE), so also accept a
+		//trajectory match for the window before the co-mover set exists
+		samecomover = G_GrappleCoMoverMember(hook, bs->grappleent)
+			|| (hook->target_ent && hook->target_ent->s.eType == ET_MOVER
+				&& BG_MoverCoMoves(&hook->target_ent->s, &g_entities[bs->grappleent].s));
+		if (!samecomover) {
+			wantrelease = qtrue;
+			whiff = qtrue;
+		}
+	}
+	else {
+		float hspeed = sqrt(bs->cur_ps.velocity[0] * bs->cur_ps.velocity[0]
+			+ bs->cur_ps.velocity[1] * bs->cur_ps.velocity[1]);
+		aas_clientmove_t speedmove;
+
+		//the pull is only worth what it adds: a short one, or the moment the
+		//swing is already fast and the drop lands
+		if (FloatTime() > bs->grapplepull_time + GRAPPLE_SPEED_HOLD) wantrelease = qtrue;
+		if (hspeed >= GRAPPLE_SPEED_RELEASE && BotGrappleArc(bs, &speedmove) == GRAPPLE_ARC_SAFE) wantrelease = qtrue;
+	}
+	//dropping into the same field of fire is worse than riding out of it
 	if (bs->inventory[INVENTORY_HEALTH] < bs->grapplepull_health - GRAPPLE_BURST_DAMAGE) {
 		aas_clientmove_t hurtmove;
 
@@ -851,6 +1074,17 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 			if (VectorLengthSquared(dir) < Square(GRAPPLE_YANK_CLOSEDIST)
 					&& !BotGrappleOutDamagesSwap(bs, VectorLength(dir))) wantrelease = qtrue;
 		}
+	}
+	else if (bs->grapplemode == GRAPPLE_MODE_RIDE) {
+		//arrived: standing on what we hooked, or captured and carried level
+		//with its top (a captured body has no ground, the mover is unlinked
+		//around its pmove)
+		if (bs->cur_ps.groundEntityNum != ENTITYNUM_NONE
+				&& (bs->cur_ps.groundEntityNum == bs->grappleent
+					|| G_GrappleCoMoverMember(hook, bs->cur_ps.groundEntityNum))) wantrelease = qtrue;
+		if (hook->s.generic1
+				&& bs->origin[2] >= g_entities[bs->grappleent].r.absmax[2] - 8) wantrelease = qtrue;
+		if (FloatTime() > bs->grapplepull_time + GRAPPLE_RIDE_HOLDTIME) wantrelease = qtrue;
 	}
 	hold = (bs->grapplemode == GRAPPLE_MODE_RIDE) ? GRAPPLE_RIDE_HOLDTIME
 		: (bs->grapplemode == GRAPPLE_MODE_SPEED) ? GRAPPLE_SPEED_MAXHOLD

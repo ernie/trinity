@@ -9,9 +9,12 @@
 #define AI_GRAPPLE_H
 
 void		BotCheckTacticalGrapple(bot_state_t *bs, aas_entityinfo_t *entinfo);
+void		BotCheckGrappleRide(bot_state_t *bs, bot_moveresult_t *moveresult);
+void		BotCheckGrappleSpeed(bot_state_t *bs, bot_moveresult_t *moveresult);
 void		BotTacticalGrappleFrame(bot_state_t *bs);
 int			BotTacticalGrappleActive(bot_state_t *bs);
 qboolean	BotGrappleAvailable(bot_state_t *bs);
+qboolean	BotGrappleRouteAvailable(bot_state_t *bs);
 qboolean	BotWantsEngagementRelease(bot_state_t *bs);
 qboolean	BotGrappleSnapsAim(bot_state_t *bs);
 qboolean	BotGrappleHookAboutToBite(gentity_t *hook);

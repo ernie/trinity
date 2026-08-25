@@ -187,8 +187,16 @@ typedef struct bot_state_s
 	float grapplestart_time;						//time the tactical grapple began
 	float grapplepull_time;							//time the pull began
 	float grapplenext_time;							//earliest next tactical grapple consideration
+	vec3_t grapplesavepoint;						//tactical grapple: world anchor a fall-save aims at
 	float routeshot_time;							//think in which botlib pressed a route grapple
 	float grapplebite_time;							//when the current route tow began pulling, 0 when not
+	vec3_t legdir;									//direction of the current straight run
+	float legstart_time;							//when that run began, 0 when not running
+	float legcheck_time;							//when the run was last looked at, so a gap ends it
+	float grapplerelease_time;						//when the last tow ended; 0 once the first shot after it is logged
+	float hurt_time;								//when the last hit landed
+	int lastdamageevent;							//damageEvent counter seen last think, so a hit is an edge
+	int grapplepulled;								//pull bit seen last think
 	float grapplesettle_time;						//when the hang stopped moving, 0 when not settled
 	float grappleretarget_time;						//when a hanging save picked a new anchor; the
 													//hook it frees on purpose must not end the mode

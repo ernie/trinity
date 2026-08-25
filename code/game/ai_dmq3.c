@@ -47,6 +47,9 @@
 
 #define IDEAL_ATTACKDIST			140
 
+// no separate cvar: tactical grapple rides bot_grapple
+#define GRAPPLE_MODE_NONE			0
+
 #define MAX_WAYPOINTS		128
 //
 bot_waypoint_t botai_waypoints[MAX_WAYPOINTS];
@@ -1565,6 +1568,8 @@ BotChooseWeapon
 void BotChooseWeapon(bot_state_t *bs) {
 	int newweaponnum;
 
+	//a route shot already went out this think: don't swap it back off
+	if (bs->routeshot_time == FloatTime()) return;
 	if (bs->cur_ps.weaponstate == WEAPON_RAISING ||
 			bs->cur_ps.weaponstate == WEAPON_DROPPING) {
 		trap_EA_SelectWeapon(bs->client, bs->weaponnum);
@@ -2651,6 +2656,27 @@ void BotRoamGoal(bot_state_t *bs, vec3_t goal) {
 
 /*
 ==================
+BotChaseRoutable
+
+A chase goal the router cannot reach turns BotMoveToGoal into a straight
+walk at the enemy's last position, and on a void map that line crosses the
+pit. No route, no chase.
+==================
+*/
+qboolean BotChaseRoutable(bot_state_t *bs, int areanum) {
+	if (!areanum) return qfalse;
+	if (!bs->areanum) return qtrue;
+	if (bs->areanum == areanum) return qtrue;
+	//a standpoint the router cannot plan from (mid-air, or riding a mover
+	//the nav data cannot see) is no place to refuse from: blocking the
+	//chase strands the rider, and the movement code's own recovery is what
+	//walks it back to routable ground
+	if (!trap_AAS_AreaReachability(bs->areanum)) return qtrue;
+	return trap_AAS_AreaTravelTimeToGoalArea(bs->areanum, bs->origin, areanum, bs->tfl) > 0;
+}
+
+/*
+==================
 BotAttackMove
 ==================
 */
@@ -2664,8 +2690,21 @@ bot_moveresult_t BotAttackMove(bot_state_t *bs, int tfl) {
 	bot_goal_t goal;
 
 	attackentity = bs->enemy;
+	//the chase branch below returns early, and BotMoveToGoal leaves movedir and
+	//ideal_viewangles untouched on several of its own paths
+	memset(&moveresult, 0, sizeof(bot_moveresult_t));
 	//
-	if (bs->attackchase_time > FloatTime()) {
+	//only BotMoveToGoal steers and ends a live route tow, and the released
+	//fall after one is still the tow's: botlib's release branch steers it in
+	//over the lip. A chase without a route falls through to the gated dodge
+	//movement; the tow variant stays unconditional, its goal only steers
+	if ((bs->attackchase_time > FloatTime()
+				&& BotChaseRoutable(bs, bs->lastenemyareanum))
+			|| (((bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL)
+					|| g_entities[bs->client].client->hook
+					|| (bs->cur_ps.groundEntityNum == ENTITYNUM_NONE
+						&& FloatTime() < bs->grapplerelease_time + 2.0f))
+				&& bs->grapplemode == GRAPPLE_MODE_NONE)) {
 		//create the chase goal
 		goal.entitynum = attackentity;
 		goal.areanum = bs->lastenemyareanum;
@@ -2678,8 +2717,6 @@ bot_moveresult_t BotAttackMove(bot_state_t *bs, int tfl) {
 		trap_BotMoveToGoal(&moveresult, bs->ms, &goal, tfl);
 		return moveresult;
 	}
-	//
-	memset(&moveresult, 0, sizeof(bot_moveresult_t));
 	//
 	attack_skill = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_ATTACK_SKILL, 0, 1);
 	jumper = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_JUMPER, 0, 1);
@@ -3604,6 +3641,33 @@ void BotAimAtEnemy(bot_state_t *bs) {
 			VectorCopy(bs->ideal_viewangles, bs->viewangles);
 			trap_EA_View(bs->client, bs->viewangles);
 		}
+	}
+}
+
+
+/*
+==================
+BotHonorMovementWeapon
+
+Holds the hook for botlib's route. The route itself is not second-guessed: the
+reachability was already priced against walking to its real destination, which
+is more than the runtime can know (it cannot read reach->areanum). Our job is to
+fly it well, not to decide whether it was worth taking.
+==================
+*/
+void BotHonorMovementWeapon(bot_state_t *bs, bot_moveresult_t *moveresult) {
+	if (!(moveresult->flags & MOVERESULT_MOVEMENTWEAPON)) return;
+	//the one refusal left is availability: no hook in hand means no hook drawn
+	if (moveresult->weapon == WP_GRAPPLING_HOOK && !BotGrappleAvailable(bs)) return;
+	//never leave the route live with the weapon withheld
+	bs->weaponnum = moveresult->weapon;
+	//a node entered later in this same think must not re-aim or re-arm
+	//under a press that already went out. An ENDED tow is the opposite: the
+	//keep-press must lapse this very think or it bridges botlib letting go
+	//and the hook never frees
+	if (moveresult->weapon == WP_GRAPPLING_HOOK) {
+		if (moveresult->flags & MOVERESULT_GRAPPLEENDED) bs->routeshot_time = 0;
+		else bs->routeshot_time = FloatTime();
 	}
 }
 
@@ -5350,6 +5414,69 @@ void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
 	}
 	//if the bot removed itself :)
 	if (!bs->inuse) return;
+	//a hit is an edge on the damage counter; the wait on a flying hook reads
+	//the stamp to know it is being shot at
+	if (bs->cur_ps.damageEvent != bs->lastdamageevent) {
+		bs->lastdamageevent = bs->cur_ps.damageEvent;
+		bs->hurt_time = FloatTime();
+	}
+	//stamp the think the pull bit clears, so the first shot after a tow
+	//can be timed
+	if (bs->grapplepulled && !(bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL)) {
+		bs->grapplerelease_time = FloatTime();
+	}
+	bs->grapplepulled = (bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) ? 1 : 0;
+	//a route tow keeps its own trigger and its own view whatever node ran:
+	//the weapon grapple frees on a think without attack, and the tow target
+	//sits inset along the view. Only while the route is still driving the tow,
+	//though: botlib re-stamps the think every frame it presses, so a stale stamp
+	//is the route letting go, and pressing past that hangs the bot on a hook
+	//nothing is steering. Unless letting go to fight is the better move
+	if ((bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) && bs->grapplemode == GRAPPLE_MODE_NONE
+			&& bs->routeshot_time == FloatTime()) {
+		if (!bs->grapplebite_time) bs->grapplebite_time = FloatTime();
+		if (!BotWantsEngagementRelease(bs)) {
+			vec3_t towdir;
+
+			bs->weaponnum = WP_GRAPPLING_HOOK;
+			trap_EA_Attack(bs->client);
+			VectorSubtract(bs->cur_ps.grapplePoint, bs->origin, towdir);
+			vectoangles(towdir, bs->ideal_viewangles);
+		}
+		//withholding the trigger cannot let go: botlib pressed it for the route
+		//earlier in this same think and EA input only clears at the top of the
+		//frame. A weapon change frees the hook whatever the trigger did. The
+		//swap is taken here rather than through BotChooseWeapon because a live
+		//tow re-stamps routeshot_time every think, which is exactly what that
+		//function refuses to swap off
+		else if (bs->weaponnum == WP_GRAPPLING_HOOK) {
+			bs->weaponnum = trap_BotChooseBestFightWeapon(bs->ws, bs->inventory);
+			bs->weaponchange_time = FloatTime();
+			trap_EA_SelectWeapon(bs->client, bs->weaponnum);
+		}
+	}
+	else {
+		bs->grapplebite_time = 0;
+		//a route hook in flight stays in hand: a weapon change frees it. The
+		//route's own hook only, on the same stamp the tow reads: one whose
+		//route was abandoned would pin the weapon slot until it expired
+		if (g_entities[bs->client].client->hook && bs->grapplemode == GRAPPLE_MODE_NONE
+				&& bs->routeshot_time == FloatTime()) {
+			//standing at the mark waiting on a long flight is a free kill for
+			//whoever is shooting: a fresh hit abandons the wait for a fight
+			//weapon (the swap frees the hook), unless the bite is a blink
+			//away and the tow is about to carry the bot out of the fire
+			if (FloatTime() < bs->hurt_time + 1.0f
+					&& !BotGrappleHookAboutToBite(g_entities[bs->client].client->hook)) {
+				bs->weaponnum = trap_BotChooseBestFightWeapon(bs->ws, bs->inventory);
+				bs->weaponchange_time = FloatTime();
+				trap_EA_SelectWeapon(bs->client, bs->weaponnum);
+			}
+			else {
+				bs->weaponnum = WP_GRAPPLING_HOOK;
+			}
+		}
+	}
 	//tactical grapple owns weapon/aim/trigger while live, whatever node ran
 	BotTacticalGrappleFrame(bs);
 	//if the bot executed too many AI nodes

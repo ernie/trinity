@@ -40,6 +40,9 @@
 #define MOVERESULT_ONTOPOF_FUNCBOB		64		//bot is ontop of a func_bobbing
 #define MOVERESULT_ONTOPOF_ELEVATOR		128		//bot is ontop of an elevator (func_plat)
 #define MOVERESULT_BLOCKEDBYAVOIDSPOT	256		//bot is blocked by an avoid spot
+#define MOVERESULT_GRAPPLEENDED			512		//the route tow ended THIS think: the game must not
+												//bridge the trigger past botlib letting go. MUST
+												//MATCH the engine's be_ai_move.h
 //
 #define MAX_AVOIDREACH					1
 #define MAX_AVOIDSPOTS					32

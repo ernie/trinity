@@ -1473,7 +1473,7 @@ int AINode_Seek_ActivateEntity(bot_state_t *bs) {
 	}
 	//
 	bs->tfl = TFL_DEFAULT;
-	if (bot_grapple.integer) bs->tfl |= TFL_GRAPPLEHOOK;
+	if (BotGrappleRouteAvailable(bs)) bs->tfl |= TFL_GRAPPLEHOOK;
 	// if in lava or slime the bot should be able to get out
 	if (BotInLavaOrSlime(bs)) bs->tfl |= TFL_LAVA|TFL_SLIME;
 	// map specific code
@@ -1615,14 +1615,14 @@ int AINode_Seek_ActivateEntity(bot_state_t *bs) {
 			VectorSubtract(target, bs->origin, dir);
 			vectoangles(dir, bs->ideal_viewangles);
 		}
-		else {
+		// a zero movedir means botlib returned no movement this think; vectoangles would read as straight down
+		else if (VectorLengthSquared(moveresult.movedir)) {
 			vectoangles(moveresult.movedir, bs->ideal_viewangles);
 		}
 		bs->ideal_viewangles[2] *= 0.5;
 	}
 	// if the weapon is used for the bot movement
-	if (moveresult.flags & MOVERESULT_MOVEMENTWEAPON)
-		bs->weaponnum = moveresult.weapon;
+	BotHonorMovementWeapon(bs, &moveresult);
 	// if there is an enemy
 	if (BotFindEnemy(bs, -1)) {
 		if (BotWantsToRetreat(bs)) {
@@ -1686,7 +1686,7 @@ int AINode_Seek_NBG(bot_state_t *bs) {
 	}
 	//
 	bs->tfl = TFL_DEFAULT;
-	if (bot_grapple.integer) bs->tfl |= TFL_GRAPPLEHOOK;
+	if (BotGrappleRouteAvailable(bs)) bs->tfl |= TFL_GRAPPLEHOOK;
 	//if in lava or slime the bot should be able to get out
 	if (BotInLavaOrSlime(bs)) bs->tfl |= TFL_LAVA|TFL_SLIME;
 	//
@@ -1752,11 +1752,12 @@ int AINode_Seek_NBG(bot_state_t *bs) {
 			vectoangles(dir, bs->ideal_viewangles);
 		}
 		//FIXME: look at cluster portals?
-		else vectoangles(moveresult.movedir, bs->ideal_viewangles);
+		else if (VectorLengthSquared(moveresult.movedir)) vectoangles(moveresult.movedir, bs->ideal_viewangles);
 		bs->ideal_viewangles[2] *= 0.5;
 	}
 	//if the weapon is used for the bot movement
-	if (moveresult.flags & MOVERESULT_MOVEMENTWEAPON) bs->weaponnum = moveresult.weapon;
+	BotHonorMovementWeapon(bs, &moveresult);
+	BotCheckGrappleRide(bs, &moveresult);
 	//if there is an enemy
 	if (BotFindEnemy(bs, -1)) {
 		if (BotWantsToRetreat(bs)) {
@@ -1829,7 +1830,7 @@ int AINode_Seek_LTG(bot_state_t *bs)
 	}
 	//
 	bs->tfl = TFL_DEFAULT;
-	if (bot_grapple.integer) bs->tfl |= TFL_GRAPPLEHOOK;
+	if (BotGrappleRouteAvailable(bs)) bs->tfl |= TFL_GRAPPLEHOOK;
 	//if in lava or slime the bot should be able to get out
 	if (BotInLavaOrSlime(bs)) bs->tfl |= TFL_LAVA|TFL_SLIME;
 	//
@@ -1956,7 +1957,10 @@ int AINode_Seek_LTG(bot_state_t *bs)
 		bs->ideal_viewangles[2] *= 0.5;
 	}
 	//if the weapon is used for the bot movement
-	if (moveresult.flags & MOVERESULT_MOVEMENTWEAPON) bs->weaponnum = moveresult.weapon;
+	BotHonorMovementWeapon(bs, &moveresult);
+	BotCheckGrappleRide(bs, &moveresult);
+	//a long straight leg is the run a player would swing off for speed
+	BotCheckGrappleSpeed(bs, &moveresult);
 	//
 	return qtrue;
 }
@@ -2012,7 +2016,7 @@ int AINode_Battle_Fight(bot_state_t *bs) {
 		return qfalse;
 	}
 	//if there is another better enemy
-	if (BotFindEnemy(bs, bs->enemy)) {
+	if (!BotTacticalGrappleActive(bs) && BotFindEnemy(bs, bs->enemy)) {
 #ifdef DEBUG
 		BotAI_Print(PRT_MESSAGE, "found new better enemy\n");
 #endif
@@ -2077,7 +2081,7 @@ int AINode_Battle_Fight(bot_state_t *bs) {
 	//update the attack inventory values
 	BotUpdateBattleInventory(bs, bs->enemy);
 	//if the bot's health decreased
-	if (bs->lastframe_health > bs->inventory[INVENTORY_HEALTH]) {
+	if (!BotTacticalGrappleActive(bs) && bs->lastframe_health > bs->inventory[INVENTORY_HEALTH]) {
 		if (BotChat_HitNoDeath(bs)) {
 			bs->stand_time = FloatTime() + BotChatTime(bs);
 			AIEnter_Stand(bs, "battle fight: chat health decreased");
@@ -2085,7 +2089,7 @@ int AINode_Battle_Fight(bot_state_t *bs) {
 		}
 	}
 	//if the bot hit someone
-	if (bs->cur_ps.persistant[PERS_HITS] > bs->lasthitcount) {
+	if (!BotTacticalGrappleActive(bs) && bs->cur_ps.persistant[PERS_HITS] > bs->lasthitcount) {
 		if (BotChat_HitNoKill(bs)) {
 			bs->stand_time = FloatTime() + BotChatTime(bs);
 			AIEnter_Stand(bs, "battle fight: chat hit someone");
@@ -2100,7 +2104,7 @@ int AINode_Battle_Fight(bot_state_t *bs) {
 			return qfalse;
 		}
 #endif
-		if (BotWantsToChase(bs)) {
+		if (BotWantsToChase(bs) || BotTacticalGrappleActive(bs)) {
 			AIEnter_Battle_Chase(bs, "battle fight: enemy out of sight");
 			return qfalse;
 		}
@@ -2114,7 +2118,7 @@ int AINode_Battle_Fight(bot_state_t *bs) {
 	BotCheckTacticalGrapple(bs, &entinfo);
 	//
 	bs->tfl = TFL_DEFAULT;
-	if (bot_grapple.integer) bs->tfl |= TFL_GRAPPLEHOOK;
+	if (BotGrappleRouteAvailable(bs)) bs->tfl |= TFL_GRAPPLEHOOK;
 	//if in lava or slime the bot should be able to get out
 	if (BotInLavaOrSlime(bs)) bs->tfl |= TFL_LAVA|TFL_SLIME;
 	//
@@ -2122,7 +2126,9 @@ int AINode_Battle_Fight(bot_state_t *bs) {
 		bs->tfl |= TFL_ROCKETJUMP;
 	}
 	//choose the best weapon to fight with
-	BotChooseWeapon(bs);
+	if (!BotTacticalGrappleActive(bs)) {
+		BotChooseWeapon(bs);
+	}
 	//do attack movements
 	moveresult = BotAttackMove(bs, bs->tfl);
 	//if the movement failed
@@ -2134,13 +2140,19 @@ int AINode_Battle_Fight(bot_state_t *bs) {
 	}
 	//
 	BotAIBlocked(bs, &moveresult, qfalse);
+	//a movement grapple frees a live hook on a weapon switch, so it must own the slot until it finishes
+	BotHonorMovementWeapon(bs, &moveresult);
 	//aim at the enemy
-	BotAimAtEnemy(bs);
+	if (!BotTacticalGrappleActive(bs)) {
+		BotAimAtEnemy(bs);
+	}
 	//attack the enemy if possible
-	BotCheckAttack(bs);
+	if (!BotTacticalGrappleActive(bs)) {
+		BotCheckAttack(bs);
+	}
 	//if the bot wants to retreat
 	if (!(bs->flags & BFL_FIGHTSUICIDAL)) {
-		if (BotWantsToRetreat(bs)) {
+		if (!BotTacticalGrappleActive(bs) && BotWantsToRetreat(bs)) {
 			AIEnter_Battle_Retreat(bs, "battle fight: wants to retreat");
 			return qtrue;
 		}
@@ -2196,7 +2208,7 @@ int AINode_Battle_Chase(bot_state_t *bs)
 		return qfalse;
 	}
 	//if there is another enemy
-	if (BotFindEnemy(bs, -1)) {
+	if (!BotTacticalGrappleActive(bs) && BotFindEnemy(bs, -1)) {
 		AIEnter_Battle_Fight(bs, "battle chase: better enemy");
 		return qfalse;
 	}
@@ -2207,7 +2219,7 @@ int AINode_Battle_Chase(bot_state_t *bs)
 	}
 	//
 	bs->tfl = TFL_DEFAULT;
-	if (bot_grapple.integer) bs->tfl |= TFL_GRAPPLEHOOK;
+	if (BotGrappleRouteAvailable(bs)) bs->tfl |= TFL_GRAPPLEHOOK;
 	//if in lava or slime the bot should be able to get out
 	if (BotInLavaOrSlime(bs)) bs->tfl |= TFL_LAVA|TFL_SLIME;
 	//
@@ -2230,7 +2242,7 @@ int AINode_Battle_Chase(bot_state_t *bs)
 		return qfalse;
 	}
 	//check for nearby goals periodicly
-	if (bs->check_time < FloatTime()) {
+	if (!BotTacticalGrappleActive(bs) && bs->check_time < FloatTime()) {
 		bs->check_time = FloatTime() + 1;
 		range = 150;
 		//
@@ -2270,18 +2282,19 @@ int AINode_Battle_Chase(bot_state_t *bs)
 				VectorSubtract(target, bs->origin, dir);
 				vectoangles(dir, bs->ideal_viewangles);
 			}
-			else {
+			else if (VectorLengthSquared(moveresult.movedir)) {
 				vectoangles(moveresult.movedir, bs->ideal_viewangles);
 			}
 		}
 		bs->ideal_viewangles[2] *= 0.5;
 	}
 	//if the weapon is used for the bot movement
-	if (moveresult.flags & MOVERESULT_MOVEMENTWEAPON) bs->weaponnum = moveresult.weapon;
+	BotHonorMovementWeapon(bs, &moveresult);
+	BotCheckGrappleRide(bs, &moveresult);
 	//if the bot is in the area the enemy was last seen in
 	if (bs->areanum == bs->lastenemyareanum) bs->chase_time = 0;
 	//if the bot wants to retreat (the bot could have been damage during the chase)
-	if (BotWantsToRetreat(bs)) {
+	if (!BotTacticalGrappleActive(bs) && BotWantsToRetreat(bs)) {
 		AIEnter_Battle_Retreat(bs, "battle chase: wants to retreat");
 		return qtrue;
 	}
@@ -2344,7 +2357,7 @@ int AINode_Battle_Retreat(bot_state_t *bs) {
 	}
 	//
 	bs->tfl = TFL_DEFAULT;
-	if (bot_grapple.integer) bs->tfl |= TFL_GRAPPLEHOOK;
+	if (BotGrappleRouteAvailable(bs)) bs->tfl |= TFL_GRAPPLEHOOK;
 	//if in lava or slime the bot should be able to get out
 	if (BotInLavaOrSlime(bs)) bs->tfl |= TFL_LAVA|TFL_SLIME;
 	//map specific code
@@ -2403,7 +2416,7 @@ int AINode_Battle_Retreat(bot_state_t *bs) {
 		return qfalse;
 	}
 	//check for nearby goals periodicly
-	if (bs->check_time < FloatTime()) {
+	if (!BotTacticalGrappleActive(bs) && bs->check_time < FloatTime()) {
 		bs->check_time = FloatTime() + 1;
 		range = 150;
 #ifdef CTF
@@ -2446,7 +2459,9 @@ int AINode_Battle_Retreat(bot_state_t *bs) {
 	//
 	BotAIBlocked(bs, &moveresult, qfalse);
 	//choose the best weapon to fight with
-	BotChooseWeapon(bs);
+	if (!BotTacticalGrappleActive(bs)) {
+		BotChooseWeapon(bs);
+	}
 	//if the view is fixed for the movement
 	if (moveresult.flags & (MOVERESULT_MOVEMENTVIEW|MOVERESULT_SWIMVIEW)) {
 		VectorCopy(moveresult.ideal_viewangles, bs->ideal_viewangles);
@@ -2456,23 +2471,27 @@ int AINode_Battle_Retreat(bot_state_t *bs) {
 		attack_skill = trap_Characteristic_BFloat(bs->character, CHARACTERISTIC_ATTACK_SKILL, 0, 1);
 		//if the bot is skilled enough
 		if (attack_skill > 0.3) {
-			BotAimAtEnemy(bs);
+			//the grapple owns the aim while live, same as the fight node
+			if (!BotTacticalGrappleActive(bs)) BotAimAtEnemy(bs);
 		}
 		else {
 			if (trap_BotMovementViewTarget(bs->ms, &goal, bs->tfl, 300, target)) {
 				VectorSubtract(target, bs->origin, dir);
 				vectoangles(dir, bs->ideal_viewangles);
 			}
-			else {
+			else if (VectorLengthSquared(moveresult.movedir)) {
 				vectoangles(moveresult.movedir, bs->ideal_viewangles);
 			}
 			bs->ideal_viewangles[2] *= 0.5;
 		}
 	}
 	//if the weapon is used for the bot movement
-	if (moveresult.flags & MOVERESULT_MOVEMENTWEAPON) bs->weaponnum = moveresult.weapon;
+	BotHonorMovementWeapon(bs, &moveresult);
+	BotCheckGrappleRide(bs, &moveresult);
 	//attack the enemy if possible
-	BotCheckAttack(bs);
+	if (!BotTacticalGrappleActive(bs)) {
+		BotCheckAttack(bs);
+	}
 	//
 	return qtrue;
 }
@@ -2527,7 +2546,7 @@ int AINode_Battle_NBG(bot_state_t *bs) {
 	}
 	//
 	bs->tfl = TFL_DEFAULT;
-	if (bot_grapple.integer) bs->tfl |= TFL_GRAPPLEHOOK;
+	if (BotGrappleRouteAvailable(bs)) bs->tfl |= TFL_GRAPPLEHOOK;
 	//if in lava or slime the bot should be able to get out
 	if (BotInLavaOrSlime(bs)) bs->tfl |= TFL_LAVA|TFL_SLIME;
 	//
@@ -2592,7 +2611,9 @@ int AINode_Battle_NBG(bot_state_t *bs) {
 	//update the attack inventory values
 	BotUpdateBattleInventory(bs, bs->enemy);
 	//choose the best weapon to fight with
-	BotChooseWeapon(bs);
+	if (!BotTacticalGrappleActive(bs)) {
+		BotChooseWeapon(bs);
+	}
 	//if the view is fixed for the movement
 	if (moveresult.flags & (MOVERESULT_MOVEMENTVIEW|MOVERESULT_SWIMVIEW)) {
 		VectorCopy(moveresult.ideal_viewangles, bs->ideal_viewangles);
@@ -2610,16 +2631,19 @@ int AINode_Battle_NBG(bot_state_t *bs) {
 				VectorSubtract(target, bs->origin, dir);
 				vectoangles(dir, bs->ideal_viewangles);
 			}
-			else {
+			else if (VectorLengthSquared(moveresult.movedir)) {
 				vectoangles(moveresult.movedir, bs->ideal_viewangles);
 			}
 			bs->ideal_viewangles[2] *= 0.5;
 		}
 	}
 	//if the weapon is used for the bot movement
-	if (moveresult.flags & MOVERESULT_MOVEMENTWEAPON) bs->weaponnum = moveresult.weapon;
+	BotHonorMovementWeapon(bs, &moveresult);
+	BotCheckGrappleRide(bs, &moveresult);
 	//attack the enemy if possible
-	BotCheckAttack(bs);
+	if (!BotTacticalGrappleActive(bs)) {
+		BotCheckAttack(bs);
+	}
 	//
 	return qtrue;
 }
