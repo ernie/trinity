@@ -338,6 +338,15 @@ qboolean G_MoverPush( gentity_t *pusher, vec3_t move, vec3_t amove, gentity_t **
 			continue;
 		}
 
+		// a captured wielder rides their anchor's co-mover set via pmove; a push
+		// would be a playerstate write prediction cannot see
+		if ( check->client && check->client->hook
+				&& check->client->hook->s.generic1
+				&& G_GrappleCoMoverMember( check->client->hook, pusher->s.number )
+				&& check->s.groundEntityNum != pusher->s.number ) {
+			continue;
+		}
+
 		// if the entity is standing on the pusher, it will definitely be moved
 		if ( check->s.groundEntityNum != pusher->s.number ) {
 			// see if the ent needs to be tested

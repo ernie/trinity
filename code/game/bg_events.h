@@ -110,7 +110,8 @@ DECLARE_EVENT( EV_TAUNT_GETFLAG ),
 DECLARE_EVENT( EV_TAUNT_GUARDBASE ),
 DECLARE_EVENT( EV_TAUNT_PATROL ),
 
-DECLARE_EVENT( EV_BLOOD )					// aggregated per-victim blood (Trinity servers); carries damage in generic1
+DECLARE_EVENT( EV_BLOOD ),					// aggregated per-victim blood (Trinity servers); carries damage in generic1
+DECLARE_EVENT( EV_GRAPPLE_RELEASE )		// hook released, hit or miss; otherEntityNum the owner, eventParm 1 if anchored (then angles carry the impact normal)
 
 #ifdef EVENT_ENUMS
 	, DECLARE_EVENT( EV_MAX )

@@ -530,7 +530,7 @@ static void CG_UpdateFreeFlyInput( void ) {
 		cg.freeFlyAngles[PITCH] = 89;
 	}
 
-	// movement — use real time when paused so free-fly still works at timescale 0
+	// movement: use real time when paused so free-fly still works at timescale 0
 	{
 	int			ft;
 	static int	lastRealTime;
@@ -1164,7 +1164,7 @@ void CG_DamageBorderVignette( void ) {
 	// refdef only covers one eye's frustum, and OpenXR frustums are asymmetric
 	// (more down-look than up, offset horizontally per eye). Transplant native's
 	// FOV-asymmetry offsets + combined-FOV stereo extension so the border covers
-	// the full binocular field and stays optically centred. Flatscreen keeps the
+	// the full binocular field and stays optically centered. Flatscreen keeps the
 	// plain refdef-pixel path below unchanged.
 	if ( vrActive ) {
 		float projCenterX, projCenterY;
@@ -1436,11 +1436,11 @@ static int CG_CalcViewValues( void ) {
 	}
 
 	if ( !CG_VR_OffsetView() ) {
-		// free-fly camera — only available in TV playback
+		// free-fly camera: only available in TV playback
 		if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
 				&& cg_followMode.integer == 2 ) {
 			if ( !cgs.tvPlayback ) {
-				// reset — freefly not available outside TV
+				// reset: freefly not available outside TV
 				trap_Cvar_Set( "cg_followMode", "0" );
 				cg.freeFlyInitialized = qfalse;
 			} else {
@@ -1681,16 +1681,18 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		CG_DamageBlendBlob();
 	}
 
+	// Process weapon adjustment mode (reads thumbstick, updates cvars)
+	CG_WeaponAdjustFrame();
+
 	// build the render lists
 	if ( !cg.hyperspace ) {
 		CG_AddPacketEntities();	// alter calcViewValues, so predicted player state is correct
 		CG_AddMarks();
 		CG_AddParticles ();
 		CG_AddLocalEntities();
+	} else {
+		CG_AddViewWeapon( &cg.predictedPlayerState );
 	}
-	// Process weapon adjustment mode (reads thumbstick, updates cvars)
-	CG_WeaponAdjustFrame();
-	CG_AddViewWeapon( &cg.predictedPlayerState );
 
 	// VR follow: add 3D crosshair at weapon aim point (first-person only).
 	// In VR the primary CG_VR_DrawFrame crosshair site already covers follow

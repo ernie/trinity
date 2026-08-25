@@ -839,10 +839,24 @@ void ClientThink_real( gentity_t *ent ) {
 		client->ps.speed *= 1.3;
 	}
 
-	// Let go of the hook if we aren't firing
-	if ( client->ps.weapon == WP_GRAPPLING_HOOK &&
-		client->hook && !( ucmd->buttons & BUTTON_ATTACK ) ) {
-		Weapon_HookFree(client->hook);
+	// Let go of the hook if we aren't firing or are switching away.
+	// PM_BeginWeaponChange clears the predicted pull flag to match.
+	if ( client->hook &&
+		( client->ps.weapon != WP_GRAPPLING_HOOK
+		|| client->ps.weaponstate == WEAPON_DROPPING
+		|| !( ucmd->buttons & BUTTON_ATTACK ) ) ) {
+		Weapon_HookFree( client->hook );
+	}
+
+	// the pad wears the quad shell like any other missile, but it outlives
+	// a fire_ copy, so mirror the owner's live state instead and the shell
+	// drops the moment the quad runs out
+	if ( client->hook ) {
+		if ( client->ps.powerups[PW_QUAD] > level.time ) {
+			client->hook->s.powerups |= 1 << PW_QUAD;
+		} else {
+			client->hook->s.powerups &= ~( 1 << PW_QUAD );
+		}
 	}
 
 	// set up for pmove
@@ -909,7 +923,42 @@ void ClientThink_real( gentity_t *ent ) {
 	pm.pmove_msec = pmove_msec.integer;
 	pm.pmove_mode = g_mode.integer;
 
+	// hand pmove the anchor trajectories and the captured pose
+	pm.grappleLatch = qfalse;
+	if ( client->hook && client->hook->s.generic1
+			&& client->hook->target_ent
+			&& client->hook->target_ent->inuse
+			&& client->hook->target_ent->s.eType == ET_MOVER ) {
+		pm.grappleLatch = qtrue;
+		VectorCopy( client->hook->s.pos.trDelta, pm.grappleLatchLocal );
+		pm.grappleMoverPos = client->hook->target_ent->s.pos;
+		pm.grappleMoverApos = client->hook->target_ent->s.apos;
+	}
+
 	VectorCopy( client->ps.origin, client->oldOrigin );
+
+	// the co-mover set cannot collide with its captive: absent while the hold runs
+	{
+		gentity_t	*comover[4];
+		int			mk, mcount;
+
+		mcount = 0;
+		if ( pm.grappleLatch ) {
+			comover[mcount++] = client->hook->target_ent;
+			for ( mk = 0 ; mk < 3 ; mk++ ) {
+				int n = ( client->hook->s.time2 >> ( mk * 10 ) ) & 0x3FF;
+				if ( n ) {
+					comover[mcount++] = &g_entities[n];
+				}
+			}
+			for ( mk = 0 ; mk < mcount ; mk++ ) {
+				if ( comover[mk]->r.linked ) {
+					trap_UnlinkEntity( comover[mk] );
+				} else {
+					comover[mk] = NULL;
+				}
+			}
+		}
 
 #ifdef MISSIONPACK
 		if (level.intermissionQueued != 0 && g_singlePlayer.integer) {
@@ -929,6 +978,13 @@ void ClientThink_real( gentity_t *ent ) {
 		Pmove (&pm);
 #endif
 
+		for ( mk = 0 ; mk < mcount ; mk++ ) {
+			if ( comover[mk] ) {
+				trap_LinkEntity( comover[mk] );
+			}
+		}
+	}
+
 	// save results of pmove
 	if ( ent->client->ps.eventSequence != oldEventSequence ) {
 		ent->eventTime = level.time;
@@ -937,10 +993,6 @@ void ClientThink_real( gentity_t *ent ) {
 	BG_PlayerStateToEntityState( &ent->client->ps, &ent->s, qtrue );
 
 	SendPendingPredictableEvents( &ent->client->ps );
-
-	if ( !( ent->client->ps.eFlags & EF_FIRING ) ) {
-		client->fireHeld = qfalse;		// for grapple
-	}
 
 	// use the snapped origin for linking so it matches client predicted versions
 	VectorCopy( ent->s.pos.trBase, ent->r.currentOrigin );

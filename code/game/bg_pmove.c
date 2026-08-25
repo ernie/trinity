@@ -6,6 +6,7 @@
 #include "q_shared.h"
 #include "bg_public.h"
 #include "bg_local.h"
+#include "bg_grapple_model.h"
 #include "bg_mode.h"
 #include "vr_bg.h"
 
@@ -749,18 +750,61 @@ static void PM_GrappleMove( void ) {
 	vec3_t vel, v;
 	float vlen;
 
-	VectorScale(pml.forward, -16, v);
+	VectorScale(pml.forward, -GRAPPLE_MODEL_TOW_TARGET_INSET, v);
 	VectorAdd(pm->ps->grapplePoint, v, v);
 	VectorSubtract(v, pm->ps->origin, vel);
 	vlen = VectorLength(vel);
 	VectorNormalize( vel );
 
-	if (vlen <= 100)
-		VectorScale(vel, 10 * vlen, vel);
+	if (vlen <= GRAPPLE_MODEL_DECEL_KNEE)
+		VectorScale(vel, GRAPPLE_MODEL_DECEL_FACTOR * vlen, vel);
 	else
-		VectorScale(vel, 800, vel);
+		VectorScale(vel, GRAPPLE_MODEL_TOWSPEED, vel);
 
 	VectorCopy(vel, pm->ps->velocity);
+
+	pml.groundPlane = qfalse;
+}
+
+/*
+===================
+PM_GrappleLatchMove
+
+Hold the captured pose through the anchor's motion, as though the wielder
+stood on it: the hold IS the anchor's push, so the anchor never blocks
+its own captive
+===================
+*/
+static void PM_GrappleLatchMove( void ) {
+	vec3_t	morg, mang, a0, target, delta;
+	vec3_t	m[3];
+	trace_t	trace;
+	float	dyaw;
+
+	BG_EvaluateTrajectory( &pm->grappleMoverPos, pm->cmd.serverTime, morg );
+	BG_EvaluateTrajectory( &pm->grappleMoverApos, pm->cmd.serverTime, mang );
+	BG_CreateRotationMatrix( mang, m );
+	BG_MoverLocalToWorld( m, pm->grappleLatchLocal, target );
+	VectorAdd( morg, target, target );
+
+	// release inherits the ride
+	VectorSubtract( target, pm->ps->origin, delta );
+	VectorScale( delta, 1.0f / pml.frametime, pm->ps->velocity );
+
+	// the anchor's co-mover set is absent from this trace on both sides
+	pm->trace( &trace, pm->ps->origin, pm->mins, pm->maxs, target, pm->ps->clientNum, pm->tracemask );
+	if ( trace.fraction == 1.0f ) {
+		VectorCopy( target, pm->ps->origin );
+	} else {
+		VectorCopy( trace.endpos, pm->ps->origin );
+	}
+
+	// the frame's spin turns the base yaw; the mouse stays free
+	BG_EvaluateTrajectory( &pm->grappleMoverApos, pm->cmd.serverTime - pml.msec, a0 );
+	dyaw = mang[YAW] - a0[YAW];
+	if ( dyaw != 0.0f ) {
+		pm->ps->delta_angles[YAW] += ANGLE2SHORT( dyaw );
+	}
 
 	pml.groundPlane = qfalse;
 }
@@ -1015,6 +1059,12 @@ static void PM_CrashLand( void ) {
 	float		vel, acc;
 	float		t;
 	float		a, b, c, den;
+
+	// the tether loads the landing, and a pinned bounce under a mover
+	// would re-trigger this every frame until it kills
+	if ( pm->ps->pm_flags & PMF_GRAPPLE_PULL ) {
+		return;
+	}
 
 	// decide which landing animation to use
 	if ( pm->ps->pm_flags & PMF_BACKWARDS_JUMP ) {
@@ -1425,6 +1475,11 @@ static void PM_Footsteps( void ) {
 		if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
 			PM_ContinueLegsAnim( LEGS_IDLECR );
 		}
+		// a tethered wielder hangs in the flight float: hold the jump pose
+		if ( pm->ps->pm_flags & PMF_GRAPPLE_PULL ) {
+			PM_ContinueLegsAnim( LEGS_JUMP );
+			return;
+		}
 		// airborne leaves position in cycle intact, but doesn't advance
 		if ( pm->waterlevel > 1 ) {
 			PM_ContinueLegsAnim( LEGS_SWIM );
@@ -1581,6 +1636,11 @@ static void PM_BeginWeaponChange( int weapon ) {
 		return;
 	}
 
+	// the pull flag is predicted; clear it here on switch or the client keeps pulling
+	if ( pm->ps->weapon == WP_GRAPPLING_HOOK ) {
+		pm->ps->pm_flags &= ~PMF_GRAPPLE_PULL;
+	}
+
 	PM_AddEvent( EV_CHANGE_WEAPON );
 	pm->ps->weaponstate = WEAPON_DROPPING;
 	pm->ps->weaponTime += Mode_GetConfig( pm->pmove_mode )->weaponDropTime;
@@ -1725,6 +1785,9 @@ static void PM_Weapon( void ) {
 			return;
 		}
 		PM_StartTorsoAnim( TORSO_ATTACK2 );
+	} else if ( pm->ps->weapon == WP_GRAPPLING_HOOK
+			&& pm->ps->weaponstate == WEAPON_FIRING ) {
+		// held refire: skip the torso replay, or it pumps the whole time the tether is out
 	} else {
 		PM_StartTorsoAnim( TORSO_ATTACK );
 	}
@@ -2057,8 +2120,24 @@ void PmoveSingle (pmove_t *pmove) {
 	// set mins, maxs, and viewheight
 	PM_CheckDuck ();
 
-	// set groundentity
-	PM_GroundTrace();
+	// the server frees the hook on the first command without attack; predict
+	// the same so the replay stops towing where the server did. Must land
+	// before the ground-trace decision below, which also reads the pull bit;
+	// otherwise the two sides take different paths on the release command
+	if ( ( pm->ps->pm_flags & PMF_GRAPPLE_PULL ) && pm->ps->weapon == WP_GRAPPLING_HOOK
+			&& !( pm->cmd.buttons & BUTTON_ATTACK ) ) {
+		pm->ps->pm_flags &= ~PMF_GRAPPLE_PULL;
+	}
+
+	// set groundentity: no floor can claim a captured wielder, and the
+	// trace's verdict would fight the hold
+	if ( ( pm->ps->pm_flags & PMF_GRAPPLE_PULL ) && pm->grappleLatch ) {
+		pm->ps->groundEntityNum = ENTITYNUM_NONE;
+		pml.groundPlane = qfalse;
+		pml.walking = qfalse;
+	} else {
+		PM_GroundTrace();
+	}
 
 	if ( pm->ps->pm_type == PM_DEAD ) {
 		PM_DeadMove ();
@@ -2071,13 +2150,19 @@ void PmoveSingle (pmove_t *pmove) {
 		PM_InvulnerabilityMove();
 	} else
 #endif
-	if ( pm->ps->powerups[PW_FLIGHT] ) {
+	if (pm->ps->pm_flags & PMF_GRAPPLE_PULL) {
+		if ( pm->grappleLatch ) {
+			// captured: the anchor's frame moves the wielder
+			PM_GrappleLatchMove();
+		} else {
+			// an anchored tether out-pulls the flight powerup
+			PM_GrappleMove();
+			// We can wiggle a bit
+			PM_AirMove();
+		}
+	} else if ( pm->ps->powerups[PW_FLIGHT] ) {
 		// flight powerup doesn't allow jump and has different friction
 		PM_FlyMove();
-	} else if (pm->ps->pm_flags & PMF_GRAPPLE_PULL) {
-		PM_GrappleMove();
-		// We can wiggle a bit
-		PM_AirMove();
 	} else if (pm->ps->pm_flags & PMF_TIME_WATERJUMP) {
 		PM_WaterJumpMove();
 	} else if ( pm->waterlevel > 1 ) {

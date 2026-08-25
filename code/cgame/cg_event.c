@@ -1072,6 +1072,43 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			es->generic1 & 0x7f, ( es->generic1 & 0x80 ) != 0 );
 		break;
 
+	case EV_GRAPPLE_RELEASE:
+		// fires on every release (see Weapon_HookFree), so the seat ramp
+		// always restarts; eventParm is 1 only for an anchored release
+		// (the temp entity's angles then carry the frozen impact normal),
+		// since a miss has no pad to drop
+		CG_GrappleSeatRestart( es->otherEntityNum );
+		// CHAN_WEAPON on purpose: a re-fire mid-materialize runs the ramp at
+		// PAD_SEAT_FIRE_BOOST and finishes in ~110ms against a 330ms sound.
+		// StartSound cannot be stopped, but a new sound on a channel replaces
+		// the one there, so the launch cuts this off when the animation does.
+		// Neither this nor the launch may move to CHAN_AUTO.
+		if ( cgs.media.sfx_grappleseat && es->otherEntityNum < MAX_CLIENTS ) {
+			trap_S_StartSound( NULL, es->otherEntityNum, CHAN_WEAPON,
+				cgs.media.sfx_grappleseat );
+		}
+		if ( es->eventParm ) {
+			// only an anchored release has a claw to draw out of anything
+			if ( cgs.media.sfx_grapplefree ) {
+				trap_S_StartSound( position, ENTITYNUM_WORLD, CHAN_AUTO,
+					cgs.media.sfx_grapplefree );
+			}
+			CG_GrapplePadFall( position, es->angles, es->otherEntityNum );
+			// the anchored scar is temporary and dies with the entity;
+			// leave the persistent, fading copy. s.time/generic1 carry
+			// the hook's spin stamp and number so a witness who never
+			// had the anchored pad in a snapshot still lands the gouges
+			// under the claws. No scar on a mover (marks are static)
+			if ( es->otherEntityNum2 < MAX_CLIENTS ) {
+				vec3_t	axis[3];
+
+				CG_GrapplePadAnchorAxis( es->angles, es->time,
+					es->generic1, axis );
+				CG_GrapplePadMark( position, axis, qfalse );
+			}
+		}
+		break;
+
 	case EV_SHOTGUN:
 		CG_ShotgunFire( es );
 		break;

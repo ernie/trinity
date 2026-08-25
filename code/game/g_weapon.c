@@ -4,6 +4,7 @@
 // perform the server side effects of a weapon firing
 
 #include "g_local.h"
+#include "bg_grapple_model.h"
 #include "bg_mode.h"
 
 static	float	s_quadFactor;
@@ -637,25 +638,187 @@ GRAPPLING HOOK
 
 void Weapon_GrapplingHook_Fire (gentity_t *ent)
 {
-	if (!ent->client->fireHeld && !ent->client->hook)
-		fire_grapple (ent, muzzle, forward);
+	gentity_t	*hook;
 
-	ent->client->fireHeld = qtrue;
+	if (!ent->client->hook) {
+		hook = fire_grapple (ent, muzzle, forward);
+		hook->damage *= s_quadFactor;
+	}
 }
 
 
+/*
+======================
+G_GrappleCoMoverMember
+
+The anchor or a member of its wired co-mover set
+======================
+*/
+qboolean G_GrappleCoMoverMember( gentity_t *hook, int entityNum ) {
+	int		k, n;
+
+	if ( hook->target_ent && hook->target_ent->s.number == entityNum ) {
+		return qtrue;
+	}
+	for ( k = 0 ; k < 3 ; k++ ) {
+		n = ( hook->s.time2 >> ( k * 10 ) ) & 0x3FF;
+		if ( n && n == entityNum ) {
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+/*
+==================
+G_GrappleDamage / G_GrappleKnockback
+
+Overrides, empty meaning the mode table decides, the same path every other
+weapon takes. Seeding these as cvar defaults cannot work: Cvar_Get keeps an
+existing cvar's value, so a mode change between maps never reaches them.
+==================
+*/
+int G_GrappleDamage( void ) {
+	if ( g_damage_gh.string[0] ) {
+		return g_damage_gh.integer;
+	}
+	return Mode_GetConfig( g_mode.integer )->weapons[WP_GRAPPLING_HOOK].damage;
+}
+
+float G_GrappleKnockback( void ) {
+	if ( g_knockback_gh.string[0] ) {
+		return g_knockback_gh.value;
+	}
+	return Mode_GetConfig( g_mode.integer )->weapons[WP_GRAPPLING_HOOK].knockback;
+}
+
 void Weapon_HookFree (gentity_t *ent)
 {
-	ent->parent->client->hook = NULL;
-	ent->parent->client->ps.pm_flags &= ~PMF_GRAPPLE_PULL;
+	// the brush runs a frame ahead of the hold on approach strokes, so a
+	// captured wielder can part overlapping it: step them clear first
+	if ( ent->s.generic1 && ent->parent->inuse && ent->parent->client
+			&& ent->parent->client->hook == ent
+			&& ent->target_ent && ent->target_ent->inuse ) {
+		trace_t		tr;
+		gentity_t	*w = ent->parent;
+
+		trap_Trace( &tr, w->r.currentOrigin, w->r.mins, w->r.maxs,
+			w->r.currentOrigin, w->s.number, MASK_PLAYERSOLID );
+		if ( tr.startsolid ) {
+			vec3_t	mang, n, p;
+			vec3_t	m[3], mt[3];
+			int		k;
+
+			BG_EvaluateTrajectory( &ent->target_ent->s.apos, level.time, mang );
+			G_CreateRotationMatrix( mang, mt );
+			G_TransposeMatrix( mt, m );
+			VectorScale( ent->pos2, -1, n );
+			G_RotatePoint( n, m );
+			for ( k = 8 ; k <= 64 ; k += 8 ) {
+				VectorMA( w->r.currentOrigin, k, n, p );
+				trap_Trace( &tr, p, w->r.mins, w->r.maxs, p, w->s.number, MASK_PLAYERSOLID );
+				if ( !tr.startsolid ) {
+					VectorCopy( p, w->client->ps.origin );
+					VectorCopy( p, w->r.currentOrigin );
+					trap_LinkEntity( w );
+					break;
+				}
+			}
+		}
+	}
+
+	// a reused client slot must not lose its own live hook: only clear the
+	// owner's pointer and pull bit if they still name this hook
+	if ( ent->parent && ent->parent->client && ent->parent->client->hook == ent ) {
+		ent->parent->client->hook = NULL;
+		ent->parent->client->ps.pm_flags &= ~PMF_GRAPPLE_PULL;
+	}
+
+	// PVS culling can drop an anchored pad from a client's snapshot without it
+	// having been freed, so absence is not a release. The event is, and it is
+	// broadcast, so PVS cannot swallow it either. Fires on EVERY
+	// release, anchored or not: the client's seat ramp restart lives on this
+	// same event, and a miss (the common case, firing into open air) is still
+	// a release that must re-materialize the pad
+	{
+		gentity_t	*tent;
+
+		tent = G_TempEntity( ent->r.currentOrigin, EV_GRAPPLE_RELEASE );
+		VectorCopy( ent->s.angles, tent->s.angles );
+		tent->s.otherEntityNum = ent->parent->s.number;
+		// only an anchored release drops fall debris; a miss carries no
+		// frozen impact normal for it to fall away from
+		tent->s.eventParm = ( ent->s.eType == ET_GRAPPLE ) ? 1 : 0;
+		// the release scar re-derives the pad's spin from these; a witness
+		// who never had the anchored pad in a snapshot has no other source.
+		// otherEntityNum2 flags a mover anchor (no scar)
+		tent->s.time = ent->s.time;
+		// 32 bits; generic1 is 8 on the wire. This is the release tent, not the
+		// hook: the hook entity's own time2 is the packed co-mover set instead,
+		// same field name, different eType, different meaning
+		tent->s.time2 = ent->s.number;
+		tent->s.otherEntityNum2 = ent->s.otherEntityNum2;
+		tent->r.svFlags |= SVF_BROADCAST;	// a release is a release for everyone, PVS or not
+	}
+
 	G_FreeEntity( ent );
 }
 
 
 void Weapon_HookThink (gentity_t *ent)
 {
+	// owner gone: drop the orphan before it writes into a reused client slot
+	if ( !ent->parent->inuse || ent->parent->client->hook != ent ) {
+		G_FreeEntity( ent );
+		return;
+	}
+
+	// no wielder, no projection (also catches a mid-latch switch to spectator)
+	if ( ent->parent->health <= 0
+			|| ent->parent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+		Weapon_HookFree( ent );
+		return;
+	}
+
 	if (ent->enemy) {
-		vec3_t v, oldorigin;
+		vec3_t v, oldorigin, dir;
+		int dmg;
+
+		// a dead, vanished, or turned-teammate target frees the hook rather
+		// than dragging the owner to it
+		if ( !ent->enemy->inuse || !ent->enemy->r.linked
+				|| ent->enemy->health <= 0
+				|| OnSameTeam( ent->parent, ent->enemy ) ) {
+			Weapon_HookFree( ent );
+			return;
+		}
+
+		// re-ticks impact damage on the model's own tick; skip at 0 since G_Damage still counts a hit
+		if ( G_GrappleDamage() > 0 && level.time >= ent->timestamp ) {
+			// a tick spans seconds, so read the wielder's LIVE quad here rather
+			// than the fire-time snapshot
+			dmg = G_GrappleDamage();
+			if ( ent->parent->client && ent->parent->client->ps.powerups[PW_QUAD] > level.time ) {
+				dmg *= g_quadfactor.value;
+			}
+#ifdef MISSIONPACK
+			if ( ent->parent->client && ent->parent->client->persistantPowerup
+					&& ent->parent->client->persistantPowerup->item
+					&& ent->parent->client->persistantPowerup->item->giTag == PW_DOUBLER ) {
+				dmg *= 2;
+			}
+#endif
+			VectorSubtract( ent->enemy->r.currentOrigin, ent->parent->r.currentOrigin, dir );
+			VectorNormalize( dir );
+			G_Damage( ent->enemy, ent, ent->parent, dir, ent->r.currentOrigin,
+				dmg, 0, MOD_GRAPPLE );
+			// the tick can kill the body it is anchored in, and the death frees
+			// this hook out from under it
+			if ( !ent->inuse || !ent->parent || !ent->parent->client || ent->parent->client->hook != ent ) {
+				return;
+			}
+			ent->timestamp += GRAPPLE_MODEL_TICK_MS;
+		}
 
 		VectorCopy(ent->r.currentOrigin, oldorigin);
 		v[0] = ent->enemy->r.currentOrigin[0] + (ent->enemy->r.mins[0] + ent->enemy->r.maxs[0]) * 0.5;
@@ -664,9 +827,220 @@ void Weapon_HookThink (gentity_t *ent)
 		SnapVectorTowards( v, oldorigin );	// save net bandwidth
 
 		G_SetOrigin( ent, v );
+		ent->s.pos.trType = TR_INTERPOLATE;	// client lerps the tracked pad
+		trap_LinkEntity( ent );
+	}
+	else if ( ent->target_ent ) {
+		gentity_t	*mover = ent->target_ent;
+		vec3_t		morg, mang, f, p, oldorigin;
+		vec3_t		m[3], mt[3];
+		trace_t		tr;
+
+		// anchor entity gone (a killed shoot-door): nothing left to grip
+		if ( !mover->inuse || mover->s.eType != ET_MOVER ) {
+			Weapon_HookFree( ent );
+			return;
+		}
+
+		BG_EvaluateTrajectory( &mover->s.pos, level.time, morg );
+		BG_EvaluateTrajectory( &mover->s.apos, level.time, mang );
+
+		// mover-frame anchor back out to world
+		G_CreateRotationMatrix( mang, mt );
+		G_TransposeMatrix( mt, m );
+		VectorCopy( ent->pos1, p );
+		G_RotatePoint( p, m );
+		VectorAdd( morg, p, p );
+
+		VectorCopy( ent->r.currentOrigin, oldorigin );
+		SnapVectorTowards( p, oldorigin );	// save net bandwidth
+
+		// rides the mover frame like the offset; vectoangles zeroing roll matches the pad's own anchor
+		VectorCopy( ent->pos2, f );
+		G_RotatePoint( f, m );
+		vectoangles( f, ent->s.angles );
+
+		G_SetOrigin( ent, p );
+		ent->s.pos.trType = TR_INTERPOLATE;	// client lerps the tracked pad
+		VectorCopy( ent->s.angles, ent->s.apos.trBase );	// angles ride the same lerp
+		trap_LinkEntity( ent );
+
+		// a sweep overrunning a grounded wielder can't be captured out of
+		// the way: snap the link; airborne overlap is an arrival instead
+		trap_Trace( &tr, ent->parent->r.currentOrigin, ent->parent->r.mins,
+			ent->parent->r.maxs, ent->parent->r.currentOrigin,
+			ent->parent->s.number, MASK_PLAYERSOLID );
+		if ( tr.startsolid && tr.entityNum == mover->s.number
+				&& !ent->s.generic1
+				&& ent->parent->client->ps.groundEntityNum != ENTITYNUM_NONE ) {
+			Weapon_HookFree( ent );
+			return;
+		}
+
+		// within reach the wielder is captured: perpendicular off the face,
+		// body support clear along the normal (rotators keep the full
+		// margin, since their spinning normal sweeps the box)
+		if ( !ent->s.generic1
+				&& ent->parent->client->ps.groundEntityNum == ENTITYNUM_NONE
+				&& Distance( ent->parent->r.currentOrigin, ent->r.currentOrigin ) <= GRAPPLE_LATCH_REACH ) {
+			vec3_t		loc, out;
+			float		standoff;
+
+			VectorScale( ent->pos2, -1, out );
+			G_RotatePoint( out, m );
+
+			if ( mover->s.apos.trType == TR_STATIONARY ) {
+				standoff = 8.0f
+					+ ent->parent->r.maxs[0] * fabs( out[0] )
+					+ ent->parent->r.maxs[1] * fabs( out[1] )
+					+ ( out[2] < 0 ? ent->parent->r.maxs[2] : -ent->parent->r.mins[2] ) * fabs( out[2] );
+			} else {
+				standoff = GRAPPLE_LATCH_STANDOFF;
+			}
+
+			VectorScale( ent->pos2, -standoff, loc );
+			VectorAdd( ent->pos1, loc, loc );
+			G_RotatePoint( loc, m );
+			VectorAdd( morg, loc, loc );
+
+			// tight sockets: the tether sets longer, out to where the body
+			// fits clear of everything but the anchor; no fit = a pinned
+			// capture, and the squeeze check resolves the lethal pins
+			{
+				vec3_t		probe;
+				int			k;
+				qboolean	linked;
+
+				linked = mover->r.linked ? qtrue : qfalse;
+				if ( linked ) {
+					trap_UnlinkEntity( mover );
+				}
+				for ( k = 0; k <= 64; k += 8 ) {
+					VectorMA( loc, (float)k, out, probe );
+					trap_Trace( &tr, probe, ent->parent->r.mins, ent->parent->r.maxs,
+						probe, ent->parent->s.number, MASK_PLAYERSOLID );
+					if ( tr.startsolid ) {
+						continue;
+					}
+					if ( k > 0 ) {
+						// margin holds the brush frame-lead off the foreign
+						// blocker; bare fit when even that is blocked
+						VectorMA( loc, (float)k + GRAPPLE_FIT_MARGIN, out, probe );
+						trap_Trace( &tr, probe, ent->parent->r.mins, ent->parent->r.maxs,
+							probe, ent->parent->s.number, MASK_PLAYERSOLID );
+						if ( tr.startsolid ) {
+							VectorMA( loc, (float)k, out, probe );
+						}
+					}
+					VectorCopy( probe, loc );
+					break;
+				}
+				if ( linked ) {
+					trap_LinkEntity( mover );
+				}
+			}
+
+			trap_Trace( &tr, ent->parent->r.currentOrigin, ent->parent->r.mins,
+				ent->parent->r.maxs, loc, ent->parent->s.number, MASK_PLAYERSOLID );
+			if ( !tr.startsolid ) {
+				VectorCopy( tr.endpos, loc );
+			}
+			VectorSubtract( loc, morg, loc );
+			G_RotatePoint( loc, mt );
+
+			VectorCopy( loc, ent->movedir );
+			ent->s.generic1 = 1;
+
+			// the whole co-mover set rides with the anchor: resolve
+			// the set once and wire it, so both prediction sides agree
+			ent->s.time2 = 0;
+			{
+				int		n, k, itmp, slot;
+				int		cand[3];
+				float	cdist[3];
+				float	d, ftmp;
+				vec3_t	cp;
+
+				slot = 0;
+				for ( n = MAX_CLIENTS ; n < level.num_entities ; n++ ) {
+					gentity_t *co = &g_entities[n];
+
+					if ( !co->inuse || co->s.eType != ET_MOVER || co == mover
+							|| !BG_MoverCoMoves( &mover->s, &co->s ) ) {
+						continue;
+					}
+					if ( co->r.absmin[0] > mover->r.absmax[0] + 128
+							|| co->r.absmax[0] < mover->r.absmin[0] - 128
+							|| co->r.absmin[1] > mover->r.absmax[1] + 128
+							|| co->r.absmax[1] < mover->r.absmin[1] - 128
+							|| co->r.absmin[2] > mover->r.absmax[2] + 128
+							|| co->r.absmax[2] < mover->r.absmin[2] - 128 ) {
+						continue;
+					}
+					// bigger movers can exceed the three slots: keep the
+					// parts nearest the pad, they contact the captive first
+					for ( k = 0 ; k < 3 ; k++ ) {
+						cp[k] = ent->r.currentOrigin[k];
+						if ( cp[k] < co->r.absmin[k] ) cp[k] = co->r.absmin[k];
+						else if ( cp[k] > co->r.absmax[k] ) cp[k] = co->r.absmax[k];
+					}
+					d = DistanceSquared( ent->r.currentOrigin, cp );
+					if ( slot < 3 ) {
+						cand[slot] = co->s.number;
+						cdist[slot] = d;
+						slot++;
+					} else if ( d < cdist[2] ) {
+						cand[2] = co->s.number;
+						cdist[2] = d;
+					} else {
+						continue;
+					}
+					for ( k = slot - 1 ; k > 0 && cdist[k] < cdist[k-1] ; k-- ) {
+						itmp = cand[k]; cand[k] = cand[k-1]; cand[k-1] = itmp;
+						ftmp = cdist[k]; cdist[k] = cdist[k-1]; cdist[k-1] = ftmp;
+					}
+				}
+				for ( k = 0 ; k < slot ; k++ ) {
+					ent->s.time2 |= cand[k] << ( k * 10 );
+				}
+			}
+		}
+
+		// G_SetOrigin wipes trDelta every think, so re-stamp the wire copy
+		// of the captured pose
+		if ( ent->s.generic1 ) {
+			VectorCopy( ent->movedir, ent->s.pos.trDelta );
+		}
+
+		// the mover cannot see its captive to push or reverse: when the
+		// world pins the wielder and the brush overruns them, crush is here
+		if ( ent->s.generic1 ) {
+			vec3_t	pose, o2, a2;
+			vec3_t	m2[3], mt2[3];
+			int		t;
+
+			// both operands at the same instant, or lag reads as strain
+			t = ent->parent->client->ps.commandTime;
+			BG_EvaluateTrajectory( &mover->s.pos, t, o2 );
+			BG_EvaluateTrajectory( &mover->s.apos, t, a2 );
+			G_CreateRotationMatrix( a2, mt2 );
+			G_TransposeMatrix( mt2, m2 );
+			VectorCopy( ent->movedir, pose );
+			G_RotatePoint( pose, m2 );
+			VectorAdd( o2, pose, pose );
+			if ( Distance( pose, ent->parent->r.currentOrigin ) > GRAPPLE_CRUSH_STRAIN ) {
+				trap_Trace( &tr, ent->parent->r.currentOrigin, ent->parent->r.mins,
+					ent->parent->r.maxs, ent->parent->r.currentOrigin,
+					ent->parent->s.number, MASK_PLAYERSOLID );
+				if ( tr.startsolid ) {
+					G_Damage( ent->parent, mover, mover, NULL, NULL, 99999, 0, MOD_CRUSH );
+				}
+			}
+		}
 	}
 
 	VectorCopy( ent->r.currentOrigin, ent->parent->client->ps.grapplePoint);
+	ent->nextthink = level.time + 25;	// every frame: smooth follow, on-schedule ticks
 }
 
 

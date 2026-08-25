@@ -1221,6 +1221,10 @@ void BeginIntermission( void ) {
 			respawn( client );
 		}
 
+		if ( client->client->hook ) {
+			Weapon_HookFree( client->client->hook );
+		}
+
 		MoveClientToIntermission( client );
 	}
 

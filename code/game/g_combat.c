@@ -301,11 +301,16 @@ void body_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int d
 
 
 // these are just for logging, the client prints its own messages
-char	*modNames[MOD_NUM_MAX] = {
+// implied size: the sentinel below makes it MOD_NUM_MAX + 1, and the read
+// site guards with ARRAY_LEN, not MOD_NUM_MAX
+char	*modNames[] = {
 #define MOD_STRINGS
 	#include "bg_mods.h"
 #undef MOD_STRINGS
-	"NULL"	// avoid -Wpedantic warnings
+	// the include's last entry carries no trailing comma (the enum variant
+	// needs it bare to append MOD_NUM_MAX), so the sentinel's comma must
+	// lead or the adjacent literals concatenate
+	, "NULL"	// avoid -Wpedantic warnings
 };
 
 #ifdef MISSIONPACK
@@ -453,6 +458,15 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
 	if (self->client && self->client->hook) {
 		Weapon_HookFree(self->client->hook);
+	}
+	// hooks anchored in this body come loose with it; a respawn in the same
+	// frame (team change) would otherwise tow the wielder to the new spawn
+	for ( i = 0 ; i < level.maxclients ; i++ ) {
+		gclient_t	*c = &level.clients[i];
+
+		if ( c->pers.connected == CON_CONNECTED && c->hook && c->hook->enemy == self ) {
+			Weapon_HookFree( c->hook );
+		}
 	}
 #ifdef MISSIONPACK
 	if ((self->client->ps.eFlags & EF_TICKING) && self->activator) {
@@ -982,11 +996,18 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 #endif
 			default: break;
 			}
-			if ( wp != WP_NONE ) {
+			if ( wp == WP_GRAPPLING_HOOK ) {
+				kbMul = G_GrappleKnockback();
+			} else if ( wp != WP_NONE ) {
 				kbMul = isSelf ? gp->weapons[wp].selfKnockback : gp->weapons[wp].knockback;
 			}
 		}
 		knockback = (int)( knockback * kbMul );
+
+		// the hook's pull is negative; the cap applies to its size
+		if ( knockback < -gp->maxKnockback ) {
+			knockback = -gp->maxKnockback;
+		}
 
 		if ( knockback > gp->maxKnockback ) {
 			knockback = gp->maxKnockback;

@@ -193,7 +193,7 @@ static void CG_NailgunEjectBrass( centity_t *cent ) {
 CG_LaserSight
 ==========================
 */
-void CG_LaserSight( vec3_t start, vec3_t end, byte colour[4], float width ) {
+void CG_LaserSight( vec3_t start, vec3_t end, byte color[4], float width ) {
   refEntity_t     re;
 	memset( &re, 0, sizeof( re ) );
 
@@ -212,10 +212,10 @@ void CG_LaserSight( vec3_t start, vec3_t end, byte colour[4], float width ) {
 
   AxisClear( re.axis );
 
-	re.shaderRGBA.rgba[0] = colour[0];
-	re.shaderRGBA.rgba[1] = colour[1];
-	re.shaderRGBA.rgba[2] = colour[2];
-	re.shaderRGBA.rgba[3] = colour[3];
+	re.shaderRGBA.rgba[0] = color[0];
+	re.shaderRGBA.rgba[1] = color[1];
+	re.shaderRGBA.rgba[2] = color[2];
+	re.shaderRGBA.rgba[3] = color[3];
 
 	trap_R_AddRefEntityToScene(&re);
 }
@@ -577,35 +577,1029 @@ static void CG_PlasmaTrail( centity_t *cent, const weaponInfo_t *wi ) {
 CG_GrappleTrail
 ==========================
 */
+// spaced over 180, not 360: cull disable already makes each plane two-sided
+#define TETHER_PLANES			3
+#define TETHER_PLANE_STEP		( 180.0f / TETHER_PLANES )
+// all three overlap down the center axis
+#define TETHER_PLANE_ALPHA		115
+
+// wider than this spills past the launcher's silhouette
+#define TETHER_HALF_WIDTH		1.30f
+
+// world length of one texture repeat
+#define TETHER_PULSE_WAVELENGTH	110.0f
+// EDIT IN LOCKSTEP with grapplingTether's tcMod scroll, or the arcs drift off
+// the crests they ride
+#define TETHER_PULSE_HZ			2.5f
+#define TETHER_CREST_PERIOD		400		// ms, 1 / TETHER_PULSE_HZ
+
+#define TETHER_TINT_R		46
+#define TETHER_TINT_G		122
+#define TETHER_TINT_B		255
+
+/*
+==========================
+CG_GrappleOwnerRGBA
+
+The launcher and the pad carry an rgbGen entity emission stage, so every path
+that draws either model has to hand it the shooter's effects color or the lit
+hardware renders black.  Stock blue until their info arrives, like the tether.
+==========================
+*/
+void CG_GrappleOwnerRGBA( int clientNum, byte *rgba ) {
+	if ( clientNum >= 0 && clientNum < MAX_CLIENTS
+			&& cgs.clientinfo[ clientNum ].infoValid ) {
+		Byte4Copy( cgs.clientinfo[ clientNum ].c1RGBA, rgba );
+		return;
+	}
+	rgba[0] = TETHER_TINT_R;
+	rgba[1] = TETHER_TINT_G;
+	rgba[2] = TETHER_TINT_B;
+	rgba[3] = 255;
+}
+
+/*
+==========================
+CG_GrappleActivity
+
+What the launcher is doing, which is also which loop is audible on it. The hook
+is its own entity, so its state is found in the snapshot, off the hook itself.
+==========================
+*/
+typedef enum {
+	GRAPPLE_IDLE,		// weapon out, hook stowed: gridle.wav
+	GRAPPLE_FLY,		// hook in flight: grfire.wav
+	GRAPPLE_PULL,		// hook anchored, owner reeling in: grpull.wav
+	GRAPPLE_RELOAD		// pad re-forming on the dock after a release
+} grappleAct_t;
+
+static int CG_GrappleActivity( int clientNum ) {
+	const entityState_t	*es;
+	int					i;
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS || !cg.snap ) {
+		return GRAPPLE_IDLE;
+	}
+
+	// pmove only ever CLEARS this flag (on the predicted switch-away), so the
+	// playerstate leads the snapshot on release, so reading it here drops the
+	// pull's dip on release instead of holding it until the snapshot catches up
+	if ( clientNum == cg.predictedPlayerState.clientNum
+			&& ( cg.predictedPlayerState.pm_flags & PMF_GRAPPLE_PULL ) ) {
+		return GRAPPLE_PULL;
+	}
+
+	for ( i = 0; i < cg.snap->numEntities; i++ ) {
+		es = &cg.snap->entities[ i ];
+		if ( es->weapon != WP_GRAPPLING_HOOK || es->otherEntityNum != clientNum ) {
+			continue;
+		}
+		if ( es->eType == ET_GRAPPLE ) {
+			return GRAPPLE_PULL;
+		}
+		if ( es->eType == ET_MISSILE ) {
+			return GRAPPLE_FLY;
+		}
+	}
+
+	// holding fire with no hook in the snapshot yet: the launch frame, and the
+	// stretch after a hook has been freed with the button still down
+	if ( clientNum == cg.predictedPlayerState.clientNum ) {
+		if ( cg.predictedPlayerState.eFlags & EF_FIRING ) {
+			return GRAPPLE_FLY;
+		}
+	} else if ( cg_entities[ clientNum ].currentState.eFlags & EF_FIRING ) {
+		return GRAPPLE_FLY;
+	}
+
+	// the charge surges while the pad re-forms, and everything keyed off
+	// activity (glow, arc density, brightness, dlight) picks that up for free
+	if ( CG_GrappleSeat( clientNum ) < 1.0f ) {
+		return GRAPPLE_RELOAD;
+	}
+
+	return GRAPPLE_IDLE;
+}
+
+/*
+==========================
+
+One launch sound per shot.  EV_FIRE_WEAPON repeats every 400ms while the button
+is held (which is why the weapon carries no flashSound), so the trigger is the
+edge into "a hook is out", not the event.  Called per view, so the first call at
+a given cg.time decides and the rest are no-ops.  A gap longer than
+PAD_SEAT_RESET means the client was out of PVS rather than idle; replaying the
+launch on the frame he reappears would be a phantom.
+==========================
+*/
+
+
+
+/*
+==========================
+CG_GrappleEnvelope
+
+Flat brightness per state, nothing time-varying: brightness modulation near
+the glass energy's 3x wave-rate cadence wagon-wheels the motion to a standstill.
+==========================
+*/
+// levels stepped well past the ~10% luminance JND so the glass beats the
+// dlit metal around it (grapple.shaderx); fly is near the ceiling already
+#define GLOW_IDLE_LEVEL		0.40f
+#define GLOW_ACTIVE_LEVEL	0.95f
+#define GLOW_PULL_LEVEL		0.75f
+
+static float CG_GrappleEnvelope( int act ) {
+	if ( act == GRAPPLE_PULL ) {
+		return GLOW_PULL_LEVEL;
+	}
+	if ( act == GRAPPLE_FLY ) {
+		return GLOW_ACTIVE_LEVEL;
+	}
+	if ( act == GRAPPLE_RELOAD ) {
+		return GLOW_ACTIVE_LEVEL;
+	}
+	return GLOW_IDLE_LEVEL;
+}
+
+/*
+==========================
+CG_GrapplePulse
+
+The envelope for a given wielder, for paths outside this file that draw his
+energy (the pad's emission stage). NOT its dlight, which rides its own swell.
+==========================
+*/
+float CG_GrapplePulse( int clientNum ) {
+	return CG_GrappleEnvelope( CG_GrappleActivity( clientNum ) );
+}
+
+/*
+==========================
+CG_GrapplePullLevel
+
+The brightness the anchored pad was drawn at (GLOW_PULL_LEVEL). The falling
+pad reads this on spawn so its fade starts continuous instead of popping to
+full brightness on the release handoff frame.
+==========================
+*/
+float CG_GrapplePullLevel( void ) {
+	return GLOW_PULL_LEVEL;
+}
+
+/*
+==========================
+CG_GrappleDlightScale / CG_GrappleDlightRadius
+
+The dim base for both grapple lights plus a shared swell on one clock, so the
+muzzle and anchor pulse together. The radius knob sits at zero; it only earns
+its keep if the pace drops below ~1 Hz, where color alone stops registering.
+==========================
+*/
+static float CG_GrappleDlightWave( void ) {
+	return (float)sin( cg.time * 0.001 * GRAPPLE_DLIGHT_PULSE_HZ * 2.0 * M_PI );
+}
+
+float CG_GrappleDlightScale( void ) {
+	return GRAPPLE_DLIGHT_SCALE + GRAPPLE_DLIGHT_PULSE_AMP * CG_GrappleDlightWave();
+}
+
+float CG_GrappleDlightRadius( float base ) {
+	return base * ( 1.0f + GRAPPLE_DLIGHT_RADIUS_AMP * CG_GrappleDlightWave() );
+}
+
+/*
+==========================
+CG_GrappleFade
+
+Scale an emission tint by the envelope.  Alpha is left alone: it selects the
+stage, it does not carry brightness.
+==========================
+*/
+void CG_GrappleFade( byte *rgba, float pulse ) {
+	rgba[0] = (byte)( rgba[0] * pulse );
+	rgba[1] = (byte)( rgba[1] * pulse );
+	rgba[2] = (byte)( rgba[2] * pulse );
+}
+
+// how far each end buries into what it meets, so neither reads as a gap close
+// up. Pad: just past its rear boss, or the cable spears into the puck's middle.
+// Launcher: shallow, since the solid emitter face has no bore to sink into
+#define TETHER_PAD_OVERLAP	1.20f
+#define TETHER_MUZZLE_OVERLAP	0.25f
+
+// below this the muzzle-to-hook vector is too short to normalize into a usable
+// direction, and the overlaps above would throw the ends off at random
+#define TETHER_MIN_LENGTH		2.0f
+
+// defined with the rest of the arc machinery, below
+static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
+		int clientNum, int act );
+
 void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
-	vec3_t	origin;
+	static const byte stockTint[3] = { TETHER_TINT_R, TETHER_TINT_G, TETHER_TINT_B };
+	vec3_t			origin, start, dir, n, tmp;
+	polyVert_t		v[4];
+	float			len, s0, s1;
 	entityState_t	*es;
-	vec3_t			forward, up;
-	refEntity_t		beam;
+	const byte		*tint;
+	int				i, k, act;
 
 	es = &ent->currentState;
 
-	BG_EvaluateTrajectory( &es->pos, cg.time, origin );
+	// the halo wears the shooter's effects color; the untinted core stage keeps
+	// the center white
+	tint = stockTint;
+	if ( es->otherEntityNum < MAX_CLIENTS
+			&& cgs.clientinfo[ es->otherEntityNum ].infoValid ) {
+		tint = cgs.clientinfo[ es->otherEntityNum ].c1RGBA;
+	}
+
+	VectorCopy( ent->lerpOrigin, origin );	// the lerped pad, not the raw snapshot trajectory
 	ent->trailTime = cg.time;
 
-	memset( &beam, 0, sizeof( beam ) );
+	// the chain meets the back of the hook, not the middle of the model.  the
+	// trail runs before CG_Missile builds the render axis, so derive it here
+	if ( wi->missileModel ) {
+		orientation_t	tether;
+		vec3_t			axis[3];
 
-	AngleVectors( cg_entities[ es->otherEntityNum ].lerpAngles, forward, NULL, up );
-	VectorCopy ( cg_entities[ es->otherEntityNum ].pe.muzzleOrigin, beam.origin );
-	VectorCopy( origin, beam.oldorigin );
+		CG_GrappleHookAxis( ent, axis );
+		trap_R_LerpTag( &tether, wi->missileModel, 0, 0, 1.0f, "tag_tether" );
+		for ( i = 0 ; i < 3 ; i++ ) {
+			VectorMA( origin, tether.origin[i], axis[i], origin );
+		}
+		// bury it along the pad's own axis, which is not the tether's direction
+		// once the pad has clamped on at an angle
+		VectorMA( origin, TETHER_PAD_OVERLAP, axis[0], origin );
+	}
 
-	if (Distance( beam.origin, beam.oldorigin ) < 64 )
-		return; // Don't draw if close
+	// chain feed loop plays from the gun while the hook flies
+	if ( es->eType == ET_MISSILE ) {
+		trap_S_AddLoopingSound( es->otherEntityNum, cg_entities[ es->otherEntityNum ].lerpOrigin,
+			vec3_origin, cgs.media.sfx_grapplefire );
+	}
 
-	beam.reType = RT_LIGHTNING;
-	beam.customShader = cgs.media.lightningShader;
+	VectorCopy( cg_entities[ es->otherEntityNum ].pe.muzzleOrigin, start );
 
-	AxisClear( beam.axis );
-	beam.shaderRGBA.rgba[0] = 0xff;
-	beam.shaderRGBA.rgba[1] = 0xff;
-	beam.shaderRGBA.rgba[2] = 0xff;
-	beam.shaderRGBA.rgba[3] = 0xff;
-	trap_R_AddRefEntityToScene( &beam );
+	// only bail when too short to derive a direction; a bigger guard blanks
+	// the tether at the end of every pull, right when it's closest to view
+	if ( Distance( start, origin ) < TETHER_MIN_LENGTH )
+		return;
+
+	VectorSubtract( origin, start, dir );
+	len = VectorNormalize( dir );
+
+	// run the near end back down the bore rather than starting flush with its
+	// mouth, which shows an empty barrel behind the tether in first person
+	VectorMA( start, -TETHER_MUZZLE_OVERLAP, dir, start );
+	len += TETHER_MUZZLE_OVERLAP;
+
+	// no light grid sample: a tether that dimmed in shadow would read as chain
+
+	// S counts texture repeats, so a charge cycle spans the same world distance
+	// at any length.  Reversed while reeling, like the pad's rings
+	act = CG_GrappleActivity( es->otherEntityNum );
+	if ( act == GRAPPLE_PULL ) {
+		s0 = len / TETHER_PULSE_WAVELENGTH;
+		s1 = 0;
+	} else {
+		s0 = 0;
+		s1 = len / TETHER_PULSE_WAVELENGTH;
+	}
+
+	for ( k = 0 ; k < 4 ; k++ ) {
+		v[k].modulate[0] = tint[0];
+		v[k].modulate[1] = tint[1];
+		v[k].modulate[2] = tint[2];
+		v[k].modulate[3] = TETHER_PLANE_ALPHA;
+	}
+	v[0].st[0] = s0;	v[0].st[1] = 0;
+	v[1].st[0] = s1;	v[1].st[1] = 0;
+	v[2].st[0] = s1;	v[2].st[1] = 1;
+	v[3].st[0] = s0;	v[3].st[1] = 1;
+
+	// basis off the cable, not the view: a billboard is wrong in stereo and
+	// collapses end-on, where the near end sits
+	PerpendicularVector( n, dir );
+
+	for ( i = 0 ; i < TETHER_PLANES ; i++ ) {
+		VectorMA( start,  TETHER_HALF_WIDTH, n, v[0].xyz );
+		VectorMA( origin, TETHER_HALF_WIDTH, n, v[1].xyz );
+		VectorMA( origin, -TETHER_HALF_WIDTH, n, v[2].xyz );
+		VectorMA( start,  -TETHER_HALF_WIDTH, n, v[3].xyz );
+
+		trap_R_AddPolyToScene( cgs.media.grappleTetherShader, 4, v );
+
+		RotatePointAroundVector( tmp, dir, n, TETHER_PLANE_STEP );
+		VectorCopy( tmp, n );
+	}
+
+	CG_TetherArcs( start, dir, len, es->otherEntityNum, act );
+}
+
+/*
+==========================
+CG_GrappleCoreArcs
+
+Charge crawling the launcher's open beam span, so the hardware reads as live
+even with the hook stowed. Each filament ignites, travels and fades rather than
+flashing; its life derives from a hash of its generation, so every view and
+mirror draws it in the same place without syncing state.
+
+Each draws twice along the same nodes: a wide halo in the owner's color and a
+thin near-white core inside it, so it reads white-hot rather than as one thin
+wash.
+
+No cull, like CG_GrappleTrail, so a segment sighted end-on thins to nothing.
+==========================
+*/
+// the three lit channels and the rail edge over each, measured off the gun model
+//   { floor center y, z, the floor's own across direction y, z,
+//     center y of the rail edge above it, half its run }
+static const float arcChannel[3][6] = {
+	{  0.000f, 2.772f, -1.0000f,  0.0000f,  0.00f, 0.50f },	// top flat
+	{  0.829f, 2.429f, -0.7071f,  0.7071f,  0.42f, 0.13f },	// +y upper facet
+	{ -0.829f, 2.429f, -0.7071f, -0.7071f, -0.42f, 0.13f }	// -y upper facet
+};
+
+#define ARC_RAIL_Z			3.30f		// rail beam underside, the shroud above
+#define ARC_FOOT_HALF		0.28f		// across the lit floor, inside its 0.30
+
+// x windows the two feet wander in.  The lit floor runs 6.64-11.16 and the
+// beam's underside 7.00-10.70; both are pulled a hair inside, so a foot that
+// slides the whole way still ends on glass / on metal
+#define ARC_FOOT_X0			6.70f
+#define ARC_FOOT_X1			11.10f
+#define ARC_RAIL_X0			7.10f
+#define ARC_RAIL_X1			10.60f
+
+// the head's x pairs to the foot's, or back-to-front diagonals become the
+// common case instead of the rare one. Reach is the PRODUCT of four uniform
+// hashes, whose tail dies faster than any single hash, keeping full-length
+// arcs rare
+#define ARC_SPAN_NEAR		0.13f
+#define ARC_SPAN_REACH		1.15f
+
+#define ARC_SLOTS			5			// filaments that can be alight at once
+#define ARC_SEGMENTS		4			// jag points along one filament
+#define ARC_CYCLE			540			// ms before a slot may light again
+#define ARC_STAGGER			107			// ...offset per slot, so they never
+										//    all come round together
+#define ARC_LIFE_MIN		140			// ms a filament lives, hashed per
+#define ARC_LIFE_MAX		340			//    instance inside this window
+#define ARC_DELAY			190			// latest it may ignite in its cycle;
+										//    + LIFE_MAX must stay under CYCLE
+#define ARC_TRAVEL			9.0f		// units/sec a foot slides along its edge
+#define ARC_TRAVEL_MIN		0.35f		// ...and the slowest share of that
+#define ARC_ARCH			0.30f		// how far the first node lifts off the
+										//    floor along the facet's own normal
+#define ARC_KINK			0.13f		// wander at the interior points
+#define ARC_JAG_STEPS		3			// times the jag re-hashes over a life
+#define ARC_HALF_WIDTH		0.085f
+#define ARC_ALPHA			0.85f
+
+// two passes on the same polyline: a wide halo in the owner's color and a thin
+// near-white core inside it.  ARC_CORE_WIDTH_FRAC must stay <= 1.0 or the core
+// pokes out from under the halo
+#define ARC_HALO_WIDTH_MULT	1.15f		// halo half-width vs ARC_HALF_WIDTH
+#define ARC_CORE_WIDTH_FRAC	0.40f		// core half-width, fraction of the halo's
+#define ARC_CORE_WHITE_MIX		0.75f		// how far the core tint pulls toward white
+#define ARC_CORE_ALPHA			0.95f		// core alpha cap
+#define ARC_CORE_ATTACK			0.15f		// core life fraction ramping up
+#define ARC_CORE_RELEASE		0.25f		// ...and fading out at the end
+#define ARC_PULSE_COUPLE		0.50f		// share of the glow envelope's dip that
+											//    reaches per-filament alpha
+
+#define ARC_SALT_STRIDE		128			// hash room per slot; the jag alone
+										//    reaches 55 of it, and two slots
+										//    sharing a hash would draw as one
+#define ARC_SALT_JAG		16			// ...so 0-15 is the per-instance room,
+										//    and it is exactly full
+
+// how busy the gap is per state; idle stays gappy on purpose
+#define ARC_DENSITY_IDLE	0.50f
+#define ARC_DENSITY_FLY		0.75f
+#define ARC_DENSITY_PULL	0.95f
+#define ARC_BRIGHT_IDLE		0.55f
+#define ARC_BRIGHT_FLY		0.85f
+#define ARC_BRIGHT_PULL		1.00f
+#define ARC_SPEED_IDLE		0.70f
+#define ARC_SPEED_FLY		1.00f
+#define ARC_SPEED_PULL		1.25f
+
+// re-judging a lit filament's gate against a NEW density on a state change
+// would blink it out mid-alpha; the factors ramp over ARC_FACTOR_TAU and the
+// gate has a soft ARC_GATE_BAND edge instead, so density crossings fade, not cut
+#define ARC_FACTOR_TAU		150.0f		// ms the factors take to follow a state
+#define ARC_GATE_BAND		0.22f		// gate hash room that fades in, not on
+#define ARC_FACTOR_RESET	500			// ms gap that means a restart or a seek
+
+/*
+==========================
+CG_ArcRandom
+
+Hashed, not sequential: every draw of a given frame has to reproduce the same
+filaments from the same seed, in any order and any number of times.
+==========================
+*/
+static float CG_ArcRandom( int tick, int salt ) {
+	unsigned int	h;
+
+	h = (unsigned int)tick * 2654435761u + (unsigned int)salt * 2246822519u;
+	h ^= h >> 15;
+	h *= 2246822519u;
+	h ^= h >> 13;
+	return ( h & 0xffff ) * ( 1.0f / 65535.0f );
+}
+
+static float CG_ArcSigned( int tick, int salt ) {
+	return 2.0f * CG_ArcRandom( tick, salt ) - 1.0f;
+}
+
+/*
+==========================
+CG_ArcDrift
+
+A foot's travel over one life: direction and speed hashed and offset away from
+zero, so a filament's two ends never nearly stall like a plain signed hash would.
+==========================
+*/
+static float CG_ArcDrift( int gen, int salt, float scale ) {
+	float	d;
+
+	d = CG_ArcSigned( gen, salt );
+	if ( d < 0.0f ) {
+		return ( d - ARC_TRAVEL_MIN ) * scale;
+	}
+	return ( d + ARC_TRAVEL_MIN ) * scale;
+}
+
+static float CG_ArcClamp( float x, float lo, float hi ) {
+	if ( x < lo ) {
+		return lo;
+	}
+	if ( x > hi ) {
+		return hi;
+	}
+	return x;
+}
+
+/*
+==========================
+CG_ArcCoreEnvelope
+
+The CORE's life curve: fast attack, hold near 1, slow release.  Unlike the
+halo's symmetric curve, the core spends most of its life at full presence.
+Two smoothstepped ramps multiply, branchless past the clamps.
+==========================
+*/
+static float CG_ArcCoreEnvelope( float u ) {
+	float	up, down;
+
+	up = CG_ArcClamp( u / ARC_CORE_ATTACK, 0.0f, 1.0f );
+	up = up * up * ( 3.0f - 2.0f * up );
+	down = CG_ArcClamp( ( 1.0f - u ) / ARC_CORE_RELEASE, 0.0f, 1.0f );
+	down = down * down * ( 3.0f - 2.0f * down );
+	return up * down;
+}
+
+/*
+==========================
+CG_ArcFactors
+
+Density, brightness and drift, ramped rather than stepped: the one thing that
+can't derive from cg.time alone, so it advances ONCE per frame and every draw shares it.
+==========================
+*/
+typedef struct {
+	int		time;			// cg.time this was last advanced
+	float	density;
+	float	bright;
+	float	speed;
+} arcFactors_t;
+
+static arcFactors_t	cg_arcFactors[MAX_CLIENTS];
+
+static const arcFactors_t *CG_ArcFactors( int clientNum, int act ) {
+	arcFactors_t	*a;
+	float			density, bright, speed, k;
+	int				dt;
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		clientNum = 0;
+	}
+	a = &cg_arcFactors[ clientNum ];
+	dt = cg.time - a->time;
+	if ( !dt ) {
+		return a;			// another draw of this frame already advanced it
+	}
+
+	if ( act == GRAPPLE_PULL ) {
+		density = ARC_DENSITY_PULL; bright = ARC_BRIGHT_PULL; speed = ARC_SPEED_PULL;
+	} else if ( act == GRAPPLE_RELOAD ) {
+		density = ARC_DENSITY_PULL * PAD_SEAT_ARC_SPIKE; bright = ARC_BRIGHT_PULL; speed = ARC_SPEED_PULL;
+	} else if ( act == GRAPPLE_FLY ) {
+		density = ARC_DENSITY_FLY; bright = ARC_BRIGHT_FLY; speed = ARC_SPEED_FLY;
+	} else {
+		density = ARC_DENSITY_IDLE; bright = ARC_BRIGHT_IDLE; speed = ARC_SPEED_IDLE;
+	}
+
+	if ( !a->time || dt < 0 || dt > ARC_FACTOR_RESET ) {
+		k = 1.0f;			// first sight of this wielder, a restart, or a seek
+	} else {
+		k = dt / ( dt + ARC_FACTOR_TAU );
+	}
+	a->density += ( density - a->density ) * k;
+	a->bright += ( bright - a->bright ) * k;
+	a->speed += ( speed - a->speed ) * k;
+	a->time = cg.time;
+	return a;
+}
+
+/*
+==========================
+CG_GrappleSeat
+
+How far through the materialize a wielder's pad is, 0..1. Cannot derive from
+cg.time alone, so it advances once per frame and every draw path shares it,
+the same shape as cg_arcFactors above.
+==========================
+*/
+typedef struct {
+	int		time;			// cg.time this was last advanced
+	float	progress;
+	int		fired;			// set once the hook has launched: ramp finishes in flight
+} padSeat_t;
+
+static padSeat_t	cg_padSeat[MAX_CLIENTS];
+
+float CG_GrappleSeat( int clientNum ) {
+	padSeat_t	*p;
+	int			delta;
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return 1.0f;
+	}
+	p = &cg_padSeat[ clientNum ];
+
+	delta = cg.time - p->time;
+	if ( delta <= 0 ) {
+		return p->progress;
+	}
+	// a demo seek or a restart resets to FULLY FORMED, not to zero: a pad that
+	// materializes because someone scrubbed is worse than one that was there.
+	// First sight of this client gets the same treatment, since early in a
+	// session cg.time can be under PAD_SEAT_RESET
+	if ( !p->time || delta > PAD_SEAT_RESET ) {
+		p->progress = 1.0f;
+	} else if ( p->progress < 1.0f ) {
+		p->progress += delta * ( p->fired ? PAD_SEAT_FIRE_BOOST : 1.0f )
+			/ (float)PAD_SEAT_TIME;
+		if ( p->progress > 1.0f ) {
+			p->progress = 1.0f;
+		}
+	}
+	p->time = cg.time;
+	return p->progress;
+}
+
+void CG_GrappleSeatRestart( int clientNum ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+	cg_padSeat[ clientNum ].progress = 0.0f;
+	cg_padSeat[ clientNum ].time = cg.time;
+	cg_padSeat[ clientNum ].fired = 0;
+}
+
+/*
+==========================
+CG_GrappleSeatFired
+
+The pad left the dock part-formed. It finishes in flight rather than blocking
+the shot, which is in-fiction: this weapon materializes its round at the
+emitter rather than storing one.
+==========================
+*/
+void CG_GrappleSeatFired( int clientNum ) {
+	if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
+		cg_padSeat[ clientNum ].fired = 1;
+	}
+}
+
+/*
+==========================
+CG_GrappleSeatSnap
+
+Anchored means seated: the ET_GRAPPLE draw never scales the pad, so a
+point-blank hit that beats the ramp must read full size on the very frame
+the claws splay.
+==========================
+*/
+void CG_GrappleSeatSnap( int clientNum ) {
+	if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
+		cg_padSeat[ clientNum ].progress = 1.0f;
+		cg_padSeat[ clientNum ].time = cg.time;
+	}
+}
+
+/*
+==========================
+CG_ArcStrip
+
+One pass of a filament along an already-built polyline: billboards each segment
+toward the view, then draws it as two quads whose
+center line carries alpha and whose edges fade to zero, so flat triangles read
+as a round filament. Called TWICE per arc from CG_GrappleCoreArcs on the same
+pt[] node array - once for the HALO, once for the CORE - so they can never drift apart.
+==========================
+*/
+static void CG_ArcStrip( vec3_t *pt, float hw, const byte *tint, float alpha ) {
+	vec3_t		mid, dir, right, viewDir, e1, e2;
+	polyVert_t	v[4];
+	int			s, k, c;
+
+	for ( s = 0; s < ARC_SEGMENTS; s++ ) {
+		VectorAdd( pt[s], pt[s + 1], mid );
+		VectorScale( mid, 0.5f, mid );
+		VectorSubtract( pt[s + 1], pt[s], dir );
+		if ( VectorNormalize( dir ) < 0.001f ) {
+			continue;
+		}
+		// billboard each piece the way the tether billboards a segment
+		VectorSubtract( mid, cg.refdef.vieworg, viewDir );
+		CrossProduct( dir, viewDir, right );
+		if ( VectorNormalize( right ) < 0.001f ) {
+			PerpendicularVector( right, dir );
+		}
+
+		// center line opaque, edges at zero alpha: a round-looking filament
+		// out of flat triangles, one strip either side
+		VectorCopy( pt[s], v[0].xyz );
+		VectorCopy( pt[s + 1], v[1].xyz );
+		v[0].st[0] = 0; v[0].st[1] = 0.5f;
+		v[1].st[0] = 1; v[1].st[1] = 0.5f;
+		v[2].st[0] = 1; v[2].st[1] = 0;
+		v[3].st[0] = 0; v[3].st[1] = 0;
+		for ( k = 0; k < 4; k++ ) {
+			for ( c = 0; c < 3; c++ ) {
+				v[k].modulate[c] = tint[c];
+			}
+			v[k].modulate[3] = ( k < 2 ) ? (byte)( 255 * alpha ) : 0;
+		}
+		for ( k = -1; k <= 1; k += 2 ) {
+			VectorMA( pt[s], k * hw, right, e1 );
+			VectorMA( pt[s + 1], k * hw, right, e2 );
+			VectorCopy( e2, v[2].xyz );
+			VectorCopy( e1, v[3].xyz );
+			trap_R_AddPolyToScene( cgs.media.grappleArcShader, 4, v );
+		}
+	}
+}
+
+// world units, unlike the launcher's, which carry its model scale
+#define TETHER_ARC_SLOTS		2
+#define TETHER_ARC_SPAN			70.0f		// cable length one filament covers
+#define TETHER_ARC_ARCH			5.0f		// how far its middle bows off
+#define TETHER_ARC_KINK			1.7f		// wander square to that bow
+#define TETHER_ARC_HALF_WIDTH	0.70f
+// ARC_DENSITY_FLY/PULL is too narrow to read across two slots: it buys a
+// quarter of a filament
+#define TETHER_ARC_DENSITY_FLY	0.45f
+#define TETHER_ARC_DENSITY_PULL	0.95f
+
+// last generation each slot crackled, so an ignition sounds once, not once per
+// frame of the filament's life
+static int	cg_tetherArcGen[MAX_CLIENTS][TETHER_ARC_SLOTS];
+
+/*
+==========================
+CG_TetherArcs
+
+The launcher's slot, gate and life machinery, but each filament pinned to a
+charge crest and traveling with it. Both feet sit on the cable, so it reads as
+the tether discharging rather than as something drawn alongside it.
+==========================
+*/
+static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
+		int clientNum, int act ) {
+	vec3_t		pt[ARC_SEGMENTS + 1];
+	vec3_t		bowDir, jagDir, p;
+	const arcFactors_t	*fac;
+	float		gate, u, d, dLit, off, bow, jw, f;
+	float		haloAlpha, coreAlpha, ramp, density;
+	float		travel, dMin, dMax, bias, x;
+	int			i, s, c, m, salt, t, gen, tin, delay, ms, tLit, js, k;
+	byte		tint[4], coreTint[4];
+
+	// under two spans there is no room for a filament to sit clear of both ends
+	if ( len < TETHER_ARC_SPAN * 2.0f ) {
+		return;
+	}
+
+	fac = CG_ArcFactors( clientNum, act );
+
+	// remapped, not replaced, so the state change still eases over ARC_FACTOR_TAU
+	ramp = CG_ArcClamp( ( fac->density - ARC_DENSITY_FLY )
+		/ ( ARC_DENSITY_PULL - ARC_DENSITY_FLY ), 0.0f, 1.0f );
+	density = TETHER_ARC_DENSITY_FLY
+		+ ( TETHER_ARC_DENSITY_PULL - TETHER_ARC_DENSITY_FLY ) * ramp;
+
+	CG_GrappleOwnerRGBA( clientNum, tint );
+	for ( c = 0; c < 3; c++ ) {
+		m = tint[c] + (int)( ( 255 - tint[c] ) * ARC_CORE_WHITE_MIX );
+		if ( m > 255 ) {
+			m = 255;
+		}
+		coreTint[c] = (byte)m;
+	}
+	coreTint[3] = 255;
+
+	for ( i = 0; i < TETHER_ARC_SLOTS; i++ ) {
+		salt = ( ARC_SLOTS + i ) * ARC_SALT_STRIDE;		// past the launcher's hash room
+		t = cg.time + i * ARC_STAGGER;
+		gen = t / ARC_CYCLE;
+		tin = t - gen * ARC_CYCLE;
+
+		gate = ( density + ARC_GATE_BAND * 0.5f - CG_ArcRandom( gen, salt ) )
+			* ( 1.0f / ARC_GATE_BAND );
+		if ( gate <= 0.0f ) {
+			continue;
+		}
+		if ( gate > 1.0f ) {
+			gate = 1.0f;
+		}
+		delay = (int)( ARC_DELAY * CG_ArcRandom( gen, salt + 1 ) );
+		ms = ARC_LIFE_MIN
+			+ (int)( ( ARC_LIFE_MAX - ARC_LIFE_MIN ) * CG_ArcRandom( gen, salt + 2 ) );
+		if ( tin < delay || tin >= delay + ms ) {
+			continue;
+		}
+		u = (float)( tin - delay ) / ms;
+
+		// real time, not the staggered slot clock, or the crest lands off where
+		// the shader draws it.  modulo one crest keeps a session-long cg.time
+		// from eating the precision the position needs
+		tLit = cg.time - ( tin - delay );
+		off = TETHER_PULSE_WAVELENGTH * ( 0.25f + TETHER_PULSE_HZ
+			* ( tLit % TETHER_CREST_PERIOD ) * 0.001f );
+		if ( off >= TETHER_PULSE_WAVELENGTH ) {
+			off -= TETHER_PULSE_WAVELENGTH;
+		}
+		// room to clear both ends for a whole life; the crest it rides carries it
+		// outward in flight and inward while reeling
+		travel = TETHER_PULSE_WAVELENGTH * TETHER_PULSE_HZ * ms * 0.001f;
+		if ( act == GRAPPLE_PULL ) {
+			dMin = TETHER_ARC_SPAN * 0.5f + travel;
+			dMax = len - TETHER_ARC_SPAN * 0.5f;
+		} else {
+			dMin = TETHER_ARC_SPAN * 0.5f;
+			dMax = len - TETHER_ARC_SPAN * 0.5f - travel;
+		}
+		if ( dMax <= dMin ) {
+			continue;			// cable too short to hold one clear of both ends
+		}
+
+		// the eye sits all but on the cable, so its far half collapses into a
+		// couple of degrees at the pad.  equal screen intervals are equal
+		// distance RATIOS: bias toward the muzzle, square for less
+		bias = CG_ArcRandom( gen, salt + 4 );
+		bias = bias * bias * bias;
+		dLit = dMin + ( dMax - dMin ) * bias;
+
+		// x runs from the end the charge starts at, which reeling swaps to the pad
+		x = ( act == GRAPPLE_PULL ) ? ( len - dLit ) : dLit;
+		k = (int)( ( x - off ) / TETHER_PULSE_WAVELENGTH + 0.5f );
+		if ( k < 0 ) {
+			k = 0;
+		}
+		x = off + k * TETHER_PULSE_WAVELENGTH + TETHER_PULSE_WAVELENGTH
+			* TETHER_PULSE_HZ * ( tin - delay ) * 0.001f;
+		d = ( act == GRAPPLE_PULL ) ? ( len - x ) : x;
+
+		// the snap can land it back over an end
+		if ( d - TETHER_ARC_SPAN * 0.5f < 0.0f || d + TETHER_ARC_SPAN * 0.5f > len ) {
+			continue;
+		}
+
+		// CG_TetherArcs runs once a frame under CG_AddPacketEntities; the core
+		// arcs run per view, and firing this from there would double every
+		// ignition on a map with a mirror.  The hash that sets the filament's
+		// brightness picks the sample, so the loudest crackle is the brightest
+		// arc and every witness agrees without syncing.
+		if ( clientNum >= 0 && clientNum < MAX_CLIENTS
+				&& cg_tetherArcGen[ clientNum ][ i ] != gen ) {
+			int	pick = (int)( CG_ArcRandom( gen, salt + 3 ) * 3.0f );
+
+			cg_tetherArcGen[ clientNum ][ i ] = gen;
+			if ( pick > 2 ) {
+				pick = 2;
+			}
+			if ( cgs.media.sfx_grapplearc[ pick ] ) {
+				vec3_t	arcOrg;
+
+				// at the filament, not the player: it lights at a real point
+				// on the cable
+				VectorMA( start, d, dir, arcOrg );
+				trap_S_StartSound( arcOrg, ENTITYNUM_WORLD, CHAN_AUTO,
+					cgs.media.sfx_grapplearc[ pick ] );
+			}
+		}
+
+		// bow in a hashed direction, wander in the one square to it
+		PerpendicularVector( bowDir, dir );
+		RotatePointAroundVector( p, dir, bowDir, 360.0f * CG_ArcRandom( gen, salt + 5 ) );
+		VectorCopy( p, bowDir );
+		CrossProduct( dir, bowDir, jagDir );
+
+		js = (int)( u * ARC_JAG_STEPS );
+		VectorMA( start, d - TETHER_ARC_SPAN * 0.5f, dir, pt[0] );
+		VectorMA( start, d + TETHER_ARC_SPAN * 0.5f, dir, pt[ARC_SEGMENTS] );
+		for ( s = 1; s < ARC_SEGMENTS; s++ ) {
+			f = (float)s / ARC_SEGMENTS;
+			VectorMA( start, d + ( f - 0.5f ) * TETHER_ARC_SPAN, dir, p );
+			// zero at both ends, so the feet stay welded to the cable
+			bow = sin( f * M_PI ) * TETHER_ARC_ARCH
+				* ( 0.6f + 0.4f * CG_ArcRandom( gen, salt + 6 + s ) );
+			VectorMA( p, bow, bowDir, p );
+			jw = CG_ArcSigned( gen * ARC_JAG_STEPS + js, salt + ARC_SALT_JAG + s )
+				* TETHER_ARC_KINK * sin( f * M_PI );
+			VectorMA( p, jw, jagDir, p );
+			VectorCopy( p, pt[s] );
+		}
+
+		haloAlpha = ARC_ALPHA * gate * fac->bright * sin( u * M_PI );
+		coreAlpha = ARC_CORE_ALPHA * gate * fac->bright * CG_ArcCoreEnvelope( u );
+		CG_ArcStrip( pt, TETHER_ARC_HALF_WIDTH, tint, haloAlpha );
+		CG_ArcStrip( pt, TETHER_ARC_HALF_WIDTH * ARC_CORE_WIDTH_FRAC,
+			coreTint, coreAlpha );
+	}
+}
+
+static void CG_GrappleCoreArcs( const refEntity_t *gun, int clientNum, int act,
+		float pulse ) {
+	vec3_t		pt[ARC_SEGMENTS + 1];
+	vec3_t		p;
+	const float	*chan;
+	const arcFactors_t	*fac;
+	float		speed;
+	float		fx, hx, fy, fz, fs, hy, hz, life, u, jw, jf;
+	float		span, sep, sepMax;
+	float		ax, ay, az, ny, nz, gate, kink[2];
+	float		f, hw, coreHw, haloAlpha, coreAlpha, pulseFactor, peakVar;
+	int			t, gen, tin, delay, ms, jag, js, m;
+	int			i, s, k, c, salt, ch;
+	byte		tint[4], coreTint[4];
+
+	fac = CG_ArcFactors( clientNum, act );
+	speed = fac->speed * ARC_TRAVEL;
+
+	// the OWNER's color, not the launcher's already-faded one, or these additive
+	// polys would carry the envelope twice (rgb * alpha on top of alphaGen vertex)
+	CG_GrappleOwnerRGBA( clientNum, tint );
+	// the core reads near-white regardless of fringe color, pulled toward white
+	// rather than copied straight; clamped so the mix can't overflow
+	for ( c = 0; c < 3; c++ ) {
+		m = tint[c] + (int)( ( 255 - tint[c] ) * ARC_CORE_WHITE_MIX );
+		if ( m > 255 ) {
+			m = 255;
+		}
+		coreTint[c] = (byte)m;
+	}
+	coreTint[3] = 255;
+
+	// the axis carries the model's scale, so filaments stay in proportion
+	hw = ARC_HALF_WIDTH * ARC_HALO_WIDTH_MULT * VectorLength( gun->axis[0] );
+	coreHw = hw * ARC_CORE_WIDTH_FRAC;
+
+	// only brightness softens its coupling to the sound envelope, so pulling
+	// still breathes but a lit filament never goes ghostly
+	pulseFactor = 1.0f - ( 1.0f - pulse ) * ARC_PULSE_COUPLE;
+
+	for ( i = 0; i < ARC_SLOTS; i++ ) {
+		salt = i * ARC_SALT_STRIDE;		// this slot's own stretch of the hash
+		t = cg.time + i * ARC_STAGGER;
+		gen = t / ARC_CYCLE;			// which filament this slot is on
+		tin = t - gen * ARC_CYCLE;		// ...and how far into its cycle
+
+		// the last ARC_GATE_BAND of hash room fades in rather than switching on,
+		// so a density change dims a live filament instead of cutting it
+		gate = ( fac->density + ARC_GATE_BAND * 0.5f - CG_ArcRandom( gen, salt ) )
+			* ( 1.0f / ARC_GATE_BAND );
+		if ( gate <= 0.0f ) {
+			continue;					// a dark cycle; the gaps are what make it tick
+		}
+		if ( gate > 1.0f ) {
+			gate = 1.0f;
+		}
+		delay = (int)( ARC_DELAY * CG_ArcRandom( gen, salt + 1 ) );
+		ms = ARC_LIFE_MIN
+			+ (int)( ( ARC_LIFE_MAX - ARC_LIFE_MIN ) * CG_ArcRandom( gen, salt + 2 ) );
+		if ( tin < delay || tin >= delay + ms ) {
+			continue;					// not lit yet, or already spent
+		}
+		u = (float)( tin - delay ) / ms;
+		life = ms * 0.001f;
+
+		ch = (int)( 3.0f * CG_ArcRandom( gen, salt + 3 ) );
+		if ( ch > 2 ) {
+			ch = 2;
+		}
+		chan = arcChannel[ch];
+
+		// the head is PAIRED to the foot: separation comes from ARC_SPAN_* above
+		span = ARC_FOOT_X1 - ARC_FOOT_X0;
+		sepMax = span * ( ARC_SPAN_NEAR * CG_ArcRandom( gen, salt + 15 )
+			+ ARC_SPAN_REACH * CG_ArcRandom( gen, salt + 11 )
+				* CG_ArcRandom( gen, salt + 12 )
+				* CG_ArcRandom( gen, salt + 13 )
+				* CG_ArcRandom( gen, salt + 14 ) );
+		sep = ( CG_ArcRandom( gen, salt + 5 ) < 0.5f ) ? -sepMax : sepMax;
+
+		// both ends then slide from there, each at its own rate.  A foot that
+		// runs out of edge just stops there
+		fx = ARC_FOOT_X0 + span * CG_ArcRandom( gen, salt + 4 );
+		hx = fx + sep;
+		fx = CG_ArcClamp( fx + CG_ArcDrift( gen, salt + 6, speed ) * life * u,
+			ARC_FOOT_X0, ARC_FOOT_X1 );
+		hx = hx + CG_ArcDrift( gen, salt + 7, speed ) * life * u;
+		// unequal drift may move the pair but not STRETCH it, or a short filament
+		// walks itself out to full length over its life
+		hx = CG_ArcClamp( hx, fx - sepMax, fx + sepMax );
+		hx = CG_ArcClamp( hx, ARC_RAIL_X0, ARC_RAIL_X1 );
+
+		// ONE hash across the floor, not one per axis: the side channels lie at
+		// 45 degrees, so independent y and z would put the foot off the glass
+		fs = ARC_FOOT_HALF * CG_ArcSigned( gen, salt + 8 );
+		fy = chan[0] + chan[2] * fs;
+		fz = chan[1] + chan[3] * fs;
+		hy = chan[4] + chan[5] * CG_ArcSigned( gen, salt + 9 );
+		hz = ARC_RAIL_Z;
+
+		// per-instance peak variance, shared by both passes so the halo and core swell together
+		peakVar = 0.65f + 0.35f * CG_ArcRandom( gen, salt + 10 );
+
+		// HALO: symmetric 4u(1-u), touching peak at the life's midpoint, at the
+		// original ARC_ALPHA cap
+		haloAlpha = ARC_ALPHA * fac->bright * pulseFactor * gate
+			* 4.0f * u * ( 1.0f - u ) * peakVar;
+
+		// CORE: flatter (see CG_ArcCoreEnvelope) and near the byte cap, so the
+		// filament spends most of its life white-hot instead of only touching it
+		coreAlpha = ARC_CORE_ALPHA * fac->bright * pulseFactor * gate
+			* CG_ArcCoreEnvelope( u ) * peakVar;
+
+		// the jag is hashed at ARC_JAG_STEPS points across the life and eased
+		// between them, so the kinks crawl instead of snapping
+		jw = u * ARC_JAG_STEPS;
+		jag = (int)jw;
+		jf = jw - jag;
+		jf = jf * jf * ( 3.0f - 2.0f * jf );
+
+		// OUT of the trench first, then across: a straight run from a side floor
+		// (45-degree facets, no rail above) to the beam buries through the LIP
+		// into barrel metal, where the depth test eats it. The first node instead
+		// lifts along the facet's own outward normal, clearing the lip entirely
+		ny = chan[3];
+		nz = -chan[2];
+		ax = fx + ( hx - fx ) * ( 1.0f / ARC_SEGMENTS );
+		ay = fy + ARC_ARCH * ny;
+		az = fz + ARC_ARCH * nz;
+
+		for ( s = 0; s <= ARC_SEGMENTS; s++ ) {
+			if ( s == 0 ) {
+				p[0] = fx;
+				p[1] = fy;
+				p[2] = fz;
+			} else {
+				f = (float)( s - 1 ) / ( ARC_SEGMENTS - 1 );
+				p[0] = ax + ( hx - ax ) * f;
+				p[1] = ay + ( hy - ay ) * f;
+				p[2] = az + ( hz - az ) * f;
+			}
+			if ( s > 0 && s < ARC_SEGMENTS ) {
+				// feet stay welded to their edges; only the middle wanders, ACROSS
+				// the channel rather than world y, since the facets sit at 45 degrees
+				for ( c = 0; c < 2; c++ ) {
+					js = salt + ARC_SALT_JAG + ( jag * ARC_SEGMENTS + s ) * 2 + c;
+					kink[c] = ARC_KINK * ( CG_ArcSigned( gen, js ) * ( 1.0f - jf )
+						+ CG_ArcSigned( gen, js + ARC_SEGMENTS * 2 ) * jf );
+				}
+				p[0] += kink[0];
+				p[1] += kink[1] * chan[2];
+				p[2] += kink[1] * chan[3];
+			}
+			VectorCopy( gun->origin, pt[s] );
+			for ( k = 0; k < 3; k++ ) {
+				VectorMA( pt[s], p[k], gun->axis[k], pt[s] );
+			}
+		}
+
+		// two passes over the SAME pt[] polyline; order doesn't matter under additive blending
+		CG_ArcStrip( pt, hw, tint, haloAlpha );
+		CG_ArcStrip( pt, coreHw, coreTint, coreAlpha );
+	}
 }
 
 /*
@@ -718,15 +1712,37 @@ void CG_RegisterWeapon( int weaponNum ) {
 
 	case WP_GRAPPLING_HOOK:
 		MAKERGB( weaponInfo->flashDlightColor, 0.6f, 0.6f, 1.0f );
-		weaponInfo->missileModel = trap_R_RegisterModel( "models/ammo/rocket/rocket.md3" );
+		// one model for both states: it rides tag_ammo in the bore while stowed
+		// and flies as the missile once away
+		weaponInfo->missileModel = trap_R_RegisterModel( "models/weapons2/grapple/grapple_pad.md3" );
 		weaponInfo->missileTrailFunc = CG_GrappleTrail;
-		weaponInfo->missileDlight = HOOK_GLOW_RADIUS;
 		weaponInfo->wiTrailTime = 2000;
 		weaponInfo->trailRadius = 64;
-		MAKERGB( weaponInfo->missileDlightColor, 1, 0.75f, 0 );
-		weaponInfo->readySound = trap_S_RegisterSound( "sound/weapons/melee/fsthum.wav", qfalse );
-		weaponInfo->firingSound = trap_S_RegisterSound( "sound/weapons/melee/fstrun.wav", qfalse );
-		cgs.media.lightningShader = trap_R_RegisterShader( "lightningBoltNew");
+		// no missileDlight: the glow belongs on the barrel, not the hook
+		// no flashSound: the grapple re-fires EV_FIRE_WEAPON while held,
+		// which would stack it; the chain feed loops from the gun instead
+		// (not missileSound, which the receding hook would doppler down)
+		weaponInfo->readySound = trap_S_RegisterSound( "sound/weapons/grapple/gridle.wav", qfalse );
+		cgs.media.sfx_grapplefire = trap_S_RegisterSound( "sound/weapons/grapple/grfire.wav", qfalse );
+		cgs.media.sfx_grapplehit = trap_S_RegisterSound( "sound/weapons/grapple/grhit.wav", qfalse );
+		cgs.media.sfx_grapplepull = trap_S_RegisterSound( "sound/weapons/grapple/grpull.wav", qfalse );
+		cgs.media.sfx_grappletether = trap_S_RegisterSound( "sound/weapons/grapple/grtether.wav", qfalse );
+		cgs.media.sfx_grapplelaunch = trap_S_RegisterSound( "sound/weapons/grapple/grlaunch.wav", qfalse );
+		cgs.media.sfx_grapplebite = trap_S_RegisterSound( "sound/weapons/grapple/grbite.wav", qfalse );
+		cgs.media.sfx_grapplefree = trap_S_RegisterSound( "sound/weapons/grapple/grfree.wav", qfalse );
+		cgs.media.sfx_grappleseat = trap_S_RegisterSound( "sound/weapons/grapple/grseat.wav", qfalse );
+		cgs.media.sfx_grappleclank = trap_S_RegisterSound( "sound/weapons/grapple/grclank.wav", qfalse );
+		cgs.media.sfx_grapplesettle = trap_S_RegisterSound( "sound/weapons/grapple/grsettle.wav", qfalse );
+		cgs.media.sfx_grapplearc[0] = trap_S_RegisterSound( "sound/weapons/grapple/arc_tick.wav", qfalse );
+		cgs.media.sfx_grapplearc[1] = trap_S_RegisterSound( "sound/weapons/grapple/arc_zap.wav", qfalse );
+		cgs.media.sfx_grapplearc[2] = trap_S_RegisterSound( "sound/weapons/grapple/arc_tear.wav", qfalse );
+		cgs.media.grappleTetherShader = trap_R_RegisterShader( "grapplingTether" );
+		cgs.media.grappleArcShader = trap_R_RegisterShader( "grapplingArc" );
+		cgs.media.grappleGunFlyShader = trap_R_RegisterShader( "models/weapons2/grapple/gun_fly" );
+		cgs.media.grappleGunPullShader = trap_R_RegisterShader( "models/weapons2/grapple/gun_pull" );
+		cgs.media.grapplePadFlyShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_fly" );
+		cgs.media.grapplePadPullShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_pull" );
+		cgs.media.grapplePadFadeShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_fade" );
 
 		break;
 
@@ -1306,6 +2322,8 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	weapon_t	weaponNum;
 	weaponInfo_t	*weapon;
 	centity_t	*nonPredictedCent;
+	int			grappleAct;
+	float		grapplePulse;
 //	int	col;
 	const	clientInfo_t	*ci;
 
@@ -1353,6 +2371,10 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			// lightning gun and gauntlet make a different sound when fire is held down
 			trap_S_AddLoopingSound( cent->currentState.number, cent->lerpOrigin, vec3_origin, weapon->firingSound );
 			cent->pe.lightningFiring = qtrue;
+		} else if ( weaponNum == WP_GRAPPLING_HOOK && ( cent->currentState.eFlags & EF_FIRING ) ) {
+			// no firing loop, but still sets the flag so the 400ms refire events
+			// skip their one-shots, or the quad sound garbles restarting every cycle
+			cent->pe.lightningFiring = qtrue;
 		} else if ( weapon->readySound ) {
 			trap_S_AddLoopingSound( cent->currentState.number, cent->lerpOrigin, vec3_origin, weapon->readySound );
 		}
@@ -1361,6 +2383,18 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	CG_PositionEntityOnTag( &gun, parent, parent->hModel, "tag_weapon");
 
 	CG_AddWeaponWithPowerups( &gun, cent->currentState.powerups );
+
+	// invis already renders the gun through invisShader, but the arcs are separate
+	// polys that shader can't touch, so they need their own gate or an invisible
+	// carrier flickers owner-colored arcs as a permanent idle tell. RF_THIRD_PERSON
+	// needs the same gate: polys carry no renderfx, so the mirror-only BODY gun
+	// was throwing its arcs into the main view with no gun under them
+	if ( weaponNum == WP_GRAPPLING_HOOK
+			&& !( gun.renderfx & RF_THIRD_PERSON )
+			&& !( cent->currentState.powerups & ( 1 << PW_INVIS ) ) ) {
+		CG_GrappleCoreArcs( &gun, cent->currentState.clientNum, grappleAct,
+			grapplePulse );
+	}
 
 	// add the spinning barrel
 	if ( weapon->barrelModel ) {
@@ -1391,12 +2425,12 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	}
 
 	// add the flash
-	if ( ( weaponNum == WP_LIGHTNING || weaponNum == WP_GAUNTLET || weaponNum == WP_GRAPPLING_HOOK )
-		&& ( nonPredictedCent->currentState.eFlags & EF_FIRING ) ) 
+	if ( ( weaponNum == WP_LIGHTNING || weaponNum == WP_GAUNTLET )
+		&& ( nonPredictedCent->currentState.eFlags & EF_FIRING ) )
 	{
 		// continuous flash
 	} else {
-		// impulse flash
+		// impulse flash; the grapple continues on for its muzzle point and claw
 		if ( cg.time - cent->muzzleFlashTime > MUZZLE_FLASH_TIME && !cent->pe.railgunFlash
 		&& weaponNum != WP_GRAPPLING_HOOK ) {
 			return;
@@ -1417,20 +2451,132 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	angles[ROLL] = crandom() * 10;
 	AnglesToAxis( angles, flash.axis );
 
-	// colorize the railgun blast
-	if ( weaponNum == WP_RAILGUN ) {
+	// colorize the railgun blast and the grapple's emitter glow
+	if ( weaponNum == WP_RAILGUN || weaponNum == WP_GRAPPLING_HOOK ) {
 		flash.shaderRGBA.rgba[0] = 255 * ci->color1[0];
 		flash.shaderRGBA.rgba[1] = 255 * ci->color1[1];
 		flash.shaderRGBA.rgba[2] = 255 * ci->color1[2];
 		flash.shaderRGBA.rgba[3] = 255;
+		if ( weaponNum == WP_GRAPPLING_HOOK ) {
+			// the emitter is fed by the same cell the channel is
+			CG_GrappleFade( flash.shaderRGBA.rgba, grapplePulse );
+		}
 	}
 
 	CG_PositionRotatedEntityOnTag( &flash, &gun, weapon->weaponModel, "tag_flash" );
-	trap_R_AddRefEntityToScene( &flash );
+	if ( weaponNum == WP_GRAPPLING_HOOK && !( nonPredictedCent->currentState.eFlags & EF_FIRING ) ) {
+		// the hook sits in the bore on tag_ammo; the flash takes over that spot
+		// once it is away
+		orientation_t	stow;
+		refEntity_t		hook;
+		int				i;
+		float			seat, a;
 
-	// attach muzzle origin to tag_flash for grappling hook
-	if ( cg_drawGun.integer || cg.renderingThirdPerson || cent->currentState.number != cg.predictedPlayerState.clientNum ) {
-		VectorCopy( flash.origin, nonPredictedCent->pe.muzzleOrigin );
+		memset( &hook, 0, sizeof( hook ) );
+		VectorCopy( parent->lightingOrigin, hook.lightingOrigin );
+		hook.shadowPlane = parent->shadowPlane;
+		hook.renderfx = parent->renderfx;
+		hook.hModel = weapon->missileModel;
+		// folded in the bore, same as in flight; it only splays on a clamp
+		hook.frame = hook.oldframe = PAD_FRAME_FOLDED;
+		// the round in the bore lights off the same charge as the launcher
+		Byte4Copy( gun.shaderRGBA.rgba, hook.shaderRGBA.rgba );
+
+		trap_R_LerpTag( &stow, weapon->weaponModel, 0, 0, 1.0f, "tag_ammo" );
+		VectorCopy( gun.origin, hook.origin );
+		for ( i = 0; i < 3; i++ ) {
+			VectorMA( hook.origin, stow.origin[i], gun.axis[i], hook.origin );
+		}
+		MatrixMultiply( stow.axis, gun.axis, hook.axis );
+
+		// It grows OUT of the emitter: the pivot is the pad's rear boss, not
+		// its origin. Pivoting on the origin starts the boss detached and
+		// slides it BACK onto the collar, which is the opposite of the pad
+		// never letting go
+		seat = CG_GrappleSeat( cent->currentState.clientNum );
+		if ( seat < 1.0f ) {
+			float	e, s, roll, d, r;
+			vec3_t	t1, t2;
+
+			// seat^1.5 via sqrt; pow() is not in the QVM libc, and 1.5
+			// reads the same as the intended 1.6
+			e = seat * sqrt( seat );
+			e = e * e * ( 3.0f - 2.0f * e );
+			s = PAD_SEAT_SCALE0 + ( 1.0f - PAD_SEAT_SCALE0 ) * e;
+
+			// unwind from PAD_SEAT_SPIN down to 0 about the pad's own
+			// forward. axis[0] points away from the viewer (same convention
+			// CG_GrappleHookAxis relies on), where a positive angle in
+			// RotatePointAroundVector reads CLOCKWISE - so a shrinking
+			// positive angle is what unwinds counterclockwise.
+			// Must run on the still-unit-length axis[0], before the extrude
+			// below scales it: RotatePointAroundVector needs a unit
+			// direction, and this is only masked right now because
+			// PAD_SEAT_SCALE0 is 1.00. RotatePointAroundVector also can't
+			// rotate a vector into itself, hence the temporaries.
+			// Own cubic ease-out on raw seat, not e: the roll wants to spin
+			// briskly off the mark and decelerate into rest, where e's
+			// smoothstep is shaped for a symmetric grow instead.
+			d = 1.0f - seat;
+			r = 1.0f - d * d * d;
+			roll = PAD_SEAT_SPIN * ( 1.0f - r );
+			VectorCopy( hook.axis[1], t1 );
+			VectorCopy( hook.axis[2], t2 );
+			RotatePointAroundVector( hook.axis[1], hook.axis[0], t1, roll );
+			RotatePointAroundVector( hook.axis[2], hook.axis[0], t2, roll );
+
+			// PAD_BOSS_X0 back along the pad's own forward, then out again
+			// by the scaled amount
+			VectorMA( hook.origin, PAD_BOSS_X0 * ( 1.0f - s ), hook.axis[0],
+				hook.origin );
+			// extrude at full width rather than scaling radially: a radially
+			// scaled boss sits INSIDE the emitter collar for the first third
+			VectorScale( hook.axis[0], s, hook.axis[0] );
+
+			a = seat / PAD_SEAT_ALPHA;
+			if ( a > 1.0f ) {
+				a = 1.0f;
+			}
+			// pad_fade's additive energy stages (glow/nrg1-3) read entity RGB,
+			// not entity alpha, for their strength; ramp both or the claws
+			// (which those stages cover) show up at full brightness at once
+			hook.shaderRGBA.rgba[0] = (byte)( hook.shaderRGBA.rgba[0] * a );
+			hook.shaderRGBA.rgba[1] = (byte)( hook.shaderRGBA.rgba[1] * a );
+			hook.shaderRGBA.rgba[2] = (byte)( hook.shaderRGBA.rgba[2] * a );
+			hook.shaderRGBA.rgba[3] = a * 0xff;
+
+			// condensing out of the collar, not yet seated: pad_fade reads
+			// that alpha. Once seated this falls through unset, back to the
+			// plain docked shader
+			hook.customShader = cgs.media.grapplePadFadeShader;
+		}
+
+		// the stowed pad shares the gun's powerup shell, or quad reads as
+		// wrapping the launcher but skipping the round in its bore
+		CG_AddWeaponWithPowerups( &hook, cent->currentState.powerups );
+	} else {
+		trap_R_AddRefEntityToScene( &flash );
+	}
+
+	// muzzle origin for the tether prefers the view weapon: in VR it IS the
+	// tracked controller, so it's correct everywhere; on flatscreen it sits at
+	// the camera, the same mirror compromise the lightning bolt and rail trail make
+	if ( ps || cg.renderingThirdPerson || cent->currentState.number != cg.predictedPlayerState.clientNum ) {
+		if ( weaponNum == WP_GRAPPLING_HOOK ) {
+			// the tether feeds from tag_chain, not the muzzle
+			orientation_t	spool;
+			vec3_t			chainOrg;
+			int				i;
+
+			trap_R_LerpTag( &spool, weapon->weaponModel, 0, 0, 1.0f, "tag_chain" );
+			VectorCopy( gun.origin, chainOrg );
+			for ( i = 0; i < 3; i++ ) {
+				VectorMA( chainOrg, spool.origin[i], gun.axis[i], chainOrg );
+			}
+			VectorCopy( chainOrg, nonPredictedCent->pe.muzzleOrigin );
+		} else {
+			VectorCopy( flash.origin, nonPredictedCent->pe.muzzleOrigin );
+		}
 	}
 
 	if ( ps || cg.renderingThirdPerson || cent->currentState.number != cg.predictedPlayerState.clientNum ) {
@@ -1465,12 +2611,26 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 
 		if ( weaponNum == WP_MACHINEGUN ) // make it a bit less annoying
 			radius = MG_FLASH_RADIUS + (rand() & WEAPON_FLASH_RADIUS_MOD);
+		else if ( weaponNum == WP_GRAPPLING_HOOK ) // breathing; see GRAPPLE_FLASH_RADIUS
+			radius = (int)CG_GrappleDlightRadius( GRAPPLE_FLASH_RADIUS );
 		else
 			radius = WEAPON_FLASH_RADIUS + (rand() & WEAPON_FLASH_RADIUS_MOD);
 
-		if ( weapon->flashDlightColor[0] || weapon->flashDlightColor[1] || weapon->flashDlightColor[2] ) {
-			trap_R_AddLightToScene( flash.origin, radius, 
-				weapon->flashDlightColor[0], weapon->flashDlightColor[1], weapon->flashDlightColor[2] );
+		// the grapple burns its glow the whole time the hook is out; every
+		// other weapon only reaches here inside MUZZLE_FLASH_TIME
+		if ( ( weaponNum != WP_GRAPPLING_HOOK || ( nonPredictedCent->currentState.eFlags & EF_FIRING ) )
+			&& ( weapon->flashDlightColor[0] || weapon->flashDlightColor[1] || weapon->flashDlightColor[2] ) ) {
+			const float *dl = weapon->flashDlightColor;
+			vec3_t		grappleDl;
+
+			// the grapple's light is projected energy: the wielder's effects
+			// color, like the rail: dim with a slow breath, never the
+			// envelope (see GRAPPLE_DLIGHT_SCALE)
+			if ( weaponNum == WP_GRAPPLING_HOOK ) {
+				VectorScale( ci->color1, CG_GrappleDlightScale(), grappleDl );
+				dl = grappleDl;
+			}
+			trap_R_AddLightToScene( flash.origin, radius, dl[0], dl[1], dl[2] );
 		}
 	}
 }
@@ -1594,7 +2754,12 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	if ( vrPosed ) {
 		CG_VR_WeaponHandFinish( &hand, vrScale );
 	} else {
-		hand.renderfx = RF_DEPTHHACK | RF_FIRST_PERSON | RF_MINLIGHT;
+		// the arc filaments carry no renderfx and draw at true depth, so a
+		// depth-hacked gun would hide them; leave the hack off, same as VR always does
+		hand.renderfx = RF_FIRST_PERSON | RF_MINLIGHT;
+		if ( ps->weapon != WP_GRAPPLING_HOOK ) {
+			hand.renderfx |= RF_DEPTHHACK;
+		}
 	}
 
 	// add everything onto the hand
@@ -1865,6 +3030,10 @@ void CG_OutOfAmmoChange( void ) {
 	}
 
 	for ( i = MAX_WEAPONS-1 ; i > 0 ; i-- ) {
+		// utility, not firepower, and never the answer to an empty gun
+		if ( i == WP_GRAPPLING_HOOK ) {
+			continue;
+		}
 		if ( CG_WeaponSelectable( i ) ) {
 			cg.weaponSelect = i;
 			break;
@@ -1912,8 +3081,9 @@ void CG_FireWeapon( centity_t *cent ) {
 	// append the flash to the weapon model
 	cent->muzzleFlashTime = cg.time;
 
-	// lightning gun only does this this on initial press
-	if ( ent->weapon == WP_LIGHTNING ) {
+	// only on initial press: both keep re-firing EV_FIRE_WEAPON while held,
+	// which would restart the quad sound every cycle
+	if ( ent->weapon == WP_LIGHTNING || ent->weapon == WP_GRAPPLING_HOOK ) {
 		if ( cent->pe.lightningFiring ) {
 			return;
 		}
@@ -2103,6 +3273,11 @@ void CG_MissileHitWall( weapon_t weapon, int clientNum, vec3_t origin, vec3_t di
 		sfx = 0;
 		radius = 4;
 		break;
+
+	case WP_GRAPPLING_HOOK:
+		// the hook bites in: no mark, no explosion
+		trap_S_StartSound( origin, ENTITYNUM_WORLD, CHAN_AUTO, cgs.media.sfx_grapplehit );
+		return;
 
 #ifdef MISSIONPACK
 	case WP_CHAINGUN:

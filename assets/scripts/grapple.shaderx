@@ -1,0 +1,286 @@
+// grappling hook hardware: EXTENDED overrides of grapple.shader's six
+// model shaders (a .shaderx definition wins over a .shader one wherever
+// .shaderx is scanned; see the emission-system notes in grapple.shader).
+// One change: instead of surfaceparm nodlight, each diffuse stage is
+// marked `dlight`, pinning the per-pixel dlight pass to the
+// black-under-glow diffuse.  The metal takes dynamic light, the glass
+// stays dark, and the stage heuristic can never pick an nrg map and
+// stamp its frozen ghost over the motion.
+// EDIT IN LOCKSTEP with grapple.shader: same six shaders, differing
+// only by that keyword swap.
+
+// ---- anchor pad ---------------------------------------------------------
+
+// docked in the bore (only drawn at idle): rings outward at the idle pace
+models/weapons2/grapple/pad
+{
+	nopicmip
+	{
+		map models/weapons2/grapple/pad.tga
+		rgbGen lightingDiffuse
+		dlight
+	}
+	{
+		map models/weapons2/grapple/pad_glow.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen const 0.4
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg1.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0 0.41667
+	}
+	{
+		map models/weapons2/grapple/pad_nrg2.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.667 0.41667
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg3.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.333 0.41667
+	}
+}
+
+// in flight: rings outward, faster
+models/weapons2/grapple/pad_fly
+{
+	nopicmip
+	{
+		map models/weapons2/grapple/pad.tga
+		rgbGen lightingDiffuse
+		dlight
+	}
+	{
+		map models/weapons2/grapple/pad_glow.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen const 0.4
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg1.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0 1.25
+	}
+	{
+		map models/weapons2/grapple/pad_nrg2.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.667 1.25
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg3.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.333 1.25
+	}
+}
+
+// anchored, owner reeling: rings inward, faster
+models/weapons2/grapple/pad_pull
+{
+	nopicmip
+	{
+		map models/weapons2/grapple/pad.tga
+		rgbGen lightingDiffuse
+		dlight
+	}
+	{
+		map models/weapons2/grapple/pad_glow.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen const 0.4
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg1.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0 1.25
+	}
+	{
+		map models/weapons2/grapple/pad_nrg2.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.333 1.25
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg3.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.667 1.25
+	}
+}
+
+// mid-transition (falling away or materializing): translucent, rings outward at the idle pace.
+// Depth-only pass first: writes depth, no color, so the blended stages
+// that follow draw only the frontmost surface.
+models/weapons2/grapple/pad_fade
+{
+	nopicmip
+	{
+		map $whiteimage
+		blendFunc GL_ZERO GL_ONE
+		depthwrite
+	}
+	{
+		map models/weapons2/grapple/pad.tga
+		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbGen lightingDiffuse
+		alphaGen entity
+		dlight
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_glow.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen const 0.4
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg1.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0 0.41667
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg2.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.667 0.41667
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/pad_nrg3.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.333 0.41667
+		depthFunc equal
+	}
+}
+
+
+// ---- launcher -----------------------------------------------------------
+
+// idle: stream toward the muzzle at the idle pace
+models/weapons2/grapple/gun
+{
+	nopicmip
+	{
+		map models/weapons2/grapple/gun.tga
+		rgbGen lightingDiffuse
+		dlight
+	}
+	{
+		map models/weapons2/grapple/gun_glow.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen const 0.4
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/gun_nrg1.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0 0.41667
+	}
+	{
+		map models/weapons2/grapple/gun_nrg2.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.667 0.41667
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/gun_nrg3.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.333 0.41667
+	}
+}
+
+// hook away: toward the muzzle, faster
+models/weapons2/grapple/gun_fly
+{
+	nopicmip
+	{
+		map models/weapons2/grapple/gun.tga
+		rgbGen lightingDiffuse
+		dlight
+	}
+	{
+		map models/weapons2/grapple/gun_glow.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen const 0.4
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/gun_nrg1.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0 1.25
+	}
+	{
+		map models/weapons2/grapple/gun_nrg2.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.667 1.25
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/gun_nrg3.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.333 1.25
+	}
+}
+
+// reeling: drawn back down the weapon, faster
+models/weapons2/grapple/gun_pull
+{
+	nopicmip
+	{
+		map models/weapons2/grapple/gun.tga
+		rgbGen lightingDiffuse
+		dlight
+	}
+	{
+		map models/weapons2/grapple/gun_glow.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen const 0.4
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/gun_nrg1.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0 1.25
+	}
+	{
+		map models/weapons2/grapple/gun_nrg2.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.333 1.25
+		depthFunc equal
+	}
+	{
+		map models/weapons2/grapple/gun_nrg3.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		rgbGen entity
+		alphaGen wave sin 0.2 0.2 0.667 1.25
+	}
+}

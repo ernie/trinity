@@ -258,7 +258,7 @@ typedef struct {
 	qboolean	teamLeader;			// true when this client is a team leader
 
 	// Trinity handshake state. Lives here (not pers) so it survives the
-	// G_InitGame memset at level change — pers gets wiped, sess gets
+	// G_InitGame memset at level change: pers gets wiped, sess gets
 	// round-tripped through the session<N> cvar. Two separate signals:
 	//   - handshakeResponded: protocol completed (nonce+proto check).
 	//     Gates the 10s drop-on-no-response timer. Set by the QVM.
@@ -367,7 +367,6 @@ struct gclient_s {
 
 	int			lastKillTime;		// for multiple kill rewards
 
-	qboolean	fireHeld;			// used for hook
 	gentity_t	*hook;				// grapple hook if out
 
 	int			switchTeamTime;		// time the player switched teams
@@ -667,6 +666,9 @@ gentity_t *fire_prox( gentity_t *self, vec3_t start, vec3_t aimdir );
 //
 void G_RunMover( gentity_t *ent );
 void Touch_DoorTrigger( gentity_t *ent, gentity_t *other, trace_t *trace );
+void G_CreateRotationMatrix( vec3_t angles, vec3_t matrix[3] );
+void G_TransposeMatrix( vec3_t matrix[3], vec3_t transpose[3] );
+void G_RotatePoint( vec3_t point, vec3_t matrix[3] );
 
 //
 // g_trigger.c
@@ -692,7 +694,10 @@ void CalcMuzzlePoint ( gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, 
 void SnapVectorTowards( vec3_t v, vec3_t to );
 qboolean CheckGauntletAttack( gentity_t *ent );
 void Weapon_HookFree (gentity_t *ent);
+int G_GrappleDamage( void );
+float G_GrappleKnockback( void );
 void Weapon_HookThink (gentity_t *ent);
+qboolean G_GrappleCoMoverMember( gentity_t *hook, int entityNum );
 
 
 //

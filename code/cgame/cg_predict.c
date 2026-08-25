@@ -10,6 +10,10 @@
 
 static	pmove_t		cg_pmove;
 
+// the captured anchor's co-mover set (anchor + wired co-movers), absent from
+// predicted collision while latched; -1 slots are empty
+static	int			cg_grappleCoMovers[4] = { -1, -1, -1, -1 };
+
 // diagnostic: snapshots whose prediction was accepted since the last miss
 static	int			predictionStreak;
 
@@ -68,7 +72,7 @@ CG_ClipMoveToEntities
 ====================
 */
 static void CG_ClipMoveToEntities ( const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
-							int skipNumber, int mask, trace_t *tr ) {
+							int skipNumber, int mask, int moverTime, const int *skipEnts, trace_t *tr ) {
 	int			i, x, zd, zu;
 	trace_t		trace;
 	entityState_t	*ent;
@@ -85,11 +89,16 @@ static void CG_ClipMoveToEntities ( const vec3_t start, const vec3_t mins, const
 			continue;
 		}
 
+		if ( skipEnts && ( ent->number == skipEnts[0] || ent->number == skipEnts[1]
+				|| ent->number == skipEnts[2] || ent->number == skipEnts[3] ) ) {
+			continue;
+		}
+
 		if ( ent->solid == SOLID_BMODEL ) {
 			// special value for bmodel
 			cmodel = trap_CM_InlineModel( ent->modelindex );
 			VectorCopy( cent->lerpAngles, angles );
-			BG_EvaluateTrajectory( &cent->currentState.pos, cg.physicsTime, origin );
+			BG_EvaluateTrajectory( &cent->currentState.pos, moverTime, origin );
 		} else {
 			// encoded bbox
 			x = (ent->solid & 255);
@@ -128,7 +137,7 @@ static void CG_ClipMoveToEntities ( const vec3_t start, const vec3_t mins, const
 CG_Trace
 ================
 */
-void	CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, 
+void	CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
 					 int skipNumber, int mask ) {
 	trace_t	t;
 
@@ -139,7 +148,54 @@ void	CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec
 		t.entityNum = ENTITYNUM_WORLD;
 
 	// check all other solid models
-	CG_ClipMoveToEntities (start, mins, maxs, end, skipNumber, mask, &t);
+	CG_ClipMoveToEntities (start, mins, maxs, end, skipNumber, mask, cg.physicsTime, NULL, &t);
+
+	*result = t;
+}
+
+/*
+================
+CG_TraceRender
+
+CG_Trace with movers at their drawn pose: view-path traces must land on
+the brush the player sees. Prediction stays on the physics pose.
+================
+*/
+void	CG_TraceRender( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
+					 int skipNumber, int mask ) {
+	trace_t	t;
+
+	trap_CM_BoxTrace ( &t, start, end, mins, maxs, 0, mask);
+	if ( t.fraction == 1.0 )
+		t.entityNum = ENTITYNUM_NONE;
+	else
+		t.entityNum = ENTITYNUM_WORLD;
+
+	CG_ClipMoveToEntities (start, mins, maxs, end, skipNumber, mask, cg.time, NULL, &t);
+
+	*result = t;
+}
+
+/*
+================
+CG_TracePredict
+
+CG_Trace for the replayed commands: while captured, the anchor's co-mover
+set is absent: the hold owns that motion on both sides
+================
+*/
+static void	CG_TracePredict( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
+					 int skipNumber, int mask ) {
+	trace_t	t;
+
+	trap_CM_BoxTrace ( &t, start, end, mins, maxs, 0, mask);
+	if ( t.fraction == 1.0 )
+		t.entityNum = ENTITYNUM_NONE;
+	else
+		t.entityNum = ENTITYNUM_WORLD;
+
+	CG_ClipMoveToEntities (start, mins, maxs, end, skipNumber, mask, cg.physicsTime,
+		cg_pmove.grappleLatch ? cg_grappleCoMovers : NULL, &t);
 
 	*result = t;
 }
@@ -460,10 +516,8 @@ static void CG_AddWeapon( int weapon, int quantity, qboolean dropped )
 	
 	//ammo = quantity;
 
-	if ( quantity < 0 ) {
-		quantity = 0; // None for you, sir! (mapper count -1)
-	} else if ( !dropped && cgs.gametype != GT_TEAM ) {
-		// dropped items and teamplay weapons always have full ammo
+	// dropped items and teamplay weapons always have full ammo
+	if ( !dropped && cgs.gametype != GT_TEAM ) {
 		if ( cg.predictedPlayerState.ammo[ weapon ] < quantity ) {
 			quantity = quantity - cg.predictedPlayerState.ammo[ weapon ];
 		} else {
@@ -549,7 +603,7 @@ static void CG_PickupPrediction( centity_t *cent, const gitem_t *item ) {
 	}
 
 	// health prediction
-	if ( item->giType == IT_HEALTH && quantity != 0 ) {
+	if ( item->giType == IT_HEALTH && quantity > 0 ) {
 		int limit;
 
 #ifdef MISSIONPACK
@@ -578,13 +632,13 @@ static void CG_PickupPrediction( centity_t *cent, const gitem_t *item ) {
 	}
 
 	// ammo prediction
-	if ( item->giType == IT_AMMO && quantity != 0 ) {
+	if ( item->giType == IT_AMMO && quantity > 0 ) {
 		CG_AddAmmo( item->giTag, quantity );
 		return;
 	}
 
 	// weapon prediction
-	if ( item->giType == IT_WEAPON && quantity != 0 ) {
+	if ( item->giType == IT_WEAPON && quantity > 0 ) {
 		CG_AddWeapon( item->giTag, quantity, (cent->currentState.modelindex2 == 1) );
 		return;
 	}
@@ -687,6 +741,14 @@ static void CG_TouchItem( centity_t *cent ) {
 		cent->delaySpawnPlayed = qfalse;
 	}
 	cent->pickupCommandTime = cg_pmove.cmd.serverTime;
+
+	// if it's a weapon, give them some predicted ammo so the autoswitch will work
+	if ( item->giType == IT_WEAPON ) {
+		cg.predictedPlayerState.stats[ STAT_WEAPONS ] |= 1 << item->giTag;
+		if ( !cg.predictedPlayerState.ammo[ item->giTag ] ) {
+			cg.predictedPlayerState.ammo[ item->giTag ] = 1;
+		}
+	}
 }
 
 
@@ -920,9 +982,13 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 		return 5;
 	}
 
-	VectorSubtract( pps->grapplePoint, ps->grapplePoint, delta );
-	if( VectorLengthSquared( delta ) > 0.01f * 0.01f )
-		return 6;
+	// only the hook's think writes grapplePoint, never Pmove: sync it
+	if ( !VectorCompare( pps->grapplePoint, ps->grapplePoint ) ) {
+		VectorCopy( ps->grapplePoint, pps->grapplePoint );
+		for ( n = 0 ; n < NUM_SAVED_STATES; n++ ) {
+			VectorCopy( ps->grapplePoint, cg.savedPmoveStates[ n ].grapplePoint );
+		}
+	}
 
 	// check/update eFlags if needed
 	v0 = pps->eFlags & EF_NOPREDICT;
@@ -1083,6 +1149,72 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 	return 0;
 }
 
+// the anchor mover a captured wielder rides, for the render-time carry
+static int cg_grappleLatchMover = -1;
+
+/*
+========================
+CG_GrappleLatchFill
+
+Hand pmove the same trajectories and captured pose the server feeds its
+own, so the hold predicts identically
+========================
+*/
+static void CG_GrappleLatchFill( pmove_t *pmv ) {
+	int						i, j;
+	const entityState_t		*es;
+	const centity_t			*mover;
+
+	pmv->grappleLatch = qfalse;
+	cg_grappleLatchMover = -1;
+	cg_grappleCoMovers[0] = cg_grappleCoMovers[1] =
+		cg_grappleCoMovers[2] = cg_grappleCoMovers[3] = -1;
+	for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {
+		es = &cg.snap->entities[ i ];
+		if ( es->eType != ET_GRAPPLE
+				|| es->otherEntityNum != cg.snap->ps.clientNum
+				|| es->otherEntityNum2 < MAX_CLIENTS
+				|| !es->generic1 ) {
+			continue;
+		}
+		mover = &cg_entities[ es->otherEntityNum2 ];
+		if ( !mover->currentValid || mover->currentState.eType != ET_MOVER ) {
+			return;
+		}
+		pmv->grappleLatch = qtrue;
+		cg_grappleLatchMover = es->otherEntityNum2;
+		VectorCopy( es->pos.trDelta, pmv->grappleLatchLocal );
+		pmv->grappleMoverPos = mover->currentState.pos;
+		pmv->grappleMoverApos = mover->currentState.apos;
+
+		// the co-mover set the server wired at capture
+		cg_grappleCoMovers[0] = es->otherEntityNum2;
+		for ( j = 0 ; j < 3 ; j++ ) {
+			int n = ( es->time2 >> ( j * 10 ) ) & 0x3FF;
+
+			cg_grappleCoMovers[j + 1] = n ? n : -1;
+		}
+		return;
+	}
+}
+
+/*
+========================
+CG_GrappleLatchAnchor
+
+Anchor mover the local player is captured to, or -1; the fill's statics
+go stale off the predicting path
+========================
+*/
+int CG_GrappleLatchAnchor( void ) {
+	if ( cg.demoPlayback || ( cg.snap->ps.pm_flags & PMF_FOLLOW )
+			|| cg_nopredict.integer || cgs.synchronousClients
+			|| !cg_pmove.grappleLatch ) {
+		return -1;
+	}
+	return cg_grappleLatchMover;
+}
+
 
 /*
 =================
@@ -1143,7 +1275,7 @@ void CG_PredictPlayerState( void ) {
 
 	// prepare for pmove
 	cg_pmove.ps = &cg.predictedPlayerState;
-	cg_pmove.trace = CG_Trace;
+	cg_pmove.trace = CG_TracePredict;
 	cg_pmove.pointcontents = CG_PointContents;
 	if ( cg_pmove.ps->pm_type == PM_DEAD ) {
 		cg_pmove.tracemask = MASK_PLAYERSOLID & ~CONTENTS_BODY;
@@ -1199,16 +1331,13 @@ void CG_PredictPlayerState( void ) {
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
 	cg_pmove.pmove_mode = cgs.mode;
+	CG_GrappleLatchFill( &cg_pmove );
 
 	// clean event stack
 	eventStack = 0;
 
 	// run cmds
 	moved = qfalse;
-
-	cg_pmove.pmove_fixed = cgs.pmove_fixed;
-	cg_pmove.pmove_msec = cgs.pmove_msec;
-	cg_pmove.pmove_mode = cgs.mode;
 
 	// Like the comments described above, a player's state is entirely
 	// re-predicted from the last valid snapshot every client frame, which
@@ -1222,7 +1351,7 @@ void CG_PredictPlayerState( void ) {
 	// If we have a new snapshot, we can compare its player state's command
 	// time to the command times in the queue to find a match.  If we find
 	// a matching state, and the predicted version has not deviated, we can
-	// use the predicted state as a base - and also do an incremental predict.
+	// use the predicted state as a base, and also do an incremental predict.
 	//
 	// With this method, we get incremental predicts on every client frame
 	// except a frame following a new snapshot in which there was a prediction
@@ -1343,9 +1472,16 @@ void CG_PredictPlayerState( void ) {
 				// delay prediction for some time or until first server event
 				cg.allowPickupPrediction = cg.time + PICKUP_PREDICTION_DELAY;
 			} else {
-				vec3_t adjusted, new_angles;
-				CG_AdjustPositionForMover( cg.predictedPlayerState.origin, 
+				vec3_t adjusted, new_angles, scratchAngles;
+				CG_AdjustPositionForMover( cg.predictedPlayerState.origin,
 					cg.predictedPlayerState.groundEntityNum, cg.physicsTime, cg.oldTime, adjusted, cg.predictedPlayerState.viewangles, new_angles);
+
+				// the old state was carried to last frame's render time, so
+				// give the fresh replay the same carry before comparing
+				if ( cg_pmove.grappleLatch && cg_grappleLatchMover >= 0 ) {
+					CG_AdjustPositionForMover( adjusted, cg_grappleLatchMover,
+						cg.predictedPlayerState.commandTime, cg.oldTime, adjusted, new_angles, scratchAngles );
+				}
 
 				if ( cg_showmiss.integer ) {
 					if ( !VectorCompare( oldPlayerState.origin, adjusted ) ) {
@@ -1435,9 +1571,17 @@ void CG_PredictPlayerState( void ) {
 	}
 
 	// adjust for the movement of the groundentity
-	CG_AdjustPositionForMover( cg.predictedPlayerState.origin, cg.predictedPlayerState.groundEntityNum, 
-		cg.physicsTime, cg.time, cg.predictedPlayerState.origin, 
+	CG_AdjustPositionForMover( cg.predictedPlayerState.origin, cg.predictedPlayerState.groundEntityNum,
+		cg.physicsTime, cg.time, cg.predictedPlayerState.origin,
 		cg.predictedPlayerState.viewangles, cg.predictedPlayerState.viewangles );
+
+	// carry the hold to render time: the replay is only as fresh as the
+	// last command, and the pad draws at cg.time
+	if ( cg_pmove.grappleLatch && cg_grappleLatchMover >= 0 ) {
+		CG_AdjustPositionForMover( cg.predictedPlayerState.origin, cg_grappleLatchMover,
+			cg.predictedPlayerState.commandTime, cg.time, cg.predictedPlayerState.origin,
+			cg.predictedPlayerState.viewangles, cg.predictedPlayerState.viewangles );
+	}
 
 	if ( cg_showmiss.integer ) {
 		if ( cg.predictedPlayerState.eventSequence > oldPlayerState.eventSequence + MAX_PS_EVENTS ) {

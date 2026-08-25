@@ -111,6 +111,73 @@
 #define WEAPON_FLASH_RADIUS		300
 #define WEAPON_FLASH_RADIUS_MOD	31
 
+// The grapple's lights (muzzle, anchor pad) burn the whole time the hook is
+// out.  No per-frame rand jitter: the color rides one shared swell paced WITH
+// the weapon's loops, so light and sound read as one machine.  The glass is
+// out of reach, since the dlight pass is pinned to the black-under-glow
+// diffuse.  2.5 Hz sits next to the wave's 2.4 Hz dominance handoff, so if
+// the stream ever seems to stutter near the lights, suspect this pace first.
+#define GRAPPLE_FLASH_RADIUS		200
+#define GRAPPLE_DLIGHT_SCALE		0.30f
+#define GRAPPLE_DLIGHT_PULSE_AMP	0.05f
+#define GRAPPLE_DLIGHT_RADIUS_AMP	0.0f
+#define GRAPPLE_DLIGHT_PULSE_HZ		2.5f
+
+// SnapVectorTowards rounds the impact point toward the shooter, so the pad
+// lands a unit clear of what it hit; push it back along its own axis. Shared
+// by the anchored draw (cg_ents.c) and the fall spawn (cg_localents.c) so the
+// release handoff doesn't pop the pad outward
+#define GRAPPLE_PAD_EMBED	1.2f
+
+// wall-bite scar half-width; the mark texture is painted to this same world
+// scale, so changing one without the other slides the gouges off the claws
+#define GRAPPLE_PAD_MARK_RADIUS	10
+
+// rolled about its line of travel in flight so it reads as gyroscopically
+// held; g_missile.c stamps s.time at impact so the anchored draw can pick up
+// the same phase rather than snapping to zero
+#define PAD_FLY_SPIN		900		// deg/s about the direction of travel,
+									//   clockwise as the shooter sees it
+// bounds the absolute clock before it multiplies by PAD_FLY_SPIN, so float32
+// precision doesn't degrade on a long-running server; retuning PAD_FLY_SPIN
+// without rechecking this reintroduces a visible jump at the wrap
+#define PAD_FLY_SPIN_MOD	360000	// ms; must stay a WHOLE number of rotations
+									//   at PAD_FLY_SPIN, or the wrap jumps:
+									//   PAD_FLY_SPIN * MOD / 1000 % 360 == 0
+
+// the anchor pad falls away on release rather than vanishing (LE_GRAPPLE_PAD)
+#define PAD_FALL_RETRACT	150		// ms the claws take to fold back
+#define PAD_FALL_KICK		20		// u/s off the frozen impact normal
+#define PAD_FALL_SCATTER	20		// u/s ceiling, in the contact plane
+#define PAD_FALL_BOUNCE		0.25f	// restitution: a heavy chunk of machinery
+									//   hops once, modestly, and never litters
+#define PAD_FALL_SPIN_DAMP	0.5f	// spin kept per ground contact
+#define PAD_FALL_DRIFT_MIN	20		// u/s of world-horizontal slide at release:
+#define PAD_FALL_DRIFT_MAX	60		//   the claws never let go on the same frame
+// the claws clear the rim by ~7.6 units, so modest deg/s already reads as
+// large motion
+#define PAD_FALL_SPIN_MIN	15		// deg/s about the pad's own axis
+#define PAD_FALL_SPIN_MAX	150
+#define PAD_FALL_TUMBLE		60		// deg/s end-over-end, scaled by the lever arm
+#define PAD_FALL_SETTLE		600		// ms easing the nose toward straight down
+#define PAD_FALL_TIME		1250	// ms before it is gone; long enough to watch
+									//   it actually drop and bounce, not a blink
+#define PAD_FALL_HOLD		0.8f	// fraction at full alpha first
+
+// the pad materializes on the dock after a release (GRAPPLE_RELOAD)
+#define PAD_SEAT_TIME		330		// ms from release to seated
+// 1.00 = fade-only, no growth (identity scale, zero boss-pivot shift at
+// both cg_weapons.c and cg_ents.c); below 1.00 it grows from the boss
+#define PAD_SEAT_SCALE0		1.00f	// scale it grows from
+// no PAD_SEAT_CURVE: the spec's 1.6 exponent is baked as seat*sqrt(seat) = 1.5,
+// since pow() is not in the QVM libc
+#define PAD_SEAT_ALPHA		0.70f	// fraction of the window alpha finishes in
+#define PAD_SEAT_SPIN		180		// deg the pad unwinds through as it forms
+#define PAD_SEAT_ARC_SPIKE	1.00f	// arc density push while seating
+#define PAD_SEAT_RESET		500		// ms gap that means a restart or a seek
+#define PAD_SEAT_FIRE_BOOST	3.0f	// ramp multiplier once the pad has launched
+#define PAD_BOSS_X0			-3.80f	// the boss nose plane; the seat scale pivots here
+
 typedef enum {
 	FOOTSTEP_NORMAL,
 	FOOTSTEP_BOOT,
@@ -247,6 +314,7 @@ typedef enum {
 	LE_FRAGMENT,
 	LE_MOVE_SCALE_FADE,
 	LE_FALL_SCALE_FADE,
+	LE_GRAPPLE_PAD,
 	LE_FADE_RGB,
 	LE_SCALE_FADE,
 	LE_SCOREPLUM,
@@ -649,7 +717,7 @@ typedef struct {
 	qhandle_t	soundBuffer[MAX_SOUNDBUFFER];
 	qhandle_t	soundPlaying;
 
-	// Trinity announcement queue — paced separately from soundBuffer because
+	// Trinity announcement queue: paced separately from soundBuffer because
 	// name .wav files are typically longer than that queue's 750ms gate.
 	// See cg_trinity_announce.c. Sized for the worst-case match-load burst:
 	// G_TrinityProcessAnnouncements emits every pending tann j in a single
@@ -857,6 +925,16 @@ typedef struct {
 	qhandle_t	railCoreShader;
 
 	qhandle_t	lightningShader;
+	qhandle_t	grappleTetherShader;
+	// vertex-colored profile, so it cannot share the tether's map and scroll
+	qhandle_t	grappleArcShader;
+	// per-state direction/speed variants of the model shaders (customShader);
+	// idle rides the models' base shaders
+	qhandle_t	grappleGunFlyShader;
+	qhandle_t	grappleGunPullShader;
+	qhandle_t	grapplePadFlyShader;
+	qhandle_t	grapplePadPullShader;
+	qhandle_t	grapplePadFadeShader;
 
 	qhandle_t	friendShader;
 
@@ -906,6 +984,7 @@ typedef struct {
 	qhandle_t	burnMarkShader;
 	qhandle_t	holeMarkShader;
 	qhandle_t	energyMarkShader;
+	qhandle_t	grappleMarkShader;
 
 	// powerup shaders
 	qhandle_t	quadShader;
@@ -989,6 +1068,17 @@ typedef struct {
 	sfxHandle_t	sfx_lghit1;
 	sfxHandle_t	sfx_lghit2;
 	sfxHandle_t	sfx_lghit3;
+	sfxHandle_t	sfx_grapplefire;
+	sfxHandle_t	sfx_grapplehit;
+	sfxHandle_t	sfx_grapplepull;
+	sfxHandle_t	sfx_grappletether;
+	sfxHandle_t	sfx_grapplelaunch;
+	sfxHandle_t	sfx_grapplebite;	// into a player; the world path is sfx_grapplehit
+	sfxHandle_t	sfx_grapplefree;	// the claw drawing out of a wall
+	sfxHandle_t	sfx_grappleseat;	// the pad reforming on the nose
+	sfxHandle_t	sfx_grappleclank;	// a released pad hits and hops
+	sfxHandle_t	sfx_grapplesettle;	// ...or comes to rest
+	sfxHandle_t	sfx_grapplearc[3];	// filament ignitions, faint to brightest
 	sfxHandle_t	sfx_ric1;
 	sfxHandle_t	sfx_ric2;
 	sfxHandle_t	sfx_ric3;
@@ -1184,6 +1274,7 @@ typedef struct {
 	int				timelimit;
 	int				overtimelimit;
 	int				maxclients;
+	qboolean		grappleEnabled;		// g_grapple: hook given at spawn
 	char			mapname[MAX_QPATH];
 	char			redTeam[MAX_QPATH];
 	char			blueTeam[MAX_QPATH];
@@ -1469,7 +1560,9 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //
 void CG_BuildSolidList( void );
 int	CG_PointContents( const vec3_t point, int passEntityNum );
-void CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, 
+void CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
+					 int skipNumber, int mask );
+void CG_TraceRender( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
 					 int skipNumber, int mask );
 void CG_PredictPlayerState( void );
 void CG_LoadDeferredPlayers( void );
@@ -1493,6 +1586,16 @@ void CG_PainEvent( centity_t *cent, int health );
 void CG_SetEntitySoundPosition( const centity_t *cent );
 void CG_AddPacketEntities( void );
 void CG_Beam( const centity_t *cent );
+void CG_GrappleHookAxis( const centity_t *cent, vec3_t axis[3] );
+void CG_GrapplePadAnchorAxis( const vec3_t angles, int stamp, int num,
+		vec3_t axis[3] );
+void CG_GrapplePadMark( const vec3_t origin, vec3_t axis[3],
+		qboolean temporary );
+
+// grapple_pad.md3 poses: arms folded back along the body in the bore and in
+// flight, splayed flat only once the pad has clamped onto a surface
+#define PAD_FRAME_FOLDED	0
+#define PAD_FRAME_CLAMPED	12
 void CG_AdjustPositionForMover( const vec3_t in, int moverNum, int fromTime, int toTime, vec3_t out, const vec3_t angles_in, vec3_t angles_out );
 
 void CG_PositionEntityOnTag( refEntity_t *entity, const refEntity_t *parent, 
@@ -1520,10 +1623,20 @@ void CG_Bullet( vec3_t origin, int sourceEntityNum, vec3_t normal, qboolean fles
 
 void CG_RailTrail( const clientInfo_t *ci, const vec3_t start, const vec3_t end );
 void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi );
+void CG_GrappleOwnerRGBA( int clientNum, byte *rgba );
+float CG_GrapplePulse( int clientNum );
+float CG_GrapplePullLevel( void );
+float CG_GrappleSeat( int clientNum );
+void CG_GrappleSeatRestart( int clientNum );
+void CG_GrappleSeatFired( int clientNum );
+void CG_GrappleSeatSnap( int clientNum );
+float CG_GrappleDlightScale( void );
+float CG_GrappleDlightRadius( float base );
+void CG_GrappleFade( byte *rgba, float pulse );
 void CG_AddViewWeapon (playerState_t *ps);
 void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent, int team );
 void CG_DrawWeaponSelect( void );
-void CG_LaserSight( vec3_t start, vec3_t end, byte colour[4], float width );
+void CG_LaserSight( vec3_t start, vec3_t end, byte color[4], float width );
 qboolean CG_WeaponSelectable( int i );
 void CG_CalculateWeaponPosition( vec3_t origin, vec3_t angles );
 
@@ -1547,6 +1660,7 @@ void	CG_ImpactMark( qhandle_t markShader,
 void	CG_InitLocalEntities( void );
 localEntity_t	*CG_AllocLocalEntity( void );
 void	CG_AddLocalEntities( void );
+void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClientNum );
 
 //
 // cg_effects.c

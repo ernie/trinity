@@ -1,6 +1,7 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "g_local.h"
+#include "bg_grapple_model.h"
 #include "bg_mode.h"
 
 #define	MISSILE_PRESTEP_TIME	50
@@ -257,6 +258,13 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 #endif
 	other = &g_entities[trace->entityNum];
 
+	// the hook never touches teammates: vanish, and the held trigger rethrows
+	if ( !strcmp( ent->classname, "hook" )
+			&& other->client && OnSameTeam( ent->parent, other ) ) {
+		Weapon_HookFree( ent );
+		return;
+	}
+
 	// check for bounce
 	if ( !other->takedamage &&
 		( ent->s.eFlags & ( EF_BOUNCE | EF_BOUNCE_HALF ) ) ) {
@@ -269,6 +277,11 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 	if ( other->takedamage ) {
 		if ( ent->s.weapon != WP_PROX_LAUNCHER ) {
 			if ( other->client && other->client->invulnerabilityTime > level.time ) {
+				// the sphere is coherent energy: the pad can't bite it, so the link drops instead
+				if ( !strcmp( ent->classname, "hook" ) ) {
+					Weapon_HookFree( ent );
+					return;
+				}
 				//
 				VectorCopy( ent->s.pos.trDelta, forward );
 				VectorNormalize( forward );
@@ -290,7 +303,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		if ( ent->damage ) {
 			vec3_t	velocity;
 
-			if( LogAccuracyHit( other, &g_entities[ent->r.ownerNum] ) ) {
+			if( LogAccuracyHit( other, &g_entities[ent->r.ownerNum] ) && ent->s.weapon != WP_GRAPPLING_HOOK ) {
 				g_entities[ent->r.ownerNum].client->accuracy_hits++;
 				hitClient = qtrue;
 			}
@@ -342,9 +355,42 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 	}
 #endif
 
+	// a body-queue corpse keeps ET_PLAYER with no client; an obelisk or a
+	// Team Arena portal also has no client but is a legitimate fixed anchor,
+	// so tell them apart by type instead: a corpse sinks, an obelisk stands
+	if ( ent->s.weapon == WP_GRAPPLING_HOOK && other->takedamage && !other->client && other->s.eType == ET_PLAYER ) {
+		Weapon_HookFree( ent );
+		return;
+	}
+
 	if (!strcmp(ent->classname, "hook")) {
 		gentity_t *nent;
-		vec3_t v;
+		vec3_t v, dir;
+
+		// the owner's hook pointer may no longer be this entity (the slot
+		// was reused by a new connection); a stale hook anchors nothing
+		if ( !( ent->parent && ent->parent->client && ent->parent->client->hook == ent ) ) {
+			G_FreeEntity( ent );
+			return;
+		}
+
+		// a mover sweeping onto the pad mid-flight buries the impact: re-seat
+		// on the entry face; buried past finding it, the tether never sets
+		if ( trace->startsolid && other->s.eType == ET_MOVER ) {
+			vec3_t	back, start;
+			trace_t	tr2;
+
+			VectorCopy( ent->s.pos.trDelta, back );
+			VectorNormalize( back );
+			VectorMA( trace->endpos, -96, back, start );
+			trap_Trace( &tr2, start, NULL, NULL, trace->endpos,
+				ent->r.ownerNum, MASK_SHOT );
+			if ( tr2.startsolid || tr2.entityNum != other->s.number ) {
+				Weapon_HookFree( ent );
+				return;
+			}
+			*trace = tr2;
+		}
 
 		nent = G_Spawn();
 		if ( other->takedamage && other->client ) {
@@ -353,6 +399,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 			nent->s.otherEntityNum = other->s.number;
 
 			ent->enemy = other;
+			ent->timestamp = level.time + 125;
 
 			v[0] = other->r.currentOrigin[0] + (other->r.mins[0] + other->r.maxs[0]) * 0.5;
 			v[1] = other->r.currentOrigin[1] + (other->r.mins[1] + other->r.maxs[1]) * 0.5;
@@ -368,6 +415,18 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		SnapVectorTowards( v, ent->s.pos.trBase );	// save net bandwidth
 
 		nent->freeAfterEvent = qtrue;
+		nent->s.weapon = WP_GRAPPLING_HOOK;	// so cgame plays the hook impact, not the default
+		// anchor perpendicular to the surface so all three claws embed
+		VectorNegate( trace->plane.normal, dir );
+		// a startsolid impact carries no plane, and vectoangles of a zero vector
+		// answers straight down, which the hang probe then walks into the floor.
+		// The flight line is the honest fallback: that is the way the claws went in
+		if ( VectorNormalize( dir ) < 0.5f ) {
+			VectorCopy( ent->s.pos.trDelta, dir );
+			VectorNormalize( dir );
+		}
+		vectoangles( dir, ent->s.angles );
+		VectorCopy( ent->s.angles, ent->s.apos.trBase );	// cgame reads pad angles via lerpAngles
 		// change over to a normal entity right at the point of impact
 		nent->s.eType = ET_GENERAL;
 		ent->s.eType = ET_GRAPPLE;
@@ -375,8 +434,33 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		G_SetOrigin( ent, v );
 		G_SetOrigin( nent, v );
 
+		// a mover-anchored pad stores the anchor and embed direction in the
+		// mover's local frame, so the think can replay both as it travels
+		if ( other->s.eType == ET_MOVER ) {
+			vec3_t	morg, mang;
+			vec3_t	m[3];
+
+			BG_EvaluateTrajectory( &other->s.pos, level.time, morg );
+			BG_EvaluateTrajectory( &other->s.apos, level.time, mang );
+			G_CreateRotationMatrix( mang, m );
+			VectorSubtract( v, morg, ent->pos1 );
+			G_RotatePoint( ent->pos1, m );
+			VectorCopy( dir, ent->pos2 );
+			G_RotatePoint( ent->pos2, m );
+			ent->target_ent = other;
+
+			// the client re-derives the pad from these, off the mover's own trajectory
+			ent->s.otherEntityNum2 = other->s.number;
+			VectorCopy( ent->pos1, ent->s.origin2 );
+			VectorCopy( ent->pos2, ent->s.angles2 );
+		}
+
+		// attach time: movers re-derive their frame from it, and the flight spin
+		// resolves its phase at impact from it
+		ent->s.time = level.time;
+
 		ent->think = Weapon_HookThink;
-		ent->nextthink = level.time + FRAMETIME;
+		ent->nextthink = level.time + 25;
 
 		ent->parent->client->ps.pm_flags |= PMF_GRAPPLE_PULL;
 		VectorCopy( ent->r.currentOrigin, ent->parent->client->ps.grapplePoint);
@@ -466,9 +550,11 @@ void G_RunMissile( gentity_t *ent ) {
 	if ( tr.fraction != 1 ) {
 		// never explode or bounce on sky
 		if ( tr.surfaceFlags & SURF_NOIMPACT ) {
-			// If grapple, reset owner
+			// a grapple lost against the sky releases properly instead of
+			// vanishing with the wielder's hook pointer left dangling
 			if (ent->parent && ent->parent->client && ent->parent->client->hook == ent) {
-				ent->parent->client->hook = NULL;
+				Weapon_HookFree( ent );
+				return;
 			}
 			G_FreeEntity( ent );
 			return;
@@ -708,8 +794,6 @@ fire_grapple
 */
 gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir) {
 	gentity_t	*hook;
-	// unlagged
-	int			hooktime;
 
 	VectorNormalize (dir);
 
@@ -721,7 +805,7 @@ gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir) {
 	hook->r.svFlags = SVF_USE_CURRENT_ORIGIN;
 	hook->s.weapon = WP_GRAPPLING_HOOK;
 	hook->r.ownerNum = self->s.number;
-	hook->damage = Mode_GetConfig( g_mode.integer )->weapons[WP_GRAPPLING_HOOK].damage;
+	hook->damage = G_GrappleDamage();
 	hook->methodOfDeath = MOD_GRAPPLE;
 	hook->clipmask = MASK_SHOT;
 	hook->parent = self;
@@ -732,17 +816,11 @@ gentity_t *fire_grapple (gentity_t *self, vec3_t start, vec3_t dir) {
 	// unlagged
 	hook->s.otherEntityNum = self->s.number;
 
-	if ( self->client ) {
-		hooktime = self->client->pers.cmd.serverTime + MISSILE_PRESTEP_TIME;
-	} else {
-		hooktime = level.time - MISSILE_PRESTEP_TIME; // // move a bit on the very first frame
-	}
-
 	hook->s.pos.trType = TR_LINEAR;
-	hook->s.pos.trTime = hooktime;
+	hook->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;		// move a bit on the very first frame
 	VectorCopy( start, hook->s.pos.trBase );
 	SnapVector( hook->s.pos.trBase );			// save net bandwidth
-	VectorScale( dir, 800, hook->s.pos.trDelta );
+	VectorScale( dir, GRAPPLE_MODEL_FIRE_SPEED, hook->s.pos.trDelta );
 	SnapVector( hook->s.pos.trDelta );			// save net bandwidth
 	VectorCopy (start, hook->r.currentOrigin);
 

@@ -316,7 +316,7 @@ void CG_UpdateVoipLevels( void ) {
 	int d;
 	qboolean playback = (qboolean)( cg.demoPlayback || cgs.tvPlayback );
 
-	// Local self from cg_voipLevel (single integer 0-5). Only valid during live play —
+	// Local self from cg_voipLevel (single integer 0-5). Only valid during live play,
 	// during demo/TV playback there's no local capture and cl_voipLevel stays 0, while
 	// cg.clientNum tracks the followed player whose received audio data is in the
 	// cl_voipLevels per-client string (engine populates that slot during playback).
@@ -359,7 +359,7 @@ void CG_UpdateVoipLevels( void ) {
 		}
 	}
 
-	// Refresh fade timestamps for any active slot — drives the talker-list fade
+	// Refresh fade timestamps for any active slot: drives the talker-list fade
 	// window. Updates even when the talker list isn't drawn (intentional fix).
 	for ( i = 0; i < MAX_CLIENTS; i++ ) {
 		if ( cg.voipTalking[i] ) {
@@ -1102,6 +1102,7 @@ static void CG_RegisterGraphics( void ) {
 	// wall marks
 	cgs.media.bulletMarkShader = trap_R_RegisterShader( "gfx/damage/bullet_mrk" );
 	cgs.media.burnMarkShader = trap_R_RegisterShader( "gfx/damage/burn_med_mrk" );
+	cgs.media.grappleMarkShader = trap_R_RegisterShader( "gfx/damage/pad_mrk" );
 	cgs.media.holeMarkShader = trap_R_RegisterShader( "gfx/damage/hole_lg_mrk" );
 	cgs.media.energyMarkShader = trap_R_RegisterShader( "gfx/damage/plasma_mrk" );
 	cgs.media.shadowMarkShader = trap_R_RegisterShader( "markShadow" );

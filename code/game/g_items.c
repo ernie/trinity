@@ -978,6 +978,10 @@ void ClearRegisteredItems( void ) {
 	// players always start with the base weapon
 	RegisterItem( BG_FindItemForWeapon( WP_MACHINEGUN ) );
 	RegisterItem( BG_FindItemForWeapon( WP_GAUNTLET ) );
+	// grapple is spawn-granted, never a map item, so clients have nothing to precache from
+	if ( g_grapple.integer ) {
+		RegisterItem( BG_FindItemForWeapon( WP_GRAPPLING_HOOK ) );
+	}
 #ifdef MISSIONPACK
 	if( g_gametype.integer == GT_HARVESTER ) {
 		RegisterItem( BG_FindItem( "Red Cube" ) );

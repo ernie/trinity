@@ -56,6 +56,15 @@ G_CVAR( g_gravity, "g_gravity", "800", 0, 0, qtrue, qfalse )
 G_CVAR( g_knockback, "g_knockback", "1000", 0, 0, qtrue, qfalse )
 G_CVAR( g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue, qfalse )
 G_CVAR( g_weaponRespawn, "g_weaponrespawn", "5", 0, 0, qtrue, qfalse )
+// give everyone the grappling hook at spawn, gauntlet-style.  SERVERINFO so
+// cgame can admit it to the weapon wheel's default set; unarchived like
+// g_mode, because a variant toggle should come from the config, not persist
+G_CVAR( g_grapple, "g_grapple", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qtrue, qfalse )
+// grapple tuning; damage/knockback are empty because unset means the mode
+// table decides, resolved per use in G_GrappleDamage/G_GrappleKnockback.
+// Hook speed is not here: it is GRAPPLE_MODEL_FIRE_SPEED, a constant
+G_CVAR( g_damage_gh, "g_damage_gh", "", 0, 0, qtrue, qfalse )
+G_CVAR( g_knockback_gh, "g_knockback_gh", "", 0, 0, qtrue, qfalse )
 G_CVAR( g_weaponTeamRespawn, "g_weaponTeamRespawn", "30", 0, 0, qtrue, qfalse )
 G_CVAR( g_forcerespawn, "g_forcerespawn", "20", 0, 0, qtrue, qfalse )
 G_CVAR( g_inactivity, "g_inactivity", "0", 0, 0, qtrue, qfalse )
@@ -93,7 +102,7 @@ G_CVAR( g_proxMineTimeout, "g_proxMineTimeout", "20000", 0, 0, qfalse, qfalse )
 G_CVAR( g_smoothClients, "g_smoothClients", "1", 0, 0, qfalse, qfalse )
 G_CVAR( pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO, 0, qfalse, qfalse )
 G_CVAR( pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse, qfalse )
-G_CVAR( g_mode, "g_mode", "0", CVAR_SERVERINFO | CVAR_SYSTEMINFO | CVAR_LATCH, 0, qfalse, qfalse )
+G_CVAR( g_mode, "g_mode", "0", CVAR_SERVERINFO | CVAR_SYSTEMINFO | CVAR_LATCH | CVAR_NORESTART, 0, qfalse, qfalse )
 
 G_CVAR( g_rotation, "g_rotation", "", CVAR_ARCHIVE, 0, qfalse, qfalse )
 

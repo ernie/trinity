@@ -1,0 +1,6 @@
+# code/game/bg_grapple_model.h is vendored byte-for-byte and hash-checked
+# elsewhere, so its exact bytes matter. It is stored with LF endings, because a
+# Windows checkout under core.autocrlf=true rewrites it to CRLF and fails that
+# check on a difference that is not in the model at all. Nothing else here is
+# pinned; the rest of the tree's line endings are not load-bearing.
+code/game/bg_grapple_model.h text eol=lf

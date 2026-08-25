@@ -285,7 +285,9 @@ void CG_VR_RegisterMedia( void ) {
 		int i;
 
 		for ( i = 1 ; i < WP_NUM_WEAPONS ; i++ ) {
-			if ( i == WP_GRAPPLING_HOOK ) {
+			// skip the grapple's media unless the server hands it out;
+			// CG_AddPlayerWeapon still registers lazily if one appears
+			if ( i == WP_GRAPPLING_HOOK && !cgs.grappleEnabled ) {
 				continue;
 			}
 			CG_RegisterWeapon( i );
@@ -936,7 +938,7 @@ void CG_VR_ComputeWeaponAngles( void ) {
 
 		AngleVectors(weaponangles, forward, NULL, NULL);
 		VectorMA(weaponorigin, 4096, forward, end);
-		CG_Trace(&trace, weaponorigin, NULL, NULL, end, cg.predictedPlayerState.clientNum, MASK_SOLID);
+		CG_TraceRender(&trace, weaponorigin, NULL, NULL, end, cg.predictedPlayerState.clientNum, MASK_SOLID);
 
 		if (cg_debugWeaponAiming.integer)
 		{
@@ -975,7 +977,7 @@ void CG_VR_ComputeWeaponAngles( void ) {
 			AngleVectors(vr->calculated_weaponangles, forward2, NULL, NULL);
 			VectorMA(origin, 4096, forward2, end2);
 
-			CG_Trace(&trace2, cg.refdef.vieworg, NULL, NULL, end2, cg.predictedPlayerState.clientNum, MASK_SOLID);
+			CG_TraceRender(&trace2, cg.refdef.vieworg, NULL, NULL, end2, cg.predictedPlayerState.clientNum, MASK_SOLID);
 
 			if (cg_debugWeaponAiming.integer)
 			{
@@ -1320,7 +1322,7 @@ void CG_VR_OnWeaponFired( int weapon ) {
 }
 
 // cg_weapons.c CG_LightningBolt's per-frame haptic only (the muzzle/
-// AngleVectors code that surrounds it stays put). weapon is unused here -
+// AngleVectors code that surrounds it stays put). weapon is unused here:
 // the original code hardcoded "tesla_fire" regardless, so this preserves
 // that verbatim; the call site still only reaches this hook from inside
 // its `vrActive && directView` branch.
@@ -1671,7 +1673,8 @@ static float length(float x, float y)
 // "*" expansions (exclusions come before the "*" they filter). Unknown and
 // duplicate tokens are dropped, so listing a weapon before "*" promotes it
 // out of the default order. Empty (the default) is "*": every weapon
-// except the gauntlet and the grappling hook, in weapon_t order.
+// except the gauntlet, and the grappling hook only while the server
+// doesn't hand it out (g_grapple), in weapon_t order.
 static int vrc_wheelSlots[WP_NUM_WEAPONS];
 static int vrc_wheelSlotCount = 0;
 
@@ -1704,7 +1707,9 @@ static void VR_WheelAppendBuiltins( qboolean *seen )
 	int weaponId;
 
 	for ( weaponId = 1; weaponId < WP_NUM_WEAPONS; ++weaponId ) {
-		if ( weaponId == WP_GAUNTLET || weaponId == WP_GRAPPLING_HOOK ) {
+		// the grapple joins the built-in set when the server hands it out
+		if ( weaponId == WP_GAUNTLET
+			|| ( weaponId == WP_GRAPPLING_HOOK && !cgs.grappleEnabled ) ) {
 			continue;
 		}
 		if ( seen[weaponId] ) {
@@ -2090,6 +2095,11 @@ void CG_DrawWeaponSelector( void )
 						Byte4Copy( ci->c1RGBA, VR_ENT_RGBA( ent ) );
 					}
 				}
+				else if ( weaponId == WP_GRAPPLING_HOOK ) {
+					// the launcher's glow stage is rgbGen entity, like the
+					// railgun core above; memset would leave it black on the wheel
+					CG_GrappleOwnerRGBA( cg.predictedPlayerState.clientNum, VR_ENT_RGBA( ent ) );
+				}
 
 				ent.hModel = cg_weapons[weaponId].weaponModel;
 				ent.renderfx = RF_OVERBRIGHT | RF_FIRST_PERSON;
@@ -2226,7 +2236,7 @@ qboolean CG_VR_WeaponHandPose( vec3_t origin, vec3_t angles, float *scale ) {
 	{
 		AngleVectors(angles, forward, NULL, NULL);
 		VectorMA(origin, 4096, forward, end);
-		CG_Trace(&trace, origin, NULL, NULL, end, cg.predictedPlayerState.clientNum, MASK_SOLID);
+		CG_TraceRender(&trace, origin, NULL, NULL, end, cg.predictedPlayerState.clientNum, MASK_SOLID);
 
 		colour[0] = 0xff;
 		colour[1] = 0x00;
@@ -2260,6 +2270,11 @@ qboolean CG_VR_WeaponHandPose( vec3_t origin, vec3_t angles, float *scale ) {
 			Q_sscanf(weapon_adjustment, "%f,%f,%f,%f,%f,%f,%f", scale,
 				   &(temp_offset[0]), &(temp_offset[1]), &(temp_offset[2]),
 				   &(adjust[PITCH]), &(adjust[YAW]), &(adjust[ROLL]));
+			// a malformed or zeroed cvar must not scale the weapon out of
+			// existence: there is no way back from an invisible model
+			if (*scale <= 0.0f) {
+				*scale = 1.0f;
+			}
 			VectorScale(temp_offset, *scale, offset);
 
 			if (!vr->right_handed)
@@ -2399,7 +2414,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			VectorSubtract( cg.refdef.vieworg, pos, vieworg );
 
 			// Prevent player clipping through solid objects
-			CG_Trace( &trace, cg.refdef.vieworg, mins, maxs, vieworg, cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
+			CG_TraceRender( &trace, cg.refdef.vieworg, mins, maxs, vieworg, cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
 
 			VectorCopy( trace.endpos, cg.refdef.vieworg );
 		}
@@ -2711,14 +2726,14 @@ static const char *weaponAdjustDefaultStrings[] = {
 	"0.8,-5.5,6,0,0,0,0",                 // 7: Railgun
 	"0.8,-4.5,6,1.5,0,0,0",               // 8: Plasma Gun
 	"0.8,-5.5,6,0,0,0,0",                 // 9: BFG
-	"",                                     // 10: Grappling Hook
+	"0.8,-2.75,6,-1.4,0,0,0",             // 10: Grapple
 	"0.8,-5.5,6,0,0,0,0",                 // 11: Nailgun (TA)
 	"0.8,-5.5,6,0,0,0,0",                 // 12: Prox Launcher (TA)
 	"0.8,-5.5,6,0,0,0,0",                 // 13: Chaingun (TA)
 };
 #define WEAPADJUST_NUM_DEFAULTS (sizeof(weaponAdjustDefaultStrings) / sizeof(weaponAdjustDefaultStrings[0]))
 
-// Adjustment state (file-scoped statics — reset on level load since cgame reloads)
+// Adjustment state (file-scoped statics: reset on level load since cgame reloads)
 static int weaponAdjustParam = 0;         // 0-6: which parameter is selected
 static float weaponAdjustValues[WEAPADJUST_NUM_PARAMS];
 static float weaponAdjustDefaults[WEAPADJUST_NUM_PARAMS];
@@ -2727,7 +2742,10 @@ static qboolean weaponAdjustParamCycled = qfalse; // debounce for thumbstick par
 static int weaponAdjustResetHoldStart = 0; // time A button was first pressed (for hold-to-reset-all)
 
 static void CG_WeaponAdjust_ParseValues( const char *str, float *out ) {
-	out[0] = out[1] = out[2] = out[3] = out[4] = out[5] = out[6] = 0.0f;
+	// out[0] is scale: default 1, not 0, since a zero scale renders nothing
+	// and the first nudge writes it back out with no visual way to recover
+	out[0] = 1.0f;
+	out[1] = out[2] = out[3] = out[4] = out[5] = out[6] = 0.0f;
 	if ( str && strlen(str) > 0 ) {
 		Q_sscanf( str, "%f,%f,%f,%f,%f,%f,%f",
 			&out[0], &out[1], &out[2], &out[3],
@@ -2924,7 +2942,7 @@ void CG_WeaponAdjustDraw( void ) {
 	int charH = TINYCHAR_HEIGHT;
 	int lineH = charH + 1;
 
-	// Horizontal layout across the top — keeps the bottom clear for weapon view
+	// Horizontal layout across the top: keeps the bottom clear for weapon view
 	// Rows: title | arrow-up | name | value | arrow-down
 	int colChars = 6;                          // each column is 6 characters wide
 	int colW = colChars * charW;               // pixel width per column
@@ -2983,7 +3001,7 @@ void CG_WeaponAdjustDraw( void ) {
 		color = isActive ? &activeColor : ( isChanged ? &changedColor : &normalColor );
 		colX = (int)boxX + 4 + i * ( colW + colPad );
 
-		// Highlight background for active parameter — spans from arrow row to bottom of box
+		// Highlight background for active parameter: spans from arrow row to bottom of box
 		if ( isActive ) {
 			float highlightTop = (float)paramStartY - 1;
 			float highlightBot = boxY + boxH;
@@ -3000,13 +3018,13 @@ void CG_WeaponAdjustDraw( void ) {
 			trap_R_SetColor( NULL );
 		}
 
-		// Parameter name — right-align within column
+		// Parameter name: right-align within column
 		nameLen = (int)strlen( weaponAdjustParamNames[i] );
 		nameX = colX + colW - nameLen * charW;
 		CG_DrawStringExt( nameX, nameY, weaponAdjustParamNames[i],
 			*color, qtrue, qfalse, charW, charH, 0 );
 
-		// Parameter value — right-align within column
+		// Parameter value: right-align within column
 		valStr = va( "%.2f", weaponAdjustValues[i] );
 		valLen = (int)strlen( valStr );
 		valX = colX + colW - valLen * charW;

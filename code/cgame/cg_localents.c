@@ -357,6 +357,155 @@ static void CG_AddFragment( localEntity_t *le ) {
 }
 
 /*
+====================
+CG_GrapplePadSettle
+
+Weight-forward nose pull: smoothstep pitch toward straight down, applied over
+the raw trajectory angles at draw time. Smoothstep because exp() is not in
+the QVM libc, and arriving beats an infinite tail.
+====================
+*/
+static void CG_GrapplePadSettle( float t, vec3_t ang ) {
+	float	s;
+
+	if ( PAD_FALL_SETTLE <= 0 ) {
+		return;
+	}
+	s = t * 1000.0f / PAD_FALL_SETTLE;
+	if ( s > 1.0f ) {
+		s = 1.0f;
+	}
+	s = s * s * ( 3.0f - 2.0f * s );
+	ang[PITCH] += AngleSubtract( 90.0f, ang[PITCH] ) * s;
+}
+
+/*
+====================
+CG_AddGrapplePad
+
+Claws fold back, the nose settles toward straight down, and the whole thing
+fades. Settling is a smoothstep approach rather than a rotation: the claws and
+contact face make the pad weight-forward, so it converges on an attitude like a
+dart instead of turning past it.
+====================
+*/
+static void CG_AddGrapplePad( localEntity_t *le ) {
+	refEntity_t	*re = &le->refEntity;
+	vec3_t		newOrigin, ang, cleanOrigin, cleanOldOrigin;
+	trace_t		trace;
+	float		t, u, c, retract, embed;
+	float		fpos;
+	int		fi;
+
+	t = ( cg.time - le->startTime ) * 0.001f;
+
+	BG_EvaluateTrajectory( &le->pos, cg.time, newOrigin );
+	if ( le->pos.trType != TR_STATIONARY ) {
+		CG_Trace( &trace, re->origin, NULL, NULL, newOrigin, -1, CONTENTS_SOLID );
+		if ( trace.fraction < 1.0f ) {
+			// reflect the CURRENT velocity: the trajectory's initial
+			// delta is dwarfed by the gravity term and reads as no bounce.
+			// CG_ReflectVelocity parks weak floor rebounds TR_STATIONARY,
+			// which ends the hop: heavy machinery does not litter
+			CG_ReflectVelocity( le, &trace );
+
+			// past the hold the pad is fading out, and a ghost should not
+			// clatter
+			if ( t < PAD_FALL_TIME * PAD_FALL_HOLD * 0.001f ) {
+				sfxHandle_t	sfx = ( le->pos.trType == TR_STATIONARY )
+					? cgs.media.sfx_grapplesettle : cgs.media.sfx_grappleclank;
+
+				if ( sfx ) {
+					trap_S_StartSound( trace.endpos, ENTITYNUM_WORLD, CHAN_AUTO, sfx );
+				}
+			}
+
+			// ground contact scrubs spin; coming to rest stops it cold
+			BG_EvaluateTrajectory( &le->angles, cg.time, ang );
+			if ( le->pos.trType == TR_STATIONARY ) {
+				// freeze the DISPLAYED attitude: the settle pull overrode
+				// pitch all fall while raw tumble integrated underneath, so
+				// freezing the raw angles snaps the pad crooked
+				CG_GrapplePadSettle( t, ang );
+				le->angles.trType = TR_STATIONARY;
+				VectorClear( le->angles.trDelta );
+			} else {
+				VectorScale( le->angles.trDelta, PAD_FALL_SPIN_DAMP,
+					le->angles.trDelta );
+			}
+			VectorCopy( ang, le->angles.trBase );
+			le->angles.trTime = cg.time;
+			VectorCopy( trace.endpos, re->origin );
+		} else {
+			VectorCopy( newOrigin, re->origin );
+		}
+	} else {
+		VectorCopy( newOrigin, re->origin );
+	}
+	VectorCopy( re->origin, re->oldorigin );
+
+	BG_EvaluateTrajectory( &le->angles, cg.time, ang );
+	// at rest trBase already holds the frozen, settle-corrected attitude;
+	// pulling further would move a pad that has stopped
+	if ( le->angles.trType != TR_STATIONARY ) {
+		CG_GrapplePadSettle( t, ang );
+	}
+	AnglesToAxis( ang, re->axis );
+
+	// claws let go before the pad does, so walk the swing ramp frame by frame
+	// so the rigid blade never lerps across more than one ~8 deg step.  The
+	// ease is baked into the frames, so a linear walk plays the authored curve
+	retract = PAD_FALL_RETRACT > 0
+		? ( t * 1000.0f > PAD_FALL_RETRACT ? 1.0f : t * 1000.0f / PAD_FALL_RETRACT )
+		: 1.0f;
+	fpos = ( 1.0f - retract ) * PAD_FRAME_CLAMPED;
+	fi = (int)fpos;
+	if ( fi >= PAD_FRAME_CLAMPED ) {
+		re->oldframe = re->frame = PAD_FRAME_CLAMPED;
+		re->backlerp = 0;
+	} else {
+		re->oldframe = fi;
+		re->frame = fi + 1;
+		re->backlerp = 1.0f - ( fpos - fi );
+	}
+
+	// magnitude of the draw-only embed offset applied just before the draw
+	// call below; withdraws to zero over the same window the claws fold back
+	embed = GRAPPLE_PAD_EMBED * ( 1.0f - retract );
+
+	// hold, then fade, keeping the owner's tint through it
+	u = ( cg.time - le->startTime ) * le->lifeRate;
+	c = ( u <= PAD_FALL_HOLD ) ? 1.0f
+		: 1.0f - ( u - PAD_FALL_HOLD ) / ( 1.0f - PAD_FALL_HOLD );
+	if ( c < 0 ) {
+		c = 0;
+	}
+	re->shaderRGBA.rgba[0] = le->color[0] * c * 0xff;
+	re->shaderRGBA.rgba[1] = le->color[1] * c * 0xff;
+	re->shaderRGBA.rgba[2] = le->color[2] * c * 0xff;
+	re->shaderRGBA.rgba[3] = c * 0xff;
+
+	// pad_fade's diffuse stage reads alphaGen entity, so the alpha write
+	// above dissolves it rather than needing a compensating shrink
+	re->customShader = cgs.media.grapplePadFadeShader;
+
+	// re->origin/oldorigin hold the clean, un-embedded physics position
+	// everywhere except across this draw call: the same save/offset/draw/restore
+	// idiom as CG_AddFragment's ground-sink offset earlier in this file.
+	// GRAPPLE_PAD_EMBED is draw-only: it must not be there when CG_Trace
+	// above reads re->origin next frame
+	VectorCopy( re->origin, cleanOrigin );
+	VectorCopy( re->oldorigin, cleanOldOrigin );
+	VectorMA( re->origin, embed, re->axis[0], re->origin );
+	VectorMA( re->oldorigin, embed, re->axis[0], re->oldorigin );
+
+	trap_R_AddRefEntityToScene( re );
+
+	VectorCopy( cleanOrigin, re->origin );
+	VectorCopy( cleanOldOrigin, re->oldorigin );
+}
+
+/*
 =====================================================================
 
 TRIVIAL LOCAL ENTITIES
@@ -1020,7 +1169,7 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 
 	damage = le->radius;
 
-	// Color based on damage amount - gradient from blue to red
+	// Color based on damage amount: gradient from blue to red
 	if (damage > 75) {
 		// Red
 		re->shaderRGBA.rgba[0] = 0xff;
@@ -1072,7 +1221,7 @@ void CG_AddDamagePlum( localEntity_t *le ) {
 	origin[0] += spread_x;
 	origin[1] += spread_y;
 
-	// Vertical arc - symmetric rise and fall over the full duration
+	// Vertical arc: symmetric rise and fall over the full duration
 	// Uses sine wave for smooth, even arc that peaks at 50% progress
 	peak_height = 15.0 * le->pos.trDelta[2] * re->radius;
 	vertical_offset = peak_height * sin(progress * M_PI);
@@ -1181,7 +1330,7 @@ static void CG_AddBloodParticle( localEntity_t *le ) {
 		BG_EvaluateTrajectory( &le->pos, cg.time, newOrigin );
 	}
 
-	// Particle entered water - spawn sinking blood cloud
+	// Particle entered water: spawn sinking blood cloud
 	if ( CG_PointContents( newOrigin, -1 ) & MASK_WATER ) {
 		localEntity_t *cloud;
 
@@ -1213,7 +1362,7 @@ static void CG_AddBloodParticle( localEntity_t *le ) {
 	}
 
 	// Near-eye cull: skip drawing a gout the camera is on top of (see
-	// CG_BloodGoutCulled). Non-freeing — it draws again once it pulls back.
+	// CG_BloodGoutCulled). Non-freeing: it draws again once it pulls back.
 	if ( CG_BloodGoutCulled( re ) ) {
 		return;
 	}
@@ -1225,6 +1374,117 @@ static void CG_AddBloodParticle( localEntity_t *le ) {
 
 
 //==============================================================================
+
+/*
+====================
+CG_GrapplePadFall
+
+The anchor let go. Kick the pad off the surface it was gripping, scatter it in
+the contact plane, and let it tumble down.
+
+Three rolls with three different shapes, because they fail differently: axial
+spin needs a floor (a pad that barely turns reads as still magnetically held),
+while tumble and scatter need only a ceiling: zero tumble is correct on a floor,
+and the kick already carries the pad clear without any scatter at all.
+====================
+*/
+void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClientNum ) {
+	localEntity_t	*le;
+	refEntity_t		*re;
+	vec3_t			normal, right, up;
+	float			a, lever, spin, pullLevel;
+	byte			rgba[4];
+
+	le = CG_AllocLocalEntity();
+	re = &le->refEntity;
+
+	le->leType = LE_GRAPPLE_PAD;
+	le->startTime = cg.time;
+	le->endTime = cg.time + PAD_FALL_TIME;
+	le->lifeRate = 1.0f / ( le->endTime - le->startTime );
+	le->bounceFactor = PAD_FALL_BOUNCE;
+
+	// the server froze the impact normal into angles; +X runs into what it hit
+	AngleVectors( angles, normal, NULL, NULL );
+
+	VectorNegate( normal, normal );
+
+	// physics starts at the true impact point, NOT embedded like the anchored
+	// draw: an embedded trBase starts every CG_Trace in CG_AddGrapplePad
+	// solid, and the pad never leaves the wall. The embedded look on the
+	// handoff frame is drawn-only, applied in CG_AddGrapplePad
+	VectorCopy( origin, le->pos.trBase );
+	le->pos.trType = TR_GRAVITY;	// BG_EvaluateTrajectory hardcodes DEFAULT_GRAVITY, not a per-trajectory value
+	le->pos.trTime = cg.time;
+	VectorScale( normal, PAD_FALL_KICK, le->pos.trDelta );
+
+	// scatter belongs in the CONTACT PLANE. Along a world axis it would scatter
+	// on a floor but merely stiffen the kick on a wall
+	MakeNormalVectors( normal, right, up );
+	a = random() * M_PI * 2;
+	VectorMA( le->pos.trDelta, PAD_FALL_SCATTER * random() * cos( a ), right,
+		le->pos.trDelta );
+	VectorMA( le->pos.trDelta, PAD_FALL_SCATTER * random() * sin( a ), up,
+		le->pos.trDelta );
+
+	// sideways slide: the claws release across a few frames, and the last one
+	// gripping drags the pad along the surface. World horizontal, projected
+	// into the contact plane so it never pushes into the wall
+	{
+		vec3_t	drift;
+		float	d;
+
+		a = random() * M_PI * 2;
+		VectorSet( drift, cos( a ), sin( a ), 0 );
+		d = DotProduct( drift, normal );
+		VectorMA( drift, -d, normal, drift );
+		// a pick near the wall normal projects to ~nothing: that release
+		// just slid less
+		if ( VectorNormalize( drift ) > 0.1f ) {
+			VectorMA( le->pos.trDelta, PAD_FALL_DRIFT_MIN + random()
+				* ( PAD_FALL_DRIFT_MAX - PAD_FALL_DRIFT_MIN ), drift,
+				le->pos.trDelta );
+		}
+	}
+
+	// tumble comes from gravity's lever arm on the offset mass, so it vanishes
+	// when the normal is vertical: face down on a floor or hung off a ceiling,
+	// gravity runs through the grip and there is no torque to have
+	lever = sqrt( normal[0] * normal[0] + normal[1] * normal[1] );
+
+	// the pad was seated against a surface the player watched it grip, so unlike
+	// CG_LaunchGib the base angles are the clamped pose, not a random one
+	VectorCopy( angles, le->angles.trBase );
+	le->angles.trType = TR_LINEAR;
+	le->angles.trTime = cg.time;
+	le->angles.trDelta[PITCH] = crandom() * PAD_FALL_TUMBLE * lever;
+	le->angles.trDelta[YAW] = 0;
+	spin = PAD_FALL_SPIN_MIN
+		+ random() * ( PAD_FALL_SPIN_MAX - PAD_FALL_SPIN_MIN );
+	if ( rand() & 1 ) {
+		spin = -spin;
+	}
+	le->angles.trDelta[ROLL] = spin;
+
+	memset( re, 0, sizeof( *re ) );
+	re->hModel = cg_weapons[ WP_GRAPPLING_HOOK ].missileModel;
+	re->renderfx = RF_NOSHADOW;
+	VectorCopy( le->pos.trBase, re->origin );
+	VectorCopy( le->pos.trBase, re->oldorigin );
+
+	// the pad carries an rgbGen entity stage, so a local entity that never sets
+	// shaderRGBA renders it black
+	CG_GrappleOwnerRGBA( ownerClientNum, rgba );
+
+	// start from the same brightness the anchored draw ended at
+	// (CG_GrappleFade with GLOW_PULL_LEVEL), or the handoff frame pops
+	// ~33% brighter
+	pullLevel = CG_GrapplePullLevel();
+	le->color[0] = rgba[0] * ( 1.0f / 255.0f ) * pullLevel;
+	le->color[1] = rgba[1] * ( 1.0f / 255.0f ) * pullLevel;
+	le->color[2] = rgba[2] * ( 1.0f / 255.0f ) * pullLevel;
+	le->color[3] = 1.0f;
+}
 
 /*
 ===================
@@ -1265,6 +1525,10 @@ void CG_AddLocalEntities( void ) {
 
 		case LE_FRAGMENT:			// gibs and brass
 			CG_AddFragment( le );
+			break;
+
+		case LE_GRAPPLE_PAD:
+			CG_AddGrapplePad( le );
 			break;
 
 		case LE_MOVE_SCALE_FADE:	// water bubbles, plasma trails, smoke puff

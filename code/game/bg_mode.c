@@ -77,7 +77,7 @@ static const int	wp_damage[WP_NUM_WEAPONS][MODE_COUNT] = {
 	/* RAILGUN          */ {     100,      80,      80,      80 },
 	/* PLASMAGUN        */ {      20,      18,      20,      20 },
 	/* BFG              */ {     100,     100,     100,     100 },
-	/* GRAPPLING_HOOK   */ {       0,       0,      10,      10 },
+	/* GRAPPLING_HOOK   */ {      10,      10,      10,      10 },
 #ifdef MISSIONPACK
 	/* NAILGUN          */ {      20,      12,      12,      12 },
 	/* PROX_LAUNCHER    */ {       0,       0,       0,       0 },
@@ -96,7 +96,7 @@ static const int	wp_teamDamage[WP_NUM_WEAPONS][MODE_COUNT] = {
 	/* RAILGUN          */ {     100,      80,      80,      80 },
 	/* PLASMAGUN        */ {      20,      18,      20,      20 },
 	/* BFG              */ {     100,     100,     100,     100 },
-	/* GRAPPLING_HOOK   */ {       0,       0,      10,      10 },
+	/* GRAPPLING_HOOK   */ {      10,      10,      10,      10 },
 #ifdef MISSIONPACK
 	/* NAILGUN          */ {      20,      12,      12,      12 },
 	/* PROX_LAUNCHER    */ {       0,       0,       0,       0 },
@@ -172,7 +172,7 @@ static const int	wp_fireTime[WP_NUM_WEAPONS][MODE_COUNT] = {
 	/* RAILGUN          */ {    1500,    1250,    1500,    1500 },
 	/* PLASMAGUN        */ {     100,     100,     100,     100 },
 	/* BFG              */ {     200,    1000,     300,     300 },
-	/* GRAPPLING_HOOK   */ {       0,       0,       0,       0 },
+	/* GRAPPLING_HOOK   */ {     400,     400,     400,     400 },
 #ifdef MISSIONPACK
 	/* NAILGUN          */ {    1000,    1000,    1000,    1000 },
 	/* PROX_LAUNCHER    */ {     800,     800,     800,     800 },
@@ -248,7 +248,7 @@ static const float	wp_knockback[WP_NUM_WEAPONS][MODE_COUNT] = {
 	/* RAILGUN          */ {    1.0f,    1.0f,   0.85f,   0.85f },
 	/* PLASMAGUN        */ {    1.0f,    1.0f,   1.10f,   1.10f },
 	/* BFG              */ {    1.0f,    1.0f,    1.0f,    1.0f },
-	/* GRAPPLING_HOOK   */ {    1.0f,    1.0f,   -5.0f,   -5.0f },
+	/* GRAPPLING_HOOK   */ {   -5.0f,   -5.0f,   -5.0f,   -5.0f },
 #ifdef MISSIONPACK
 	/* NAILGUN          */ {    1.0f,    1.0f,    1.0f,    1.0f },
 	/* PROX_LAUNCHER    */ {    1.0f,    1.0f,    1.0f,    1.0f },
@@ -267,7 +267,7 @@ static const float	wp_selfKnockback[WP_NUM_WEAPONS][MODE_COUNT] = {
 	/* RAILGUN          */ {    1.0f,    1.0f,   0.85f,   0.85f },
 	/* PLASMAGUN        */ {    1.0f,    1.0f,   1.30f,   1.30f },
 	/* BFG              */ {    1.0f,    1.0f,    1.0f,    1.0f },
-	/* GRAPPLING_HOOK   */ {    1.0f,    1.0f,   -5.0f,   -5.0f },
+	/* GRAPPLING_HOOK   */ {   -5.0f,   -5.0f,   -5.0f,   -5.0f },
 #ifdef MISSIONPACK
 	/* NAILGUN          */ {    1.0f,    1.0f,    1.0f,    1.0f },
 	/* PROX_LAUNCHER    */ {    1.0f,    1.0f,    1.0f,    1.0f },

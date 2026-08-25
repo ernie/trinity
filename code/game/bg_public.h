@@ -137,6 +137,11 @@ typedef enum {
 #define	PMF_RESPAWNED		512		// clear after attack and jump buttons come up
 #define	PMF_USE_ITEM_HELD	1024
 #define PMF_GRAPPLE_PULL	2048	// pull towards grapple location
+									// MUST MATCH the engine botlib's
+									// "pmf_grapplepull" libvar default: the
+									// bots' armed-release frame hook reads
+									// this bit from the playerstate, and the
+									// engine cannot include this header
 #define PMF_FOLLOW			4096	// spectate following another player
 #define PMF_SCOREBOARD		8192	// spectate as a scoreboard
 #define PMF_INVULEXPAND		16384	// invulnerability sphere set to full size
@@ -172,7 +177,15 @@ typedef struct {
 	int			pmove_fixed;
 	int			pmove_msec;
 
+
 	int			pmove_mode;			// gamemode_t; combat & movement both index from it
+
+	// mover-anchored grapple: pmove holds the captured pose through the
+	// anchor's motion, identically on both sides, so prediction is exact
+	qboolean	grappleLatch;
+	vec3_t		grappleLatchLocal;		// captured pose in the mover frame
+	trajectory_t	grappleMoverPos;
+	trajectory_t	grappleMoverApos;
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame
@@ -183,6 +196,20 @@ typedef struct {
 // if a full pmove isn't done on the client, you can just update the angles
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd );
 void Pmove (pmove_t *pmove);
+
+// capture envelope: must contain the pull's chase stall vs a fast anchor
+#define GRAPPLE_LATCH_REACH		64.0f
+// captured pose clearance off the face: brush contact splits prediction,
+// which clips the snapshot pose while the server clips the live one
+#define GRAPPLE_LATCH_STANDOFF	48.0f
+// same-clock strain is pure signal: the hold is exact unless blocked, so
+// this only needs to clear float noise for stock-parity lethality
+#define GRAPPLE_CRUSH_STRAIN	8.0f
+// extra tether set past a tight socket's bare fit, holding the frame-lead off
+#define GRAPPLE_FIT_MARGIN		12.0f
+void BG_CreateRotationMatrix( const vec3_t angles, vec3_t matrix[3] );
+void BG_MoverLocalToWorld( vec3_t matrix[3], const vec3_t in, vec3_t out );
+qboolean BG_MoverCoMoves( const entityState_t *a, const entityState_t *b );
 
 
 //===================================================================================

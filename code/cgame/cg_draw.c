@@ -23,7 +23,7 @@ char systemChat[256];
 char teamChat1[256];
 char teamChat2[256];
 
-// VOIP speaker HUD timing — used by the status-bar icon's fade-window
+// VOIP speaker HUD timing: used by the status-bar icon's fade-window
 // extension and by CG_DrawVoipSpeakers. Hoisted up here so the status bar
 // (which appears earlier in this file) can reference them too.
 #define VOIP_SPEAKER_DISPLAY_TIME	1000
@@ -1083,7 +1083,7 @@ static vec4_t trinityGold = { 0.88f, 0.66f, 0.18f, 1.0f };
 CG_DrawViewerMoment
 
 Watch/depart eye, centered just above the stock centerprint height with
-the medal fade. Deliberately not a reward and not in the medal slot — a
+the medal fade. Deliberately not a reward and not in the medal slot: a
 simultaneous medal draws at y=56 unobstructed. CG_TrinityViewersMoment
 plays the callout directly when the configstring flips.
 =================
@@ -1377,7 +1377,7 @@ qboolean CG_GetVoipChannelColor( vec3_t color ) {
 CG_VoipSpeakerShader
 
 Pick a speaker shader for a given level value (0-4). Level 0 returns the idle
-shader (used both for "not transmitting" and "transmitting but silent" — the
+shader (used both for "not transmitting" and "transmitting but silent": the
 caller distinguishes those by checking cg.voipTalking[i]). Levels 1-4 return
 the corresponding speakerLevelShader entry.
 =====================
@@ -1466,7 +1466,7 @@ static float CG_DrawVoipSpeakers( float y ) {
 		bgColor[0] = 0.0f; bgColor[1] = 0.0f; bgColor[2] = 0.0f; bgColor[3] = 0.33f * fadeColor[3];
 		CG_FillRect( x, y, 120, TINYCHAR_HEIGHT + 2, bgColor );
 
-		// speaker icon — channel-colored, with waves while talking
+		// speaker icon: channel-colored, with waves while talking
 		{
 			vec4_t iconColor;
 			qboolean isLocalSelf = ( i == cg.clientNum
@@ -1474,7 +1474,7 @@ static float CG_DrawVoipSpeakers( float y ) {
 
 			if ( isLocalSelf ) {
 				// voip_channels only tracks incoming packets, so the local
-				// slot is always zero — derive our own channel from
+				// slot is always zero: derive our own channel from
 				// cl_voipSendTarget instead.
 				(void)CG_GetVoipChannelColor( iconColor );
 			} else if ( cgs.voipVersion >= 2 && cg.voipChannel[i] ) {
@@ -1833,7 +1833,7 @@ static void CG_DrawLowerRight( void ) {
 	float	y;
 
 	// Minimal (zoomed) HUD doesn't draw the status bar, so don't reserve
-	// space for it — anchor scores/powerups to the actual bottom edge.
+	// space for it: anchor scores/powerups to the actual bottom edge.
 	y = CG_VR_DrawingZoomedHUD() ? cgs.screenYmax + 1 : cgs.screenYmax + 1 - STATUSBAR_HEIGHT;
 
 	if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 2 ) {
@@ -2606,7 +2606,7 @@ void CG_DrawCrosshair3D(void)
 		maxdist = 8192.0f;
 	}
 	VectorMA(origin, maxdist, viewaxis[0], endpos);
-	CG_Trace(&trace, origin, NULL, NULL, endpos, 0, MASK_SHOT);
+	CG_TraceRender(&trace, origin, NULL, NULL, endpos, 0, MASK_SHOT);
 #if 0
 	maxdist = cgs.glconfig.vidWidth * stereoSep * zProj / (2 * xmax);
 	VectorMA(cg.refdef.vieworg, maxdist, cg.refdef.viewaxis[0], endpos);
@@ -2804,7 +2804,7 @@ static float CG_DrawVote( float y, qboolean highlighted ) {
 		Q_strncpyz( caller, "Vote:", sizeof( caller ) );
 	}
 
-	// line 2: vote description — resolve clientkick <N> to player name
+	// line 2: vote description, resolving clientkick <N> to player name
 	if ( !Q_strncmp( cgs.voteString, "clientkick ", 11 ) ) {
 		int cn = atoi( cgs.voteString + 11 );
 		if ( cn >= 0 && cn < MAX_CLIENTS && cgs.clientinfo[cn].infoValid )
@@ -2896,7 +2896,7 @@ static float CG_DrawTeamVote( float y, qboolean highlighted ) {
 		Q_strncpyz( caller, "Team Vote:", sizeof( caller ) );
 	}
 
-	// line 2: vote description — resolve leader <N> to player name
+	// line 2: vote description, resolving leader <N> to player name
 	if ( !Q_strncmp( cgs.teamVoteString[cs_offset], "leader ", 7 ) ) {
 		int cn = atoi( cgs.teamVoteString[cs_offset] + 7 );
 		if ( cn >= 0 && cn < MAX_CLIENTS && cgs.clientinfo[cn].infoValid )
@@ -3546,7 +3546,7 @@ static void CG_ProcessVoteHold( void ) {
 
 	if ( holdButton != 0 ) {
 		if ( cg.voteHoldButton != holdButton || cg.voteHoldTarget != target ) {
-			// started holding a new button, or target dialog changed — restart
+			// started holding a new button, or target dialog changed: restart
 			cg.voteHoldStartTime = cg.time;
 			cg.voteHoldButton = holdButton;
 			cg.voteHoldTarget = target;
@@ -3569,7 +3569,7 @@ static void CG_ProcessVoteHold( void ) {
 			return;
 		}
 	} else {
-		// released — cancel hold
+		// released: cancel hold
 		CG_ResetVoteHold();
 	}
 }
@@ -3850,7 +3850,7 @@ static float CG_DrawTVOffer( float y ) {
 
 	offer = cg_tvdOffer.string;
 
-	// offer cleared by engine — release state
+	// offer cleared by engine: release state
 	if ( offer[0] == '\0' ) {
 		if ( cg.tvdOfferName[0] ) {
 			cg.tvdOfferName[0] = '\0';
@@ -4296,7 +4296,7 @@ void CG_ResetSeekState( void ) {
 
 	// -- HUD display timers --
 
-	// Medal display — CG_DrawReward: CG_FadeColor(rewardTime, 3000)
+	// Medal display, CG_DrawReward: CG_FadeColor(rewardTime, 3000)
 	cg.rewardStack = 0;
 	cg.rewardTime = 0;
 
@@ -4308,46 +4308,46 @@ void CG_ResetSeekState( void ) {
 	cg.trinityAnnounceOut = 0;
 	cg.trinityAnnounceTime = 0;
 
-	// Center print — CG_DrawCenterString: CG_FadeColor(centerPrintTime, 1000*cg_centertime)
+	// Center print, CG_DrawCenterString: CG_FadeColor(centerPrintTime, 1000*cg_centertime)
 	cg.centerPrintTime = 0;
 
-	// Item pickup notification — CG_DrawPickupItem: CG_FadeColorTime(itemPickupTime, 3000, 250)
+	// Item pickup notification, CG_DrawPickupItem: CG_FadeColorTime(itemPickupTime, 3000, 250)
 	cg.itemPickupTime = 0;
 	cg.itemPickupBlendTime = 0;
 
-	// Weapon select bar — CG_DrawWeaponSelect: CG_FadeColor(weaponSelectTime, 1400)
+	// Weapon select bar, CG_DrawWeaponSelect: CG_FadeColor(weaponSelectTime, 1400)
 	cg.weaponSelectTime = 0;
 
-	// Attacker head — CG_DrawAttacker: (cg.time - attackerTime) vs 10000
+	// Attacker head, CG_DrawAttacker: (cg.time - attackerTime) vs 10000
 	cg.attackerTime = 0;
 
-	// Status bar head idle animation — anchor a fresh cycle to the new timeline
+	// Status bar head idle animation: anchor a fresh cycle to the new timeline
 	cg.headStartTime = cg.time;
 	cg.headEndTime = cg.time;
 
 	// Killer name display
 	cg.killerTime = 0;
 
-	// Crosshair target name — CG_DrawCrosshairNames: CG_FadeColor(crosshairClientTime, 1000)
+	// Crosshair target name, CG_DrawCrosshairNames: CG_FadeColor(crosshairClientTime, 1000)
 	cg.crosshairClientTime = 0;
 
-	// Powerup icon pulse — CG_DrawStatusBar: (cg.time - powerupTime) vs PULSE_TIME
+	// Powerup icon pulse, CG_DrawStatusBar: (cg.time - powerupTime) vs PULSE_TIME
 	cg.powerupTime = 0;
 
-	// Voice chat menu — CG_DrawTimedMenus: (cg.time - voiceTime) vs 2500
+	// Voice chat menu, CG_DrawTimedMenus: (cg.time - voiceTime) vs 2500
 	cg.voiceTime = 0;
 
-	// Download finish animation — (cg.time - downloadFinishTime) vs 1500
+	// Download finish animation: (cg.time - downloadFinishTime) vs 1500
 	cg.downloadFinishTime = 0;
 
-	// Auto-follow killer — CG_DrawActiveFrame: (followTime < cg.time)
+	// Auto-follow killer, CG_DrawActiveFrame: (followTime < cg.time)
 	// Shouldn't actually be used during TV playback, but technically stale.
 	cg.followTime = 0;
 
-	// Low ammo warning — not time-based but stale across seeks
+	// Low ammo warning: not time-based but stale across seeks
 	cg.lowAmmoWarning = 0;
 
-	// Damage vignette — CG_DamageBlendBlob: (cg.time - damageTime) vs DAMAGE_TIME
+	// Damage vignette, CG_DamageBlendBlob: (cg.time - damageTime) vs DAMAGE_TIME
 	cg.damageTime = 0;
 
 	// Scoreboard / intermission
@@ -4365,7 +4365,7 @@ void CG_ResetSeekState( void ) {
 	// Flush queued announcer sounds (e.g. stale "Excellent!")
 	CG_AddBufferedSound( -1 );
 
-	// Buffered-sound gate — leaving the old value here means any sound
+	// Buffered-sound gate: leaving the old value here means any sound
 	// that played in a forward-of-here timeline pushes cg.soundTime into
 	// our future, blocking both the buffered queue and the Trinity tick
 	// until cg.time catches up (which it never does after a backward seek).
@@ -4571,7 +4571,7 @@ static void CG_DrawWeapReticle( void )
 	float X_WIDTH = 640;
 	float Y_HEIGHT = 480;
 
-	// Geometric center — cyclopean scope renders to the geometric framebuffer center.
+	// Geometric center: cyclopean scope renders to the geometric framebuffer center.
 	float centerX = 320.0f;
 	float centerY = 240.0f;
 

@@ -321,7 +321,7 @@ gitem_t	bg_itemlist[] =
         { "models/weapons2/grapple/grapple.md3", 
 		0, 0, 0},
 /* icon */		"icons/iconw_grapple",
-/* pickup */	"Grappling Hook",
+/* pickup */	"Grapple",
 		0,
 		IT_WEAPON,
 		WP_GRAPPLING_HOOK,
@@ -1305,6 +1305,58 @@ void BG_AddPredictableEventToPlayerstate( entity_event_t newEvent, int eventParm
 	ps->events[ps->eventSequence & (MAX_PS_EVENTS-1)] = newEvent;
 	ps->eventParms[ps->eventSequence & (MAX_PS_EVENTS-1)] = eventParm;
 	ps->eventSequence++;
+}
+
+
+/*
+================
+BG_CreateRotationMatrix
+
+Rows are the rotated frame; apply the transpose for local -> world
+================
+*/
+void BG_CreateRotationMatrix( const vec3_t angles, vec3_t matrix[3] ) {
+	AngleVectors( angles, matrix[0], matrix[1], matrix[2] );
+	VectorInverse( matrix[1] );
+}
+
+/*
+================
+BG_MoverLocalToWorld
+
+Applies the transpose without building it
+================
+*/
+void BG_MoverLocalToWorld( vec3_t matrix[3], const vec3_t in, vec3_t out ) {
+	out[0] = matrix[0][0] * in[0] + matrix[1][0] * in[1] + matrix[2][0] * in[2];
+	out[1] = matrix[0][1] * in[0] + matrix[1][1] * in[1] + matrix[2][1] * in[2];
+	out[2] = matrix[0][2] * in[0] + matrix[1][2] * in[1] + matrix[2][2] * in[2];
+}
+
+/*
+================
+BG_MoverCoMoves
+
+Movers on identical trajectories are one rigid co-mover set
+================
+*/
+qboolean BG_MoverCoMoves( const entityState_t *a, const entityState_t *b ) {
+	if ( a->pos.trType == TR_STATIONARY && a->apos.trType == TR_STATIONARY ) {
+		return qfalse;
+	}
+	if ( a->pos.trType != b->pos.trType
+			|| a->pos.trTime != b->pos.trTime
+			|| a->pos.trDuration != b->pos.trDuration
+			|| !VectorCompare( a->pos.trDelta, b->pos.trDelta ) ) {
+		return qfalse;
+	}
+	if ( a->apos.trType != b->apos.trType
+			|| a->apos.trTime != b->apos.trTime
+			|| a->apos.trDuration != b->apos.trDuration
+			|| !VectorCompare( a->apos.trDelta, b->apos.trDelta ) ) {
+		return qfalse;
+	}
+	return qtrue;
 }
 
 

@@ -84,7 +84,7 @@ static void CG_ParseScores( void ) {
 	cg.teamScores[1] = atoi( CG_Argv( 3 ) );
 
 	// Playback: the "scores" command carries stale team scores; CS_SCORES is
-	// authoritative (read direct — cgs.scores1/2 aren't seeded after a TV CG_Init).
+	// authoritative (read direct: cgs.scores1/2 aren't seeded after a TV CG_Init).
 	if ( cg.demoPlayback || cgs.tvPlayback ) {
 		cg.teamScores[0] = atoi( CG_ConfigString( CS_SCORES1 ) );
 		cg.teamScores[1] = atoi( CG_ConfigString( CS_SCORES2 ) );
@@ -180,6 +180,7 @@ void CG_ParseServerinfo( void ) {
 	cgs.timelimit = atoi( Info_ValueForKey( info, "timelimit" ) );
 	cgs.overtimelimit = atoi( Info_ValueForKey( info, "g_overtimelimit" ) );
 	cgs.maxclients = atoi( Info_ValueForKey( info, "sv_maxclients" ) );
+	cgs.grappleEnabled = atoi( Info_ValueForKey( info, "g_grapple" ) ) ? qtrue : qfalse;
 	mapname = Info_ValueForKey( info, "mapname" );
 	Com_sprintf( cgs.mapname, sizeof( cgs.mapname ), "maps/%s.bsp", mapname );
 	Q_strncpyz( cgs.redTeam, Info_ValueForKey( info, "g_redTeam" ), sizeof(cgs.redTeam) );
@@ -1111,7 +1112,7 @@ static void CG_ServerCommand( void ) {
 			char	subtype;
 			char	teamTok;
 
-			// Copy the subtype char immediately — CG_Argv buffers may be
+			// Copy the subtype char immediately: CG_Argv buffers may be
 			// reused across calls in some engines, so don't keep a pointer
 			// from CG_Argv(1) while calling CG_Argv(2).
 			subtype = CG_Argv( 1 )[0];

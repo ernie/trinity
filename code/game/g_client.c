@@ -969,7 +969,7 @@ void ClientBegin( int clientNum ) {
 
 		// Trinity join announcement for already-verified players coming back
 		// after a map rotation or switching from spectator to playing. The
-		// helper is idempotent — bails if announcedJoin is set.
+		// helper is idempotent: bails if announcedJoin is set.
 		G_TrinityMaybeAnnounceJoin( ent );
 	}
 
@@ -1159,6 +1159,9 @@ void ClientSpawn(gentity_t *ent) {
 
 	client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_GAUNTLET );
 	client->ps.ammo[WP_GAUNTLET] = -1;
+	if ( g_grapple.integer ) {
+		client->ps.stats[STAT_WEAPONS] |= ( 1 << WP_GRAPPLING_HOOK );
+	}
 	client->ps.ammo[WP_GRAPPLING_HOOK] = -1;
 
 	// health will count down towards max_health
@@ -1205,9 +1208,13 @@ void ClientSpawn(gentity_t *ent) {
 		G_UseTargets( spawnPoint, ent );
 
 		// select the highest weapon number available, after any
-		// spawn given items have fired
+		// spawn given items have fired.  The grapple sits above the BFG in
+		// weapon_t but is utility, not firepower, so don't spawn holding it
 		client->ps.weapon = 1;
 		for ( i = WP_NUM_WEAPONS - 1 ; i > 0 ; i-- ) {
+			if ( i == WP_GRAPPLING_HOOK ) {
+				continue;
+			}
 			if ( client->ps.stats[STAT_WEAPONS] & ( 1 << i ) ) {
 				client->ps.weapon = i;
 				break;
@@ -1314,6 +1321,10 @@ void ClientDisconnect( int clientNum ) {
 		&& !level.warmupTime && level.sortedClients[1] == clientNum ) {
 		level.clients[ level.sortedClients[0] ].sess.wins++;
 		ClientUserinfoChanged( level.sortedClients[0] );
+	}
+
+	if ( ent->client->hook ) {
+		Weapon_HookFree( ent->client->hook );
 	}
 
 	trap_UnlinkEntity( ent );

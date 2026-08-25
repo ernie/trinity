@@ -58,6 +58,20 @@ TELEPORTERS
 
 void TeleportPlayer( gentity_t *player, vec3_t origin, vec3_t angles ) {
 	gentity_t	*tent;
+	gentity_t	*e;
+	int			i;
+
+	// translocation breaks the projection at either end: the traveler's
+	// own hook, and any hook biting the traveler
+	if ( player->client->hook ) {
+		Weapon_HookFree( player->client->hook );
+	}
+	for ( i = MAX_CLIENTS ; i < level.num_entities ; i++ ) {
+		e = &g_entities[i];
+		if ( e->inuse && e->s.eType == ET_GRAPPLE && e->enemy == player ) {
+			Weapon_HookFree( e );
+		}
+	}
 
 	// use temp events at source and destination to prevent the effect
 	// from getting dropped by a second player event
