@@ -477,6 +477,29 @@ qboolean CG_VR_IsDeathCam( void )
 static float vr_hmdYaw = 0;
 
 /*
+============
+CG_VR_DeltaYaw
+
+delta_angles yaw for the fake-6DOF compositions, carried to render time:
+a captured hold steps base yaw per command while the anchor draws at cg.time
+============
+*/
+static float CG_VR_DeltaYaw( void ) {
+	float	yaw = SHORT2ANGLE( cg.predictedPlayerState.delta_angles[YAW] );
+	int		mover = CG_GrappleLatchAnchor();
+
+	if ( mover >= 0 ) {
+		vec3_t	a0, a1;
+
+		BG_EvaluateTrajectory( &cg_entities[ mover ].currentState.apos,
+			cg.predictedPlayerState.commandTime, a0 );
+		BG_EvaluateTrajectory( &cg_entities[ mover ].currentState.apos, cg.time, a1 );
+		yaw += a1[YAW] - a0[YAW];
+	}
+	return yaw;
+}
+
+/*
 ===============
 CG_InitSmoothFollow
 
@@ -734,7 +757,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 			float deltaYaw;
 
 			VectorCopy(vr->offhandangles, angles);
-			deltaYaw = (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)) ? 0.0f : SHORT2ANGLE(cg.predictedPlayerState.delta_angles[YAW]);
+			deltaYaw = (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)) ? 0.0f : CG_VR_DeltaYaw();
 			angles[YAW] += deltaYaw + (vr->clientviewangles[YAW] - vr->hmdorientation[YAW]);
 			AngleVectors(angles, forward, right, up);
 			VectorMA(vrc_vieworigin, vr->thumbstick_location[THUMB_LEFT][1] * 5.0f, forward, vrc_vieworigin);
@@ -991,7 +1014,7 @@ void CG_VR_ComputeWeaponAngles( void ) {
 			}
 
 			//convert to real-world angles - should be very close to real weapon angles
-			deltaYaw = SHORT2ANGLE(cg.predictedPlayerState.delta_angles[YAW]);
+			deltaYaw = CG_VR_DeltaYaw();
 			vr->calculated_weaponangles[YAW] -= (deltaYaw + (vr->clientviewangles[YAW] - vr->hmdorientation[YAW]));
 		}
 	}
@@ -1035,7 +1058,7 @@ qboolean CG_VR_ViewAxis( void ) {
 			vec3_t angles;
 			float deltaYaw;
 			VectorCopy(vr->hmdorientation, angles);
-			deltaYaw = SHORT2ANGLE(cg.predictedPlayerState.delta_angles[YAW]);
+			deltaYaw = CG_VR_DeltaYaw();
 			angles[YAW] = deltaYaw + vr->clientviewangles[YAW];
 			AnglesToAxis(angles, cg.refdef.viewaxis);
 		}
@@ -1558,7 +1581,7 @@ void CG_ConvertFromVR(vec3_t in, vec3_t offset, vec3_t out)
 	{
 		//We are not using true 6DoF, so make the appropriate adjustment to the view
 		//angles as we send orientation to the server that includes the weapon angles
-		float deltaYaw = SHORT2ANGLE(cg.predictedPlayerState.delta_angles[YAW]);
+		float deltaYaw = CG_VR_DeltaYaw();
 		float angleYaw;
 		if (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
 		{
@@ -1621,7 +1644,7 @@ static void CG_CalculateVRPositionInWorld( vec3_t in_position,  vec3_t in_offset
 	if ( !vr->use_6dof )
 	{
 		//Calculate the offhand angles from "first principles"
-		float deltaYaw = SHORT2ANGLE(cg.predictedPlayerState.delta_angles[YAW]);
+		float deltaYaw = CG_VR_DeltaYaw();
 		angles[YAW] = deltaYaw + (vr->clientviewangles[YAW] - vr->hmdorientation[YAW]) + in_orientation[YAW];
 	}
 	else
@@ -2408,7 +2431,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			VectorClear( pos );
 			VectorSubtract( vr->hmdposition, vr->hmdorigin, hmdposition );
 
-			angleYaw = SHORT2ANGLE( cg.predictedPlayerState.delta_angles[YAW] ) + ( vr->clientviewangles[YAW] - vr->hmdorientation[YAW] );
+			angleYaw = CG_VR_DeltaYaw() + ( vr->clientviewangles[YAW] - vr->hmdorientation[YAW] );
 			rotateAboutOrigin( hmdposition[2], hmdposition[0], angleYaw, pos );
 			VectorScale( pos, worldscale, pos );
 			VectorSubtract( cg.refdef.vieworg, pos, vieworg );
@@ -2416,7 +2439,13 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			// Prevent player clipping through solid objects
 			CG_TraceRender( &trace, cg.refdef.vieworg, mins, maxs, vieworg, cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
 
-			VectorCopy( trace.endpos, cg.refdef.vieworg );
+			// the captured anchor is transparent to the hold's own trace; the
+			// camera clip must not fight the snug ride either
+			if ( trace.entityNum == CG_GrappleLatchAnchor() ) {
+				VectorCopy( vieworg, cg.refdef.vieworg );
+			} else {
+				VectorCopy( trace.endpos, cg.refdef.vieworg );
+			}
 		}
 	}
 
@@ -2493,7 +2522,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 				if (!vr->use_6dof)
 				{
 					// Fake 6DoF: use clientviewangles logic
-					float viewYaw = SHORT2ANGLE(cg.predictedPlayerState.delta_angles[YAW]) +
+					float viewYaw = CG_VR_DeltaYaw() +
 					    (vr->clientviewangles[YAW] - vr->hmdorientation[YAW]);
 					angles[YAW] = viewYaw + RAD2DEG(atan2(hmd_yaw_y, hmd_yaw_x));
 				}
