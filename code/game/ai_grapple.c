@@ -934,7 +934,7 @@ void BotCheckGrappleSave(bot_state_t *bs) {
 	if (FloatTime() < bs->grapplegiveup_time) return;
 	if (bs->cur_ps.velocity[2] > -100) {
 		if (bs->cur_ps.velocity[2] < 0 && !g_entities[bs->client].client->hook
-				&& bs->routeshot_time != FloatTime()) {
+				&& bs->routehold_time != FloatTime()) {
 			trace_t ftr;
 			vec3_t below;
 
@@ -954,7 +954,7 @@ void BotCheckGrappleSave(bot_state_t *bs) {
 				|| arc == GRAPPLE_ARC_UNRESOLVED) return;
 		//the fall after a route release already has a landing; only a lethal
 		//read overrides that
-		if (arc != GRAPPLE_ARC_LETHAL && FloatTime() < bs->routeshot_time + 3.0f) return;
+		if (arc != GRAPPLE_ARC_LETHAL && FloatTime() < bs->routetrigger_time + 3.0f) return;
 		//a painful landing is a capped bite, worth a hook only when it would finish the bot
 		if (arc == GRAPPLE_ARC_PAINFUL && !BotGrappleFallWouldKill(bs)) return;
 	}

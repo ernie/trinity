@@ -1569,8 +1569,8 @@ BotChooseWeapon
 void BotChooseWeapon(bot_state_t *bs) {
 	int newweaponnum;
 
-	//a route shot already went out this think: don't swap it back off
-	if (bs->routeshot_time == FloatTime()) return;
+	//botlib wants the hook in hand this think: don't swap it back off
+	if (bs->routehold_time == FloatTime()) return;
 	if (bs->cur_ps.weaponstate == WEAPON_RAISING ||
 			bs->cur_ps.weaponstate == WEAPON_DROPPING) {
 		trap_EA_SelectWeapon(bs->client, bs->weaponnum);
@@ -3542,7 +3542,7 @@ void BotAimAtEnemy(bot_state_t *bs) {
 	//enemy above drops the tow target and the climb dies short, and air control
 	//takes its wishdir from the view, so turning mid-flight bends the arc
 	if ((bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) || BotTacticalGrappleActive(bs)
-			|| bs->routeshot_time == FloatTime()) {
+			|| bs->routehold_time == FloatTime()) {
 		return;
 	}
 	//get the enemy entity information
@@ -3859,13 +3859,17 @@ void BotHonorMovementWeapon(bot_state_t *bs, bot_moveresult_t *moveresult) {
 	if (moveresult->weapon == WP_GRAPPLING_HOOK && !BotGrappleAvailable(bs)) return;
 	//never leave the route live with the weapon withheld
 	bs->weaponnum = moveresult->weapon;
-	//a node entered later in this same think must not re-aim or re-arm
-	//under a press that already went out. An ENDED tow is the opposite: the
-	//keep-press must lapse this very think or it bridges botlib letting go
-	//and the hook never frees
+	//an ENDED tow must lapse this very think, or the keep-press bridges botlib
+	//letting go and the hook never frees
 	if (moveresult->weapon == WP_GRAPPLING_HOOK) {
-		if (moveresult->flags & MOVERESULT_GRAPPLEENDED) bs->routeshot_time = 0;
-		else bs->routeshot_time = FloatTime();
+		if (moveresult->flags & MOVERESULT_GRAPPLEENDED) {
+			bs->routehold_time = 0;
+			bs->routetrigger_time = 0;
+		}
+		else {
+			bs->routehold_time = FloatTime();
+			if (moveresult->flags & MOVERESULT_GRAPPLETRIGGER) bs->routetrigger_time = FloatTime();
+		}
 	}
 }
 
@@ -3887,9 +3891,12 @@ void BotCheckAttack(bot_state_t *bs) {
 	vec3_t mins = {-8, -8, -8}, maxs = {8, 8, 8};
 
 	//mid-tow or mid-maneuver the crosshair is holding a flight line, not an
-	//enemy, so firing would only spray down the arc. Live state only: the
-	//playerstate's own pull flag plus the expressive layer's mode
-	if ((bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) || BotTacticalGrappleActive(bs)) return;
+	//enemy. And the hook is navigation gear whoever put it in hand: the only
+	//shot at a player is the tactical yank, which fires it itself
+	if ((bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) || BotTacticalGrappleActive(bs)
+			|| bs->weaponnum == WP_GRAPPLING_HOOK) {
+		return;
+	}
 	attackentity = bs->enemy;
 	//
 	BotEntityInfo(attackentity, &entinfo);
@@ -5632,14 +5639,23 @@ void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
 		bs->grapplerelease_time = FloatTime();
 	}
 	bs->grapplepulled = (bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) ? 1 : 0;
+	//an owner lets go on the think and the server frees the hook on the next
+	//frame, so one think unowned is every ending: only a second one is a bug
+	if ((bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) && bs->grapplemode == GRAPPLE_MODE_NONE
+			&& bs->routetrigger_time != FloatTime()) {
+		if (!bs->grappledisown_time) bs->grappledisown_time = FloatTime();
+		else if (bot_grapple.integer >= 2) {
+			G_Printf("GRAPPLE-DISOWNED c%d dt %d d %d t %d\n", bs->client,
+					(int) ((FloatTime() - bs->grappledisown_time) * 1000),
+					(int) Distance(bs->origin, bs->cur_ps.grapplePoint), level.time);
+		}
+	}
+	else bs->grappledisown_time = 0;
 	//a route tow keeps its own trigger and its own view whatever node ran:
 	//the weapon grapple frees on a think without attack, and the tow target
-	//sits inset along the view. Only while the route is still driving the tow,
-	//though: botlib re-stamps the think every frame it presses, so a stale stamp
-	//is the route letting go, and pressing past that hangs the bot on a hook
-	//nothing is steering. Unless letting go to fight is the better move
+	//sits inset along the view. Unless letting go to fight is the better move
 	if ((bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) && bs->grapplemode == GRAPPLE_MODE_NONE
-			&& bs->routeshot_time == FloatTime()) {
+			&& bs->routetrigger_time == FloatTime()) {
 		if (!bs->grapplebite_time) bs->grapplebite_time = FloatTime();
 		if (!BotWantsEngagementRelease(bs)) {
 			vec3_t towdir;
@@ -5651,10 +5667,8 @@ void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
 		}
 		//withholding the trigger cannot let go: botlib pressed it for the route
 		//earlier in this same think and EA input only clears at the top of the
-		//frame. A weapon change frees the hook whatever the trigger did. The
-		//swap is taken here rather than through BotChooseWeapon because a live
-		//tow re-stamps routeshot_time every think, which is exactly what that
-		//function refuses to swap off
+		//frame. A weapon change frees the hook whatever the trigger did, and it
+		//is taken here because BotChooseWeapon refuses to swap off a held hook
 		else if (bs->weaponnum == WP_GRAPPLING_HOOK) {
 			bs->weaponnum = trap_BotChooseBestFightWeapon(bs->ws, bs->inventory);
 			bs->weaponchange_time = FloatTime();
@@ -5663,11 +5677,11 @@ void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
 	}
 	else {
 		bs->grapplebite_time = 0;
-		//a route hook in flight stays in hand: a weapon change frees it. The
-		//route's own hook only, on the same stamp the tow reads: one whose
-		//route was abandoned would pin the weapon slot until it expired
+		//a route hook in flight stays in hand: a weapon change frees it. Only a
+		//hook botlib is pressing for; one whose route was abandoned would pin
+		//the weapon slot until it expired
 		if (g_entities[bs->client].client->hook && bs->grapplemode == GRAPPLE_MODE_NONE
-				&& bs->routeshot_time == FloatTime()) {
+				&& bs->routetrigger_time == FloatTime()) {
 			//standing at the mark waiting on a long flight is a free kill for
 			//whoever is shooting: a fresh hit abandons the wait for a fight
 			//weapon (the swap frees the hook), unless the bite is a blink

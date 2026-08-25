@@ -25,11 +25,11 @@
 #define MFL_WATERJUMP					16		//bot is waterjumping
 #define MFL_TELEPORTED					32		//bot is being teleported
 #define MFL_GRAPPLEPULL					64		//bot is being pulled by the grapple
-#define MFL_ACTIVEGRAPPLE				128		//bot is using the grapple hook
-#define MFL_GRAPPLERESET				256		//bot has reset the grapple
 #define MFL_WALK						512		//bot should walk slowly
-#define MFL_HOOKREADY					2048	//the grapple is in hand, raised, and not out: a route shot may press. MUST MATCH the engine's be_ai_move.h (1024 is the engine's own)
-#define MFL_HOOKOUT						8192	//our hook entity exists, flying or anchored. MUST MATCH the engine's be_ai_move.h
+//128, 256 and 1024 are the engine botlib's own grapple state; a game flag needs
+//the same bit in both headers
+#define MFL_HOOKREADY					2048	//the grapple is in hand, raised, and not out: a route shot may press. MUST MATCH the engine's be_ai_move.h
+#define MFL_HOOKOUT						4096	//our hook entity exists, flying or anchored. MUST MATCH the engine's be_ai_move.h
 // move result flags
 #define MOVERESULT_MOVEMENTVIEW			1		//bot uses view for movement
 #define MOVERESULT_SWIMVIEW				2		//bot uses view for swimming
@@ -42,6 +42,9 @@
 #define MOVERESULT_BLOCKEDBYAVOIDSPOT	256		//bot is blocked by an avoid spot
 #define MOVERESULT_GRAPPLEENDED			512		//the route tow ended THIS think: the game must not
 												//bridge the trigger past botlib letting go. MUST
+												//MATCH the engine's be_ai_move.h
+#define MOVERESULT_GRAPPLETRIGGER		1024	//botlib pressed the grapple trigger THIS think; a
+												//hook it did not press for is nobody's tow. MUST
 												//MATCH the engine's be_ai_move.h
 //
 #define MAX_AVOIDREACH					1

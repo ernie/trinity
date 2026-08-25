@@ -1661,6 +1661,12 @@ int BotInitLibrary( void ) {
 	//this game sets the grapple view to the ideal exactly on the firing
 	//command, so a route shot may fire on position alone
 	trap_BotLibVarSet("bot_grappleaim", "1");
+	//botlib cannot include the game headers, so it carries these two as
+	//defaults; derive them here or an inserted weapon repoints it silently
+	Com_sprintf(buf, sizeof(buf), "%d", WP_GRAPPLING_HOOK);
+	trap_BotLibVarSet("weapindex_grapple", buf);
+	Com_sprintf(buf, sizeof(buf), "%d", PMF_GRAPPLE_PULL);
+	trap_BotLibVarSet("pmf_grapplepull", buf);
 	//no chatting
 	trap_Cvar_VariableStringBuffer("bot_nochat", buf, sizeof(buf));
 	if ( buf[0] )

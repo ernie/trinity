@@ -188,8 +188,11 @@ typedef struct bot_state_s
 	float grapplepull_time;							//time the pull began
 	float grapplenext_time;							//earliest next tactical grapple consideration
 	vec3_t grapplesavepoint;						//tactical grapple: world anchor a fall-save aims at
-	float routeshot_time;							//think in which botlib pressed a route grapple
-	float grapplebite_time;							//when the current route tow began pulling, 0 when not
+	float routehold_time;							//think in which botlib asked for the hook in hand
+	float routetrigger_time;						//think in which botlib pressed the route trigger
+	float grappledisown_time;						//when the tether lost its owner; 0 while owned
+	float grapplebite_time;							//when the keeper took this tow, 0 when not holding one;
+													//a think botlib sits out restarts it
 	vec3_t legdir;									//direction of the current straight run
 	float legstart_time;							//when that run began, 0 when not running
 	float legcheck_time;							//when the run was last looked at, so a gap ends it
