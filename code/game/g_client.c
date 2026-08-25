@@ -1126,6 +1126,7 @@ void ClientSpawn(gentity_t *ent) {
 	// clear entity values
 	client->ps.stats[STAT_MAX_HEALTH] = client->pers.maxHealth;
 	client->ps.eFlags = flags;
+	client->lasthurt_client = ENTITYNUM_NONE;	// 0 is a real client
 
 	ent->s.groundEntityNum = ENTITYNUM_NONE;
 	ent->client = &level.clients[index];

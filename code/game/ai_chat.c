@@ -737,7 +737,7 @@ int BotChat_HitTalking(bot_state_t *bs) {
 	if (bs->lastchat_time > FloatTime() - TIME_BETWEENCHATTING) return qfalse;
 	if (BotNumActivePlayers() <= 1) return qfalse;
 	lasthurt_client = g_entities[bs->client].client->lasthurt_client;
-	if (!lasthurt_client) return qfalse;
+	if (lasthurt_client == ENTITYNUM_NONE) return qfalse;
 	if (lasthurt_client == bs->client) return qfalse;
 	//
 	if (lasthurt_client < 0 || lasthurt_client >= MAX_CLIENTS) return qfalse;
@@ -774,7 +774,7 @@ int BotChat_HitNoDeath(bot_state_t *bs) {
 	aas_entityinfo_t entinfo;
 
 	lasthurt_client = g_entities[bs->client].client->lasthurt_client;
-	if (!lasthurt_client) return qfalse;
+	if (lasthurt_client == ENTITYNUM_NONE) return qfalse;
 	if (lasthurt_client == bs->client) return qfalse;
 	//
 	if (lasthurt_client < 0 || lasthurt_client >= MAX_CLIENTS) return qfalse;
