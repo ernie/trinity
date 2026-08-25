@@ -633,11 +633,11 @@ typedef enum {
 	GRAPPLE_RELOAD		// pad re-forming on the dock after a release
 } grappleAct_t;
 
-static int CG_GrappleActivity( int clientNum ) {
+static int CG_GrappleActivityScan( int clientNum ) {
 	const entityState_t	*es;
 	int					i;
 
-	if ( clientNum < 0 || clientNum >= MAX_CLIENTS || !cg.snap ) {
+	if ( !cg.snap ) {
 		return GRAPPLE_IDLE;
 	}
 
@@ -679,6 +679,21 @@ static int CG_GrappleActivity( int clientNum ) {
 	}
 
 	return GRAPPLE_IDLE;
+}
+
+// several draw paths ask per frame; the snapshot scan answers once
+static int CG_GrappleActivity( int clientNum ) {
+	static int	cached[MAX_CLIENTS];
+	static int	stamp[MAX_CLIENTS];
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return GRAPPLE_IDLE;
+	}
+	if ( stamp[clientNum] != cg.time ) {
+		stamp[clientNum] = cg.time;
+		cached[clientNum] = CG_GrappleActivityScan( clientNum );
+	}
+	return cached[clientNum];
 }
 
 /*
@@ -868,7 +883,7 @@ static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
 	static const byte stockTint[3] = { TETHER_TINT_R, TETHER_TINT_G, TETHER_TINT_B };
 	vec3_t			origin, start, dir, n, tmp;
-	polyVert_t		v[4];
+	polyVert_t		v[4 * TETHER_PLANES];
 	float			len, s0, s1;
 	entityState_t	*es;
 	const byte		*tint;
@@ -947,32 +962,33 @@ void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
 		s1 = len / TETHER_PULSE_WAVELENGTH;
 	}
 
-	for ( k = 0 ; k < 4 ; k++ ) {
+	for ( k = 0 ; k < 4 * TETHER_PLANES ; k++ ) {
 		v[k].modulate[0] = tint[0];
 		v[k].modulate[1] = tint[1];
 		v[k].modulate[2] = tint[2];
 		v[k].modulate[3] = TETHER_PLANE_ALPHA;
 	}
-	v[0].st[0] = s0;	v[0].st[1] = 0;
-	v[1].st[0] = s1;	v[1].st[1] = 0;
-	v[2].st[0] = s1;	v[2].st[1] = 1;
-	v[3].st[0] = s0;	v[3].st[1] = 1;
+	for ( k = 0 ; k < 4 * TETHER_PLANES ; k += 4 ) {
+		v[k+0].st[0] = s0;	v[k+0].st[1] = 0;
+		v[k+1].st[0] = s1;	v[k+1].st[1] = 0;
+		v[k+2].st[0] = s1;	v[k+2].st[1] = 1;
+		v[k+3].st[0] = s0;	v[k+3].st[1] = 1;
+	}
 
 	// basis off the cable, not the view: a billboard is wrong in stereo and
 	// collapses end-on, where the near end sits
 	PerpendicularVector( n, dir );
 
 	for ( i = 0 ; i < TETHER_PLANES ; i++ ) {
-		VectorMA( start,  TETHER_HALF_WIDTH, n, v[0].xyz );
-		VectorMA( origin, TETHER_HALF_WIDTH, n, v[1].xyz );
-		VectorMA( origin, -TETHER_HALF_WIDTH, n, v[2].xyz );
-		VectorMA( start,  -TETHER_HALF_WIDTH, n, v[3].xyz );
-
-		trap_R_AddPolyToScene( cgs.media.grappleTetherShader, 4, v );
+		VectorMA( start,  TETHER_HALF_WIDTH, n, v[4*i+0].xyz );
+		VectorMA( origin, TETHER_HALF_WIDTH, n, v[4*i+1].xyz );
+		VectorMA( origin, -TETHER_HALF_WIDTH, n, v[4*i+2].xyz );
+		VectorMA( start,  -TETHER_HALF_WIDTH, n, v[4*i+3].xyz );
 
 		RotatePointAroundVector( tmp, dir, n, TETHER_PLANE_STEP );
 		VectorCopy( tmp, n );
 	}
+	trap_R_AddPolysToScene( cgs.media.grappleTetherShader, 4, v, TETHER_PLANES );
 
 	CG_TetherArcs( start, dir, len, es->otherEntityNum, act );
 }

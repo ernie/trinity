@@ -259,7 +259,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 	other = &g_entities[trace->entityNum];
 
 	// the hook never touches teammates: vanish, and the held trigger rethrows
-	if ( !strcmp( ent->classname, "hook" )
+	if ( ent->s.weapon == WP_GRAPPLING_HOOK
 			&& other->client && OnSameTeam( ent->parent, other ) ) {
 		Weapon_HookFree( ent );
 		return;
@@ -278,7 +278,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		if ( ent->s.weapon != WP_PROX_LAUNCHER ) {
 			if ( other->client && other->client->invulnerabilityTime > level.time ) {
 				// the sphere is coherent energy: the pad can't bite it, so the link drops instead
-				if ( !strcmp( ent->classname, "hook" ) ) {
+				if ( ent->s.weapon == WP_GRAPPLING_HOOK ) {
 					Weapon_HookFree( ent );
 					return;
 				}
@@ -363,7 +363,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		return;
 	}
 
-	if (!strcmp(ent->classname, "hook")) {
+	if (ent->s.weapon == WP_GRAPPLING_HOOK) {
 		gentity_t *nent;
 		vec3_t v, dir;
 

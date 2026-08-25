@@ -7,6 +7,8 @@
 #include "bg_grapple_model.h"
 #include "bg_mode.h"
 
+extern	vmCvar_t	bot_grapple;
+
 static	float	s_quadFactor;
 static	vec3_t	forward, right, up;
 static	vec3_t	muzzle;
@@ -647,7 +649,7 @@ void Weapon_GrapplingHook_Fire (gentity_t *ent)
 			&& !( ( ent->r.svFlags & SVF_BOT ) && ent->client->fireHeld ) ) {
 		hook = fire_grapple (ent, muzzle, forward);
 		hook->damage *= s_quadFactor;
-		if ( ( ent->r.svFlags & SVF_BOT ) && trap_Cvar_VariableIntegerValue( "bot_grapple" ) >= 2 ) {
+		if ( ( ent->r.svFlags & SVF_BOT ) && bot_grapple.integer >= 2 ) {
 			G_Printf( "GRAPPLE-LAUNCH c%d t %d yaw %.2f pitch %.2f\n", ent->s.number, level.time,
 					ent->client->ps.viewangles[YAW], ent->client->ps.viewangles[PITCH] );
 		}
