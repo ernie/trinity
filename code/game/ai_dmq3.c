@@ -10,7 +10,6 @@
  *
  *****************************************************************************/
 
-
 #include "g_local.h"
 #include "botlib.h"
 #include "be_aas.h"
@@ -27,6 +26,7 @@
 #include "ai_chat.h"
 #include "ai_cmd.h"
 #include "ai_dmnet.h"
+#include "ai_grapple.h"
 #include "ai_team.h"
 //
 #include "chars.h"				//characteristics
@@ -89,7 +89,6 @@ int red_numaltroutegoals;
 aas_altroutegoal_t blue_altroutegoals[MAX_ALTROUTEGOALS];
 int blue_numaltroutegoals;
 
-
 /*
 ==================
 BotSetUserInfo
@@ -107,7 +106,6 @@ static void BotSetUserInfo( bot_state_t *bs, const char *key, const char *value 
 	trap_SetUserinfo( bs->client, userinfo );
 	ClientUserinfoChanged( bs->client );
 }
-
 
 /*
 ==================
@@ -181,7 +179,6 @@ bot_goal_t *BotTeamFlag(bot_state_t *bs) {
 		return &ctf_blueflag;
 	}
 }
-
 
 /*
 ==================
@@ -1382,7 +1379,6 @@ int BotPointAreaNum(vec3_t origin) {
 	return 0;
 }
 
-
 /*
 ==================
 ClientName
@@ -1404,7 +1400,6 @@ char *ClientName( int client, char *name, int size ) {
 	return name;
 }
 
-
 /*
 ==================
 ClientSkin
@@ -1424,7 +1419,6 @@ char *ClientSkin( int client, char *skin, int size ) {
 	return skin;
 }
 
-
 /*
 ==================
 ClientFromName
@@ -1443,15 +1437,14 @@ int ClientFromName( const char *name ) {
 	return -1;
 }
 
-
 /*
 ==================
 ClientOnSameTeamFromName
 ==================
 */
 int ClientOnSameTeamFromName( bot_state_t *bs, const char *name ) {
-	char buf[MAX_INFO_STRING];
 	int i;
+	char buf[MAX_INFO_STRING];
 
 	for ( i = 0; i < level.maxclients; i++ ) {
 		if ( !BotSameTeam( bs, i ) )
@@ -1464,7 +1457,6 @@ int ClientOnSameTeamFromName( bot_state_t *bs, const char *name ) {
 
 	return -1;
 }
-
 
 /*
 ==================
@@ -1483,7 +1475,6 @@ const char *stristr(const char *str, const char *charset) {
 	}
 	return NULL;
 }
-
 
 /*
 ==================
@@ -3311,6 +3302,14 @@ void BotAimAtEnemy(bot_state_t *bs) {
 	if (bs->enemy < 0) {
 		return;
 	}
+	//mid-tow or mid-maneuver the view is the mechanism, not a gun mount:
+	//PM_GrappleMove tows toward grapplePoint inset back along the view, so an
+	//enemy above drops the tow target and the climb dies short, and air control
+	//takes its wishdir from the view, so turning mid-flight bends the arc
+	if ((bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) || BotTacticalGrappleActive(bs)
+			|| bs->routeshot_time == FloatTime()) {
+		return;
+	}
 	//get the enemy entity information
 	BotEntityInfo(bs->enemy, &entinfo);
 	//if this is not a player (should be an obelisk)
@@ -3345,6 +3344,9 @@ void BotAimAtEnemy(bot_state_t *bs) {
 	}
 
 	//get the weapon information
+	//botlib leaves the struct untouched when it rejects the number, and the grapple's
+	//slot is absent from both weapons.c, so this can never be read uninitialized
+	memset(&wi, 0, sizeof(wi));
 	trap_BotGetWeaponInfo(bs->ws, bs->weaponnum, &wi);
 	//get the weapon specific aim accuracy and or aim skill
 	if (wi.number == WP_MACHINEGUN) {
@@ -3423,8 +3425,28 @@ void BotAimAtEnemy(bot_state_t *bs) {
 		if (trace.fraction <= 1 && trace.ent != entinfo.number) {
 			bestorigin[2] += 16;
 		}
+		//a tethered enemy flies a straight line at a constant speed: lead it
+		//by the flight time, or by one think for a hitscan weapon
+		//reads g_grapple, not bot_grapple: this is about whoever is being pulled
+		//below aim_skill 0.4 this bot never leads anything
+		if (g_grapple.integer && aim_skill > 0.4 && entinfo.update_time > 0 &&
+				entinfo.number >= 0 && entinfo.number < MAX_CLIENTS
+				&& g_entities[entinfo.number].client
+				&& (g_entities[entinfo.number].client->ps.pm_flags & PMF_GRAPPLE_PULL)) {
+			VectorSubtract(entinfo.origin, entinfo.lastvisorigin, dir);
+			VectorScale(dir, 1 / entinfo.update_time, dir);
+			if (wi.speed > 0) {
+				vec3_t	todist;
+
+				VectorSubtract(entinfo.origin, bs->origin, todist);
+				VectorMA(bestorigin, VectorLength(todist) / wi.speed, dir, bestorigin);
+			}
+			else {
+				VectorMA(bestorigin, 0.1f, dir, bestorigin);
+			}
+		}
 		//if it is not an instant hit weapon the bot might want to predict the enemy
-		if (wi.speed) {
+		else if (wi.speed) {
 			//
 			VectorSubtract(bestorigin, bs->origin, dir);
 			dist = VectorLength(dir);
@@ -3602,6 +3624,10 @@ void BotCheckAttack(bot_state_t *bs) {
 	weapon_t weapon;
 	vec3_t mins = {-8, -8, -8}, maxs = {8, 8, 8};
 
+	//mid-tow or mid-maneuver the crosshair is holding a flight line, not an
+	//enemy, so firing would only spray down the arc. Live state only: the
+	//playerstate's own pull flag plus the expressive layer's mode
+	if ((bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) || BotTacticalGrappleActive(bs)) return;
 	attackentity = bs->enemy;
 	//
 	BotEntityInfo(attackentity, &entinfo);
@@ -3660,6 +3686,8 @@ void BotCheckAttack(bot_state_t *bs) {
 		return;
 
 	//get the weapon info
+	//botlib leaves the struct untouched when it rejects the number
+	memset(&wi, 0, sizeof(wi));
 	trap_BotGetWeaponInfo(bs->ws, bs->weaponnum, &wi);
 	//get the start point shooting from
 	VectorCopy(bs->origin, start);
@@ -3815,8 +3843,8 @@ this is ugly
 ==================
 */
 int BotModelMinsMaxs(int modelindex, int eType, int contents, vec3_t mins, vec3_t maxs) {
-	gentity_t *ent;
 	int i;
+	gentity_t *ent;
 
 	ent = &g_entities[0];
 	for (i = 0; i < level.num_entities; i++, ent++) {
@@ -4162,8 +4190,8 @@ BotIsGoingToActivateEntity
 ==================
 */
 int BotIsGoingToActivateEntity(bot_state_t *bs, int entitynum) {
-	bot_activategoal_t *a;
 	int i;
+	bot_activategoal_t *a;
 
 	for (a = bs->activatestack; a; a = a->next) {
 		if (a->time < FloatTime())
@@ -5249,8 +5277,8 @@ BotDeathmatchAI
 */
 void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
 	char gender[144], name[144], buf[144];
-	char userinfo[MAX_INFO_STRING];
 	int i;
+	char userinfo[MAX_INFO_STRING];
 
 	//if the bot has just been setup
 	if (bs->setupcount > 0) {
@@ -5322,6 +5350,8 @@ void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
 	}
 	//if the bot removed itself :)
 	if (!bs->inuse) return;
+	//tactical grapple owns weapon/aim/trigger while live, whatever node ran
+	BotTacticalGrappleFrame(bs);
 	//if the bot executed too many AI nodes
 	if (i >= MAX_NODESWITCHES) {
 		trap_BotDumpGoalStack(bs->gs);
@@ -5371,8 +5401,8 @@ BotSetEntityNumForGoal
 ==================
 */
 void BotSetEntityNumForGoal(bot_goal_t *goal, char *classname) {
-	gentity_t *ent;
 	int i;
+	gentity_t *ent;
 	vec3_t dir;
 
 	ent = &g_entities[0];
@@ -5435,7 +5465,8 @@ void BotSetupDeathmatchAI(void) {
 	gametype = trap_Cvar_VariableIntegerValue( "g_gametype" );
 
 	trap_Cvar_Register(&bot_rocketjump, "bot_rocketjump", "1", 0);
-	trap_Cvar_Register(&bot_grapple, "bot_grapple", "0", 0);
+	//engine default is moving to 1 too; this matches it, not an override
+	trap_Cvar_Register(&bot_grapple, "bot_grapple", "1", 0);
 	trap_Cvar_Register(&bot_fastchat, "bot_fastchat", "0", 0);
 	trap_Cvar_Register(&bot_nochat, "bot_nochat", "0", 0);
 	trap_Cvar_Register(&bot_testrchat, "bot_testrchat", "0", 0);

@@ -127,6 +127,13 @@ typedef struct aas_entityinfo_s
 	int		torsoAnim;		// mask off ANIM_TOGGLEBIT
 } aas_entityinfo_t;
 
+// area contents bits reported in aas_areainfo_t contents
+#define AREACONTENTS_LAVA		2
+#define AREACONTENTS_SLIME		4
+
+// area flag bits reported in aas_areainfo_t flags
+#define AREA_GROUNDED			1
+
 // area info
 typedef struct aas_areainfo_s
 {

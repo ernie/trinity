@@ -26,6 +26,7 @@
 #include "ai_chat.h"
 #include "ai_cmd.h"
 #include "ai_dmnet.h"
+#include "ai_grapple.h"
 #include "ai_team.h"
 //data file headers
 #include "chars.h"			//characteristics
@@ -2110,6 +2111,7 @@ int AINode_Battle_Fight(bot_state_t *bs) {
 	}
 	//use holdable items
 	BotBattleUseItems(bs);
+	BotCheckTacticalGrapple(bs, &entinfo);
 	//
 	bs->tfl = TFL_DEFAULT;
 	if (bot_grapple.integer) bs->tfl |= TFL_GRAPPLEHOOK;

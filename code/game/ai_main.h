@@ -180,6 +180,18 @@ typedef struct bot_state_s
 	float blockedbyavoidspot_time;					//time blocked by an avoid spot
 	float predictobstacles_time;					//last time the bot predicted obstacles
 	int predictobstacles_goalareanum;				//last goal areanum the bot predicted obstacles for
+	int grapplemode;								//current tactical grapple mode
+	int grappleent;									//tactical grapple target entity
+	int grapplehookent;								//our hook entity once launched
+	int grapplepull_health;							//health when the pull began
+	float grapplestart_time;						//time the tactical grapple began
+	float grapplepull_time;							//time the pull began
+	float grapplenext_time;							//earliest next tactical grapple consideration
+	float routeshot_time;							//think in which botlib pressed a route grapple
+	float grapplebite_time;							//when the current route tow began pulling, 0 when not
+	float grapplesettle_time;						//when the hang stopped moving, 0 when not settled
+	float grappleretarget_time;						//when a hanging save picked a new anchor; the
+													//hook it frees on purpose must not end the mode
 	vec3_t aimtarget;
 	vec3_t enemyvelocity;							//enemy velocity 0.5 secs ago during battle
 	vec3_t enemyorigin;								//enemy origin 0.5 secs ago during battle
@@ -265,6 +277,8 @@ void BotResetState(bot_state_t *bs);
 int NumBots(void);
 //returns info about the entity
 void BotEntityInfo(int entnum, aas_entityinfo_t *info);
+//needed cross-file by the tactical grapple aim gate
+float AngleDifference(float ang1, float ang2);
 
 extern float floattime;
 #define FloatTime() floattime

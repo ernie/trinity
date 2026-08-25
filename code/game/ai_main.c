@@ -25,6 +25,7 @@
 //
 #include "ai_main.h"
 #include "ai_dmq3.h"
+#include "ai_grapple.h"
 #include "ai_chat.h"
 #include "ai_cmd.h"
 #include "ai_dmnet.h"
@@ -920,6 +921,14 @@ void BotUpdateInput(bot_state_t *bs, int time, int elapsed_time) {
 	//respawn hack
 	if (bi.actionflags & ACTION_RESPAWN) {
 		if (bs->lastucmd.buttons & BUTTON_ATTACK) bi.actionflags &= ~(ACTION_RESPAWN|ACTION_ATTACK);
+	}
+	//the view slews like a player's; the command that fires a grapple at the
+	//world carries the exact angles, so only the one frame of slew between
+	//thinks is left
+	if ((bi.actionflags & ACTION_ATTACK) && bs->weaponnum == WP_GRAPPLING_HOOK
+			&& BotGrappleSnapsAim(bs)) {
+		VectorCopy(bs->ideal_viewangles, bi.viewangles);
+		VectorCopy(bs->ideal_viewangles, bs->viewangles);
 	}
 	//convert the bot input to a usercmd
 	BotInputToUserCommand(&bi, &bs->lastucmd, bs->cur_ps.delta_angles, time);

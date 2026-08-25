@@ -1,7 +1,7 @@
 # Game sources (shared between baseq3 and missionpack)
 QA_SRC = \
  g_main $(QADIR)/g_syscalls.asm \
- ai_chat ai_cmd ai_dmnet ai_dmq3 ai_main ai_team ai_vcmd \
+ ai_chat ai_cmd ai_dmnet ai_dmq3 ai_grapple ai_main ai_team ai_vcmd \
  bg_mode bg_lib bg_misc bg_pmove bg_hash bg_slidemove \
  g_active g_arenas g_bot g_client g_cmds g_combat g_items g_mem g_misc \
  g_missile g_mover g_rotation g_session g_spawn g_svcmds g_target g_team \
