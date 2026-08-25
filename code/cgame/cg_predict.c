@@ -1157,35 +1157,44 @@ static int cg_grappleLatchMover = -1;
 CG_GrappleLatchFill
 
 Hand pmove the same trajectories and captured pose the server feeds its
-own, so the hold predicts identically
+own, so the hold predicts identically. snap is the snapshot the
+prediction base came from, and useNext says it is cg.nextSnap
 ========================
 */
-static void CG_GrappleLatchFill( pmove_t *pmv ) {
+static void CG_GrappleLatchFill( pmove_t *pmv, const snapshot_t *snap, qboolean useNext ) {
 	int						i, j;
-	const entityState_t		*es;
+	const entityState_t		*es, *ms;
 	const centity_t			*mover;
 
 	pmv->grappleLatch = qfalse;
 	cg_grappleLatchMover = -1;
 	cg_grappleCoMovers[0] = cg_grappleCoMovers[1] =
 		cg_grappleCoMovers[2] = cg_grappleCoMovers[3] = -1;
-	for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {
-		es = &cg.snap->entities[ i ];
+	for ( i = 0 ; i < snap->numEntities ; i++ ) {
+		es = &snap->entities[ i ];
 		if ( es->eType != ET_GRAPPLE
-				|| es->otherEntityNum != cg.snap->ps.clientNum
+				|| es->otherEntityNum != snap->ps.clientNum
 				|| es->otherEntityNum2 < MAX_CLIENTS
 				|| !es->generic1 ) {
 			continue;
 		}
 		mover = &cg_entities[ es->otherEntityNum2 ];
-		if ( !mover->currentValid || mover->currentState.eType != ET_MOVER ) {
+
+		// a pose from the other snapshot leaves the hold a frame out of
+		// step with the playerState prediction starts from
+		ms = useNext ? &mover->nextState : &mover->currentState;
+
+		// under useNext the next snapshot is the truth: a mover it carries
+		// is valid before the current one has seen it, and an entity never
+		// seen has a zeroed nextState that fails the type test
+		if ( ms->eType != ET_MOVER || ( !useNext && !mover->currentValid ) ) {
 			return;
 		}
 		pmv->grappleLatch = qtrue;
 		cg_grappleLatchMover = es->otherEntityNum2;
 		VectorCopy( es->pos.trDelta, pmv->grappleLatchLocal );
-		pmv->grappleMoverPos = mover->currentState.pos;
-		pmv->grappleMoverApos = mover->currentState.apos;
+		pmv->grappleMoverPos = ms->pos;
+		pmv->grappleMoverApos = ms->apos;
 
 		// the co-mover set the server wired at capture
 		cg_grappleCoMovers[0] = es->otherEntityNum2;
@@ -1246,6 +1255,7 @@ void CG_PredictPlayerState( void ) {
 	int			cmdNum, current;
 	playerState_t	oldPlayerState;
 	qboolean	moved;
+	qboolean	useNext;
 	usercmd_t	oldestCmd;
 	usercmd_t	latestCmd;
 	int stateIndex = 0, predictCmd = 0;
@@ -1313,7 +1323,8 @@ void CG_PredictPlayerState( void ) {
 	// the server time is beyond our current cg.time,
 	// because predicted player positions are going to 
 	// be ahead of everything else anyway
-	if ( cg.nextSnap && !cg.nextFrameTeleport && !cg.thisFrameTeleport ) {
+	useNext = ( cg.nextSnap && !cg.nextFrameTeleport && !cg.thisFrameTeleport );
+	if ( useNext ) {
 		cg.predictedPlayerState = cg.nextSnap->ps;
 		cg.physicsTime = cg.nextSnap->serverTime;
 	} else {
@@ -1331,7 +1342,7 @@ void CG_PredictPlayerState( void ) {
 	cg_pmove.pmove_fixed = cgs.pmove_fixed;
 	cg_pmove.pmove_msec = cgs.pmove_msec;
 	cg_pmove.pmove_mode = cgs.mode;
-	CG_GrappleLatchFill( &cg_pmove );
+	CG_GrappleLatchFill( &cg_pmove, useNext ? cg.nextSnap : cg.snap, useNext );
 
 	// clean event stack
 	eventStack = 0;
