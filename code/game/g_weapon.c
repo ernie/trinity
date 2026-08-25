@@ -758,6 +758,7 @@ void Weapon_HookFree (gentity_t *ent)
 		// same field name, different eType, different meaning
 		tent->s.time2 = ent->s.number;
 		tent->s.otherEntityNum2 = ent->s.otherEntityNum2;
+		tent->s.modelindex2 = ent->s.modelindex2;	// a body anchor leaves no scar
 		tent->r.svFlags |= SVF_BROADCAST;	// a release is a release for everyone, PVS or not
 	}
 

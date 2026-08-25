@@ -9,6 +9,26 @@
 // EDIT IN LOCKSTEP with grapple.shader: same six shaders, differing
 // only by that keyword swap.
 
+// The launcher's filament arcs for the first-person gun, which draws in the
+// crunched depth range where true-depth polys always lose.  `depthhack`
+// moves the arcs into that range, keeping their real ordering against the
+// barrel.  DELIBERATELY absent from grapple.shader: an engine that never
+// scans .shaderx registers nothing and cgame falls back to grappleArc.
+// Keep the body identical to grappleArc.
+grappleArcFP
+{
+	nopicmip
+	cull disable
+	sort additive
+	depthhack
+	{
+		map $whiteimage
+		blendfunc GL_SRC_ALPHA GL_ONE
+		rgbGen vertex
+		alphaGen vertex
+	}
+}
+
 // ---- anchor pad ---------------------------------------------------------
 
 // docked in the bore (only drawn at idle): rings outward at the idle pace

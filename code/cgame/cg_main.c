@@ -1097,6 +1097,12 @@ static void CG_RegisterGraphics( void ) {
 	// register all weapons (as they are used on weapon wheel selector)
 	CG_VR_RegisterMedia();
 
+	// the grapple is handed out at spawn and sits in no map, so a hook can be
+	// the first grapple thing a client sees
+	if ( cgs.grappleEnabled ) {
+		CG_RegisterWeapon( WP_GRAPPLING_HOOK );
+	}
+
 	cg.skipDFshaders = qfalse;
 
 	// wall marks

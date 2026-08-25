@@ -1078,33 +1078,44 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		// (the temp entity's angles then carry the frozen impact normal),
 		// since a miss has no pad to drop
 		CG_GrappleSeatRestart( es->otherEntityNum );
-		// CHAN_WEAPON on purpose: a re-fire mid-materialize runs the ramp at
-		// PAD_SEAT_FIRE_BOOST and finishes in ~110ms against a 330ms sound.
-		// StartSound cannot be stopped, but a new sound on a channel replaces
-		// the one there, so the launch cuts this off when the animation does.
-		// Neither this nor the launch may move to CHAN_AUTO.
-		if ( cgs.media.sfx_grappleseat && es->otherEntityNum < MAX_CLIENTS ) {
-			trap_S_StartSound( NULL, es->otherEntityNum, CHAN_WEAPON,
-				cgs.media.sfx_grappleseat );
-		}
-		if ( es->eventParm ) {
-			// only an anchored release has a claw to draw out of anything
-			if ( cgs.media.sfx_grapplefree ) {
-				trap_S_StartSound( position, ENTITYNUM_WORLD, CHAN_AUTO,
-					cgs.media.sfx_grapplefree );
+		// the same release retires the launch key, so the next throw sounds even
+		// when the server reuses this hook's entity slot for it; time2 is the
+		// hook that actually died, so a same-snapshot next throw can't be undone
+		CG_GrappleLaunchEnded( es->otherEntityNum, es->time2 );
+		// this tent is SVF_BROADCAST so every client can retire the two keys
+		// above regardless of PVS, but that also means it reaches clients who
+		// never saw the release: only a witness draws its debris, scar and
+		// seat sound
+		if ( trap_R_inPVS( cg.refdef.vieworg, position ) ) {
+			// CHAN_WEAPON on purpose: a re-fire mid-materialize runs the ramp at
+			// PAD_SEAT_FIRE_BOOST and finishes in ~110ms against a 330ms sound.
+			// StartSound cannot be stopped, but a new sound on a channel replaces
+			// the one there, so the launch cuts this off when the animation does.
+			// Neither this nor the launch may move to CHAN_AUTO.
+			if ( cgs.media.sfx_grappleseat && es->otherEntityNum < MAX_CLIENTS ) {
+				trap_S_StartSound( NULL, es->otherEntityNum, CHAN_WEAPON,
+					cgs.media.sfx_grappleseat );
 			}
-			CG_GrapplePadFall( position, es->angles, es->otherEntityNum );
-			// the anchored scar is temporary and dies with the entity;
-			// leave the persistent, fading copy. s.time/generic1 carry
-			// the hook's spin stamp and number so a witness who never
-			// had the anchored pad in a snapshot still lands the gouges
-			// under the claws. No scar on a mover (marks are static)
-			if ( es->otherEntityNum2 < MAX_CLIENTS ) {
-				vec3_t	axis[3];
+			if ( es->eventParm ) {
+				// only an anchored release has a claw to draw out of anything
+				if ( cgs.media.sfx_grapplefree ) {
+					trap_S_StartSound( position, ENTITYNUM_WORLD, CHAN_AUTO,
+						cgs.media.sfx_grapplefree );
+				}
+				CG_GrapplePadFall( position, es->angles, es->otherEntityNum,
+					es->time, es->time2 );
+				// the anchored scar is temporary and dies with the entity;
+				// leave the persistent, fading copy. s.time/time2 carry
+				// the hook's spin stamp and number so a witness who never
+				// had the anchored pad in a snapshot still lands the gouges
+				// under the claws. No scar on a mover (marks are static)
+				if ( es->otherEntityNum2 < MAX_CLIENTS && !es->modelindex2 ) {
+					vec3_t	axis[3];
 
-				CG_GrapplePadAnchorAxis( es->angles, es->time,
-					es->generic1, axis );
-				CG_GrapplePadMark( position, axis, qfalse );
+					CG_GrapplePadAnchorAxis( es->angles, es->time,
+						es->time2, axis );
+					CG_GrapplePadMark( position, axis, qfalse );
+				}
 			}
 		}
 		break;

@@ -683,45 +683,59 @@ static int CG_GrappleActivity( int clientNum ) {
 
 /*
 ==========================
-CG_GrappleLaunchCheck
+CG_GrappleLaunchSeen
 
-One launch sound per shot.  EV_FIRE_WEAPON repeats every 400ms while the button
-is held (which is why the weapon carries no flashSound), so the trigger is the
-edge into "a hook is out", not the event.  Called per view, so the first call at
-a given cg.time decides and the rest are no-ops.  A gap longer than
-PAD_SEAT_RESET means the client was out of PVS rather than idle; replaying the
-launch on the frame he reappears would be a phantom.
+One launch sound per hook.  EV_FIRE_WEAPON repeats every 400ms while the button
+is held (why the weapon carries no flashSound), so no state on the wielder
+carries the edge.  The hook entity does: every throw spawns one, and a witness
+out of PVS for the shot still gets the launch when the hook arrives.  Slots
+are recycled, so the key is retired with the hook (see CG_GrappleLaunchEnded).
+Missiles never take a number below MAX_CLIENTS, so zero reads as "no hook" and
+the zeroed array is already correct at map load.
 ==========================
 */
-typedef struct {
-	int		time;		// cg.time of the last update, 0 = never seen
-	int		act;
-} grappleLaunch_t;
+static void CG_GrappleSeatFired( int clientNum );
 
-static grappleLaunch_t	cg_grappleLaunch[MAX_CLIENTS];
+static int	cg_lastHookNum[MAX_CLIENTS];
 
-static void CG_GrappleLaunchCheck( int clientNum, int act ) {
-	grappleLaunch_t	*g;
-	qboolean		out, wasOut;
-
-	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+void CG_GrappleLaunchSeen( int owner, int hookNum ) {
+	if ( owner < 0 || owner >= MAX_CLIENTS ) {
 		return;
 	}
-	g = &cg_grappleLaunch[ clientNum ];
-	if ( g->time == cg.time ) {
-		return;			// already decided this frame
+	if ( cg_lastHookNum[ owner ] == hookNum ) {
+		return;
 	}
+	cg_lastHookNum[ owner ] = hookNum;
 
-	out = ( act == GRAPPLE_FLY || act == GRAPPLE_PULL );
-	wasOut = ( g->act == GRAPPLE_FLY || g->act == GRAPPLE_PULL );
-
-	if ( g->time && cg.time - g->time <= PAD_SEAT_RESET && out && !wasOut
-			&& cgs.media.sfx_grapplelaunch ) {
+	if ( cgs.media.sfx_grapplelaunch ) {
 		// CHAN_WEAPON cuts a running seat sound short on a re-fire mid-materialize
-		trap_S_StartSound( NULL, clientNum, CHAN_WEAPON, cgs.media.sfx_grapplelaunch );
+		trap_S_StartSound( NULL, owner, CHAN_WEAPON, cgs.media.sfx_grapplelaunch );
 	}
-	g->act = act;
-	g->time = cg.time;
+
+	// the pad left the dock at whatever size it had reached
+	CG_GrappleSeatFired( owner );
+}
+
+/*
+==========================
+CG_GrappleLaunchEnded
+
+Retire the key with the hook.  G_Spawn reuses the lowest free slot, so a key
+that outlived its hook would swallow the next throw's launch.  A release tent
+and the next throw's hook can land in the same snapshot in either order, so the
+caller passes the number of the hook that actually died; clearing only on a
+match leaves a key the next throw already set alone.  Zero (a foreign tent, or
+a game QVM too old to carry one) clears unconditionally.
+==========================
+*/
+void CG_GrappleLaunchEnded( int owner, int hookNum ) {
+	if ( owner < 0 || owner >= MAX_CLIENTS ) {
+		return;
+	}
+	if ( hookNum && cg_lastHookNum[ owner ] != hookNum ) {
+		return;
+	}
+	cg_lastHookNum[ owner ] = 0;
 }
 
 /*
@@ -821,6 +835,10 @@ void CG_GrappleFade( byte *rgba, float pulse ) {
 // direction, and the overlaps above would throw the ends off at random
 #define TETHER_MIN_LENGTH		2.0f
 
+// past this the stamp is stale: a weapon that is still being drawn refreshes it
+// every frame, so an older one belongs to a gun that left the view
+#define TETHER_MUZZLE_STALE		250
+
 // defined with the rest of the arc machinery, below
 static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 		int clientNum, int act );
@@ -832,7 +850,7 @@ void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
 	float			len, s0, s1;
 	entityState_t	*es;
 	const byte		*tint;
-	int				i, k, act;
+	int				i, k, act, owner;
 
 	es = &ent->currentState;
 
@@ -850,13 +868,13 @@ void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
 	// the chain meets the back of the hook, not the middle of the model.  the
 	// trail runs before CG_Missile builds the render axis, so derive it here
 	if ( wi->missileModel ) {
-		orientation_t	tether;
+		orientation_t	padTether;
 		vec3_t			axis[3];
 
 		CG_GrappleHookAxis( ent, axis );
-		trap_R_LerpTag( &tether, wi->missileModel, 0, 0, 1.0f, "tag_tether" );
+		padTether = wi->padTetherTag;
 		for ( i = 0 ; i < 3 ; i++ ) {
-			VectorMA( origin, tether.origin[i], axis[i], origin );
+			VectorMA( origin, padTether.origin[i], axis[i], origin );
 		}
 		// bury it along the pad's own axis, which is not the tether's direction
 		// once the pad has clamped on at an angle
@@ -864,12 +882,22 @@ void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
 	}
 
 	// chain feed loop plays from the gun while the hook flies
-	if ( es->eType == ET_MISSILE ) {
+	if ( es->eType == ET_MISSILE && cgs.media.sfx_grapplefire ) {
 		trap_S_AddLoopingSound( es->otherEntityNum, cg_entities[ es->otherEntityNum ].lerpOrigin,
 			vec3_origin, cgs.media.sfx_grapplefire );
 	}
 
-	VectorCopy( cg_entities[ es->otherEntityNum ].pe.muzzleOrigin, start );
+	owner = es->otherEntityNum;
+	VectorCopy( cg_entities[ owner ].pe.muzzleOrigin, start );
+
+	// a muzzle written this recently is live wherever it came from: the local and
+	// followed clients ride the playerState rather than the entity list, so their
+	// own entity never goes valid and cannot vouch for the view weapon that wrote
+	// it. An owner nobody has drawn carries stamp 0, the case this fallback is for
+	if ( !cg_entities[ owner ].pe.muzzleTime
+			|| cg.time - cg_entities[ owner ].pe.muzzleTime > TETHER_MUZZLE_STALE ) {
+		VectorCopy( cg_entities[ owner ].lerpOrigin, start );	// no live muzzle
+	}
 
 	// only bail when too short to derive a direction; a bigger guard blanks
 	// the tether at the end of every pull, right when it's closest to view
@@ -1173,8 +1201,15 @@ float CG_GrappleSeat( int clientNum ) {
 	p = &cg_padSeat[ clientNum ];
 
 	delta = cg.time - p->time;
-	if ( delta <= 0 ) {
-		return p->progress;
+	if ( delta < 0 ) {
+		// the clock ran backward under us; the ramp cannot follow it, and a pad
+		// frozen half-formed until cg.time catches up is the worse of the two
+		p->progress = 1.0f;
+		p->time = cg.time;
+		return 1.0f;
+	}
+	if ( delta == 0 ) {
+		return p->progress;		// already advanced this frame
 	}
 	// a demo seek or a restart resets to FULLY FORMED, not to zero: a pad that
 	// materializes because someone scrubbed is worse than one that was there.
@@ -1211,7 +1246,7 @@ the shot, which is in-fiction: this weapon materializes its round at the
 emitter rather than storing one.
 ==========================
 */
-void CG_GrappleSeatFired( int clientNum ) {
+static void CG_GrappleSeatFired( int clientNum ) {
 	if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
 		cg_padSeat[ clientNum ].fired = 1;
 	}
@@ -1235,20 +1270,42 @@ void CG_GrappleSeatSnap( int clientNum ) {
 
 /*
 ==========================
+CG_GrappleResetState
+
+Every per-wielder grapple ramp advances against cg.time, and the launch key
+assumes a hook entity is only ever seen appearing once.  A seek breaks both at
+once: it moves the clock out from under the ramps, and it can land before a
+hook already on the wire, which then has to read as a fresh launch.
+==========================
+*/
+void CG_GrappleResetState( void ) {
+	memset( cg_padSeat, 0, sizeof( cg_padSeat ) );
+	memset( cg_arcFactors, 0, sizeof( cg_arcFactors ) );
+	memset( cg_lastHookNum, 0, sizeof( cg_lastHookNum ) );
+}
+
+/*
+==========================
 CG_ArcStrip
 
 One pass of a filament along an already-built polyline: billboards each segment
 toward the view, then draws it as two quads whose
 center line carries alpha and whose edges fade to zero, so flat triangles read
 as a round filament. Called TWICE per arc from CG_GrappleCoreArcs on the same
-pt[] node array - once for the HALO, once for the CORE - so they can never drift apart.
+pt[] node array (once for the HALO, once for the CORE) so they can never drift apart.
+
+Every quad of one pass goes in through a single trap: a QVM syscall costs far
+more than the poly it carries, and one pass is eight of them.
 ==========================
 */
-static void CG_ArcStrip( vec3_t *pt, float hw, const byte *tint, float alpha ) {
+static void CG_ArcStrip( vec3_t *pt, float hw, const byte *tint, float alpha,
+		qhandle_t shader ) {
 	vec3_t		mid, dir, right, viewDir, e1, e2;
-	polyVert_t	v[4];
-	int			s, k, c;
+	polyVert_t	v[ARC_SEGMENTS * 2 * 4];
+	polyVert_t	*q;
+	int			s, k, c, n;
 
+	n = 0;
 	for ( s = 0; s < ARC_SEGMENTS; s++ ) {
 		VectorAdd( pt[s], pt[s + 1], mid );
 		VectorScale( mid, 0.5f, mid );
@@ -1265,25 +1322,29 @@ static void CG_ArcStrip( vec3_t *pt, float hw, const byte *tint, float alpha ) {
 
 		// center line opaque, edges at zero alpha: a round-looking filament
 		// out of flat triangles, one strip either side
-		VectorCopy( pt[s], v[0].xyz );
-		VectorCopy( pt[s + 1], v[1].xyz );
-		v[0].st[0] = 0; v[0].st[1] = 0.5f;
-		v[1].st[0] = 1; v[1].st[1] = 0.5f;
-		v[2].st[0] = 1; v[2].st[1] = 0;
-		v[3].st[0] = 0; v[3].st[1] = 0;
-		for ( k = 0; k < 4; k++ ) {
-			for ( c = 0; c < 3; c++ ) {
-				v[k].modulate[c] = tint[c];
-			}
-			v[k].modulate[3] = ( k < 2 ) ? (byte)( 255 * alpha ) : 0;
-		}
 		for ( k = -1; k <= 1; k += 2 ) {
+			q = &v[n * 4];
+			VectorCopy( pt[s], q[0].xyz );
+			VectorCopy( pt[s + 1], q[1].xyz );
 			VectorMA( pt[s], k * hw, right, e1 );
 			VectorMA( pt[s + 1], k * hw, right, e2 );
-			VectorCopy( e2, v[2].xyz );
-			VectorCopy( e1, v[3].xyz );
-			trap_R_AddPolyToScene( cgs.media.grappleArcShader, 4, v );
+			VectorCopy( e2, q[2].xyz );
+			VectorCopy( e1, q[3].xyz );
+			q[0].st[0] = 0; q[0].st[1] = 0.5f;
+			q[1].st[0] = 1; q[1].st[1] = 0.5f;
+			q[2].st[0] = 1; q[2].st[1] = 0;
+			q[3].st[0] = 0; q[3].st[1] = 0;
+			for ( c = 0; c < 4; c++ ) {
+				q[c].modulate[0] = tint[0];
+				q[c].modulate[1] = tint[1];
+				q[c].modulate[2] = tint[2];
+				q[c].modulate[3] = ( c < 2 ) ? (byte)( 255 * alpha ) : 0;
+			}
+			n++;
 		}
+	}
+	if ( n ) {
+		trap_R_AddPolysToScene( shader, 4, v, n );
 	}
 }
 
@@ -1436,6 +1497,14 @@ static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 			}
 		}
 
+		// a filament is under 1.5u across, so it thins to a couple of pixels
+		// past a few hundred units and costs sixteen quads to draw.  Under the
+		// ignition rather than over it: the crackle carries much further
+		VectorMA( start, d, dir, p );
+		if ( DistanceSquared( p, cg.refdef.vieworg ) >= 256 * 256 ) {
+			continue;
+		}
+
 		// bow in a hashed direction, wander in the one square to it
 		PerpendicularVector( bowDir, dir );
 		RotatePointAroundVector( p, dir, bowDir, 360.0f * CG_ArcRandom( gen, salt + 5 ) );
@@ -1460,9 +1529,10 @@ static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 
 		haloAlpha = ARC_ALPHA * gate * fac->bright * sin( u * M_PI );
 		coreAlpha = ARC_CORE_ALPHA * gate * fac->bright * CG_ArcCoreEnvelope( u );
-		CG_ArcStrip( pt, TETHER_ARC_HALF_WIDTH, tint, haloAlpha );
+		CG_ArcStrip( pt, TETHER_ARC_HALF_WIDTH, tint, haloAlpha,
+			cgs.media.grappleArcShader );
 		CG_ArcStrip( pt, TETHER_ARC_HALF_WIDTH * ARC_CORE_WIDTH_FRAC,
-			coreTint, coreAlpha );
+			coreTint, coreAlpha, cgs.media.grappleArcShader );
 	}
 }
 
@@ -1480,6 +1550,16 @@ static void CG_GrappleCoreArcs( const refEntity_t *gun, int clientNum, int act,
 	int			t, gen, tin, delay, ms, jag, js, m;
 	int			i, s, k, c, salt, ch;
 	byte		tint[4], coreTint[4];
+	qhandle_t	shader;
+
+	// a depth-hacked gun tests in the crunched range, where true-depth polys
+	// always lose; the FP shader rides its range.  A zero handle means the
+	// engine never scanned .shaderx: stay at true depth
+	if ( ( gun->renderfx & RF_DEPTHHACK ) && cgs.media.grappleArcFPShader ) {
+		shader = cgs.media.grappleArcFPShader;
+	} else {
+		shader = cgs.media.grappleArcShader;
+	}
 
 	fac = CG_ArcFactors( clientNum, act );
 	speed = fac->speed * ARC_TRAVEL;
@@ -1626,8 +1706,8 @@ static void CG_GrappleCoreArcs( const refEntity_t *gun, int clientNum, int act,
 		}
 
 		// two passes over the SAME pt[] polyline; order doesn't matter under additive blending
-		CG_ArcStrip( pt, hw, tint, haloAlpha );
-		CG_ArcStrip( pt, coreHw, coreTint, coreAlpha );
+		CG_ArcStrip( pt, hw, tint, haloAlpha, shader );
+		CG_ArcStrip( pt, coreHw, coreTint, coreAlpha, shader );
 	}
 }
 
@@ -1741,8 +1821,8 @@ void CG_RegisterWeapon( int weaponNum ) {
 
 	case WP_GRAPPLING_HOOK:
 		MAKERGB( weaponInfo->flashDlightColor, 0.6f, 0.6f, 1.0f );
-		// one model for both states: it rides tag_ammo in the bore while stowed
-		// and flies as the missile once away
+		// one model for both states: it rides the stow tag in the bore while
+		// stowed and flies as the missile once away
 		weaponInfo->missileModel = trap_R_RegisterModel( "models/weapons2/grapple/grapple_pad.md3" );
 		weaponInfo->missileTrailFunc = CG_GrappleTrail;
 		weaponInfo->wiTrailTime = 2000;
@@ -1766,12 +1846,19 @@ void CG_RegisterWeapon( int weaponNum ) {
 		cgs.media.sfx_grapplearc[1] = trap_S_RegisterSound( "sound/weapons/grapple/arc_zap.wav", qfalse );
 		cgs.media.sfx_grapplearc[2] = trap_S_RegisterSound( "sound/weapons/grapple/arc_tear.wav", qfalse );
 		cgs.media.grappleTetherShader = trap_R_RegisterShader( "grapplingTether" );
-		cgs.media.grappleArcShader = trap_R_RegisterShader( "grapplingArc" );
+		cgs.media.grappleArcShader = trap_R_RegisterShader( "grappleArc" );
+		cgs.media.grappleArcFPShader = trap_R_RegisterShader( "grappleArcFP" );
 		cgs.media.grappleGunFlyShader = trap_R_RegisterShader( "models/weapons2/grapple/gun_fly" );
 		cgs.media.grappleGunPullShader = trap_R_RegisterShader( "models/weapons2/grapple/gun_pull" );
 		cgs.media.grapplePadFlyShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_fly" );
 		cgs.media.grapplePadPullShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_pull" );
 		cgs.media.grapplePadFadeShader = trap_R_RegisterShader( "models/weapons2/grapple/pad_fade" );
+
+		// all three are read at frame 0 wherever they are used, so they can
+		// never change: lerp them once instead of three times a frame
+		trap_R_LerpTag( &weaponInfo->padTetherTag, weaponInfo->missileModel, 0, 0, 1.0f, "tag_tether" );
+		trap_R_LerpTag( &weaponInfo->gunTetherTag, weaponInfo->weaponModel, 0, 0, 1.0f, "tag_tether" );
+		trap_R_LerpTag( &weaponInfo->stowTag, weaponInfo->weaponModel, 0, 0, 1.0f, "tag_stow" );
 
 		break;
 
@@ -2394,7 +2481,6 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	grapplePulse = 1.0f;
 	if ( weaponNum == WP_GRAPPLING_HOOK ) {
 		grappleAct = CG_GrappleActivity( cent->currentState.clientNum );
-		CG_GrappleLaunchCheck( cent->currentState.clientNum, grappleAct );
 		grapplePulse = CG_GrappleEnvelope( grappleAct );
 		CG_GrappleOwnerRGBA( cent->currentState.clientNum, gun.shaderRGBA.rgba );
 		CG_GrappleFade( gun.shaderRGBA.rgba, grapplePulse );
@@ -2439,7 +2525,10 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	// was throwing its arcs into the main view with no gun under them
 	if ( weaponNum == WP_GRAPPLING_HOOK
 			&& !( gun.renderfx & RF_THIRD_PERSON )
-			&& !( cent->currentState.powerups & ( 1 << PW_INVIS ) ) ) {
+			&& !( cent->currentState.powerups & ( 1 << PW_INVIS ) )
+			// filaments are 0.1u wide: sub-pixel past a few hundred units
+			&& ( ( gun.renderfx & RF_FIRST_PERSON )
+				|| DistanceSquared( gun.origin, cg.refdef.vieworg ) < 256 * 256 ) ) {
 		CG_GrappleCoreArcs( &gun, cent->currentState.clientNum, grappleAct,
 			grapplePulse );
 	}
@@ -2513,8 +2602,8 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 
 	CG_PositionRotatedEntityOnTag( &flash, &gun, weapon->weaponModel, "tag_flash" );
 	if ( weaponNum == WP_GRAPPLING_HOOK && !( nonPredictedCent->currentState.eFlags & EF_FIRING ) ) {
-		// the hook sits in the bore on tag_ammo; the flash takes over that spot
-		// once it is away
+		// the hook sits in the bore on the stow tag; the flash takes over that
+		// spot once it is away
 		orientation_t	stow;
 		refEntity_t		hook;
 		int				i;
@@ -2530,7 +2619,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		// the round in the bore lights off the same charge as the launcher
 		Byte4Copy( gun.shaderRGBA.rgba, hook.shaderRGBA.rgba );
 
-		trap_R_LerpTag( &stow, weapon->weaponModel, 0, 0, 1.0f, "tag_ammo" );
+		stow = weapon->stowTag;
 		VectorCopy( gun.origin, hook.origin );
 		for ( i = 0; i < 3; i++ ) {
 			VectorMA( hook.origin, stow.origin[i], gun.axis[i], hook.origin );
@@ -2611,20 +2700,21 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	// the camera, the same mirror compromise the lightning bolt and rail trail make
 	if ( ps || cg.renderingThirdPerson || cent->currentState.number != cg.predictedPlayerState.clientNum ) {
 		if ( weaponNum == WP_GRAPPLING_HOOK ) {
-			// the tether feeds from tag_chain, not the muzzle
-			orientation_t	spool;
+			// the tether feeds from the gun's tether tag, not the muzzle
+			orientation_t	gunTether;
 			vec3_t			chainOrg;
 			int				i;
 
-			trap_R_LerpTag( &spool, weapon->weaponModel, 0, 0, 1.0f, "tag_chain" );
+			gunTether = weapon->gunTetherTag;
 			VectorCopy( gun.origin, chainOrg );
 			for ( i = 0; i < 3; i++ ) {
-				VectorMA( chainOrg, spool.origin[i], gun.axis[i], chainOrg );
+				VectorMA( chainOrg, gunTether.origin[i], gun.axis[i], chainOrg );
 			}
 			VectorCopy( chainOrg, nonPredictedCent->pe.muzzleOrigin );
 		} else {
 			VectorCopy( flash.origin, nonPredictedCent->pe.muzzleOrigin );
 		}
+		nonPredictedCent->pe.muzzleTime = cg.time;
 	}
 
 	if ( ps || cg.renderingThirdPerson || cent->currentState.number != cg.predictedPlayerState.clientNum ) {
@@ -2728,6 +2818,7 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 			if ( !CG_VR_OwnsHiddenGunMuzzle() ) {
 				// head-derived muzzle would clobber the controller muzzle in VR
 				VectorCopy( origin, cg_entities[ps->clientNum].pe.muzzleOrigin );
+				cg_entities[ps->clientNum].pe.muzzleTime = cg.time;
 			}
 			CG_LightningBolt( &cg_entities[ps->clientNum], origin );
 		}
@@ -2802,12 +2893,7 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 	if ( vrPosed ) {
 		CG_VR_WeaponHandFinish( &hand, vrScale );
 	} else {
-		// the arc filaments carry no renderfx and draw at true depth, so a
-		// depth-hacked gun would hide them; leave the hack off, same as VR always does
-		hand.renderfx = RF_FIRST_PERSON | RF_MINLIGHT;
-		if ( ps->weapon != WP_GRAPPLING_HOOK ) {
-			hand.renderfx |= RF_DEPTHHACK;
-		}
+		hand.renderfx = RF_FIRST_PERSON | RF_MINLIGHT | RF_DEPTHHACK;
 	}
 
 	// add everything onto the hand
@@ -3324,7 +3410,9 @@ void CG_MissileHitWall( weapon_t weapon, int clientNum, vec3_t origin, vec3_t di
 
 	case WP_GRAPPLING_HOOK:
 		// the hook bites in: no mark, no explosion
-		trap_S_StartSound( origin, ENTITYNUM_WORLD, CHAN_AUTO, cgs.media.sfx_grapplehit );
+		if ( cgs.media.sfx_grapplehit ) {
+			trap_S_StartSound( origin, ENTITYNUM_WORLD, CHAN_AUTO, cgs.media.sfx_grapplehit );
+		}
 		return;
 
 #ifdef MISSIONPACK

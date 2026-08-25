@@ -4362,6 +4362,9 @@ void CG_ResetSeekState( void ) {
 	// View bob, damage kick, weapon kick offsets
 	CG_ResetViewOffsets();
 
+	// Grapple pad ramps, arc smoothing, and the per-hook launch key
+	CG_GrappleResetState();
+
 	// Flush queued announcer sounds (e.g. stale "Excellent!")
 	CG_AddBufferedSound( -1 );
 

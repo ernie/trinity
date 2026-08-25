@@ -1388,7 +1388,7 @@ while tumble and scatter need only a ceiling: zero tumble is correct on a floor,
 and the kick already carries the pad clear without any scatter at all.
 ====================
 */
-void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClientNum ) {
+void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClientNum, int stamp, int num ) {
 	localEntity_t	*le;
 	refEntity_t		*re;
 	vec3_t			normal, right, up;
@@ -1454,7 +1454,14 @@ void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClien
 
 	// the pad was seated against a surface the player watched it grip, so unlike
 	// CG_LaunchGib the base angles are the clamped pose, not a random one
-	VectorCopy( angles, le->angles.trBase );
+	{
+		vec3_t	axis[3], rolled;
+
+		// start from the pose the anchored draw showed, roll included
+		CG_GrapplePadAnchorAxis( angles, stamp, num, axis );
+		CG_AxisToAngles( axis, rolled );
+		VectorCopy( rolled, le->angles.trBase );
+	}
 	le->angles.trType = TR_LINEAR;
 	le->angles.trTime = cg.time;
 	le->angles.trDelta[PITCH] = crandom() * PAD_FALL_TUMBLE * lever;

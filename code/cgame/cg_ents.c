@@ -500,6 +500,7 @@ static void CG_Missile( centity_t *cent ) {
 	if ( s1->weapon >= WP_NUM_WEAPONS ) {
 		s1->weapon = WP_NONE;
 	}
+	CG_RegisterWeapon( s1->weapon );
 	weapon = &cg_weapons[s1->weapon];
 
 	// calculate the axis
@@ -576,7 +577,7 @@ static void CG_Missile( centity_t *cent ) {
 		// in flight the pad lights with the tether streaming off it,
 		// rings running outward at flight pace
 		CG_GrappleOwnerRGBA( s1->otherEntityNum, ent.shaderRGBA.rgba );
-		CG_GrappleSeatFired( s1->otherEntityNum );
+		CG_GrappleLaunchSeen( s1->otherEntityNum, s1->number );
 
 		// calling CG_GrappleSeat is what advances the ramp while the pad is
 		// in flight; a pad fired mid-materialize leaves the dock part-formed
@@ -694,7 +695,7 @@ Inverse of AnglesToAxis, roll included: yaw/pitch from the forward row,
 roll as the signed rotation of the up row away from the roll-zero frame.
 ===============
 */
-static void CG_AxisToAngles( vec3_t axis[3], vec3_t angles ) {
+void CG_AxisToAngles( vec3_t axis[3], vec3_t angles ) {
 	vec3_t	axis0[3];
 	float	sn, cs;
 
@@ -721,6 +722,7 @@ static void CG_Grapple( centity_t *cent ) {
 	if ( s1->weapon >= WP_NUM_WEAPONS ) {
 		s1->weapon = WP_NONE;
 	}
+	CG_RegisterWeapon( s1->weapon );
 	weapon = &cg_weapons[s1->weapon];
 
 	// re-derive from the mover's rendered trajectory so the pad paths with it
@@ -755,6 +757,11 @@ static void CG_Grapple( centity_t *cent ) {
 	// the far end of the launcher's cell breathes on its envelope, always the
 	// pull loop here
 	pulse = CG_GrapplePulse( s1->otherEntityNum );
+
+	// a hook that crosses the whole room in one server frame is never seen as
+	// ET_MISSILE, so this is the only sighting its launch will ever get; the key
+	// makes the call a no-op on every hook that did fly
+	CG_GrappleLaunchSeen( s1->otherEntityNum, s1->number );
 
 	// anchored means seated: the ET_GRAPPLE path never scales the pad, so a
 	// point-blank hit that beats the ramp snaps to full size on the same frame
@@ -796,7 +803,7 @@ static void CG_Grapple( centity_t *cent ) {
 	// temporary scar, re-projected per frame so it never ages under a held
 	// pad; the release event stamps the fading copy. No scar on a mover:
 	// mark polys are static world geometry and would be left hanging
-	if ( s1->otherEntityNum2 < MAX_CLIENTS ) {
+	if ( s1->otherEntityNum2 < MAX_CLIENTS && !s1->modelindex2 ) {
 		CG_GrapplePadMark( cent->lerpOrigin, ent.axis, qtrue );
 	}
 

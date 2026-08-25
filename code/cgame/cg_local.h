@@ -237,6 +237,7 @@ typedef struct {
 	int				railFireTime;
 
 	vec3_t			muzzleOrigin;
+	int				muzzleTime;		// 0 until a drawn weapon has written the origin above
 
 	// railgun trail spawning
 	vec3_t			railgunImpact;
@@ -516,6 +517,11 @@ typedef struct weaponInfo_s {
 	float			missileDlight;
 	vec3_t			missileDlightColor;
 	int				missileRenderfx;
+
+	// frame-0 tags, static: sampled once at registration
+	orientation_t	padTetherTag;		// where the tether meets the pad
+	orientation_t	gunTetherTag;		// where it feeds out of the gun
+	orientation_t	stowTag;			// the pad's seat in the gun's bore
 
 	void			(*ejectBrassFunc)( centity_t * );
 
@@ -928,6 +934,8 @@ typedef struct {
 	qhandle_t	grappleTetherShader;
 	// vertex-colored profile, so it cannot share the tether's map and scroll
 	qhandle_t	grappleArcShader;
+	// same arcs in the view-weapon depth range; 0 where the engine lacks it
+	qhandle_t	grappleArcFPShader;
 	// per-state direction/speed variants of the model shaders (customShader);
 	// idle rides the models' base shaders
 	qhandle_t	grappleGunFlyShader;
@@ -1589,6 +1597,7 @@ void CG_Beam( const centity_t *cent );
 void CG_GrappleHookAxis( const centity_t *cent, vec3_t axis[3] );
 void CG_GrapplePadAnchorAxis( const vec3_t angles, int stamp, int num,
 		vec3_t axis[3] );
+void CG_AxisToAngles( vec3_t axis[3], vec3_t angles );
 void CG_GrapplePadMark( const vec3_t origin, vec3_t axis[3],
 		qboolean temporary );
 
@@ -1628,8 +1637,10 @@ float CG_GrapplePulse( int clientNum );
 float CG_GrapplePullLevel( void );
 float CG_GrappleSeat( int clientNum );
 void CG_GrappleSeatRestart( int clientNum );
-void CG_GrappleSeatFired( int clientNum );
 void CG_GrappleSeatSnap( int clientNum );
+void CG_GrappleLaunchSeen( int owner, int hookNum );
+void CG_GrappleLaunchEnded( int owner, int hookNum );
+void CG_GrappleResetState( void );
 float CG_GrappleDlightScale( void );
 float CG_GrappleDlightRadius( float base );
 void CG_GrappleFade( byte *rgba, float pulse );
@@ -1660,7 +1671,7 @@ void	CG_ImpactMark( qhandle_t markShader,
 void	CG_InitLocalEntities( void );
 localEntity_t	*CG_AllocLocalEntity( void );
 void	CG_AddLocalEntities( void );
-void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClientNum );
+void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClientNum, int stamp, int num );
 
 //
 // cg_effects.c

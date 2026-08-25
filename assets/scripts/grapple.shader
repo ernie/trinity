@@ -28,7 +28,9 @@ grapplingTether
 // Electrical arcs, on the launcher's beam span and along the tether.  They
 // write their cross-section into the vertices, so they take no map, and must
 // not take the tether's scroll.
-grapplingArc
+// grapple.shaderx carries grappleArcFP, this same body plus `depthhack`
+// for the view weapon; keep the two in lockstep.
+grappleArc
 {
 	nopicmip
 	cull disable

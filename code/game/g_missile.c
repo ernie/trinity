@@ -400,6 +400,9 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 
 			ent->enemy = other;
 			ent->timestamp = level.time + 125;
+			// a body has no surface to gouge, and the claws ride it away from
+			// whatever was behind it, which is what a scar there would mark
+			ent->s.modelindex2 = 1;
 
 			v[0] = other->r.currentOrigin[0] + (other->r.mins[0] + other->r.maxs[0]) * 0.5;
 			v[1] = other->r.currentOrigin[1] + (other->r.mins[1] + other->r.maxs[1]) * 0.5;
