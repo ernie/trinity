@@ -15,6 +15,7 @@ void UI_SPArena_Start( const char *arenaInfo ) {
 	}
 
 	trap_Cvar_SetValue( "g_mode", Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer ) );
+	trap_Cvar_SetValue( "g_grapple", ui_grapple.integer ? 1 : 0 );
 
 	level = atoi( Info_ValueForKey( arenaInfo, "num" ) );
 	txt = Info_ValueForKey( arenaInfo, "special" );

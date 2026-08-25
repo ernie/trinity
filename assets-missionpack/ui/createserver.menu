@@ -54,7 +54,7 @@ itemDef {
 
 itemDef {
 	name window
-	rect 204 165 227 270	
+	rect 204 165 227 255
 	style WINDOW_STYLE_FILLED
 	border 1
 	bordercolor 1 1 1 .25
@@ -223,7 +223,7 @@ itemDef {
 	text "Capture Limit:"
 	cvar "capturelimit"
 	ownerdrawflag UI_SHOW_NETANYTEAMGAME
- 	rect 260 60 128 12
+ 	rect 260 57 128 12
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 65
 	textaligny 12
@@ -239,7 +239,7 @@ itemDef {
 	text "Frag Limit:"
 	cvar "fraglimit"
 	ownerdrawflag UI_SHOW_NETANYNONTEAMGAME
-      	rect 260 60 128 12
+      	rect 260 57 128 12
       	textalign ITEM_ALIGN_RIGHT
       	textalignx 65
 	maxchars 4
@@ -255,7 +255,7 @@ itemDef {
       	type ITEM_TYPE_NUMERICFIELD
 	text "Time Limit:"
 	cvar "timelimit"
-      	rect 260 77 128 12
+      	rect 260 72 128 12
       	textalign ITEM_ALIGN_RIGHT
       	textalignx 65
 	maxchars 4
@@ -272,7 +272,7 @@ itemDef {
       	type ITEM_TYPE_YESNO
 	text "Friendly Fire:"
 	cvar "g_friendlyfire"
-      	rect 260 94 128 12
+      	rect 260 87 128 12
       	textalign ITEM_ALIGN_RIGHT
       	textalignx 65
       	textaligny 12
@@ -287,7 +287,7 @@ itemDef {
       	type ITEM_TYPE_YESNO
 	text "Pure Server:"
 	cvar "sv_pure"
-      	rect 260 111 128 12
+      	rect 260 102 128 12
       	textalign ITEM_ALIGN_RIGHT
       	textalignx 65
       	textaligny 12
@@ -305,7 +305,7 @@ itemDef {
 	// dedicated is a special cvar in that as soon as it is set, the game goes to console only so the ui catches this one specifically
 	cvar "ui_dedicated"
 	cvarFloatList { "No" 0 "LAN" 1 "Internet" 2 }
-	rect 260 128 128 12
+	rect 260 117 128 12
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 65
 	textaligny 12
@@ -322,7 +322,23 @@ itemDef {
 		// Trinity movement+combat ruleset; labels match BG_ModeName in bg_mode.c
 		cvar "ui_mode"
 		cvarFloatList { "Quake 3" 0 "CPMA" 1 "Quake Live" 2 "QL Turbo" 3 }
-		rect 260 145 128 12
+		rect 260 132 128 12
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 65
+		textaligny 12
+		textscale .25
+		forecolor 1 1 1 1
+		visible 1
+	}
+
+	itemDef {
+		name grapple
+		group grpsettings
+		type ITEM_TYPE_YESNO
+		text "Grapple:"
+		// applied to g_grapple at launch (ui_main.c) - g_grapple isn't archived
+		cvar "ui_grapple"
+		rect 260 147 128 12
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 65
 		textaligny 12

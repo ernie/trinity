@@ -49,8 +49,9 @@ SINGLE PLAYER LEVEL SELECT MENU
 #define ID_CUSTOM			25
 #define ID_NEXT				26
 #define ID_MODE				27
+#define ID_GRAPPLE			28
 
-#define PLAYER_Y			314
+#define PLAYER_Y			300
 #define AWARDS_Y			(PLAYER_Y + 26)
 
 
@@ -67,6 +68,7 @@ typedef struct {
 	menubitmap_s	item_custom;
 	menubitmap_s	item_next;
 	menulist_s		item_mode;
+	menuradiobutton_s	item_grapple;
 	menubitmap_s	item_null;
 
 	qboolean		reinit;
@@ -527,6 +529,20 @@ static void UI_SPLevelMenu_ModeEvent( void* ptr, int notification ) {
 
 /*
 =================
+UI_SPLevelMenu_GrappleEvent
+=================
+*/
+static void UI_SPLevelMenu_GrappleEvent( void* ptr, int notification ) {
+	if (notification != QM_ACTIVATED) {
+		return;
+	}
+
+	trap_Cvar_SetValue( "ui_grapple", levelMenuInfo.item_grapple.curvalue );
+}
+
+
+/*
+=================
 UI_SPLevelMenu_MenuDraw
 =================
 */
@@ -893,10 +909,19 @@ static void UI_SPLevelMenu_Init( void ) {
 	levelMenuInfo.item_mode.generic.flags			= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	levelMenuInfo.item_mode.generic.callback		= UI_SPLevelMenu_ModeEvent;
 	levelMenuInfo.item_mode.generic.id				= ID_MODE;
-	levelMenuInfo.item_mode.generic.x				= 552;
-	levelMenuInfo.item_mode.generic.y				= 38;
+	levelMenuInfo.item_mode.generic.x				= 360;
+	levelMenuInfo.item_mode.generic.y				= 394;
 	levelMenuInfo.item_mode.itemnames				= mode_list;
 	levelMenuInfo.item_mode.curvalue				= (int)Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer );
+
+	levelMenuInfo.item_grapple.generic.type			= MTYPE_RADIOBUTTON;
+	levelMenuInfo.item_grapple.generic.name			= "Grapple:";
+	levelMenuInfo.item_grapple.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	levelMenuInfo.item_grapple.generic.callback		= UI_SPLevelMenu_GrappleEvent;
+	levelMenuInfo.item_grapple.generic.id			= ID_GRAPPLE;
+	levelMenuInfo.item_grapple.generic.x			= 570;
+	levelMenuInfo.item_grapple.generic.y			= 394;
+	levelMenuInfo.item_grapple.curvalue				= ui_grapple.integer != 0;
 
 	levelMenuInfo.item_null.generic.type			= MTYPE_BITMAP;
 	levelMenuInfo.item_null.generic.flags			= QMF_LEFT_JUSTIFY|QMF_MOUSEONLY|QMF_SILENT;
@@ -923,11 +948,12 @@ static void UI_SPLevelMenu_Init( void ) {
 	for( n = 0; n < count; n++ ) {
 		Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_awards[n] );
 	}
+	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_mode );
+	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_grapple );
 	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_back );
 	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_reset );
 	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_custom );
 	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_next );
-	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_mode );
 	Menu_AddItem( &levelMenuInfo.menu, &levelMenuInfo.item_null );
 
 	trap_Cvar_VariableStringBuffer( "ui_spSelection", buf, sizeof(buf) );

@@ -804,7 +804,7 @@ void Text_PaintWithCursor_NoColorEscape(float x, float y, float scale, vec4_t co
 		glyph2 = &font->glyphs[cursor & 255];
 		while (s && *s && count < len) {
 			glyph = &font->glyphs[*s & 255];
-			// No color code interpretation - just draw each character
+			// No color code interpretation: just draw each character
 			yadj = useScale * glyph->top;
 			if (style == ITEM_TEXTSTYLE_SHADOWED || style == ITEM_TEXTSTYLE_SHADOWEDMORE) {
 				int ofs = style == ITEM_TEXTSTYLE_SHADOWED ? 1 : 2;
@@ -996,7 +996,7 @@ void _UI_Refresh( int realtime )
 
 	UI_UpdateCvars();
 
-	// Poll trinity login status — switch views on success
+	// Poll trinity login status: switch views on success
 	{
 		static char lastLoginStatus[32] = "";
 		char loginStatus[32];
@@ -3834,6 +3834,7 @@ static void UI_StartSkirmish(qboolean next) {
 	g = uiInfo.gameTypes[ui_gameType.integer].gtEnum;
 	trap_Cvar_SetValue( "g_gametype", g );
 	trap_Cvar_SetValue( "g_mode", Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer ) );
+	trap_Cvar_SetValue( "g_grapple", ui_grapple.integer ? 1 : 0 );
 	trap_Cmd_ExecuteText( EXEC_APPEND, va( "wait ; wait ; map %s\n", uiInfo.mapList[ui_currentMap.integer].mapLoadName) );
 	skill = trap_Cvar_VariableValue( "g_spSkill" );
 	trap_Cvar_Set("ui_scoreMap", uiInfo.mapList[ui_currentMap.integer].mapName);
@@ -4132,6 +4133,7 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cvar_SetValue( "dedicated", Com_Clamp( 0, 2, ui_dedicated.integer ) );
 			trap_Cvar_SetValue( "g_gametype", Com_Clamp( 0, 8, uiInfo.gameTypes[ui_netGameType.integer].gtEnum ) );
 			trap_Cvar_SetValue( "g_mode", Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer ) );
+			trap_Cvar_SetValue( "g_grapple", ui_grapple.integer ? 1 : 0 );
 			// ui_redTeam/ui_blueTeam are what the createserver selectors edit;
 			// ui_teamName/ui_opponentName (vanilla read those) are SP-skirmish-only
 			trap_Cvar_Set("g_redTeam", UI_Cvar_VariableString("ui_redTeam"));
@@ -6719,7 +6721,7 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 		// to VR only: on flatscreen the stock Menu_Paint background draw
 		// is already letterboxed/pillarboxed to the 4:3 box via the normal
 		// scale/bias transform, so an ungated fill would visibly paint the
-		// window's black bars with the menu background - a flatscreen
+		// window's black bars with the menu background, a flatscreen
 		// visual change, not just harmless overdraw.
 		if ( vrActive && menu->window.background ) {
 			UI_VR_FillScreen( menu->window.background );

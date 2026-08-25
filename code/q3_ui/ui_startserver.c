@@ -604,6 +604,7 @@ SERVER OPTIONS MENU *****
 #define ID_GO					23
 #define ID_BACK					24
 #define ID_MODE					25
+#define ID_GRAPPLE				26
 
 #define PLAYER_SLOTS			12
 
@@ -617,6 +618,7 @@ typedef struct {
 	menubitmap_s		picframe;
 
 	menulist_s			mode;
+	menuradiobutton_s	grapple;
 	menulist_s			dedicated;
 	menufield_s			timelimit;
 	menufield_s			fraglimit;
@@ -787,6 +789,7 @@ static void ServerOptions_Start( void ) {
 	trap_Cvar_SetValue( "g_friendlyfire", friendlyfire );
 	trap_Cvar_SetValue( "sv_pure", pure );
 	trap_Cvar_SetValue( "g_mode", s_serveroptions.mode.curvalue );
+	trap_Cvar_SetValue( "g_grapple", s_serveroptions.grapple.curvalue );
 	trap_Cvar_Set("sv_hostname", s_serveroptions.hostname.field.buffer );
 
 	// the wait commands will allow the dedicated to take effect
@@ -956,6 +959,12 @@ static void ServerOptions_Event( void* ptr, int event ) {
 		}
 		trap_Cvar_SetValue( "ui_mode", s_serveroptions.mode.curvalue );
 		break;
+	case ID_GRAPPLE:
+		if( event != QM_ACTIVATED ) {
+			break;
+		}
+		trap_Cvar_SetValue( "ui_grapple", s_serveroptions.grapple.curvalue );
+		break;
 	case ID_GO:
 		if( event != QM_ACTIVATED ) {
 			break;
@@ -1078,7 +1087,7 @@ static void ServerOptions_InitBotNames( void ) {
 	// get info for this map
 	arenaInfo = UI_GetArenaInfoByMap( s_serveroptions.mapnamebuffer );
 
-	// get the bot info - we'll seed with them if any are listed
+	// get the bot info; we'll seed with them if any are listed
 	Q_strncpyz( bots, Info_ValueForKey( arenaInfo, "bots" ), sizeof(bots) );
 	p = &bots[0];
 	while( *p && count < PLAYER_SLOTS ) {
@@ -1205,6 +1214,7 @@ static void ServerOptions_SetMenuItems( void ) {
 	Q_strncpyz( s_serveroptions.hostname.field.buffer, UI_Cvar_VariableString( "sv_hostname" ), sizeof( s_serveroptions.hostname.field.buffer ) );
 	s_serveroptions.pure.curvalue = Com_Clamp( 0, 1, trap_Cvar_VariableValue( "sv_pure" ) );
 	s_serveroptions.mode.curvalue = (int)Com_Clamp( 0, MODE_COUNT - 1, ui_mode.integer );
+	s_serveroptions.grapple.curvalue = ui_grapple.integer != 0;
 
 	// set the map pic
 	info = UI_GetArenaInfoByNumber( s_startserver.maplist[ s_startserver.currentmap ]);
@@ -1333,6 +1343,15 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 	s_serveroptions.mode.generic.x				= OPTIONS_X;
 	s_serveroptions.mode.generic.y				= y;
 	s_serveroptions.mode.itemnames				= mode_list;
+
+	y += BIGCHAR_HEIGHT+2;
+	s_serveroptions.grapple.generic.type		= MTYPE_RADIOBUTTON;
+	s_serveroptions.grapple.generic.name		= "Grapple:";
+	s_serveroptions.grapple.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_serveroptions.grapple.generic.id			= ID_GRAPPLE;
+	s_serveroptions.grapple.generic.callback	= ServerOptions_Event;
+	s_serveroptions.grapple.generic.x			= OPTIONS_X;
+	s_serveroptions.grapple.generic.y			= y;
 
 	y += BIGCHAR_HEIGHT+2;
 	if( s_serveroptions.gametype != GT_CTF ) {
@@ -1542,6 +1561,7 @@ static void ServerOptions_MenuInit( qboolean multiplayer ) {
 	}
 
 	Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.mode );
+	Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.grapple );
 	if( s_serveroptions.gametype != GT_CTF ) {
 		if( s_serveroptions_vr ) {
 			Menu_AddItem( &s_serveroptions.menu, &s_serveroptions.fraglimitspin );

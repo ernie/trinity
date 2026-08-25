@@ -153,7 +153,7 @@ itemDef {
 
 itemDef {
 	name window
-	rect 0 170 640 192	
+	rect 0 170 640 205
 	style WINDOW_STYLE_EMPTY
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -178,7 +178,7 @@ itemDef {
 itemDef {
       	name score
       	style WINDOW_STYLE_SHADER
-   	rect 0 260 20 100
+   	rect 0 273 20 100
 	background "ui/assets/score.tga"
 	forecolor .5 .5 .5 .5
  	visible 1
@@ -187,7 +187,7 @@ itemDef {
 
 itemDef {
 	name window
-	rect 0 255 320 5	
+	rect 0 268 320 5
 	style WINDOW_STYLE_EMPTY
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -978,12 +978,31 @@ itemdef {
     	}
 
   itemDef {
+      	name grapple
+	group grpsettings
+      	type ITEM_TYPE_YESNO
+	text "Grapple:"
+	// applied to g_grapple at launch (ui_main.c) - g_grapple isn't archived
+	cvar "ui_grapple"
+ 	rect 120 249 128 12
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 0
+	textaligny 12
+	textscale .25
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/nomenu.wav" }
+	mouseEnter { show message_grapple }
+	mouseExit { hide message_grapple }
+    	}
+
+  itemDef {
       	name normal
 	group grpsettings
         type ITEM_TYPE_NUMERICFIELD
 	text "Game Score:"
 	cvar "ui_scoreTeam" 
- 	rect 120 265 128 12 
+ 	rect 120 278 128 12 
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 0
 	textaligny 12
@@ -997,8 +1016,8 @@ itemdef {
 	group grpsettings
         type ITEM_TYPE_NUMERICFIELD
 	text "Completion Time:"
-	cvar "ui_scoreTime" 
- 	rect 120 278 128 12 
+	cvar "ui_scoreTime"
+ 	rect 120 291 128 12
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 0
 	textaligny 12
@@ -1013,8 +1032,8 @@ itemdef {
 	group grpsettings
         type ITEM_TYPE_NUMERICFIELD
 	text "Base Score:"
-	cvar "ui_scoreBase" 
- 	rect 120 291 128 12 
+	cvar "ui_scoreBase"
+ 	rect 120 304 128 12
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 0
 	textaligny 12
@@ -1031,8 +1050,8 @@ itemdef {
 	group grpsettings
         type ITEM_TYPE_NUMERICFIELD
 	text "Time Bonus:"
-	cvar "ui_scoreTimeBonus" 
- 	rect 120 304 128 12 
+	cvar "ui_scoreTimeBonus"
+ 	rect 120 317 128 12
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 0
 	textaligny 12
@@ -1048,8 +1067,8 @@ itemDef {
 	group grpsettings
         type ITEM_TYPE_NUMERICFIELD
 	text "Shutout Bonus:"
-	cvar "ui_scoreShutoutBonus" 
- 	rect 120 317 128 12 
+	cvar "ui_scoreShutoutBonus"
+ 	rect 120 330 128 12
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 0
 	textaligny 12
@@ -1065,8 +1084,8 @@ itemDef {
 	group grpsettings
         type ITEM_TYPE_NUMERICFIELD
 	text "Skill Bonus:"
-	cvar "ui_scoreSkillBonus" 
- 	rect 120 330 128 12 
+	cvar "ui_scoreSkillBonus"
+ 	rect 120 343 128 12
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 0
 	textaligny 12
@@ -1082,8 +1101,8 @@ itemDef {
 	group grpsettings
   	type ITEM_TYPE_NUMERICFIELD
 	text "Total Score:"
-	cvar "ui_scoreScore" 
- 	rect 120 343 128 12 
+	cvar "ui_scoreScore"
+ 	rect 120 356 128 12
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 0
 	textaligny 12
@@ -1638,6 +1657,21 @@ itemDef {
 	textaligny 25
 	textscale .416
 	text "Set Movement and Combat Rules"
+	forecolor 1 1 1 1
+	decoration
+	visible 0
+	}
+itemDef {
+	name message_grapple
+	group grpmessage
+	style 0
+	rect 320 430 128 30
+	textstyle 1
+	textalign 1
+	textalignx 0
+	textaligny 25
+	textscale .416
+	text "Everyone Spawns with the Grapple"
 	forecolor 1 1 1 1
 	decoration
 	visible 0

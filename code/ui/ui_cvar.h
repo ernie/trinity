@@ -63,6 +63,8 @@ UI_CVAR( ui_gameType, "ui_gametype", "3", CVAR_ARCHIVE )
 // g_mode is systeminfo (servers push it onto clients), so the archived
 // preference lives here and is applied to g_mode at launch
 UI_CVAR( ui_mode, "ui_mode", "0", CVAR_ARCHIVE )
+// g_grapple isn't archived; the menu preference persists here, applied at launch
+UI_CVAR( ui_grapple, "ui_grapple", "0", CVAR_ARCHIVE )
 UI_CVAR( ui_joinGameType, "ui_joinGametype", "0", CVAR_ARCHIVE )
 UI_CVAR( ui_netGameType, "ui_netGametype", "3", CVAR_ARCHIVE )
 UI_CVAR( ui_actualNetGameType, "ui_actualNetGametype", "3", CVAR_ARCHIVE )

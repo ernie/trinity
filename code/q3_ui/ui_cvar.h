@@ -28,6 +28,9 @@ UI_CVAR( ui_ctf_friendly, "ui_ctf_friendly",  "0", CVAR_ARCHIVE )
 // preference lives here and is applied to g_mode at launch
 UI_CVAR( ui_mode, "ui_mode", "0", CVAR_ARCHIVE )
 
+// g_grapple isn't archived; the menu preference persists here, applied at launch
+UI_CVAR( ui_grapple, "ui_grapple", "0", CVAR_ARCHIVE )
+
 UI_CVAR( ui_arenasFile, "g_arenasFile", "", CVAR_INIT|CVAR_ROM )
 UI_CVAR( ui_botsFile, "g_botsFile", "", CVAR_ARCHIVE|CVAR_LATCH )
 UI_CVAR( ui_spScores1, "g_spScores1", "", CVAR_ARCHIVE )
