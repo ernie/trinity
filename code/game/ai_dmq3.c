@@ -17,6 +17,7 @@
 #include "be_ai_char.h"
 #include "be_ai_chat.h"
 #include "be_ai_gen.h"
+#include "bg_mode.h"
 #include "be_ai_goal.h"
 #include "be_ai_move.h"
 #include "be_ai_weap.h"
@@ -2677,6 +2678,172 @@ qboolean BotChaseRoutable(bot_state_t *bs, int areanum) {
 
 /*
 ==================
+BotCombatFloorLethal
+
+The probes see brushes; the kill volume over a pit floor is an entity a
+trace passes through, and the nav data is what knows that floor is death.
+==================
+*/
+static qboolean BotCombatFloorLethal(vec3_t floorpos) {
+	aas_areainfo_t info;
+	int area;
+
+	area = trap_AAS_PointAreaNum(floorpos);
+	if (!area) return qfalse;
+	trap_AAS_AreaInfo(area, &info);
+	return (info.contents & (AREACONTENTS_LAVA|AREACONTENTS_SLIME)) != 0;
+}
+
+/*
+==================
+BotCombatJumpArcSafe
+
+A jump commits a flight, not a line: flat probes cannot see a raised brush
+the hop lacks the height to clear, and the deflection off one lands on a
+line none of them priced. Fly the jump the way the body will and judge
+where it comes down.
+==================
+*/
+static qboolean BotCombatJumpArcSafe(bot_state_t *bs, vec3_t hor) {
+	aas_clientmove_t move;
+	aas_areainfo_t info;
+	bsp_trace_t tr;
+	vec3_t vel, cmdmove, dir, probe, down;
+	int area;
+
+	VectorSet(vel, bs->cur_ps.velocity[0], bs->cur_ps.velocity[1],
+			Mode_GetConfig(g_mode.integer)->jumpVelocity);
+	//the DECISION prices the committed arc: the model's air control steers
+	//far harder than the real one, and a stick-curved prediction lands
+	//where the body never arrives
+	VectorScale(hor, 40, cmdmove);
+	trap_AAS_PredictClientMovement(&move, bs->entitynum, bs->origin,
+			PRESENCE_NORMAL, qfalse, vel, cmdmove, 13, 13, 0.1f,
+			SE_HITGROUND|SE_HITGROUNDDAMAGE|SE_ENTERWATER|SE_ENTERSLIME
+				|SE_ENTERLAVA|SE_TOUCHJUMPPAD|SE_TOUCHTELEPORTER,
+			0, qfalse);
+	if (move.stopevent & (SE_ENTERSLIME|SE_ENTERLAVA|SE_HITGROUNDDAMAGE)) return qfalse;
+	//a pad or teleporter catches whatever lands on it
+	if (move.stopevent & (SE_TOUCHJUMPPAD|SE_TOUCHTELEPORTER)) return qtrue;
+	//no landing inside the horizon is a fall still going
+	if (!(move.stopevent & (SE_HITGROUND|SE_ENTERWATER))) return qfalse;
+	area = trap_AAS_PointAreaNum(move.endpos);
+	if (area) {
+		trap_AAS_AreaInfo(area, &info);
+		if (info.contents & (AREACONTENTS_LAVA|AREACONTENTS_SLIME)) return qfalse;
+	}
+	//the landing needs margin: knockback and drift bend the arc, and a
+	//landing that only holds at the exact point is a coin flip
+	VectorSet(dir, move.velocity[0], move.velocity[1], 0);
+	if (VectorNormalize(dir) < 0.1f) VectorCopy(hor, dir);
+	VectorMA(move.endpos, 64, dir, probe);
+	VectorCopy(probe, down);
+	down[2] -= 160;
+	BotAI_Trace(&tr, probe, NULL, NULL, down, bs->entitynum, MASK_PLAYERSOLID);
+	if (!tr.startsolid && tr.fraction >= 1.0f) return qfalse;
+	if (!tr.startsolid && BotCombatFloorLethal(tr.endpos)) return qfalse;
+	return qtrue;
+}
+
+/*
+==================
+BotCombatMoveSafe
+
+Combat movement prices dodge value and nothing else, so a strafe that
+carries over a ledge is taken as readily as one that does not: on a void
+map that is a pit death every few minutes. Probe the travel the move
+commits before the next think can take it back and refuse a direction
+whose floor is gone; the caller's own fallback picks another one, and
+standing to shoot beats diving.
+==================
+*/
+static qboolean BotCombatMoveSafe(bot_state_t *bs, vec3_t dir, int movetype) {
+	bsp_trace_t tr;
+	vec3_t hor, probe, down, high, mins, maxs;
+	float commit, landz;
+
+	VectorCopy(playerMins, mins);
+	VectorCopy(playerMaxs, maxs);
+	hor[0] = dir[0]; hor[1] = dir[1]; hor[2] = 0;
+	if (VectorNormalize(hor) < 0.1f) return qtrue;
+	//airborne the jump is committed but the air control is not: 400 of stick
+	//drifts the arc, and a dodge jump beside a ledge lands off it on the
+	//drift alone. Refuse control pushing toward floorless space; the deeper
+	//probe covers the height the arc still has to fall
+	if (bs->cur_ps.groundEntityNum == ENTITYNUM_NONE) {
+		VectorMA(bs->origin, 96, hor, probe);
+		BotAI_Trace(&tr, bs->origin, mins, maxs, probe, bs->entitynum, MASK_PLAYERSOLID);
+		if (tr.fraction < 1.0f) return qtrue;
+		VectorCopy(probe, down);
+		down[2] -= 512;
+		BotAI_Trace(&tr, probe, mins, maxs, down, bs->entitynum, MASK_PLAYERSOLID);
+		if (tr.fraction >= 1.0f) return qfalse;
+		//deep in a fall the pit's own floor comes into the probe's reach and
+		//every direction starts reading as landable
+		return !BotCombatFloorLethal(tr.endpos);
+	}
+	if (movetype == MOVE_JUMP) return BotCombatJumpArcSafe(bs, hor);
+	commit = 96;
+	VectorMA(bs->origin, commit, hor, probe);
+	//something solid on the way is a wall, not a ledge, but only a face too
+	//steep to walk on. A walkable slope re-probes from above its rise, so a
+	//ramp cannot pass as a wall and the end test below reads the void past
+	//its crest while the body is still on the slope
+	BotAI_Trace(&tr, bs->origin, mins, maxs, probe, bs->entitynum, MASK_PLAYERSOLID);
+	if (tr.fraction < 1.0f) {
+		if (tr.plane.normal[2] < 0.7f) return qtrue;
+		VectorCopy(bs->origin, high);
+		high[2] += 64;
+		VectorMA(high, commit, hor, probe);
+		BotAI_Trace(&tr, high, mins, maxs, probe, bs->entitynum, MASK_PLAYERSOLID);
+		if (tr.fraction < 1.0f) return qtrue;
+	}
+	//steps, ramps and one deck down stay legal; past this the floor is gone.
+	//The midpoint too: a gap narrower than the commit hides between the
+	//start and a far side that happens to hold floor. A MOVER under a JUMP's
+	//probe is floor that will not be there: the platform moves on while the
+	//arc is in the air, so the jump is priced as if the floor were gone; a
+	//walk can ride what it steps onto
+	VectorMA(bs->origin, commit * 0.5f, hor, down);
+	down[2] -= 160;
+	VectorMA(bs->origin, commit * 0.5f, hor, probe);
+	BotAI_Trace(&tr, probe, mins, maxs, down, bs->entitynum, MASK_PLAYERSOLID);
+	if (tr.fraction >= 1.0f) return qfalse;
+	if (BotCombatFloorLethal(tr.endpos)) return qfalse;
+	VectorMA(bs->origin, commit, hor, probe);
+	VectorCopy(probe, down);
+	down[2] -= 160;
+	BotAI_Trace(&tr, probe, mins, maxs, down, bs->entitynum, MASK_PLAYERSOLID);
+	if (tr.fraction >= 1.0f) return qfalse;
+	if (BotCombatFloorLethal(tr.endpos)) return qfalse;
+	landz = tr.endpos[2];
+	//a landing one deck down only counts while that deck continues: past
+	//its edge the next commit is the void, and the dodge chains off it
+	if (bs->origin[2] - landz > 40) {
+		VectorMA(probe, commit, hor, high);
+		high[2] = landz + 8;
+		VectorCopy(high, down);
+		down[2] -= 160;
+		BotAI_Trace(&tr, high, mins, maxs, down, bs->entitynum, MASK_PLAYERSOLID);
+		if (tr.fraction >= 1.0f) return qfalse;
+		if (BotCombatFloorLethal(tr.endpos)) return qfalse;
+		//a raised brush at the probe reads as floor while standing between
+		//the body and whatever lies beyond: continuation is owed PAST it
+		if (tr.startsolid || tr.endpos[2] > high[2] - 8) {
+			VectorMA(high, 96, hor, high);
+			high[2] += 48;
+			VectorCopy(high, down);
+			down[2] -= 208;
+			BotAI_Trace(&tr, high, mins, maxs, down, bs->entitynum, MASK_PLAYERSOLID);
+			if (tr.fraction >= 1.0f) return qfalse;
+			if (BotCombatFloorLethal(tr.endpos)) return qfalse;
+		}
+	}
+	return qtrue;
+}
+
+/*
+==================
 BotAttackMove
 ==================
 */
@@ -2725,6 +2892,20 @@ bot_moveresult_t BotAttackMove(bot_state_t *bs, int tfl) {
 	if (attack_skill < 0.2) return moveresult;
 	//initialize the movement state
 	BotSetupForMovement(bs);
+	//the gate prices the COMMAND, but the body follows command plus
+	//momentum, and a drift beside a ledge slides off while every command
+	//stays legal. A heading already over the void outranks any dodge:
+	//brake first, fight after
+	hordir[0] = bs->cur_ps.velocity[0];
+	hordir[1] = bs->cur_ps.velocity[1];
+	hordir[2] = 0;
+	if (VectorNormalize(hordir) > 150 && !BotCombatMoveSafe(bs, hordir, MOVE_WALK)) {
+		VectorNegate(hordir, hordir);
+		if (BotCombatMoveSafe(bs, hordir, MOVE_WALK)) {
+			trap_BotMoveInDirection(bs->ms, hordir, 400, MOVE_WALK);
+		}
+		return moveresult;
+	}
 	//get the enemy entity info
 	BotEntityInfo(attackentity, &entinfo);
 	//direction towards the enemy
@@ -2767,10 +2948,12 @@ bot_moveresult_t BotAttackMove(bot_state_t *bs, int tfl) {
 	if (attack_skill <= 0.4) {
 		//just walk to or away from the enemy
 		if (dist > attack_dist + attack_range) {
-			if (trap_BotMoveInDirection(bs->ms, forward, 400, movetype)) return moveresult;
+			if (BotCombatMoveSafe(bs, forward, movetype)
+					&& trap_BotMoveInDirection(bs->ms, forward, 400, movetype)) return moveresult;
 		}
 		if (dist < attack_dist - attack_range) {
-			if (trap_BotMoveInDirection(bs->ms, backward, 400, movetype)) return moveresult;
+			if (BotCombatMoveSafe(bs, backward, movetype)
+					&& trap_BotMoveInDirection(bs->ms, backward, 400, movetype)) return moveresult;
 		}
 		return moveresult;
 	}
@@ -2812,14 +2995,29 @@ bot_moveresult_t BotAttackMove(bot_state_t *bs, int tfl) {
 			}
 		}
 		//perform the movement
-		if (trap_BotMoveInDirection(bs->ms, sideward, 400, movetype))
+		if (BotCombatMoveSafe(bs, sideward, movetype)
+				&& trap_BotMoveInDirection(bs->ms, sideward, 400, movetype)) {
+			if (movetype == MOVE_JUMP && bot_grapple.integer >= 2) {
+				G_Printf("COMBAT-JUMP c%d vy %d %d t %d\n", bs->client,
+						(int) bs->cur_ps.velocity[0], (int) bs->cur_ps.velocity[1],
+						level.time);
+			}
 			return moveresult;
+		}
 		//movement failed, flip the strafe direction
 		bs->flags ^= BFL_STRAFERIGHT;
 		bs->attackstrafe_time = 0;
 	}
-	//bot couldn't do any usefull movement
-//	bs->attackchase_time = AAS_Time() + 6;
+	//every direction refused, but the body still carries the dodge's
+	//momentum toward whatever refused it: without a command the slide
+	//finishes what the gate stopped, so brake with a step back up the
+	//velocity when that step itself is safe
+	hordir[0] = -bs->cur_ps.velocity[0];
+	hordir[1] = -bs->cur_ps.velocity[1];
+	hordir[2] = 0;
+	if (VectorNormalize(hordir) > 50 && BotCombatMoveSafe(bs, hordir, MOVE_WALK)) {
+		trap_BotMoveInDirection(bs->ms, hordir, 400, MOVE_WALK);
+	}
 	return moveresult;
 }
 
@@ -4637,16 +4835,22 @@ void BotAIBlocked(bot_state_t *bs, bot_moveresult_t *moveresult, int activate) {
 	//
 	if (bs->flags & BFL_AVOIDRIGHT) VectorNegate(sideward, sideward);
 	// try to crouch straight forward?
-	if (!trap_BotMoveInDirection(bs->ms, hordir, 400, movetype)) {
+	//every nudge takes the ledge gate: an avoidance step is the one move
+	//nothing else prices, and beside an edge it walks off it
+	if (!BotCombatMoveSafe(bs, hordir, movetype)
+			|| !trap_BotMoveInDirection(bs->ms, hordir, 400, movetype)) {
 		// perform the movement
-		if (!trap_BotMoveInDirection(bs->ms, sideward, 400, movetype)) {
+		if (!BotCombatMoveSafe(bs, sideward, movetype)
+				|| !trap_BotMoveInDirection(bs->ms, sideward, 400, movetype)) {
 			// flip the avoid direction flag
 			bs->flags ^= BFL_AVOIDRIGHT;
 			// flip the direction
 			// VectorNegate(sideward, sideward);
 			VectorMA(sideward, -1, hordir, sideward);
 			// move in the other direction
-			trap_BotMoveInDirection(bs->ms, sideward, 400, movetype);
+			if (BotCombatMoveSafe(bs, sideward, movetype)) {
+				trap_BotMoveInDirection(bs->ms, sideward, 400, movetype);
+			}
 		}
 	}
 	//
@@ -5420,6 +5624,8 @@ void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
 		bs->lastdamageevent = bs->cur_ps.damageEvent;
 		bs->hurt_time = FloatTime();
 	}
+	//a lethal fall outranks whatever the node was doing
+	BotCheckGrappleSave(bs);
 	//stamp the think the pull bit clears, so the first shot after a tow
 	//can be timed
 	if (bs->grapplepulled && !(bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL)) {

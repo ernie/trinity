@@ -148,11 +148,37 @@ static void BotGrappleMantleRefuse(bot_state_t *bs, const char *why, int detail)
 
 /*
 ==================
+BotGrappleSaveFailed
+
+A failed save that gained no height feeds a streak; enough of a streak
+means the geometry has no way up from here, and the fall is let finish.
+==================
+*/
+static void BotGrappleSaveFailed(bot_state_t *bs) {
+	VectorCopy(bs->grapplesavepoint, bs->grapplebanned_org);
+	bs->grapplebanned_time = FloatTime();
+	if (bs->origin[2] <= bs->grapplefail_z + 64) bs->grapplefail_count++;
+	else bs->grapplefail_count = 1;
+	bs->grapplefail_z = bs->origin[2];
+	if (bs->grapplefail_count >= 4) {
+		bs->grapplefail_count = 0;
+		bs->grapplegiveup_time = FloatTime() + 8;
+	}
+}
+
+/*
+==================
 BotTacticalGrappleBegin
 ==================
 */
 static void BotTacticalGrappleBegin(bot_state_t *bs, int mode) {
 	bs->grapplemode = mode;
+	//botlib banks a fired route reach's cargo in the movestate and its frame
+	//hook judges any later bite against it, so a tactical hook biting under
+	//banked cargo reads as a huge miss and is let go a frame after it bit.
+	//The reset ends any outstanding route tow and leaves the frame hook
+	//nothing to judge; the router replans from scratch on its next think
+	if (bs->ms) trap_BotResetMoveState(bs->ms);
 }
 
 /*
@@ -664,6 +690,295 @@ void BotCheckGrappleRide(bot_state_t *bs, bot_moveresult_t *moveresult) {
 
 /*
 ==================
+BotGrappleSaveAnchor
+
+The point-finding half of the save, re-run every think until it answers: a
+falling view keeps uncovering geometry the last think's fan missed. Returns
+0 for no anchor, 1 for one the bot comes DOWN from, 2 for a deck-lip anchor
+whose way out is up.
+==================
+*/
+//what the last anchor search had to work with, for the nofind diagnostic
+static int saveanchor_fan, saveanchor_lips;
+
+static int BotGrappleSaveAnchor(bot_state_t *bs, vec3_t point) {
+	//up-steep through down-steep: the map above a falling bot is walls and
+	//lips, but a floor across the gap is safety a downward anchor can
+	//reach. Down stays STEEP: the body falls the hook's whole flight, and a
+	//shallow-down target at range is level with it by the bite
+	static const float savepitch[GRAPPLE_SAVE_PITCHES] = { -70, -55, -30, 45, 70 };
+	vec3_t testangles, forward[GRAPPLE_SAVE_CANDIDATES], hit[GRAPPLE_SAVE_CANDIDATES], start, end, dropvel;
+	bsp_trace_t bsptr;
+	trace_t tr;
+	aas_clientmove_t dropmove;
+	float aimcost[GRAPPLE_SAVE_CANDIDATES], dist[GRAPPLE_SAVE_CANDIDATES], yaw;
+	float facez[GRAPPLE_SAVE_CANDIDATES];
+	int order[GRAPPLE_SAVE_CANDIDATES], liptype[GRAPPLE_SAVE_CANDIDATES], nvalid;
+	int i, j, k, p, besti, tmp, droparc, droparea;
+
+	//a falling bot loses the map upwards, so fan pitches as well as yaws
+	nvalid = 0;
+	for (p = 0; p < GRAPPLE_SAVE_PITCHES; p++) {
+		for (i = 0; i < GRAPPLE_SAVE_YAWS; i++) {
+			yaw = bs->viewangles[YAW] + i * 45;
+			VectorSet(testangles, savepitch[p], yaw, 0);
+			AngleVectors(testangles, forward[nvalid], NULL, NULL);
+			VectorMA(bs->eye, GRAPPLE_SAVE_RANGE, forward[nvalid], end);
+			BotAI_Trace(&bsptr, bs->eye, NULL, NULL, end, bs->entitynum, MASK_SHOT);
+			if (bsptr.fraction >= 1 || (bsptr.surface.flags & SURF_SKY)) continue;
+			VectorCopy(bsptr.endpos, hit[nvalid]);
+			//yaw from the loop index, not AngleDifference: the symmetric +45/-45 pair
+			//would otherwise never compare equal and the distance tie-break would be dead
+			aimcost[nvalid] = ((i <= 4) ? i * 45.0f : (8 - i) * 45.0f)
+					+ fabs(AngleDifference(bs->viewangles[PITCH], savepitch[p]));
+			dist[nvalid] = GRAPPLE_SAVE_RANGE * bsptr.fraction;
+			facez[nvalid] = bsptr.plane.normal[2];
+			liptype[nvalid] = 0;
+			order[nvalid] = nvalid;
+			nvalid++;
+		}
+	}
+	//the fan samples fixed pitches, and a map of floating islands offers
+	//almost nothing but thin bands at the deck edges; most of it slips
+	//between the rays. The nav data knows where every deck is: aim just
+	//under the lip of each routable area's edge facing the bot, where a
+	//bite sits one step below standable ground and the mantle finishes the
+	//save upward. These skip the drop test: their way out is up
+	{
+		int areas[GRAPPLE_SAVE_AREAS], narea, a, lips;
+		aas_areainfo_t info;
+		vec3_t amins, amaxs, edge, dir2, tang;
+		float decktop, d;
+
+		VectorSet(amins, bs->origin[0] - 800, bs->origin[1] - 800, bs->origin[2] - 100);
+		VectorSet(amaxs, bs->origin[0] + 800, bs->origin[1] + 800, bs->origin[2] + 600);
+		narea = trap_AAS_BBoxAreas(amins, amaxs, areas, GRAPPLE_SAVE_AREAS);
+		lips = 0;
+		for (a = 0; a < narea && lips < GRAPPLE_SAVE_LIPS; a++) {
+			if (!trap_AAS_AreaReachability(areas[a])) continue;
+			trap_AAS_AreaInfo(areas[a], &info);
+			if (!(info.flags & AREA_GROUNDED)) continue;
+			//origin space: an origin stands 24 above the deck it walks
+			decktop = info.mins[2] - 24;
+			//the area edge nearest the bot; a bot inside the footprint gets
+			//the closest side, since the lip has to be a face, not a floor
+			edge[0] = bs->origin[0] < info.mins[0] ? info.mins[0]
+					: (bs->origin[0] > info.maxs[0] ? info.maxs[0] : bs->origin[0]);
+			edge[1] = bs->origin[1] < info.mins[1] ? info.mins[1]
+					: (bs->origin[1] > info.maxs[1] ? info.maxs[1] : bs->origin[1]);
+			if (edge[0] == bs->origin[0] && edge[1] == bs->origin[1]) {
+				float dx = (bs->origin[0] - info.mins[0] < info.maxs[0] - bs->origin[0])
+						? info.mins[0] : info.maxs[0];
+				float dy = (bs->origin[1] - info.mins[1] < info.maxs[1] - bs->origin[1])
+						? info.mins[1] : info.maxs[1];
+				if (fabs(dx - bs->origin[0]) < fabs(dy - bs->origin[1])) edge[0] = dx;
+				else edge[1] = dy;
+			}
+			edge[2] = decktop - 6;
+			VectorSubtract(edge, bs->eye, dir2);
+			d = VectorNormalize(dir2);
+			if (d < 40 || d > GRAPPLE_SAVE_RANGE) continue;
+			//through the lip point and a little past: the area edge is only
+			//approximately the physical face, and the hook needs a surface,
+			//not a coordinate. The hit has to be the band at the lip: not a
+			//wall in front of it, not the deck top far beyond it
+			//a lip whose vault just fell back is not worth an immediate retry
+			if (FloatTime() < bs->grapplebanned_time + 4.0f
+					&& Distance(edge, bs->grapplebanned_org) < 48) continue;
+			VectorMA(edge, 48, dir2, end);
+			BotAI_Trace(&bsptr, bs->eye, NULL, NULL, end, bs->entitynum, MASK_SHOT);
+			if (bsptr.fraction >= 1 || (bsptr.surface.flags & SURF_SKY)) continue;
+			if (Distance(bsptr.endpos, edge) > 64) continue;
+			if (fabs(bsptr.endpos[2] - edge[2]) > 24) continue;
+			//decks span many areas, so most area edges are interior seams:
+			//seen from below those resolve to the deck's UNDERSIDE, and only
+			//the hit plane tells a real island edge (a near-vertical band)
+			//from it
+			if (fabs(bsptr.plane.normal[2]) > 0.4f) continue;
+			VectorCopy(bsptr.endpos, hit[nvalid]);
+			VectorCopy(dir2, forward[nvalid]);
+			vectoangles(dir2, tang);
+			aimcost[nvalid] = fabs(AngleDifference(bs->viewangles[YAW], tang[YAW]))
+					+ fabs(AngleDifference(bs->viewangles[PITCH], tang[PITCH]));
+			dist[nvalid] = d * bsptr.fraction;
+			liptype[nvalid] = 1;
+			order[nvalid] = nvalid;
+			nvalid++;
+			lips++;
+		}
+		saveanchor_fan = nvalid - lips;
+		saveanchor_lips = lips;
+	}
+	//priority: cheapest to aim at wins (the view slew is the slow part), distance breaks ties
+	for (j = 0; j < nvalid; j++) {
+		besti = j;
+		for (k = j + 1; k < nvalid; k++) {
+			if (aimcost[order[k]] < aimcost[order[besti]]
+					|| (aimcost[order[k]] == aimcost[order[besti]] && dist[order[k]] < dist[order[besti]])) {
+				besti = k;
+			}
+		}
+		tmp = order[j]; order[j] = order[besti]; order[besti] = tmp;
+	}
+	//first candidate the bot can come DOWN from wins: predict the drop out of
+	//the hang the tow settles into, and take the anchor only if that drop
+	//lands somewhere the router can route from. The anchor itself proves
+	//nothing: the underside of a floating deck reads well from below and
+	//buys only a hang over the same void. Worse candidates never pay for the
+	//prediction, and a bare void underneath rejects on a trace alone
+	for (j = 0; j < nvalid; j++) {
+		i = order[j];
+		//an anchor that just failed this bot fails it again
+		if (FloatTime() < bs->grapplebanned_time + 5.0f
+				&& Distance(hit[i], bs->grapplebanned_org) < 48) continue;
+		//a lip candidate's exit is upward onto the deck it hangs from,
+		//already proven routable; only drop candidates owe a landing
+		if (liptype[i]) {
+			VectorCopy(hit[i], point);
+			return 2;
+		}
+		VectorMA(hit[i], -16, forward[i], start);
+		VectorCopy(start, end);
+		end[2] -= GRAPPLE_VOID_FLOOR_REACH;
+		trap_Trace(&tr, start, NULL, NULL, end, bs->entitynum, MASK_PLAYERSOLID);
+		if (tr.fraction >= 1.0f) continue;
+		VectorClear(dropvel);
+		droparc = BotGrapplePredictArc(bs, start, dropvel, 0, &dropmove);
+		if (droparc == GRAPPLE_ARC_LETHAL || droparc == GRAPPLE_ARC_UNRESOLVED) continue;
+		//the bar the entry set: a drop the bot cannot pay for is no save
+		if (droparc == GRAPPLE_ARC_PAINFUL && BotGrappleFallWouldKill(bs)) continue;
+		//a pad under the drop launches the bot back into play; anything else
+		//has to put the body in an area with a way onward
+		if (droparc != GRAPPLE_ARC_UNSCORED) {
+			droparea = trap_AAS_PointAreaNum(dropmove.endpos);
+			if (!droparea || !trap_AAS_AreaReachability(droparea)) continue;
+		}
+		VectorCopy(hit[i], point);
+		return 1;
+	}
+	//nothing qualifies outright: a catch that merely STOPS the fall still
+	//beats riding it out. The hang it buys re-searches from where it hangs,
+	//so a bare wall is a ladder rung, not a destination. An underside
+	//cannot be climbed out of, and a rung must top the last one taken, or
+	//the fall between hangs re-qualifies the same height forever
+	for (j = 0; j < nvalid; j++) {
+		i = order[j];
+		if (liptype[i]) continue;
+		if (FloatTime() < bs->grapplebanned_time + 5.0f
+				&& Distance(hit[i], bs->grapplebanned_org) < 48) continue;
+		if (facez[i] < -0.3f) continue;
+		if (hit[i][2] < bs->origin[2] - 128) continue;
+		if (FloatTime() < bs->grappleladder_time + 4.0f
+				&& hit[i][2] < bs->grappleladder_z + 32) continue;
+		//a floor-faced rung must not be the kill floor itself
+		if (facez[i] > 0.7f) {
+			aas_areainfo_t rinfo;
+			vec3_t rorg;
+			int rarea;
+
+			VectorCopy(hit[i], rorg);
+			rorg[2] += 24;
+			rarea = trap_AAS_PointAreaNum(rorg);
+			if (rarea) {
+				trap_AAS_AreaInfo(rarea, &rinfo);
+				if (rinfo.contents & (AREACONTENTS_LAVA|AREACONTENTS_SLIME)) continue;
+			}
+		}
+		VectorCopy(hit[i], point);
+		bs->grappleladder_time = FloatTime();
+		bs->grappleladder_z = hit[i][2];
+		return 3;
+	}
+	return 0;
+}
+
+/*
+==================
+BotCheckGrappleSave
+
+Node-independent survival reflex: no character skips saving its own life, and
+a lethal fall doesn't wait for a battle node to notice.
+==================
+*/
+void BotCheckGrappleSave(bot_state_t *bs) {
+	vec3_t point;
+	int found;
+
+	if (!BotGrappleAvailable(bs)) return;
+	if (bs->grapplemode != GRAPPLE_MODE_NONE) return;
+	//a corpse falling still passes every other gate; without this the frame
+	//function's own dead-guard re-arms the full cooldown every think
+	if (BotIsDead(bs) || BotIsObserver(bs) || BotIntermission(bs)) return;
+	if (bs->settings.skill < 3) return;
+	if (g_entities[bs->client].client->hook) return;
+	if (bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL) return;
+	//cheapest perils first: not falling, barely falling, already survivable.
+	//The fall-speed wait stays: a save that takes the view at the top of a
+	//knocked arc surrenders the air control that flies the bot home. The
+	//WEAPON is another matter: raising the hook costs most of a short fall,
+	//so a floorless descent claims the slot early while the view stays free
+	if (bs->cur_ps.groundEntityNum != ENTITYNUM_NONE) {
+		//real footing clears the failure streak
+		bs->grapplefail_count = 0;
+		return;
+	}
+	//enough failures without climbing: this geometry has no way up, and
+	//another identical try is not survival
+	if (FloatTime() < bs->grapplegiveup_time) return;
+	if (bs->cur_ps.velocity[2] > -100) {
+		if (bs->cur_ps.velocity[2] < 0 && !g_entities[bs->client].client->hook
+				&& bs->routeshot_time != FloatTime()) {
+			trace_t ftr;
+			vec3_t below;
+
+			VectorCopy(bs->origin, below);
+			below[2] -= 1024;
+			trap_Trace(&ftr, bs->origin, NULL, NULL, below, bs->entitynum, MASK_PLAYERSOLID);
+			if (ftr.fraction >= 1.0f) bs->weaponnum = WP_GRAPPLING_HOOK;
+		}
+		return;
+	}
+	{
+		aas_clientmove_t arcmove;
+		int arc;
+
+		arc = BotGrappleArc(bs, &arcmove);
+		if (arc == GRAPPLE_ARC_SAFE || arc == GRAPPLE_ARC_UNSCORED
+				|| arc == GRAPPLE_ARC_UNRESOLVED) return;
+		//the fall after a route release already has a landing; only a lethal
+		//read overrides that
+		if (arc != GRAPPLE_ARC_LETHAL && FloatTime() < bs->routeshot_time + 3.0f) return;
+		//a painful landing is a capped bite, worth a hook only when it would finish the bot
+		if (arc == GRAPPLE_ARC_PAINFUL && !BotGrappleFallWouldKill(bs)) return;
+	}
+
+	//the doom is read, so the draw starts NOW: the weapon raise costs most of
+	//a short fall, and an anchor a later think uncovers is worthless if the
+	//hook is still holstered when it appears. The mode claims weapon and
+	//trigger; the search keeps running from the frame function until it
+	//answers or the danger passes
+	BotTacticalGrappleBegin(bs, GRAPPLE_MODE_SAVE);
+	//claim the weapon slot before the node's consumers read it
+	bs->weaponnum = WP_GRAPPLING_HOOK;
+	bs->grapplehookent = 0;
+	bs->grapplestart_time = FloatTime();
+	bs->grapplepull_time = 0;
+	found = BotGrappleSaveAnchor(bs, point);
+	if (found) {
+		VectorCopy(point, bs->grapplesavepoint);
+		bs->grappleent = ENTITYNUM_WORLD;
+		bs->grapplesavelip = (found == 2);
+	}
+	else {
+		//keep falling armed: no anchor qualifies from here, but the fan
+		//re-runs every think and the fall keeps changing what it can see
+		bs->grappleent = ENTITYNUM_NONE;
+		bs->grapplesavelip = 0;
+	}
+}
+
+/*
+==================
 BotCheckGrappleSpeed
 
 A player on a long straight run hooks something ahead and above and lets go
@@ -1170,6 +1485,40 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 		BotTacticalGrappleEnd(bs, qfalse);
 		return;
 	}
+	//the vault's rise: the node's movement keeps pushing toward the deck,
+	//and air control into the face below the lip clips the corner and eats
+	//the climb. Hold the stick until the feet reach step-up range of the
+	//deck, then push in; the ride ends on ground, or falls back to the fall
+	//the reflex owns. This outranks the hook-gone ending: the ride IS the
+	//save's ending
+	if (bs->grapplemode == GRAPPLE_MODE_SAVE && bs->grapplevault_time > 0) {
+		vec3_t in;
+
+		//falling back below the lip is the vault failing: hand the fall to
+		//the reflex NOW, and remember the lip so the re-search tries
+		//something else
+		if (bs->cur_ps.velocity[2] < 0
+				&& bs->origin[2] < bs->grapplevault_deckz - 40) {
+			BotGrappleSaveFailed(bs);
+			BotTacticalGrappleEnd(bs, qtrue);
+			return;
+		}
+		if (bs->cur_ps.groundEntityNum != ENTITYNUM_NONE
+				|| FloatTime() > bs->grapplevault_time + 2.0f) {
+			BotTacticalGrappleEnd(bs, qfalse);
+			return;
+		}
+		VectorSubtract(bs->grapplesavepoint, bs->origin, in);
+		in[2] = 0;
+		if (VectorNormalize(in) > 0.1f
+				&& bs->origin[2] - 24 >= bs->grapplevault_deckz - 18) {
+			trap_EA_Move(bs->client, in, 400);
+		}
+		else {
+			trap_EA_Move(bs->client, in, 0);
+		}
+		return;
+	}
 	hook = g_entities[bs->client].client->hook;
 	pulled = bs->cur_ps.pm_flags & PMF_GRAPPLE_PULL;
 	//one hook per press, so a launched hook that is gone was freed: done,
@@ -1217,6 +1566,43 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 			bs->weaponnum = WP_GRAPPLING_HOOK;
 			BotGrappleAimDir(bs, aimpoint);
 		}
+		else if (bs->grapplemode == GRAPPLE_MODE_SAVE) {
+			//the danger may have already passed (landed, ground came into range)
+			if (BotGrappleReleaseSafe(bs)) {
+				BotTacticalGrappleEnd(bs, qtrue);
+				return;
+			}
+			bs->weaponnum = WP_GRAPPLING_HOOK;
+			//drawn but still searching: the fan re-runs as the fall uncovers
+			//geometry, and until it answers the view stays the bot's own
+			if (bs->grappleent == ENTITYNUM_NONE) {
+				int found = BotGrappleSaveAnchor(bs, aimpoint);
+
+				if (!found) {
+					if (bot_grapple.integer >= 2
+							&& FloatTime() > bs->grapplesavelog_time + 0.5f) {
+						bs->grapplesavelog_time = FloatTime();
+						G_Printf("GRAPPLE-SAVE c%d nofind fan %d lips %d t %d\n",
+								bs->client, saveanchor_fan, saveanchor_lips, level.time);
+					}
+					return;
+				}
+				VectorCopy(aimpoint, bs->grapplesavepoint);
+				bs->grappleent = ENTITYNUM_WORLD;
+				bs->grapplesavelip = (found == 2);
+			}
+			//a world point can't go stale: no validity check, no End path
+			VectorCopy(bs->grapplesavepoint, aimpoint);
+			BotGrappleAimDir(bs, aimpoint);
+			if (bot_grapple.integer >= 2
+					&& FloatTime() > bs->grapplesavelog_time + 0.5f) {
+				bs->grapplesavelog_time = FloatTime();
+				G_Printf("GRAPPLE-SAVE c%d aim dy %d dp %d lip %d t %d\n", bs->client,
+						(int) AngleDifference(bs->viewangles[YAW], bs->ideal_viewangles[YAW]),
+						(int) AngleDifference(bs->viewangles[PITCH], bs->ideal_viewangles[PITCH]),
+						bs->grapplesavelip, level.time);
+			}
+		}
 		else {
 			//a speed hook's anchor is a world point too, and the run it was
 			//picked from is still under the bot
@@ -1251,6 +1637,10 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 					: (bsptr.fraction >= 1 || bsptr.ent == bs->grappleent)) {
 				trap_EA_Attack(bs->client);
 			}
+			else if (bs->grapplemode == GRAPPLE_MODE_SAVE) {
+				//the line is gone; hand the target back to the fan
+				bs->grappleent = ENTITYNUM_NONE;
+			}
 		}
 		return;
 	}
@@ -1283,6 +1673,11 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 				return;
 			}
 		}
+		else if (bs->grapplemode == GRAPPLE_MODE_SAVE && BotGrappleReleaseSafe(bs)) {
+			//the danger passed before the pad even landed; stand down
+			BotTacticalGrappleEnd(bs, qtrue);
+			return;
+		}
 		//backstop: a shot that never got anywhere near is also a failed launch
 		if (FloatTime() > bs->grapplestart_time + GRAPPLE_YANK_FIREWINDOW + GRAPPLE_YANK_FLIGHTWINDOW) {
 			BotTacticalGrappleEnd(bs, qtrue);
@@ -1299,6 +1694,16 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 		bs->grapplemantle_time = 0;
 		bs->grapplemantle_deckz = 0;
 		bs->grapplesettle_time = 0;
+		//a bite far from the chosen anchor is the wrong surface, and every
+		//exit the anchor was picked for is gone with it: let go while the
+		//fall still has room for another try, and ban the AIM, or the next
+		//fall's fan re-offers the same shot through the same gap forever
+		if (bs->grapplemode == GRAPPLE_MODE_SAVE
+				&& Distance(bs->cur_ps.grapplePoint, bs->grapplesavepoint) > 64) {
+			BotGrappleSaveFailed(bs);
+			BotTacticalGrappleEnd(bs, qtrue);
+			return;
+		}
 	}
 	//lip anchors release frame-side (BotGrappleFrameRelease); a frame that
 	//already let go ends the save through the hook-gone path above
@@ -1340,6 +1745,55 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 			return;
 		}
 	}
+	//a hang going nowhere can still SEE: re-run the anchor search from it,
+	//and a fresh target frees this hook on purpose and re-fires without
+	//leaving the mode. The mantle keeps first claim on hangs it can step
+	//out of
+	if (bs->grapplemode == GRAPPLE_MODE_SAVE
+			&& bs->grapplemantle_time <= 0
+			&& ((bs->grapplesettle_time && FloatTime() > bs->grapplesettle_time + 0.5f)
+				|| FloatTime() > bs->grapplepull_time + 1.5f)) {
+		vec3_t newpoint;
+		int found;
+
+		found = BotGrappleSaveAnchor(bs, newpoint);
+		//a bare catch re-taken from a hang must CLIMB, or the ladder loops
+		if (found == 3 && newpoint[2] < bs->cur_ps.grapplePoint[2] + 64) found = 0;
+		if (!found && bot_grapple.integer >= 2
+				&& FloatTime() > bs->grapplesavelog_time + 0.5f) {
+			bs->grapplesavelog_time = FloatTime();
+			G_Printf("GRAPPLE-SAVE c%d hangfind fan %d lips %d t %d\n",
+					bs->client, saveanchor_fan, saveanchor_lips, level.time);
+		}
+		if (found && Distance(newpoint, bs->cur_ps.grapplePoint) > 64) {
+			VectorCopy(newpoint, bs->grapplesavepoint);
+			bs->grapplesavelip = (found == 2);
+			bs->grappleent = ENTITYNUM_WORLD;
+			bs->grappleretarget_time = FloatTime();
+			if (bot_grapple.integer >= 2) {
+				G_Printf("GRAPPLE-SAVE c%d retarget lip %d t %d\n",
+						bs->client, bs->grapplesavelip, level.time);
+			}
+			//withholding the trigger this think is the release; the freed
+			//hook hands the mode to the pre-launch flow with the new point
+			bs->weaponnum = WP_GRAPPLING_HOOK;
+			return;
+		}
+	}
+	//a hang with no mantle, no safe drop and no better anchor is hopeless:
+	//the anchor is static, so nothing improves with holding, and the fall a
+	//release hands back gets the whole search again. A hang that never
+	//reads settled is pinned short of its target and gets the longer fuse
+	if (bs->grapplemode == GRAPPLE_MODE_SAVE
+			&& bs->grapplemantle_time <= 0
+			&& ((bs->grapplesettle_time
+					&& FloatTime() > bs->grapplesettle_time + 0.5f
+					&& FloatTime() > bs->grapplepull_time + 2.0f)
+				|| FloatTime() > bs->grapplepull_time + 4.0f)) {
+		BotGrappleSaveFailed(bs);
+		BotTacticalGrappleEnd(bs, qtrue);
+		return;
+	}
 	wantrelease = qfalse;
 	whiff = qfalse;
 	//attach identity: latching onto the wrong target/mover is a whiff, not a hit
@@ -1359,6 +1813,11 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 			wantrelease = qtrue;
 			whiff = qtrue;
 		}
+	}
+	else if (bs->grapplemode == GRAPPLE_MODE_SAVE) {
+		//any solid anchor is a successful save; retry-soon cooldown, not the full one
+		wantrelease = qtrue;
+		whiff = qtrue;
 	}
 	else {
 		float hspeed = sqrt(bs->cur_ps.velocity[0] * bs->cur_ps.velocity[0]

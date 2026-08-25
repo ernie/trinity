@@ -10,6 +10,7 @@
 
 void		BotCheckTacticalGrapple(bot_state_t *bs, aas_entityinfo_t *entinfo);
 void		BotCheckGrappleRide(bot_state_t *bs, bot_moveresult_t *moveresult);
+void		BotCheckGrappleSave(bot_state_t *bs);
 void		BotCheckGrappleSpeed(bot_state_t *bs, bot_moveresult_t *moveresult);
 void		BotTacticalGrappleFrame(bot_state_t *bs);
 int			BotTacticalGrappleActive(bot_state_t *bs);

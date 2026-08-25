@@ -1644,6 +1644,9 @@ int BotInitLibrary( void ) {
 	//bot developer mode and log file
 	trap_BotLibVarSet("bot_developer", bot_developer.string);
 	trap_BotLibVarSet("log", buf);
+	//this game sets the grapple view to the ideal exactly on the firing
+	//command, so a route shot may fire on position alone
+	trap_BotLibVarSet("bot_grappleaim", "1");
 	//no chatting
 	trap_Cvar_VariableStringBuffer("bot_nochat", buf, sizeof(buf));
 	if ( buf[0] )

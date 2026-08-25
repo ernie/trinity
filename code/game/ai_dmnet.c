@@ -2228,6 +2228,13 @@ int AINode_Battle_Chase(bot_state_t *bs)
 	}
 	//map specific code
 	BotMapScripts(bs);
+	//no route to the last seen spot means the chase cannot be walked, and
+	//BotMoveToGoal would walk the straight line at it instead, off whatever
+	//ledge lies between
+	if (!BotChaseRoutable(bs, bs->lastenemyareanum)) {
+		AIEnter_Seek_LTG(bs, "battle chase: no route");
+		return qfalse;
+	}
 	//create the chase goal
 	goal.entitynum = bs->enemy;
 	goal.areanum = bs->lastenemyareanum;

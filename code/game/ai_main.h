@@ -201,10 +201,20 @@ typedef struct bot_state_s
 	float grapplemantle_deckz;						//top of the deck a mantle is climbing onto
 	float grapplesettle_time;						//when the hang stopped moving, 0 when not settled
 	float grapplemantlelog_time;					//last mantle-refusal diagnostic, to rate-limit it
+	float grapplesavelog_time;						//last save-search diagnostic, to rate-limit it
 	float grappleretarget_time;						//when a hanging save picked a new anchor; the
 													//hook it frees on purpose must not end the mode
 	vec3_t grapplehang_org;							//where the hang was last think: a pinned body
 													//reads high commanded speed while going nowhere
+	float grappleladder_time;						//when the last ladder rung was taken
+	float grappleladder_z;							//its height: the next rung must top it, across
+													//the falls between hangs
+	float grapplebanned_time;						//when a save anchor last failed its bot
+	vec3_t grapplebanned_org;						//that anchor: not worth an immediate retry
+	int grapplefail_count;							//consecutive failed saves without altitude gained
+	float grapplefail_z;							//height of the last failure
+	float grapplegiveup_time;						//saves suppressed until then: cycling anchors
+													//that never climb is not survival
 	int grapplesavelip;								//the save's anchor hangs under a routable deck lip
 	float grapplevault_time;						//the frame side let the vault go; holds the trigger
 													//up until the ride ends
