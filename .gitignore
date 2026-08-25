@@ -1,5 +1,7 @@
 # Claude Code
 .claude/
+CLAUDE.md
+docs/superpowers/
 
 # Distribution output
 dist/
