@@ -574,6 +574,9 @@ static void CG_Missile( centity_t *cent ) {
 		float	seat;
 
 		CG_GrappleHookAxis( cent, ent.axis );
+		// half-open for flight, the pose it leaves the bore with; it splays
+		// the rest of the way on the clamp
+		ent.frame = ent.oldframe = PAD_FRAME_STOWED;
 		// in flight the pad lights with the tether streaming off it,
 		// rings running outward at flight pace
 		CG_GrappleOwnerRGBA( s1->otherEntityNum, ent.shaderRGBA.rgba );
@@ -717,6 +720,8 @@ static void CG_Grapple( centity_t *cent ) {
 	float				pulse;
 	float				dscale;
 	float				dradius;
+	float				fpos;
+	int					fi;
 
 	s1 = &cent->currentState;
 	if ( s1->weapon >= WP_NUM_WEAPONS ) {
@@ -794,8 +799,20 @@ static void CG_Grapple( centity_t *cent ) {
 	ent.hModel = weapon->missileModel;
 	ent.renderfx = weapon->missileRenderfx | RF_NOSHADOW;
 
-	// clamped onto the surface rather than folded for flight
-	ent.frame = ent.oldframe = PAD_FRAME_CLAMPED;
+	// splaying onto the surface from the half-open flight pose, stepped a
+	// frame at a time like the fall retract so the rigid blades never lerp
+	// across more than one authored step
+	fpos = PAD_FRAME_STOWED + CG_GrappleClampFrac( s1->otherEntityNum, s1->number )
+		* ( PAD_FRAME_CLAMPED - PAD_FRAME_STOWED );
+	fi = (int)fpos;
+	if ( fi >= PAD_FRAME_CLAMPED ) {
+		ent.frame = ent.oldframe = PAD_FRAME_CLAMPED;
+		ent.backlerp = 0;
+	} else {
+		ent.oldframe = fi;
+		ent.frame = fi + 1;
+		ent.backlerp = 1.0f - ( fpos - fi );
+	}
 
 	// the server froze the surface normal into angles at impact: +X runs into what it hit
 	CG_GrappleHookAxis( cent, ent.axis );

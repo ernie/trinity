@@ -166,12 +166,13 @@
 
 // the pad materializes on the dock after a release (GRAPPLE_RELOAD)
 #define PAD_SEAT_TIME		330		// ms from release to seated
-// 1.00 = fade-only, no growth (identity scale, zero boss-pivot shift at
-// both cg_weapons.c and cg_ents.c); below 1.00 it grows from the boss
+// 1.00 = fade-only, no growth; below 1.00 it grows from the boss
 #define PAD_SEAT_SCALE0		1.00f	// scale it grows from
-// no PAD_SEAT_CURVE: the spec's 1.6 exponent is baked as seat*sqrt(seat) = 1.5,
+// no PAD_SEAT_CURVE: the intended 1.6 ease is baked as seat*sqrt(seat),
 // since pow() is not in the QVM libc
-#define PAD_SEAT_ALPHA		0.70f	// fraction of the window alpha finishes in
+#define PAD_SEAT_ALPHA		0.40f	// fraction of the window alpha finishes in; the
+									// claw fold is ease-out and front-loaded, so a
+									// late finish plays most of it translucent
 #define PAD_SEAT_SPIN		180		// deg the pad unwinds through as it forms
 #define PAD_SEAT_ARC_SPIKE	1.00f	// arc density push while seating
 #define PAD_SEAT_RESET		500		// ms gap that means a restart or a seek
@@ -1601,10 +1602,13 @@ void CG_AxisToAngles( vec3_t axis[3], vec3_t angles );
 void CG_GrapplePadMark( const vec3_t origin, vec3_t axis[3],
 		qboolean temporary );
 
-// grapple_pad.md3 poses: arms folded back along the body in the bore and in
-// flight, splayed flat only once the pad has clamped onto a surface
+// grapple_pad.md3 poses: arms folded back along the body only after the
+// dropped pad's fall retract, held half-open in the bore and in flight,
+// splayed flat once the pad has clamped onto a surface
 #define PAD_FRAME_FOLDED	0
+#define PAD_FRAME_STOWED	6
 #define PAD_FRAME_CLAMPED	12
+#define PAD_CLAMP_SPLAY		60		// ms the claws take to splay onto a hit
 void CG_AdjustPositionForMover( const vec3_t in, int moverNum, int fromTime, int toTime, vec3_t out, const vec3_t angles_in, vec3_t angles_out );
 
 void CG_PositionEntityOnTag( refEntity_t *entity, const refEntity_t *parent, 
@@ -1640,6 +1644,7 @@ void CG_GrappleSeatRestart( int clientNum );
 void CG_GrappleSeatSnap( int clientNum );
 void CG_GrappleLaunchSeen( int owner, int hookNum );
 void CG_GrappleLaunchEnded( int owner, int hookNum );
+float CG_GrappleClampFrac( int owner, int hookNum );
 void CG_GrappleResetState( void );
 float CG_GrappleDlightScale( void );
 float CG_GrappleDlightRadius( float base );

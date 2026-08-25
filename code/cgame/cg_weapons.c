@@ -695,6 +695,7 @@ the zeroed array is already correct at map load.
 ==========================
 */
 static void CG_GrappleSeatFired( int clientNum );
+static int CG_GrappleSeatSettled( int clientNum );
 
 static int	cg_lastHookNum[MAX_CLIENTS];
 
@@ -751,6 +752,10 @@ the glass energy's 3x wave-rate cadence wagon-wheels the motion to a standstill.
 #define GLOW_IDLE_LEVEL		0.40f
 #define GLOW_ACTIVE_LEVEL	0.95f
 #define GLOW_PULL_LEVEL		0.75f
+// one-shot glide off the reload surge into idle when the seat lands; a
+// transient, not a periodic modulation, so it cannot wagon-wheel the
+// ring motion the flat envelope protects
+#define GLOW_SETTLE_MS		150
 
 static float CG_GrappleEnvelope( int act ) {
 	if ( act == GRAPPLE_PULL ) {
@@ -774,7 +779,24 @@ energy (the pad's emission stage). NOT its dlight, which rides its own swell.
 ==========================
 */
 float CG_GrapplePulse( int clientNum ) {
-	return CG_GrappleEnvelope( CG_GrappleActivity( clientNum ) );
+	int		act, settled, delta;
+	float	level;
+
+	act = CG_GrappleActivity( clientNum );
+	level = CG_GrappleEnvelope( act );
+	// the reload surge would end on a step the frame the seat lands; glide
+	// it into idle instead
+	if ( act == GRAPPLE_IDLE ) {
+		settled = CG_GrappleSeatSettled( clientNum );
+		if ( settled ) {
+			delta = cg.time - settled;
+			if ( delta >= 0 && delta < GLOW_SETTLE_MS ) {
+				level += ( GLOW_ACTIVE_LEVEL - level )
+					* ( 1.0f - (float)delta / (float)GLOW_SETTLE_MS );
+			}
+		}
+	}
+	return level;
 }
 
 /*
@@ -1187,6 +1209,9 @@ typedef struct {
 	int		time;			// cg.time this was last advanced
 	float	progress;
 	int		fired;			// set once the hook has launched: ramp finishes in flight
+	int		settled;		// cg.time the ramp ADVANCED to completion; a snap or a
+							// seek reset leaves it alone, so only a watched landing
+							// plays the surge's settle glide
 } padSeat_t;
 
 static padSeat_t	cg_padSeat[MAX_CLIENTS];
@@ -1220,12 +1245,20 @@ float CG_GrappleSeat( int clientNum ) {
 	} else if ( p->progress < 1.0f ) {
 		p->progress += delta * ( p->fired ? PAD_SEAT_FIRE_BOOST : 1.0f )
 			/ (float)PAD_SEAT_TIME;
-		if ( p->progress > 1.0f ) {
+		if ( p->progress >= 1.0f ) {
 			p->progress = 1.0f;
+			p->settled = cg.time;
 		}
 	}
 	p->time = cg.time;
 	return p->progress;
+}
+
+static int CG_GrappleSeatSettled( int clientNum ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return 0;
+	}
+	return cg_padSeat[ clientNum ].settled;
 }
 
 void CG_GrappleSeatRestart( int clientNum ) {
@@ -1270,6 +1303,42 @@ void CG_GrappleSeatSnap( int clientNum ) {
 
 /*
 ==========================
+CG_GrappleClampFrac
+
+How far through the splay an anchored pad is, 0..1. Keyed by hook entity
+like the launch edge: an owner has one hook at a time, and a recycled
+slot restamps because the number changes. A seek replays the walk, the
+same exposure the launch key already accepts.
+==========================
+*/
+typedef struct {
+	int		hookNum;
+	int		time;			// cg.time this hook was first seen anchored
+} padClamp_t;
+
+static padClamp_t	cg_padClamp[MAX_CLIENTS];
+
+float CG_GrappleClampFrac( int owner, int hookNum ) {
+	padClamp_t	*p;
+	int			delta;
+
+	if ( owner < 0 || owner >= MAX_CLIENTS ) {
+		return 1.0f;
+	}
+	p = &cg_padClamp[ owner ];
+	if ( p->hookNum != hookNum ) {
+		p->hookNum = hookNum;
+		p->time = cg.time;
+	}
+	delta = cg.time - p->time;
+	if ( delta < 0 || delta >= PAD_CLAMP_SPLAY ) {
+		return 1.0f;
+	}
+	return delta / (float)PAD_CLAMP_SPLAY;
+}
+
+/*
+==========================
 CG_GrappleResetState
 
 Every per-wielder grapple ramp advances against cg.time, and the launch key
@@ -1280,6 +1349,7 @@ hook already on the wire, which then has to read as a fresh launch.
 */
 void CG_GrappleResetState( void ) {
 	memset( cg_padSeat, 0, sizeof( cg_padSeat ) );
+	memset( cg_padClamp, 0, sizeof( cg_padClamp ) );
 	memset( cg_arcFactors, 0, sizeof( cg_arcFactors ) );
 	memset( cg_lastHookNum, 0, sizeof( cg_lastHookNum ) );
 }
@@ -2481,7 +2551,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 	grapplePulse = 1.0f;
 	if ( weaponNum == WP_GRAPPLING_HOOK ) {
 		grappleAct = CG_GrappleActivity( cent->currentState.clientNum );
-		grapplePulse = CG_GrappleEnvelope( grappleAct );
+		grapplePulse = CG_GrapplePulse( cent->currentState.clientNum );
 		CG_GrappleOwnerRGBA( cent->currentState.clientNum, gun.shaderRGBA.rgba );
 		CG_GrappleFade( gun.shaderRGBA.rgba, grapplePulse );
 		// the state also picks the stream's direction and pace: base shader
@@ -2614,8 +2684,8 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		hook.shadowPlane = parent->shadowPlane;
 		hook.renderfx = parent->renderfx;
 		hook.hModel = weapon->missileModel;
-		// folded in the bore, same as in flight; it only splays on a clamp
-		hook.frame = hook.oldframe = PAD_FRAME_FOLDED;
+		// half-open in the bore, same as in flight; it splays fully on a clamp
+		hook.frame = hook.oldframe = PAD_FRAME_STOWED;
 		// the round in the bore lights off the same charge as the launcher
 		Byte4Copy( gun.shaderRGBA.rgba, hook.shaderRGBA.rgba );
 
@@ -2632,8 +2702,9 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		// never letting go
 		seat = CG_GrappleSeat( cent->currentState.clientNum );
 		if ( seat < 1.0f ) {
-			float	e, s, roll, d, r;
-			vec3_t	t1, t2;
+			float	e, s, roll, d, r, cf, fpos;
+			int		fi;
+			vec3_t	fwd, t1, t2;
 
 			// seat^1.5 via sqrt; pow() is not in the QVM libc, and 1.5
 			// reads the same as the intended 1.6
@@ -2641,26 +2712,48 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			e = e * e * ( 3.0f - 2.0f * e );
 			s = PAD_SEAT_SCALE0 + ( 1.0f - PAD_SEAT_SCALE0 ) * e;
 
-			// unwind from PAD_SEAT_SPIN down to 0 about the pad's own
-			// forward. axis[0] points away from the viewer (same convention
-			// CG_GrappleHookAxis relies on), where a positive angle in
-			// RotatePointAroundVector reads CLOCKWISE - so a shrinking
-			// positive angle is what unwinds counterclockwise.
-			// Must run on the still-unit-length axis[0], before the extrude
-			// below scales it: RotatePointAroundVector needs a unit
-			// direction, and this is only masked right now because
-			// PAD_SEAT_SCALE0 is 1.00. RotatePointAroundVector also can't
-			// rotate a vector into itself, hence the temporaries.
-			// Own cubic ease-out on raw seat, not e: the roll wants to spin
-			// briskly off the mark and decelerate into rest, where e's
-			// smoothstep is shaped for a symmetric grow instead.
+			// Unwind PAD_SEAT_SPIN to 0 about a normalized copy of axis[0],
+			// before the extrude below adds scale: RotatePointAroundVector
+			// needs a unit direction (a scaled one warps the frame), and in
+			// VR the hand scale rides the tag chain into axis[0].  It also
+			// can't rotate a vector into itself, hence the temporaries.
+			// axis[0] recedes from the viewer, so a positive angle reads
+			// clockwise and a shrinking positive angle unwinds
+			// counterclockwise.  Cubic ease-out on raw seat, not e: the roll
+			// spins briskly off the mark and decelerates into rest, where
+			// e's smoothstep is shaped for a symmetric grow.
 			d = 1.0f - seat;
 			r = 1.0f - d * d * d;
 			roll = PAD_SEAT_SPIN * ( 1.0f - r );
+			VectorCopy( hook.axis[0], fwd );
+			VectorNormalize( fwd );
 			VectorCopy( hook.axis[1], t1 );
 			VectorCopy( hook.axis[2], t2 );
-			RotatePointAroundVector( hook.axis[1], hook.axis[0], t1, roll );
-			RotatePointAroundVector( hook.axis[2], hook.axis[0], t2, roll );
+			RotatePointAroundVector( hook.axis[1], fwd, t1, roll );
+			RotatePointAroundVector( hook.axis[2], fwd, t2, roll );
+
+			// the claws hold the splay they last clamped with through the
+			// fade and fold to the stow pose only once it lands: the fold is
+			// the seat's one readable motion, so it plays fully opaque. The
+			// roll's cubic ease-out, remapped onto the post-fade remainder
+			// of the window. Stepped a frame at a time like the fall
+			// retract, so the rigid blades never lerp across more than one
+			// authored step
+			cf = ( seat - PAD_SEAT_ALPHA ) / ( 1.0f - PAD_SEAT_ALPHA );
+			if ( cf < 0 ) {
+				cf = 0;
+			}
+			cf = 1.0f - cf;
+			fpos = PAD_FRAME_STOWED + ( PAD_FRAME_CLAMPED - PAD_FRAME_STOWED ) * cf * cf * cf;
+			fi = (int)fpos;
+			if ( fi >= PAD_FRAME_CLAMPED ) {
+				hook.frame = hook.oldframe = PAD_FRAME_CLAMPED;
+				hook.backlerp = 0;
+			} else {
+				hook.oldframe = fi;
+				hook.frame = fi + 1;
+				hook.backlerp = 1.0f - ( fpos - fi );
+			}
 
 			// PAD_BOSS_X0 back along the pad's own forward, then out again
 			// by the scaled amount
