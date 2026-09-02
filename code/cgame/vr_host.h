@@ -22,6 +22,12 @@
 #ifndef VR_HOST_HAS_WARMUP_EVENTS
 #define VR_HOST_HAS_WARMUP_EVENTS 0
 #endif
+#ifndef VR_HOST_HAS_GRAPPLE
+#define VR_HOST_HAS_GRAPPLE 0
+#endif
+#ifndef VR_HOST_HAS_TRACE_RENDER
+#define VR_HOST_HAS_TRACE_RENDER 0
+#endif
 
 // ---- Tunables (host may predefine; defaults match this tree) --------------
 
@@ -68,6 +74,19 @@ void CG_LaserSight( vec3_t start, vec3_t end, byte colour[4], float width );
 #if VR_HOST_HAS_WARMUP_EVENTS
 // Fire warmup/countdown announcer events during the HUD pass.
 void CG_WarmupEvents( void );
+#endif
+
+#if VR_HOST_HAS_GRAPPLE
+// Anchor mover the local player is captured to, or -1.
+int CG_GrappleLatchAnchor( void );
+// Effects color the grapple hardware's entity-color stage draws with.
+void CG_GrappleOwnerRGBA( int clientNum, byte *rgba );
+#endif
+
+#if VR_HOST_HAS_TRACE_RENDER
+// CG_Trace with movers at their drawn pose.
+void CG_TraceRender( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
+					 int skipNumber, int mask );
 #endif
 
 // ---- Stock functions the host must export (static in stock 1.32) ---------

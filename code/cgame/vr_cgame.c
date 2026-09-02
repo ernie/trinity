@@ -74,6 +74,37 @@ static qboolean VR_HostTVPlayback( void ) {
 #endif
 }
 
+static qboolean VR_HostGrappleEnabled( void ) {
+#if VR_HOST_HAS_GRAPPLE
+	return cgs.grappleEnabled;
+#else
+	return qfalse;
+#endif
+}
+
+static int VR_HostGrappleAnchor( void ) {
+#if VR_HOST_HAS_GRAPPLE
+	return CG_GrappleLatchAnchor();
+#else
+	return -1;
+#endif
+}
+
+static void VR_HostGrappleRGBA( int clientNum, byte *rgba ) {
+#if VR_HOST_HAS_GRAPPLE
+	CG_GrappleOwnerRGBA( clientNum, rgba );
+#endif
+}
+
+static void VR_HostTraceRender( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
+					 int skipNumber, int mask ) {
+#if VR_HOST_HAS_TRACE_RENDER
+	CG_TraceRender( result, start, mins, maxs, end, skipNumber, mask );
+#else
+	CG_Trace( result, start, mins, maxs, end, skipNumber, mask );
+#endif
+}
+
 #ifdef Q3_VM
 void	(*trap_R_BeginPostBloom2D)( void );
 void	(*trap_R_EndPostBloom2D)( void );
@@ -287,7 +318,7 @@ void CG_VR_RegisterMedia( void ) {
 		for ( i = 1 ; i < WP_NUM_WEAPONS ; i++ ) {
 			// skip the grapple's media unless the server hands it out;
 			// CG_AddPlayerWeapon still registers lazily if one appears
-			if ( i == WP_GRAPPLING_HOOK && !cgs.grappleEnabled ) {
+			if ( i == WP_GRAPPLING_HOOK && !VR_HostGrappleEnabled() ) {
 				continue;
 			}
 			CG_RegisterWeapon( i );
@@ -486,7 +517,7 @@ a captured hold steps base yaw per command while the anchor draws at cg.time
 */
 static float CG_VR_DeltaYaw( void ) {
 	float	yaw = SHORT2ANGLE( cg.predictedPlayerState.delta_angles[YAW] );
-	int		mover = CG_GrappleLatchAnchor();
+	int		mover = VR_HostGrappleAnchor();
 
 	if ( mover >= 0 ) {
 		vec3_t	a0, a1;
@@ -961,7 +992,7 @@ void CG_VR_ComputeWeaponAngles( void ) {
 
 		AngleVectors(weaponangles, forward, NULL, NULL);
 		VectorMA(weaponorigin, 4096, forward, end);
-		CG_TraceRender(&trace, weaponorigin, NULL, NULL, end, cg.predictedPlayerState.clientNum, MASK_SOLID);
+		VR_HostTraceRender(&trace, weaponorigin, NULL, NULL, end, cg.predictedPlayerState.clientNum, MASK_SOLID);
 
 		if (cg_debugWeaponAiming.integer)
 		{
@@ -1000,7 +1031,7 @@ void CG_VR_ComputeWeaponAngles( void ) {
 			AngleVectors(vr->calculated_weaponangles, forward2, NULL, NULL);
 			VectorMA(origin, 4096, forward2, end2);
 
-			CG_TraceRender(&trace2, cg.refdef.vieworg, NULL, NULL, end2, cg.predictedPlayerState.clientNum, MASK_SOLID);
+			VR_HostTraceRender(&trace2, cg.refdef.vieworg, NULL, NULL, end2, cg.predictedPlayerState.clientNum, MASK_SOLID);
 
 			if (cg_debugWeaponAiming.integer)
 			{
@@ -1732,7 +1763,7 @@ static void VR_WheelAppendBuiltins( qboolean *seen )
 	for ( weaponId = 1; weaponId < WP_NUM_WEAPONS; ++weaponId ) {
 		// the grapple joins the built-in set when the server hands it out
 		if ( weaponId == WP_GAUNTLET
-			|| ( weaponId == WP_GRAPPLING_HOOK && !cgs.grappleEnabled ) ) {
+			|| ( weaponId == WP_GRAPPLING_HOOK && !VR_HostGrappleEnabled() ) ) {
 			continue;
 		}
 		if ( seen[weaponId] ) {
@@ -2121,7 +2152,7 @@ void CG_DrawWeaponSelector( void )
 				else if ( weaponId == WP_GRAPPLING_HOOK ) {
 					// the launcher's glow stage is rgbGen entity, like the
 					// railgun core above; memset would leave it black on the wheel
-					CG_GrappleOwnerRGBA( cg.predictedPlayerState.clientNum, VR_ENT_RGBA( ent ) );
+					VR_HostGrappleRGBA( cg.predictedPlayerState.clientNum, VR_ENT_RGBA( ent ) );
 				}
 
 				ent.hModel = cg_weapons[weaponId].weaponModel;
@@ -2259,7 +2290,7 @@ qboolean CG_VR_WeaponHandPose( vec3_t origin, vec3_t angles, float *scale ) {
 	{
 		AngleVectors(angles, forward, NULL, NULL);
 		VectorMA(origin, 4096, forward, end);
-		CG_TraceRender(&trace, origin, NULL, NULL, end, cg.predictedPlayerState.clientNum, MASK_SOLID);
+		VR_HostTraceRender(&trace, origin, NULL, NULL, end, cg.predictedPlayerState.clientNum, MASK_SOLID);
 
 		colour[0] = 0xff;
 		colour[1] = 0x00;
@@ -2437,11 +2468,11 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			VectorSubtract( cg.refdef.vieworg, pos, vieworg );
 
 			// Prevent player clipping through solid objects
-			CG_TraceRender( &trace, cg.refdef.vieworg, mins, maxs, vieworg, cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
+			VR_HostTraceRender( &trace, cg.refdef.vieworg, mins, maxs, vieworg, cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
 
 			// the captured anchor is transparent to the hold's own trace; the
 			// camera clip must not fight the snug ride either
-			if ( trace.entityNum == CG_GrappleLatchAnchor() ) {
+			if ( trace.entityNum == VR_HostGrappleAnchor() ) {
 				VectorCopy( vieworg, cg.refdef.vieworg );
 			} else {
 				VectorCopy( trace.endpos, cg.refdef.vieworg );

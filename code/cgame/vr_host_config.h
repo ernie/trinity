@@ -16,6 +16,14 @@
 // (CG_WarmupEvents). 0: the drop never calls it and it need not exist.
 #define VR_HOST_HAS_WARMUP_EVENTS 1
 
+// This tree hands the grapple out per server (cgs.grappleEnabled) and holds a
+// captured player on a mover (CG_GrappleLatchAnchor, CG_GrappleOwnerRGBA).
+#define VR_HOST_HAS_GRAPPLE 1
+
+// This tree clips view-path traces against movers at their drawn pose
+// (CG_TraceRender). 0: the drop traces through CG_Trace.
+#define VR_HOST_HAS_TRACE_RENDER 1
+
 // Optional: the weapon wheel's default set - what "*" and an empty
 // cg_weaponSelectorWeapons expand to - in the cvar's token language.
 // Tokens are whitespace-separated (commas are not separators); a token is
