@@ -39,6 +39,7 @@ typedef struct {
 	menutext_s		login;
 	menutext_s		update;
 	menutext_s		exit;
+	menubitmap_s	sigil; // For clicks
 
 	qhandle_t		bannerModel;
 } mainmenu_t;
@@ -47,9 +48,38 @@ typedef struct {
 static mainmenu_t s_main;
 
 static char      trinityVersion[64];
+static char      trinityEngine[64];
+static qhandle_t trinityWordmark;
+static qhandle_t trinityFlareShader;
+static sfxHandle_t trinityFlareSound;
+static int       trinityFlareTime;
 static qboolean  trinityVersionLoaded = qfalse;
 static qhandle_t trinityModel;
-static qhandle_t trinityFlameShader;
+
+#define SIGIL_X		45
+#define SIGIL_Y		247
+#define SIGIL_SIZE	120
+
+/*
+===============
+MainMenu_SigilFlare
+===============
+*/
+static float MainMenu_SigilFlare( int now ) {
+	int dt = now - trinityFlareTime;
+
+	if ( !trinityFlareTime || dt < 0 || dt >= 1000 ) {
+		return 0;
+	}
+	return dt < 300 ? 1.0f : 1.0f - ( dt - 300 ) / 700.0f;
+}
+
+static void MainMenu_SigilEvent( void *ptr, int event ) {
+	if ( event == QM_ACTIVATED ) {
+		trinityFlareTime = uis.realtime;
+		trap_S_StartLocalSound( trinityFlareSound, CHAN_LOCAL_SOUND );
+	}
+}
 
 typedef struct {
 	menuframework_s menu;	
@@ -193,7 +223,8 @@ MainMenu_Cache
 void MainMenu_Cache( void ) {
 	s_main.bannerModel = trap_R_RegisterModel( MAIN_BANNER_MODEL );
 	trinityModel = trap_R_RegisterModel( "models/trinity/trinity.md3" );
-	trinityFlameShader = trap_R_RegisterShaderNoMip( "gfx/trinity/flameball" );
+	trinityFlareShader = trap_R_RegisterShaderNoMip( "gfx/trinity/flare" );
+	trinityFlareSound = trap_S_RegisterSound( "sound/items/poweruprespawn.wav", qfalse );
 }
 
 sfxHandle_t ErrorMessage_Key(int key)
@@ -203,12 +234,90 @@ sfxHandle_t ErrorMessage_Key(int key)
 	return (menu_null_sound);
 }
 
+/*
+===============
+MainMenu_StripVersionPrefix
+===============
+*/
+static void MainMenu_StripVersionPrefix( char *s, int size ) {
+	if ( s[0] == 'v' || s[0] == 'V' ) {
+		char buf[64];
+		Q_strncpyz( buf, s + 1, sizeof( buf ) );
+		Q_strncpyz( s, buf, size );
+	}
+}
+
 static void MainMenu_LoadTrinityVersion( void ) {
+	char buf[64];
+	const char *p;
+
 	trinityVersionLoaded = qtrue;
 	Q_strncpyz( trinityVersion, TRINITY_VERSION, sizeof( trinityVersion ) );
+	MainMenu_StripVersionPrefix( trinityVersion, sizeof( trinityVersion ) );
+	trinityWordmark = trap_R_RegisterShaderNoMip( "gfx/trinity/wordmark" );
+	// "trinity-engine/vX.Y.Z" or similar on Trinity engines
+	trap_Cvar_VariableStringBuffer( "com_engine", buf, sizeof( buf ) );
+	p = strchr( buf, '/' );
+	Q_strncpyz( trinityEngine, p ? p + 1 : buf, sizeof( trinityEngine ) );
+	MainMenu_StripVersionPrefix( trinityEngine, sizeof( trinityEngine ) );
 
 	trinityModel = trap_R_RegisterModel( "models/trinity/trinity.md3" );
-	trinityFlameShader = trap_R_RegisterShaderNoMip( "gfx/trinity/flameball" );
+	trinityFlareShader = trap_R_RegisterShaderNoMip( "gfx/trinity/flare" );
+	trinityFlareSound = trap_S_RegisterSound( "sound/items/poweruprespawn.wav", qfalse );
+}
+
+/*
+===============
+MainMenu_DrawTinyString
+
+The menu's own strings start at 8x16, too big for a version line.
+===============
+*/
+static void MainMenu_DrawTinyString( int x, int y, const char *str, vec4_t color ) {
+	const int w = 4, h = 7;
+	vec4_t shadow = { 0, 0, 0, 0.8f };
+
+	UI_DrawString2( x + 1, y + 1, str, shadow, w, h );
+	UI_DrawString2( x, y, str, color, w, h );
+}
+
+/*
+===============
+MainMenu_AddSigil
+===============
+*/
+static void MainMenu_AddSigil( const vec3_t origin ) {
+	refEntity_t	ent;
+	vec3_t		angles, lightPos;
+
+	lightPos[0] = origin[0] - 140.0f;
+	lightPos[1] = origin[1] + 40.0f;
+	lightPos[2] = origin[2] + 80.0f;
+	trap_R_AddLightToScene( lightPos, 420.0f, 0.70f, 0.80f, 1.0f );
+
+	memset( &ent, 0, sizeof( ent ) );
+	{
+		float t = uis.realtime * 0.001f;
+		float shake = 5.0f * MainMenu_SigilFlare( uis.realtime );
+		VectorSet( angles, 3.0f * sin( t * 0.31f ) + shake * sin( t * 88.0f ),
+			12.0f * sin( t * 0.45f ) + 5.0f * sin( t * 0.17f ) + shake * sin( t * 95.0f + 1.0f ),
+			3.0f * sin( t * 0.23f ) + shake * sin( t * 77.0f + 2.0f ) );
+	}
+	AnglesToAxis( angles, ent.axis );
+	ent.hModel = trinityModel;
+	VectorCopy( origin, ent.origin );
+	VectorCopy( origin, ent.lightingOrigin );
+	ent.renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
+	VectorCopy( ent.origin, ent.oldorigin );
+	trap_R_AddRefEntityToScene( &ent );
+
+	if ( trinityFlareShader && MainMenu_SigilFlare( uis.realtime ) > 0 ) {
+		byte level = (byte)( 255 * MainMenu_SigilFlare( uis.realtime ) );
+		ent.customShader = trinityFlareShader;
+		ent.shaderRGBA.rgba[0] = ent.shaderRGBA.rgba[1] = ent.shaderRGBA.rgba[2] = level;
+		ent.shaderRGBA.rgba[3] = 255;
+		trap_R_AddRefEntityToScene( &ent );
+	}
 }
 
 /*
@@ -227,81 +336,36 @@ static void Main_MenuDraw( void ) {
 	float			x, y, w, h;
 	vec4_t			color = {0.5, 0, 0, 1};
 
-	if ( trinityModel && trap_Cvar_VariableValue( "ui_trinitySigil" ) ) {
-		refdef_t		bgRefdef;
-		refEntity_t		bgEnt;
-		vec3_t			bgMins, bgMaxs, bgOrigin, bgAngles;
-		float			bgX, bgY, bgW, bgH, bgLen;
-		float			desiredFovX, desiredFovY;
+	if ( trinityModel ) {
+		refdef_t		rd;
+		vec3_t			mins, maxs, org;
+		float			rx, ry, rw, rh, len;
+		float			desFov = 30.0f;
 
-		memset( &bgRefdef, 0, sizeof( bgRefdef ) );
-		bgRefdef.rdflags = RDF_NOWORLDMODEL;
-		AxisClear( bgRefdef.viewaxis );
+		rx = SIGIL_X;
+		ry = SIGIL_Y;
+		rw = SIGIL_SIZE;
+		rh = SIGIL_SIZE;
+		memset( &rd, 0, sizeof( rd ) );
+		rd.rdflags = RDF_NOWORLDMODEL;
+		AxisClear( rd.viewaxis );
+		UI_VR_CompensateModelFov( &rd, desFov, desFov );
+		UI_AdjustFrom640( &rx, &ry, &rw, &rh );
+		rd.x = rx;
+		rd.y = ry;
+		rd.width = rw;
+		rd.height = rh;
+		rd.time = uis.realtime;
 
-		bgX = 0;
-		bgY = 0;
-		bgW = 640;
-		bgH = 480;
-		UI_AdjustFrom640( &bgX, &bgY, &bgW, &bgH );
-		bgRefdef.x = bgX;
-		bgRefdef.y = bgY;
-		bgRefdef.width = bgW;
-		bgRefdef.height = bgH;
-
-		desiredFovX = 30.0f;
-		desiredFovY = 22.5f;
-		UI_VR_CompensateModelFov( &bgRefdef, desiredFovX, desiredFovY );
-		bgRefdef.time = uis.realtime;
-
-		trap_R_ModelBounds( trinityModel, bgMins, bgMaxs );
-		bgLen = 0.5 * ( bgMaxs[2] - bgMins[2] );
-		bgOrigin[0] = ( bgLen / tan( DEG2RAD( desiredFovY ) * 0.5 ) ) * 1.5;
-		bgOrigin[1] = 0.5 * ( bgMins[1] + bgMaxs[1] );
-		bgOrigin[2] = -0.5 * ( bgMins[2] + bgMaxs[2] ) - 0.08 * ( bgMaxs[2] - bgMins[2] );
+		trap_R_ModelBounds( trinityModel, mins, maxs );
+		len = 0.5 * ( maxs[2] - mins[2] );
+		org[0] = len / tan( DEG2RAD( desFov ) * 0.5 );
+		org[1] = 0.5 * ( mins[1] + maxs[1] );
+		org[2] = -0.5 * ( mins[2] + maxs[2] );
 
 		trap_R_ClearScene();
-
-		// See UI_DrawTrinitySigil in missionpack ui_main.c for the
-		// rationale behind the flame sprite + dlight placement.
-		if ( trinityFlameShader ) {
-			refEntity_t flameEnt;
-			memset( &flameEnt, 0, sizeof( flameEnt ) );
-			flameEnt.reType = RT_SPRITE;
-			flameEnt.customShader = trinityFlameShader;
-			flameEnt.origin[0] = bgOrigin[0] + 60.0f;
-			flameEnt.origin[1] = bgOrigin[1];
-			flameEnt.origin[2] = bgOrigin[2] + 15.0f;
-			VectorCopy( flameEnt.origin, flameEnt.oldorigin );
-			flameEnt.radius = bgLen * 0.6f;
-			flameEnt.shaderRGBA.rgba[0] = 255;
-			flameEnt.shaderRGBA.rgba[1] = 255;
-			flameEnt.shaderRGBA.rgba[2] = 255;
-			flameEnt.shaderRGBA.rgba[3] = 255;
-			trap_R_AddRefEntityToScene( &flameEnt );
-
-			{
-				vec3_t lightPos;
-				float t = uis.realtime * 0.001f;
-				float flick = 0.8f + 0.15f * sin( t * 5.3f ) + 0.1f * sin( t * 13.7f );
-				lightPos[0] = bgOrigin[0] - 120.0f;
-				lightPos[1] = bgOrigin[1];
-				lightPos[2] = bgOrigin[2] - 35.0f;
-				trap_R_AddLightToScene( lightPos, 600.0f * flick, 1.0f, 0.25f, 0.05f );
-			}
-		}
-
-		memset( &bgEnt, 0, sizeof( bgEnt ) );
-		VectorSet( bgAngles, 0, -( uis.realtime / 100.0f ), 0 );
-		AnglesToAxis( bgAngles, bgEnt.axis );
-
-		bgEnt.hModel = trinityModel;
-		VectorCopy( bgOrigin, bgEnt.origin );
-		VectorCopy( bgOrigin, bgEnt.lightingOrigin );
-		bgEnt.renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
-		VectorCopy( bgEnt.origin, bgEnt.oldorigin );
-
-		trap_R_AddRefEntityToScene( &bgEnt );
-		trap_R_RenderScene( &bgRefdef );
+		MainMenu_AddSigil( org );
+		trap_R_RenderScene( &rd );
 	}
 
 	// setup the refdef
@@ -373,98 +437,19 @@ static void Main_MenuDraw( void ) {
 		return;
 	}
 
-	// Trinity version badge
 	if ( !trinityVersionLoaded ) {
 		MainMenu_LoadTrinityVersion();
 	}
 	if ( trinityVersion[0] ) {
-		int textWidth = strlen( trinityVersion ) * SMALLCHAR_WIDTH;
-		int modelSize = 16;
-		int rightMargin = 4;
-		int vx = 640 - rightMargin - textWidth;
-		int vy = 464;
 		vec4_t versionColor = { 1.0f, 1.0f, 1.0f, 0.8f };
+		const char *line = trinityEngine[0] ? va( "%s / %s", trinityEngine, trinityVersion ) : trinityVersion;
+		int cx = 105;
 
-		// Draw rotating 3D trinity model
-		if ( trinityModel ) {
-			refdef_t rd;
-			refEntity_t re;
-			vec3_t mins, maxs, org, ang;
-			float mx, my, mw, mh, len;
-			float desFovX = 30.0f;
-			float desFovY = 30.0f;
-
-			mx = vx - modelSize;
-			my = vy;
-			mw = modelSize;
-			mh = modelSize;
-
-			memset( &rd, 0, sizeof( rd ) );
-			rd.rdflags = RDF_NOWORLDMODEL;
-			AxisClear( rd.viewaxis );
-
-			UI_VR_CompensateModelFov( &rd, desFovX, desFovY );
-
-			UI_AdjustFrom640( &mx, &my, &mw, &mh );
-			rd.x = mx;
-			rd.y = my;
-			rd.width = mw;
-			rd.height = mh;
-
-			trap_R_ModelBounds( trinityModel, mins, maxs );
-
-			len = 0.5 * ( maxs[2] - mins[2] );
-			org[0] = len / tan( DEG2RAD( desFovX ) * 0.5 );
-			org[1] = 0.5 * ( mins[1] + maxs[1] );
-			org[2] = -0.5 * ( mins[2] + maxs[2] );
-
-			rd.time = uis.realtime;
-
-			trap_R_ClearScene();
-
-			if ( trinityFlameShader ) {
-				refEntity_t flameEnt;
-				memset( &flameEnt, 0, sizeof( flameEnt ) );
-				flameEnt.reType = RT_SPRITE;
-				flameEnt.customShader = trinityFlameShader;
-				flameEnt.origin[0] = org[0] + 60.0f;
-				flameEnt.origin[1] = org[1];
-				flameEnt.origin[2] = org[2] + 15.0f;
-				VectorCopy( flameEnt.origin, flameEnt.oldorigin );
-				flameEnt.radius = len * 0.6f;
-				flameEnt.shaderRGBA.rgba[0] = 255;
-				flameEnt.shaderRGBA.rgba[1] = 255;
-				flameEnt.shaderRGBA.rgba[2] = 255;
-				flameEnt.shaderRGBA.rgba[3] = 255;
-				trap_R_AddRefEntityToScene( &flameEnt );
-
-				{
-					vec3_t lightPos;
-					float t = uis.realtime * 0.001f;
-					float flick = 0.8f + 0.15f * sin( t * 5.3f ) + 0.1f * sin( t * 13.7f );
-					lightPos[0] = org[0] - 120.0f;
-					lightPos[1] = org[1];
-					lightPos[2] = org[2] - 35.0f;
-					trap_R_AddLightToScene( lightPos, 600.0f * flick, 1.0f, 0.25f, 0.05f );
-				}
-			}
-
-			memset( &re, 0, sizeof( re ) );
-
-			VectorSet( ang, 0, -( uis.realtime / 100.0f ), 0 );
-			AnglesToAxis( ang, re.axis );
-
-			re.hModel = trinityModel;
-			VectorCopy( org, re.origin );
-			VectorCopy( org, re.lightingOrigin );
-			re.renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
-			VectorCopy( re.origin, re.oldorigin );
-
-			trap_R_AddRefEntityToScene( &re );
-			trap_R_RenderScene( &rd );
+		// the line's bottom is level with the Exit item's
+		if ( trinityWordmark ) {
+			UI_DrawHandlePic( cx - 45, 371, 90, 20, trinityWordmark );
 		}
-
-		UI_DrawString( vx, vy, trinityVersion, UI_LEFT|UI_SMALLFONT|UI_DROPSHADOW, versionColor );
+		MainMenu_DrawTinyString( cx - (int)strlen( line ) * 4 / 2, 392, line, versionColor );
 	}
 }
 
@@ -680,6 +665,16 @@ void UI_MainMenu( void ) {
 	}
 	Menu_AddItem( &s_main.menu,	&s_main.exit );
 	Menu_AddItem( &s_main.menu,	&s_main.login );
+
+	// just for clicks
+	s_main.sigil.generic.type		= MTYPE_BITMAP;
+	s_main.sigil.generic.flags		= QMF_LEFT_JUSTIFY|QMF_SILENT|QMF_MOUSEONLY;
+	s_main.sigil.generic.x			= SIGIL_X;
+	s_main.sigil.generic.y			= SIGIL_Y;
+	s_main.sigil.width				= SIGIL_SIZE;
+	s_main.sigil.height				= SIGIL_SIZE;
+	s_main.sigil.generic.callback	= MainMenu_SigilEvent;
+	Menu_AddItem( &s_main.menu,	&s_main.sigil );
 	// Override hit rect to match bitmap font size (PText_Init sized it for proportional font)
 	{
 		int w = strlen( s_main.login.string ) * SMALLCHAR_WIDTH;

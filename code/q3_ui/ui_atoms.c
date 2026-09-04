@@ -619,7 +619,7 @@ void UI_DrawProportionalString_AutoWrapped( int x, int y, int xmax, int ystep, c
 UI_DrawString2
 =================
 */
-static void UI_DrawString2( int x, int y, const char* str, vec4_t color, int charw, int charh )
+void UI_DrawString2( int x, int y, const char* str, vec4_t color, int charw, int charh )
 {
 	const char* s;
 	char	ch;
@@ -1231,7 +1231,7 @@ void UI_Refresh( int realtime )
 		{
 			// draw the background
 			trap_R_DrawStretchPic( 0, 0, uis.glconfig.vidWidth, uis.glconfig.vidHeight, 0, 0, 1, 1, uis.menuBackNoLogoShader );
-			if ( uis.activemenu->showlogo && !trap_Cvar_VariableValue( "ui_trinitySigil" ) ) {
+			if ( uis.activemenu->showlogo ) {
 				UI_DrawHandlePic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, uis.menuBackShader );
 			}
 		}

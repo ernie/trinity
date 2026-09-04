@@ -135,11 +135,11 @@ itemDef {
     }
 
 itemDef {
-      	name trinitySigil				// Rotating Trinity sigil overlay
+      	name trinitySigil
       	ownerdraw UI_TRINITYSIGIL
-      	rect 205 123 235 235
+      	rect 520 164 120 120
       	visible 1
-	decoration
+      	action { uiScript sigilFlare }
     }
 
 

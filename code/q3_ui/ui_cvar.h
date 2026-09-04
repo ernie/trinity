@@ -59,6 +59,5 @@ UI_CVAR( ui_blood, "com_blood", "2", CVAR_ARCHIVE_ND )	// so the menu can read/p
 
 UI_CVAR( ui_cdkeychecked, "ui_cdkeychecked", "1", CVAR_ROM )
 
-UI_CVAR( ui_trinitySigil, "ui_trinitySigil", "1", CVAR_ARCHIVE )
 
 #undef UI_CVAR

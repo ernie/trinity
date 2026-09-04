@@ -7,13 +7,58 @@ models/trinity/trinity
 	{
 		map $whiteimage
 		blendFunc GL_DST_COLOR GL_ZERO
-		rgbGen const ( 0.20 0.20 0.20 )
+		rgbGen const ( 0.92 0.94 1.00 )
 	}
 	{
 		map textures/sfx/specular.tga
 		tcGen environment
 		blendFunc GL_ONE GL_ONE
-		rgbGen const ( 0.08 0.08 0.08 )
+		rgbGen const ( 0.10 0.10 0.11 )
+	}
+	{
+		map models/trinity/trinity_glow0.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		alphaGen wave sin 0.35 0.45 0 0.27
+	}
+	{
+		map models/trinity/trinity_glow1.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		alphaGen wave triangle 0.35 0.45 0.333 0.38
+	}
+	{
+		map models/trinity/trinity_glow2.tga
+		blendFunc GL_SRC_ALPHA GL_ONE
+		alphaGen wave sin 0.35 0.45 0.667 0.21
+	}
+}
+
+gfx/trinity/flare
+{
+	{
+		map models/trinity/trinity_glow0.tga
+		blendFunc GL_ONE GL_ONE
+		rgbGen entity
+	}
+	{
+		map models/trinity/trinity_glow1.tga
+		blendFunc GL_ONE GL_ONE
+		rgbGen entity
+	}
+	{
+		map models/trinity/trinity_glow2.tga
+		blendFunc GL_ONE GL_ONE
+		rgbGen entity
+	}
+}
+
+gfx/trinity/wordmark
+{
+	nopicmip
+	nomipmaps
+	{
+		map gfx/trinity/wordmark.tga
+		blendFunc blend
+		rgbGen vertex
 	}
 }
 

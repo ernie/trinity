@@ -63,10 +63,7 @@ textures/ctf2/blueteam02
 	}
 
 }
-// trinity: matched the team_icon/* clan logos so the generic Red/Blue
-// fallback fades the same way (triangle 0..~0.7 over 5s) — without this
-// the menu/scoreboard art reads as static while clan logos pulse. Added
-// nopicmip to keep our upscaled 256x256 art crisp at small UI sizes.
+
 textures/ctf2/redteam01
 {
 	cull none
@@ -144,8 +141,6 @@ textures/ctf2/xblueteam01
 }
 
 
-// trinity: see redteam01 above for rationale — matched team_icon fade
-// so generic Blue fallback pulses identically to clan logos.
 textures/ctf2/blueteam01
 {
 	cull none
