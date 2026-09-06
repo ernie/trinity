@@ -280,6 +280,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define UI_TRINITYSIGIL 262
 #define UI_HDR_PEAK_NITS 263
 #define UI_DYNAMICLIGHTS 264
+#define UI_REFRESHRATE 265
+#define UI_FOVEATION 266
+#define UI_FOVEATION_STRENGTH 267
+#define UI_WEAPONPITCH 268
 
 #define VOICECHAT_GETFLAG			"getflag"				// command someone to get the flag
 #define VOICECHAT_OFFENSE			"offense"				// command someone to go on offense

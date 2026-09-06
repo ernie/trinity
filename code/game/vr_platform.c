@@ -24,8 +24,8 @@ vrPlatform_t VR_Platform( qboolean vrActive ) {
 	if ( !Q_stricmp( buf, "pc" ) ) {
 		return VRP_PC;
 	}
-	if ( !Q_stricmp( buf, "quest" ) ) {
-		return VRP_QUEST;
+	if ( !Q_stricmp( buf, "standalone" ) ) {
+		return VRP_STANDALONE;
 	}
 	return VRP_NONE;
 }

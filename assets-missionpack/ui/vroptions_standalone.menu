@@ -1,7 +1,7 @@
 #include "ui/menudef.h"
 
 {
-\\ VR OPTIONS (QUEST) - self-contained sidebar menu \\
+\\ VR OPTIONS (STANDALONE) - self-contained sidebar menu \\
 
 menuDef {
 	name "vroptions_menu"
@@ -379,14 +379,44 @@ itemDef {
 	group grpVR
 	type ITEM_TYPE_SLIDER
 	text "Weapon Pitch:"
-	cvarfloat "vr_weaponPitch" 0 -25 5
-	rect 301 238 256 20
+	cvarfloat "vr_weaponPitch" 0 -25 25
+	rect 301 238 236 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
 	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	ownerdraw UI_WEAPONPITCH
+	rect 536 238 22 20
+	textalign ITEM_ALIGN_LEFT
+	textaligny 20
+	textscale .333
+	forecolor 1 .75 0 1
+	visible 0
+	decoration
+	}
+itemDef {
+	name controls
+	group grpVR
+	text "Reset"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	backcolor .37 .1 .1 1
+	rect 560 238 50 20
+	textalign ITEM_ALIGN_CENTER
+	textalignx 25
+	textaligny 15
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; setcvar vr_weaponPitch 0 }
 	}
 itemDef {
 	name controls
@@ -639,10 +669,9 @@ itemDef {
 itemDef {
 	name hud
 	group grpVR
-	type ITEM_TYPE_MULTI
+	type ITEM_TYPE_OWNERDRAW
 	text "Refresh Rate:"
-	cvar "vr_refreshrate"
-	cvarFloatList { "60" 60 "72" 72 "80" 80 "90" 90 "120" 120 }
+	ownerdraw UI_REFRESHRATE
 	rect 301 326 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
@@ -650,6 +679,80 @@ itemDef {
 	textscale .333
 	forecolor 1 1 1 1
 	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	text "Foveated Rendering:"
+	ownerdraw UI_FOVEATION
+	rect 301 348 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	text "Foveation Strength:"
+	ownerdraw UI_FOVEATION_STRENGTH
+	rect 301 370 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	text "Apply"
+	type 1
+	textscale .3
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 377 399 100 26
+	textalign ITEM_ALIGN_CENTER
+	textalignx 50
+	textaligny 20
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; exec "vid_restart" }
+	mouseEnter { setcolor backcolor .1 .37 .1 1 }
+	mouseExit { setcolor backcolor .37 .1 .1 1 }
+	}
+itemDef {
+	name hud
+	group grpVR
+	style WINDOW_STYLE_SHADER
+	background "ui/assets/framebutton.tga"
+	rect 377 399 100 26
+	visible 0
+	decoration
+	}
+itemDef {
+	name hud
+	group grpVR
+	style WINDOW_STYLE_SHADER
+	background "ui/assets/leftbutton.tga"
+	rect 365 377 13 26
+	visible 0
+	decoration
+	}
+itemDef {
+	name hud
+	group grpVR
+	style WINDOW_STYLE_SHADER
+	background "ui/assets/rightbutton.tga"
+	rect 476 377 13 26
+	visible 0
+	decoration
 	}
 
 // BACK BAR //

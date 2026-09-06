@@ -398,7 +398,7 @@ itemDef {
 	group grpVR
 	type ITEM_TYPE_SLIDER
 	text "Weapon Pitch:"
-	cvarfloat "vr_weaponPitch" 0 -25 5
+	cvarfloat "vr_weaponPitch" 0 -25 25
 	rect 301 238 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128

@@ -233,9 +233,8 @@ itemDef {
 	}
 
 // VR Options	//
-// Only visible under a VR engine (vr_platform is "pc"/"quest";
-// unset on flatscreen, so the item hides and the column keeps
-// its stock shape).
+// VR engines only: vr_platform is unset on flatscreen, so the item hides and
+// the column keeps its stock shape.
 
 itemDef {
       	name vroptions
@@ -251,9 +250,9 @@ itemDef {
 	forecolor 1 1 1 1
 	visible 1
 	cvarTest "vr_platform"
-	showCvar { "pc" ; "quest" }
+	showCvar { "pc" ; "standalone" }
 	action { play "sound/misc/kcaction.wav" ;
-	close control_menu ; 
+	close control_menu ;
 	close system_menu ;
 	close options_menu ; 
 	close cdkey_menu ;

@@ -100,8 +100,8 @@ You also need the VR settings screens, for each UI you build. baseq3: five C
 menu files (`ui_vroptions.c`, the hub, plus `ui_vrcomfort.c`,
 `ui_vrcontrols.c`, `ui_vrhud.c`, `ui_vrmirror.c`); one build serves both
 platforms. Team Arena: the VR `.menu` files together with **both** manifests
-(`vrmenus_pc.txt`, `vrmenus_quest.txt`) — bundle the pc and quest variants
-both, because the same `ui.qvm` may be loaded by either engine and
+(`vrmenus_pc.txt`, `vrmenus_standalone.txt`) — bundle the pc and standalone
+variants both, because the same `ui.qvm` may be loaded by either engine and
 `UI_VR_LoadMenus` picks the manifest at runtime from the platform. Step 7
 explains why the screens are required and what a replacement must reproduce.
 

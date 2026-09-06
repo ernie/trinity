@@ -157,6 +157,9 @@ static char quake3worldMessage[] = "Visit www.quake3world.com - News, Community,
 #endif
 
 static void UI_StartServerRefresh(qboolean full);
+static const char *UI_FoveationText(void);
+static const char *UI_FoveationStrengthText(void);
+static const char *UI_WeaponPitchText(void);
 static void UI_DrawTrinitySigil( rectDef_t *rect );
 static void UI_StopServerRefresh( void );
 static void UI_FavoriteAddressAdd( const char *addr );
@@ -2353,6 +2356,18 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 		case UI_HDR_PEAK_NITS:
 			s = va( "%i nits", (int)( trap_Cvar_VariableValue( "r_hdrPeak" ) + 0.5f ) );
 			break;
+		case UI_REFRESHRATE:
+			s = va( "%i Hz", (int)( trap_Cvar_VariableValue( "vr_refreshrate" ) + 0.5f ) );
+			break;
+		case UI_FOVEATION:
+			s = UI_FoveationText();
+			break;
+		case UI_FOVEATION_STRENGTH:
+			s = UI_FoveationStrengthText();
+			break;
+		case UI_WEAPONPITCH:
+			s = UI_WeaponPitchText();
+			break;
     default:
       break;
   }
@@ -2648,6 +2663,192 @@ static void UI_DrawGLInfo(rectDef_t *rect, float scale, vec4_t color, int textSt
 
 // FIXME: table drive
 //
+#define MAX_REFRESH_RATES 16
+static int uiRefreshRates[MAX_REFRESH_RATES];
+static int uiNumRefreshRates;
+
+static void UI_ReadRefreshRates(void) {
+	static const int fallback[] = { 60, 72, 80, 90, 120 };
+	char list[256];
+	char *p;
+	int i;
+
+	uiNumRefreshRates = 0;
+	trap_Cvar_VariableStringBuffer("vr_refreshrates", list, sizeof(list));
+	p = list;
+	while (uiNumRefreshRates < MAX_REFRESH_RATES) {
+		const char *token = COM_Parse(&p);
+		if (!token[0]) {
+			break;
+		}
+		uiRefreshRates[uiNumRefreshRates++] = (int)(atof(token) + 0.5f);
+	}
+	if (uiNumRefreshRates == 0) {
+		for (i = 0; i < ARRAY_LEN(fallback); i++) {
+			uiRefreshRates[i] = fallback[i];
+		}
+		uiNumRefreshRates = ARRAY_LEN(fallback);
+	}
+}
+
+// nearest, since an archived vr_refreshrate may not be in this headset's list
+static int UI_RefreshRateIndex(void) {
+	int rate = (int)(trap_Cvar_VariableValue("vr_refreshrate") + 0.5f);
+	int best = 0;
+	int i;
+
+	UI_ReadRefreshRates();
+	for (i = 1; i < uiNumRefreshRates; i++) {
+		if (abs(uiRefreshRates[i] - rate) < abs(uiRefreshRates[best] - rate)) {
+			best = i;
+		}
+	}
+	return best;
+}
+
+static void UI_DrawRefreshRate(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	Text_Paint(rect->x, rect->y, scale, color, va("%i Hz", uiRefreshRates[UI_RefreshRateIndex()]), 0, 0, textStyle);
+}
+
+static qboolean UI_RefreshRate_HandleKey(int flags, float *special, int key) {
+	int select = UI_SelectForKey(key);
+	if (select != 0) {
+		int i = UI_RefreshRateIndex() + select;
+
+		if (i >= uiNumRefreshRates) {
+			i = 0;
+		} else if (i < 0) {
+			i = uiNumRefreshRates - 1;
+		}
+
+		// the engine applies this live and writes back the rate it actually got
+		trap_Cvar_SetValue("vr_refreshrate", uiRefreshRates[i]);
+		return qtrue;
+	}
+	return qfalse;
+}
+
+// vr_foveation: 0 off, 1 fixed, 2 eye tracked. vr_foveationStrength: 1 low, 2 medium, 3 high.
+// vr_foveationCaps (none / fixed / eyetracked) caps the mode row at what the headset has.
+static const char *uiFoveationNames[] = { "Off", "Fixed", "Eye-Tracked" };
+static const char *uiFoveationStrengthNames[] = { "Low", "Medium", "High" };
+
+// highest vr_foveation value this headset supports, -1 when it has none
+static int UI_FoveationMax(void) {
+	char caps[32];
+
+	trap_Cvar_VariableStringBuffer("vr_foveationCaps", caps, sizeof(caps));
+	if (!Q_stricmp(caps, "eyetracked")) {
+		return 2;
+	}
+	if (!Q_stricmp(caps, "fixed")) {
+		return 1;
+	}
+	return -1;
+}
+
+static int UI_FoveationLevel(int max) {
+	int level = (int)trap_Cvar_VariableValue("vr_foveation");
+
+	if (level < 0) {
+		level = 0;
+	} else if (level > max) {
+		level = max;
+	}
+	return level;
+}
+
+static const char *UI_FoveationText(void) {
+	int max = UI_FoveationMax();
+
+	if (max < 0) {
+		return "Not Supported";
+	}
+	return uiFoveationNames[UI_FoveationLevel(max)];
+}
+
+static void UI_DrawFoveation(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	Text_Paint(rect->x, rect->y, scale, color, UI_FoveationText(), 0, 0, textStyle);
+}
+
+static qboolean UI_Foveation_HandleKey(int flags, float *special, int key) {
+	int select = UI_SelectForKey(key);
+	if (select != 0) {
+		int max = UI_FoveationMax();
+		int level;
+
+		if (max < 0) {
+			return qtrue;
+		}
+		level = UI_FoveationLevel(max) + select;
+		if (level > max) {
+			level = 0;
+		} else if (level < 0) {
+			level = max;
+		}
+
+		// the engine applies this live and falls back if the runtime refuses
+		trap_Cvar_SetValue("vr_foveation", level);
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static int UI_FoveationStrength(void) {
+	int strength = (int)trap_Cvar_VariableValue("vr_foveationStrength");
+
+	if (strength < 1) {
+		strength = 1;
+	} else if (strength > 3) {
+		strength = 3;
+	}
+	return strength;
+}
+
+static const char *UI_FoveationStrengthText(void) {
+	if (UI_FoveationMax() < 0) {
+		return "Not Supported";
+	}
+	return uiFoveationStrengthNames[UI_FoveationStrength() - 1];
+}
+
+// Only the player's own tilt: the engine applies the grip-to-aim correction itself, so zero reads as none.
+static const char *UI_WeaponPitchText(void) {
+	int offset = (int)trap_Cvar_VariableValue("vr_weaponPitch");
+
+	// Kept terse: this sits in the narrow strip beside the slider bar
+	return va("%s%i", offset > 0 ? "+" : "", offset);
+}
+
+static void UI_DrawWeaponPitch(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	Text_Paint(rect->x, rect->y, scale, color, UI_WeaponPitchText(), 0, 0, textStyle);
+}
+
+static void UI_DrawFoveationStrength(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	Text_Paint(rect->x, rect->y, scale, color, UI_FoveationStrengthText(), 0, 0, textStyle);
+}
+
+static qboolean UI_FoveationStrength_HandleKey(int flags, float *special, int key) {
+	int select = UI_SelectForKey(key);
+	if (select != 0) {
+		int strength;
+
+		if (UI_FoveationMax() < 0) {
+			return qtrue;
+		}
+		strength = UI_FoveationStrength() + select;
+		if (strength > 3) {
+			strength = 1;
+		} else if (strength < 1) {
+			strength = 3;
+		}
+
+		trap_Cvar_SetValue("vr_foveationStrength", strength);
+		return qtrue;
+	}
+	return qfalse;
+}
+
 static void UI_DrawHDRPeakNits(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	Text_Paint(rect->x, rect->y, scale, color, va("%i nits", (int)(trap_Cvar_VariableValue("r_hdrPeak") + 0.5f)), 0, 0, textStyle);
 }
@@ -2842,6 +3043,18 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 			break;
 		case UI_HDR_PEAK_NITS:
 			UI_DrawHDRPeakNits(&rect, scale, color, textStyle);
+			break;
+		case UI_REFRESHRATE:
+			UI_DrawRefreshRate(&rect, scale, color, textStyle);
+			break;
+		case UI_FOVEATION:
+			UI_DrawFoveation(&rect, scale, color, textStyle);
+			break;
+		case UI_FOVEATION_STRENGTH:
+			UI_DrawFoveationStrength(&rect, scale, color, textStyle);
+			break;
+		case UI_WEAPONPITCH:
+			UI_DrawWeaponPitch(&rect, scale, color, textStyle);
 			break;
 		case UI_DYNAMICLIGHTS:
 			UI_DrawDynamicLights(&rect, scale, color, textStyle);
@@ -3460,6 +3673,14 @@ static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, 
       break;
     case UI_DYNAMICLIGHTS:
       return UI_DynamicLights_HandleKey(flags, special, key);
+      break;
+    case UI_REFRESHRATE:
+      return UI_RefreshRate_HandleKey(flags, special, key);
+      break;
+    case UI_FOVEATION:
+      return UI_Foveation_HandleKey(flags, special, key);
+    case UI_FOVEATION_STRENGTH:
+      return UI_FoveationStrength_HandleKey(flags, special, key);
       break;
     case UI_CLANNAME:
       return UI_ClanName_HandleKey(flags, special, key);

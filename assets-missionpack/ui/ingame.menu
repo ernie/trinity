@@ -208,7 +208,7 @@ itemDef {
 	backcolor 0 .17 0 1
       	visible 1
 	cvarTest "vr_platform"
-	showCvar { "pc" ; "quest" }
+	showCvar { "pc" ; "standalone" }
       	action { open ingame_vroptions }
 	mouseEnter { setitemcolor vrtab backcolor .1 .37 .1 1 }
       	mouseExit { setitemcolor vrtab backcolor 0 .17 0 1 }
@@ -230,7 +230,7 @@ itemDef {
 	backcolor 0 .17 0 1
       	visible 1
 	cvarTest "vr_platform"
-	hideCvar { "pc" ; "quest" }
+	hideCvar { "pc" ; "standalone" }
       	action { open ingame_controls }
 	mouseEnter { setitemcolor controls backcolor .1 .37 .1 1 }
       	mouseExit { setitemcolor controls backcolor 0 .17 0 1 }

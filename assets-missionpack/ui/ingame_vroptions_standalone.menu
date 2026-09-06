@@ -1,7 +1,7 @@
 #include "ui/menudef.h"
 
 {
-\\ IN-GAME VR OPTIONS (QUEST) - tabbed Team Arena style \\
+\\ IN-GAME VR OPTIONS (STANDALONE) - tabbed Team Arena style \\
 
 menuDef {
 	name "ingame_vroptions"
@@ -529,14 +529,44 @@ itemDef {
 	group grpVR
 	type ITEM_TYPE_SLIDER
 	text "Weapon Pitch:"
-	cvarfloat "vr_weaponPitch" 0 -25 5
-	rect 28 212 340 18
+	cvarfloat "vr_weaponPitch" 0 -25 25
+	rect 28 212 286 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	ownerdraw UI_WEAPONPITCH
+	rect 313 212 18 18
+	textalign ITEM_ALIGN_LEFT
+	textaligny 14
+	textscale .25
+	forecolor 1 .75 0 1
+	visible 0
+	decoration
+	}
+itemDef {
+	name controls
+	group grpVR
+	text "Reset"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	backcolor .37 .1 .1 1
+	rect 333 212 40 18
+	textalign ITEM_ALIGN_CENTER
+	textalignx 18
+	textaligny 13
+	textscale .2
+	forecolor 1 1 1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; setcvar vr_weaponPitch 0 }
 	}
 itemDef {
 	name controls
@@ -626,7 +656,7 @@ itemDef {
 	visible 0
 	}
 
-// HUD & DISPLAY GROUP (QUEST)	//
+// HUD & DISPLAY GROUP (STANDALONE)	//
 
 itemDef {
 	name hud
@@ -789,10 +819,9 @@ itemDef {
 itemDef {
 	name hud
 	group grpVR
-	type ITEM_TYPE_MULTI
+	type ITEM_TYPE_OWNERDRAW
 	text "Refresh Rate:"
-	cvar "vr_refreshrate"
-	cvarFloatList { "60" 60 "72" 72 "80" 80 "90" 90 "120" 120 }
+	ownerdraw UI_REFRESHRATE
 	rect 28 248 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
@@ -800,6 +829,53 @@ itemDef {
 	textscale .25
 	forecolor 1 1 1 1
 	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	text "Foveated Rendering:"
+	ownerdraw UI_FOVEATION
+	rect 28 266 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	text "Foveation Strength:"
+	ownerdraw UI_FOVEATION_STRENGTH
+	rect 28 284 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	text "Apply"
+	type 1
+	textscale .25
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 159 308 100 20
+	textalign 1
+	textalignx 50
+	textaligny 15
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; exec "vid_restart" }
+	mouseEnter { setcolor backcolor .1 .37 .1 1 }
+	mouseExit { setcolor backcolor .37 .1 .1 1 }
 	}
 
 }

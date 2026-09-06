@@ -85,7 +85,7 @@ static void VROptions_Event( void *ptr, int event ) {
 		break;
 
 	case ID_HUD:
-		UI_VRHudMenu();
+		UI_VRHudDisplayMenu();
 		break;
 
 	case ID_MIRROR:

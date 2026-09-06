@@ -1257,17 +1257,30 @@ static void AddFloat( char **buf_p, float fval, int width, int prec, int reduce 
 	char	text[32];
 	int		digits;
 	float	signedVal;
+	float	half;
 	char	*buf;
 	int		val;
 
 	if ( reduce && fval == 0.0f )
 		return;
 
+	// fix precisiion
+	if ( prec < 0 ) {
+		prec = 6;
+	}
+
 	// get the sign
 	signedVal = fval;
 	if ( fval < 0 ) {
 		fval = -fval;
 	}
+
+	// round like libc: truncating prints 1.3 as "1.299999", which does not read back equal to 1.3
+	half = 0.5f;
+	for ( val = 0; val < prec; val++ ) {
+		half *= 0.1f;
+	}
+	fval += half;
 
 	// write the float number
 	digits = 0;
@@ -1284,11 +1297,6 @@ static void AddFloat( char **buf_p, float fval, int width, int prec, int reduce 
 	}
 
 	buf = *buf_p;
-
-	// fix precisiion
-	if ( prec < 0 ) {
-		prec = 6;
-	}
 
 	if ( prec ) {
 		width -= prec + 1;

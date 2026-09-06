@@ -3246,8 +3246,12 @@ qboolean CG_VR_AdjustFrom640( float *x, float *y, float *w, float *h )
 				yOffset = opticalOffset * screenYScale;
 			}
 
-			trap_Cvar_VariableStringBuffer( "vr_hudYOffset", yOffBuf, sizeof( yOffBuf ) );
-			hudYOffset = atof( yOffBuf );
+			// vr_hudYOffset moves the HUD in the 3D views only; on the virtual screen the HUD is part of the screen
+			hudYOffset = 0.0f;
+			if (!vr->virtual_screen) {
+				trap_Cvar_VariableStringBuffer( "vr_hudYOffset", yOffBuf, sizeof( yOffBuf ) );
+				hudYOffset = atof( yOffBuf );
+			}
 
 			*x *= screenXScale;
 			*y *= screenYScale;

@@ -498,7 +498,11 @@ static void GraphicsOptions_ApplyChanges( void *unused, int notification )
 	}
 
 	trap_Cvar_SetValue( "r_ext_compressed_textures", s_graphicsoptions.compressed.curvalue );
-	trap_Cvar_SetValue( "r_hdrDisplay", s_graphicsoptions.hdr.curvalue );
+	// a write would create the cvar on an engine without HDR output, and its
+	// existence is what enables every HDR item
+	if ( UI_HDR_Available() ) {
+		trap_Cvar_SetValue( "r_hdrDisplay", s_graphicsoptions.hdr.curvalue );
+	}
 
 	// the r_mode-class rows exist only on flatscreen; the runtime owns the
 	// display under VR

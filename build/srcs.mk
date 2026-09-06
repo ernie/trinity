@@ -52,7 +52,7 @@ UI_SRC = \
  ui_removebots ui_saveconfig ui_serverinfo ui_servers2 ui_setup ui_sound \
  ui_sparena ui_specifyserver ui_splevel ui_sppostgame ui_spskill \
  ui_startserver ui_team ui_teamorders ui_video ui_vrcomfort ui_vrcontrols \
- ui_vrhud ui_vrmirror ui_vroptions vr_ui \
+ ui_vrhud_display ui_vrmirror ui_vroptions vr_ui \
  bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform \
  q_math q_shared \
 

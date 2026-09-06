@@ -53,8 +53,8 @@ void UI_VRComfortMenu( void );
 void UI_VRComfort_Cache( void );
 void UI_VRControlsMenu( void );
 void UI_VRControls_Cache( void );
-void UI_VRHudMenu( void );
-void UI_VRHud_Cache( void );
+void UI_VRHudDisplayMenu( void );
+void UI_VRHudDisplay_Cache( void );
 void UI_VRMirrorMenu( void );
 void UI_VRMirror_Cache( void );
 

@@ -110,21 +110,21 @@ CG_CVAR( cg_buildScript, "com_buildScript", "0", 0 )	// force loading of all pos
 CG_CVAR( cg_paused, "cl_paused", "0", CVAR_ROM )
 CG_CVAR( cg_blood, "com_blood", "2", CVAR_ARCHIVE_ND )	// 0 off, 1 classic, 2 enhanced
 CG_CVAR( cg_bloodGibSpray, "cg_bloodGibSpray", "1.0", CVAR_ARCHIVE_ND )	// 0-1 gib-spray gout density
-CG_CVAR_PLATFORM( cg_bloodGibSpray, VRPM_QUEST, "0.2" )
+CG_CVAR_PLATFORM( cg_bloodGibSpray, VRPM_STANDALONE, "0.2" )
 CG_CVAR( cg_bloodGoutScale, "cg_bloodGoutScale", "1.0", CVAR_ARCHIVE_ND )	// 0-1 gout sprite radius scale
 CG_CVAR( cg_bloodNearCull, "cg_bloodNearCull", "0.5", CVAR_ARCHIVE_ND )	// cull a gout once it covers > this fraction of screen height (0=off)
-CG_CVAR_PLATFORM( cg_bloodNearCull, VRPM_QUEST, "0.3" )
+CG_CVAR_PLATFORM( cg_bloodNearCull, VRPM_STANDALONE, "0.3" )
 CG_CVAR( cg_bloodBleedGouts, "cg_bloodBleedGouts", "8", CVAR_ARCHIVE_ND )	// max gouts per hit
 CG_CVAR( cg_bloodBleedDecals, "cg_bloodBleedDecals", "8", CVAR_ARCHIVE_ND )	// max decals per hit
 CG_CVAR( cg_bloodTrailStep, "cg_bloodTrailStep", "10", CVAR_ARCHIVE_ND )	// units between trail gouts
-CG_CVAR_PLATFORM( cg_bloodTrailStep, VRPM_QUEST, "30" )
+CG_CVAR_PLATFORM( cg_bloodTrailStep, VRPM_STANDALONE, "30" )
 CG_CVAR( cg_bloodTrailDecalStep, "cg_bloodTrailDecalStep", "3", CVAR_ARCHIVE_ND )	// trail decal every Nth gout; 0=none
 CG_CVAR( cg_bloodDecals, "cg_bloodDecals", "1", CVAR_ARCHIVE_ND )	// master gate for projected blood decals
 CG_CVAR( cg_bloodDecalScale, "cg_bloodDecalScale", "1.0", CVAR_ARCHIVE_ND )	// painted decal size multiplier
-CG_CVAR_PLATFORM( cg_bloodDecalScale, VRPM_QUEST, "0.75" )
+CG_CVAR_PLATFORM( cg_bloodDecalScale, VRPM_STANDALONE, "0.75" )
 CG_CVAR( cg_bloodDecalReach, "cg_bloodDecalReach", "1.0", CVAR_ARCHIVE_ND )	// surface-reach multiplier (decoupled from size)
 CG_CVAR( cg_bloodDecalTime, "cg_bloodDecalTime", "8000", CVAR_ARCHIVE_ND )	// decal lifetime (ms)
-CG_CVAR_PLATFORM( cg_bloodDecalTime, VRPM_QUEST, "4000" )
+CG_CVAR_PLATFORM( cg_bloodDecalTime, VRPM_STANDALONE, "4000" )
 #ifdef MISSIONPACK
 CG_CVAR( cg_currentSelectedPlayer, "cg_currentSelectedPlayer", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_currentSelectedPlayerName, "cg_currentSelectedPlayerName", "", CVAR_ARCHIVE )

@@ -197,7 +197,7 @@ void UI_VR_LoadMenus( void ) {
 	if ( platform == VRP_NONE ) {
 		return;
 	}
-	manifest = ( platform == VRP_QUEST ) ? "ui/vrmenus_quest.txt" : "ui/vrmenus_pc.txt";
+	manifest = ( platform == VRP_STANDALONE ) ? "ui/vrmenus_standalone.txt" : "ui/vrmenus_pc.txt";
 
 	len = trap_FS_FOpenFile( manifest, &f, FS_READ );
 	if ( f ) {

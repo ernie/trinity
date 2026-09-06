@@ -35,6 +35,8 @@ VR CONTROLS OPTIONS MENU
 #define ART_FRAMEL				"menu/art/frame2_l"
 #define ART_FRAMER				"menu/art/frame1_r"
 #define ART_BACK0				"menu/art/back_0"
+#define ART_RESET0				"menu/art/reset_0"
+#define ART_RESET1				"menu/art/reset_1"
 #define ART_BACK1				"menu/art/back_1"
 
 #define VR_X_POS		330
@@ -58,6 +60,7 @@ VR CONTROLS OPTIONS MENU
 #define ID_HOLSTER2D			140
 #define ID_AUTOSWITCH			141
 #define ID_SENDROLL				142
+#define ID_WEAPONPITCHRESET		143
 
 #define ID_BACK					150
 
@@ -81,6 +84,8 @@ typedef struct {
 	menuradiobutton_s	switchthumbsticks;
 	menuslider_s		triggersensitivity;
 	menuslider_s		weaponpitch;
+	menutext_s			weaponpitchvalue;
+	menubitmap_s		weaponpitchreset;
 	menulist_s			weaponselectormode;
 	menulist_s			controlschema;
 	menuradiobutton_s	weaponadjust;
@@ -92,6 +97,17 @@ typedef struct {
 } vrcontrols_t;
 
 static vrcontrols_t s_vrcontrols;
+
+static char s_vrcontrols_pitchLabel[16];	// menutext_s keeps a pointer, so the readout needs static storage
+
+static int s_vrcontrols_hintY;	// set below the last row: the block fills the frame, so a fixed fraction lands inside it
+
+static void VRControls_UpdatePitchLabel( void ) {
+	const int offset = s_vrcontrols.weaponpitch.curvalue - 25;
+
+	Com_sprintf( s_vrcontrols_pitchLabel, sizeof( s_vrcontrols_pitchLabel ),
+		"%s%i", offset > 0 ? "+" : "", offset );
+}
 
 
 static void VRControls_SetMenuItems( void ) {
@@ -105,6 +121,7 @@ static void VRControls_SetMenuItems( void ) {
 	s_vrcontrols.switchthumbsticks.curvalue	= trap_Cvar_VariableValue( "vr_switchThumbsticks" ) != 0;
 	s_vrcontrols.triggersensitivity.curvalue	= trap_Cvar_VariableValue( "vr_triggerSensitivity" );
 	s_vrcontrols.weaponpitch.curvalue		= trap_Cvar_VariableValue( "vr_weaponPitch" ) + 25;
+	VRControls_UpdatePitchLabel();
 	s_vrcontrols.weaponselectormode.curvalue	= (int)trap_Cvar_VariableValue( "vr_weaponSelectorMode" ) % 2;
 	s_vrcontrols.controlschema.curvalue		= (int)trap_Cvar_VariableValue( "vr_controlSchema" ) % 3;
 	s_vrcontrols.weaponadjust.curvalue		= trap_Cvar_VariableValue( "vr_weaponAdjust" ) != 0;
@@ -189,6 +206,13 @@ static void VRControls_MenuEvent( void* ptr, int notification ) {
 
 		case ID_WEAPONPITCH:
 			trap_Cvar_SetValue( "vr_weaponPitch", s_vrcontrols.weaponpitch.curvalue - 25 );
+			VRControls_UpdatePitchLabel();
+			break;
+
+		case ID_WEAPONPITCHRESET:
+			trap_Cvar_SetValue( "vr_weaponPitch", 0 );
+			s_vrcontrols.weaponpitch.curvalue = 25;
+			VRControls_UpdatePitchLabel();
 			break;
 
 		case ID_WEAPONSELECTORMODE:
@@ -290,11 +314,22 @@ static void VRControls_SensitivityStatusBar( void *self )
 	char buf[128] = { 0 };
 	Com_sprintf( buf, sizeof(buf), "Current value: %d (default: 100)", currentValue );
 
-	UI_DrawString(SCREEN_WIDTH * 0.50, SCREEN_HEIGHT * 0.75, buf, UI_SMALLFONT|UI_CENTER, colorWhite );
+	UI_DrawString( SCREEN_WIDTH * 0.50, s_vrcontrols_hintY, buf, UI_SMALLFONT|UI_CENTER, colorWhite );
+}
+
+static void VRControls_WeaponPitchStatusBar( void *self )
+{
+	// the engine applies the grip-to-aim correction itself; this is only the player's tilt on top
+	const int offset = s_vrcontrols.weaponpitch.curvalue - 25;
+
+	char buf[128] = { 0 };
+	Com_sprintf( buf, sizeof(buf), "Current offset: %s%d degrees (default: 0)", offset > 0 ? "+" : "", offset );
+
+	UI_DrawString( SCREEN_WIDTH * 0.50, s_vrcontrols_hintY, buf, UI_SMALLFONT|UI_CENTER, colorWhite );
 }
 
 static void VRControls_WeaponAdjustStatusBar( void *self ) {
-	UI_DrawString( SCREEN_WIDTH * 0.50, SCREEN_HEIGHT * 0.80, "Hold both grips for 1s to enter weapon adjustment mode", UI_SMALLFONT|UI_CENTER, colorWhite );
+	UI_DrawString( SCREEN_WIDTH * 0.50, s_vrcontrols_hintY, "Hold both grips for 1s to enter weapon adjustment mode", UI_SMALLFONT|UI_CENTER, colorWhite );
 }
 
 static void VRControls_MenuInit( void ) {
@@ -476,8 +511,30 @@ static void VRControls_MenuInit( void ) {
 	s_vrcontrols.weaponpitch.generic.name		= "Weapon Pitch:";
 	s_vrcontrols.weaponpitch.generic.id			= ID_WEAPONPITCH;
 	s_vrcontrols.weaponpitch.generic.callback	= VRControls_MenuEvent;
+	s_vrcontrols.weaponpitch.generic.statusbar	= VRControls_WeaponPitchStatusBar;
 	s_vrcontrols.weaponpitch.minvalue			= 0;
-	s_vrcontrols.weaponpitch.maxvalue			= 30;
+	s_vrcontrols.weaponpitch.maxvalue			= 50;
+
+	// The slider bar runs from x + SMALLCHAR_WIDTH for 96 pixels, so the row is free from x + 104 on.
+	s_vrcontrols.weaponpitchvalue.generic.type		= MTYPE_TEXT;
+	s_vrcontrols.weaponpitchvalue.generic.flags		= QMF_LEFT_JUSTIFY|QMF_INACTIVE;
+	s_vrcontrols.weaponpitchvalue.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 104;
+	s_vrcontrols.weaponpitchvalue.generic.y			= y;
+	s_vrcontrols.weaponpitchvalue.string			= s_vrcontrols_pitchLabel;
+	s_vrcontrols.weaponpitchvalue.color				= text_color_normal;
+	s_vrcontrols.weaponpitchvalue.style				= UI_LEFT|UI_SMALLFONT;
+
+	// 128x64 art at half size, so it fits inside the row.
+	s_vrcontrols.weaponpitchreset.generic.type		= MTYPE_BITMAP;
+	s_vrcontrols.weaponpitchreset.generic.name		= ART_RESET0;
+	s_vrcontrols.weaponpitchreset.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_vrcontrols.weaponpitchreset.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 128;
+	s_vrcontrols.weaponpitchreset.generic.y			= y - 8;
+	s_vrcontrols.weaponpitchreset.generic.id		= ID_WEAPONPITCHRESET;
+	s_vrcontrols.weaponpitchreset.generic.callback	= VRControls_MenuEvent;
+	s_vrcontrols.weaponpitchreset.width				= 64;
+	s_vrcontrols.weaponpitchreset.height			= 32;
+	s_vrcontrols.weaponpitchreset.focuspic			= ART_RESET1;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrcontrols.weaponselectormode.generic.type		= MTYPE_SPINCONTROL;
@@ -538,6 +595,8 @@ static void VRControls_MenuInit( void ) {
 	s_vrcontrols.sendroll.generic.x			= VR_X_POS;
 	s_vrcontrols.sendroll.generic.y			= y;
 
+	s_vrcontrols_hintY = y + BIGCHAR_HEIGHT + 2;
+
 	s_vrcontrols.back.generic.type		= MTYPE_BITMAP;
 	s_vrcontrols.back.generic.name		= ART_BACK0;
 	s_vrcontrols.back.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
@@ -563,6 +622,8 @@ static void VRControls_MenuInit( void ) {
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.switchthumbsticks );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.triggersensitivity );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponpitch );
+	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponpitchvalue );
+	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponpitchreset );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponselectormode );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.controlschema );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponadjust );
@@ -586,6 +647,8 @@ void UI_VRControls_Cache( void ) {
 	trap_R_RegisterShaderNoMip( ART_FRAMER );
 	trap_R_RegisterShaderNoMip( ART_BACK0 );
 	trap_R_RegisterShaderNoMip( ART_BACK1 );
+	trap_R_RegisterShaderNoMip( ART_RESET0 );
+	trap_R_RegisterShaderNoMip( ART_RESET1 );
 }
 
 

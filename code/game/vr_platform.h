@@ -8,13 +8,13 @@
 typedef enum {
 	VRP_NONE,
 	VRP_PC,
-	VRP_QUEST
+	VRP_STANDALONE
 } vrPlatform_t;
 
 // VRP_NONE is 0 and contributes no bits, so the enum cannot double as a mask.
-#define VRPM_FLAT	( 1 << VRP_NONE )
-#define VRPM_PC		( 1 << VRP_PC )
-#define VRPM_QUEST	( 1 << VRP_QUEST )
+#define VRPM_FLAT		( 1 << VRP_NONE )
+#define VRPM_PC			( 1 << VRP_PC )
+#define VRPM_STANDALONE	( 1 << VRP_STANDALONE )
 
 vrPlatform_t VR_Platform( qboolean vrActive );
 

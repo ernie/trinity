@@ -4570,7 +4570,8 @@ static void CG_DrawWeapReticle( void )
 	vec4_t red = {0.8f, 0.0f, 0.0f, 0.5f};
 
 	float indentX = 0.16f;
-	float indentY = 0.21f;  // larger Y indent to make scope circular (compensates for 4:3 aspect)
+	float aspect = (float)cgs.glconfig.vidWidth / (float)cgs.glconfig.vidHeight;
+	float indentY = 0.5f - (0.5f - indentX) * aspect;
 	float X_WIDTH = 640;
 	float Y_HEIGHT = 480;
 
@@ -4578,10 +4579,16 @@ static void CG_DrawWeapReticle( void )
 	float centerX = 320.0f;
 	float centerY = 240.0f;
 
-	float x = (X_WIDTH * indentX);
-	float y = (Y_HEIGHT * indentY);
-	float w = (X_WIDTH * (1-(2*indentX))) / 2.0f;
-	float h = (Y_HEIGHT * (1-(2*indentY))) / 2;
+	float x, y, w, h;
+
+	if ( indentY < 0.0f ) {
+		indentY = 0.0f;  // very wide buffer: the circle overruns the top and bottom
+	}
+
+	x = (X_WIDTH * indentX);
+	y = (Y_HEIGHT * indentY);
+	w = (X_WIDTH * (1-(2*indentX))) / 2.0f;
+	h = (Y_HEIGHT * (1-(2*indentY))) / 2;
 
 	CG_AdjustFrom640( &x, &y, &w, &h );
 
