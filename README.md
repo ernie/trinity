@@ -74,6 +74,7 @@ bind downarrow tv_prev       # previous player
 - Independent head and torso tracking for VR clients, backwards-compatible with flatscreen players
 - VR player head movement captured in demos for playback
 - VR player icon displayed on the scoreboard
+- The grapple joins the VR weapon wheel when the server hands it out
 
 **Server**
 
@@ -84,6 +85,11 @@ bind downarrow tv_prev       # previous player
   - `2` — Quake Live (auto-hop, jump velocity 275; damage adjustments, cg_trueShotgun)
   - `3` — Quake Live Turbo (Quake Live combat with CPMA-style strafe air control + ramp jump)
 - `g_teamDMSpawnThreshold`: Set > 0 to include Team (CTF) spawns in maps with fewer deathmatch spawns than the value. Allows use of maps that are otherwise a telefrag-fest in Team DM.
+- `g_grapple`: Hand every player a grapple at spawn — weapon slot 10, unlimited ammo. Hold fire to throw the anchor pad; the tether pulls you to wherever it bites. Release fire or switch weapons to let go. A pad stuck in an enemy deals steady damage while attached; one that touches a teammate drops. Also a **Grapple** toggle on the create-server and skirmish screens. Default `0`.
+- `g_damage_gh`: Damage an attached tether deals. Empty (default) uses the game mode's value; `0` turns it off.
+- `g_knockback_gh`: Knockback the anchor pad delivers on impact. Empty (default) uses the game mode's value; `0` turns it off.
+- `bot_grapple`: Bots travel and fight with the grapple whenever the server hands it out (`1`, default); `0` keeps them off it, `2` logs their grapple activity. Travel routes come from Trinity navigation data (`maps/*.aat`, shipped for the stock baseq3 and Team Arena maps), loaded beside each map's `.aas`.
+- `sv_fps` defaults to `40`, matching the engines; the mod's movement and the grapple's pull are tuned for it.
 
 The per-mode movement and combat values were determined by dumping cvars where possible, followed by community resources, then trial and error until things felt right. Bug reports of differences in behavior from the _default_ settings for CPMA/Quake Live are greatly appreciated.
 
