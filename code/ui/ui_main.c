@@ -2357,13 +2357,8 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 			s = va( "%i nits", (int)( trap_Cvar_VariableValue( "r_hdrPeak" ) + 0.5f ) );
 			break;
 		case UI_REFRESHRATE:
-			s = va( "%i Hz", (int)( trap_Cvar_VariableValue( "vr_refreshrate" ) + 0.5f ) );
-			break;
 		case UI_FOVEATION:
-			s = UI_FoveationText();
-			break;
 		case UI_FOVEATION_STRENGTH:
-			s = UI_FoveationStrengthText();
 			break;
 		case UI_WEAPONPITCH:
 			s = UI_WeaponPitchText();

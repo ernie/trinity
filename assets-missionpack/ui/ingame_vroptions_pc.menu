@@ -549,13 +549,30 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Weapon Pitch:"
 	cvarfloat "vr_weaponPitch" 0 -25 25
-	rect 28 212 340 18
+	rect 28 212 286 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	text "Reset"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	backcolor .37 .1 .1 1
+	rect 333 212 40 18
+	textalign ITEM_ALIGN_CENTER
+	textalignx 18
+	textaligny 13
+	textscale .2
+	forecolor 1 1 1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; setcvar vr_weaponPitch 0 }
 	}
 itemDef {
 	name controls
@@ -805,6 +822,67 @@ itemDef {
 	textscale .25
 	forecolor 1 1 1 1
 	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	text "Refresh Rate:"
+	ownerdraw UI_REFRESHRATE
+	rect 28 248 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	text "Foveated Rendering:"
+	ownerdraw UI_FOVEATION
+	rect 28 266 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	text "Foveation Strength:"
+	ownerdraw UI_FOVEATION_STRENGTH
+	rect 28 284 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	text "Apply"
+	type 1
+	textscale .25
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 159 308 100 20
+	textalign 1
+	textalignx 50
+	textaligny 15
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; exec "vid_restart" }
+	mouseEnter { setcolor backcolor .1 .37 .1 1 }
+	mouseExit { setcolor backcolor .37 .1 .1 1 }
 	}
 
 // DESKTOP MIRROR GROUP (PC ONLY)	//
