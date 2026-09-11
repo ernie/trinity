@@ -106,14 +106,12 @@ static void VR_HostTraceRender( trace_t *result, const vec3_t start, const vec3_
 }
 
 #ifdef Q3_VM
-void	(*trap_R_BeginPostBloom2D)( void );
-void	(*trap_R_EndPostBloom2D)( void );
+void	(*trap_R_SceneComplete)( void );
 void	(*trap_R_HUDBufferStart)( qboolean clear );
 void	(*trap_R_HUDBufferEnd)( void );
-void	(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
+void	(*trap_HapticEvent)( const char *event, int position, int channel, int intensity, float yaw, float height );
 #else
-int dll_trap_R_BeginPostBloom2D;
-int dll_trap_R_EndPostBloom2D;
+int dll_trap_R_SceneComplete;
 int dll_trap_R_HUDBufferStart;
 int dll_trap_R_HUDBufferEnd;
 int dll_trap_HapticEvent;
@@ -143,7 +141,7 @@ void CG_VR_Init( void ) {
 
 	trap_Cvar_VariableStringBuffer( "//trap_GetValue", ext, sizeof( ext ) );
 	if ( !ext[0] )
-		return;		// flatscreen engine: dormant
+		return;		// no extensions at all: dormant
 
 #ifdef Q3_VM
 	trap_GetValue = (void*)~atoi( ext );
@@ -164,8 +162,7 @@ void CG_VR_Init( void ) {
 
 	// The rest of the VR trap set is part of the v1 contract, so a registered
 	// engine provides all of it - bind unconditionally.
-	VR_RESOLVE( trap_R_BeginPostBloom2D, ext );
-	VR_RESOLVE( trap_R_EndPostBloom2D, ext );
+	VR_RESOLVE( trap_R_SceneComplete, ext );
 	VR_RESOLVE( trap_R_HUDBufferStart, ext );
 	VR_RESOLVE( trap_R_HUDBufferEnd, ext );
 	VR_RESOLVE( trap_HapticEvent, ext );
@@ -244,10 +241,10 @@ void CG_VR_Frame( void ) {
 	}
 }
 
-void CG_VRHaptic( const char *description, int position, int channel, int intensity, float yaw, float height ) {
+void CG_VRHaptic( const char *event, int position, int channel, int intensity, float yaw, float height ) {
 	if ( !vrActive )
 		return;
-	trap_HapticEvent( description, position, channel, intensity, yaw, height );
+	trap_HapticEvent( event, position, channel, intensity, yaw, height );
 }
 
 static void ProbeLine( int *y, const char *text ) {
@@ -2604,9 +2601,9 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 	// Restore the un-folded origin now that the scene has been submitted.
 	VectorCopy( baseOrg, cg.refdef.vieworg );
 
-	// Apply bloom now, BEFORE 2D drawing begins. This ensures bloom only
-	// affects the 3D scene, not UI elements.
-	trap_R_BeginPostBloom2D();
+	// After trap_R_RenderScene: the engine's scene-sampling work runs here,
+	// so whatever is drawn afterward stays out of it.
+	trap_R_SceneComplete();
 
 	{
 		char  hudBuf[16];
@@ -2707,8 +2704,6 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			}
 		}
 	}
-
-	trap_R_EndPostBloom2D();
 
 	return qtrue;
 }

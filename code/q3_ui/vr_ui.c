@@ -15,7 +15,7 @@ qboolean vrActive = qfalse;
 #ifdef Q3_VM
 qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
-void	(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
+void	(*trap_HapticEvent)( const char *event, int position, int channel, int intensity, float yaw, float height );
 void	(*trap_VKeyboard_Show)( void );
 void	(*trap_VKeyboard_Hide)( void );
 qboolean (*trap_VKeyboard_IsActive)( void );
@@ -51,7 +51,7 @@ void UI_VR_Init( void ) {
 
 	trap_Cvar_VariableStringBuffer( "//trap_GetValue", ext, sizeof( ext ) );
 	if ( !ext[0] )
-		return;		// flatscreen engine: dormant, normal mouse mode
+		return;		// no extensions at all: dormant, normal mouse mode
 
 #ifdef Q3_VM
 	trap_GetValue = (void*)~atoi( ext );
@@ -94,10 +94,10 @@ void UI_VR_Shutdown( void ) {
 	vr->menuCursorActive = qfalse;
 }
 
-void UI_VRHaptic( const char *description, int position, int channel, int intensity, float yaw, float height ) {
+void UI_VRHaptic( const char *event, int position, int channel, int intensity, float yaw, float height ) {
 	if ( !vrActive )
 		return;
-	trap_HapticEvent( description, position, channel, intensity, yaw, height );
+	trap_HapticEvent( event, position, channel, intensity, yaw, height );
 }
 
 // Virtual keyboard wrappers; dormant on a flatscreen engine.

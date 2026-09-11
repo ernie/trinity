@@ -2055,19 +2055,16 @@ extern vr_shared_t *vr;
 extern qboolean vrActive;
 
 #ifdef Q3_VM
-extern void	(*trap_R_BeginPostBloom2D)( void );
-extern void	(*trap_R_EndPostBloom2D)( void );
+extern void	(*trap_R_SceneComplete)( void );
 extern void	(*trap_R_HUDBufferStart)( qboolean clear );
 extern void	(*trap_R_HUDBufferEnd)( void );
-extern void	(*trap_HapticEvent)( const char *description, int position, int channel, int intensity, float yaw, float height );
+extern void	(*trap_HapticEvent)( const char *event, int position, int channel, int intensity, float yaw, float height );
 #else
-void trap_R_BeginPostBloom2D( void );
-void trap_R_EndPostBloom2D( void );
+void trap_R_SceneComplete( void );
 void trap_R_HUDBufferStart( qboolean clear );
 void trap_R_HUDBufferEnd( void );
-void trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height );
-extern int dll_trap_R_BeginPostBloom2D;
-extern int dll_trap_R_EndPostBloom2D;
+void trap_HapticEvent( const char *event, int position, int channel, int intensity, float yaw, float height );
+extern int dll_trap_R_SceneComplete;
 extern int dll_trap_R_HUDBufferStart;
 extern int dll_trap_R_HUDBufferEnd;
 extern int dll_trap_HapticEvent;

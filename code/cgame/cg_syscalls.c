@@ -453,12 +453,8 @@ void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMin
 	syscall( dll_trap_VR_RegisterState, state, stateSize, apiMajor, apiMinor );
 }
 
-void trap_R_BeginPostBloom2D( void ) {
-	syscall( dll_trap_R_BeginPostBloom2D );
-}
-
-void trap_R_EndPostBloom2D( void ) {
-	syscall( dll_trap_R_EndPostBloom2D );
+void trap_R_SceneComplete( void ) {
+	syscall( dll_trap_R_SceneComplete );
 }
 
 void trap_R_HUDBufferStart( qboolean clear ) {
@@ -469,6 +465,6 @@ void trap_R_HUDBufferEnd( void ) {
 	syscall( dll_trap_R_HUDBufferEnd );
 }
 
-void trap_HapticEvent( const char *description, int position, int channel, int intensity, float yaw, float height ) {
-	syscall( dll_trap_HapticEvent, description, position, channel, intensity, PASSFLOAT(yaw), PASSFLOAT(height) );
+void trap_HapticEvent( const char *event, int position, int channel, int intensity, float yaw, float height ) {
+	syscall( dll_trap_HapticEvent, event, position, channel, intensity, PASSFLOAT(yaw), PASSFLOAT(height) );
 }

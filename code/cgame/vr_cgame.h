@@ -14,7 +14,7 @@ void CG_VR_Init( void );
 void CG_VR_Shutdown( void );
 void CG_VR_RegisterMedia( void );
 void CG_VR_Frame( void );
-void CG_VRHaptic( const char *description, int position, int channel, int intensity, float yaw, float height );
+void CG_VRHaptic( const char *event, int position, int channel, int intensity, float yaw, float height );
 void CG_VRProbe_Draw( void );
 
 // cg_view.c per-frame view-pipeline hooks: FOV override, forced third-person

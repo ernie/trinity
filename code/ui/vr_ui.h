@@ -16,7 +16,7 @@ vrPlatform_t UI_VR_Platform( void );
 
 void UI_VR_Init( void );
 void UI_VR_Shutdown( void );
-void UI_VRHaptic( const char *description, int position, int channel, int intensity, float yaw, float height );
+void UI_VRHaptic( const char *event, int position, int channel, int intensity, float yaw, float height );
 void UI_VKeyboardShow( void );
 void UI_VKeyboardHide( void );
 qboolean UI_VKeyboardIsActive( void );

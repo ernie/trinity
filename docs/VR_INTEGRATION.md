@@ -903,7 +903,7 @@ set with new traps is what a `VR_API_MINOR` bump is for.
 | Key | Modules |
 |-----|---------|
 | `trap_VR_RegisterState` | all (**the gate**: its resolve sets `vrActive` / `g_vrActive`) |
-| `trap_R_BeginPostBloom2D` / `trap_R_EndPostBloom2D` | cgame |
+| `trap_R_SceneComplete` | cgame |
 | `trap_R_HUDBufferStart` / `trap_R_HUDBufferEnd` | cgame |
 | `trap_HapticEvent` | cgame, both UI |
 | `trap_VKeyboard_Show` / `_Hide` / `_IsActive` / `_HandleKey` | both UI |
