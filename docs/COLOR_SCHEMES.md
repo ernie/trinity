@@ -156,6 +156,11 @@ by bit weight.
 by the UI ([§6](#6-ui-slider-translation-tables)) and broadcast by the server
 ([code/game/g_client.c:713-722](../code/game/g_client.c#L713-L722)).
 
+- **Bots** take `color1` / `color2` from their `scripts/bots.txt` entry, or
+  `4` / `5` without one. While `g_botColors` is on (default `1`, latched),
+  `scripts/botcolors.txt` replaces them for the bots it names when the roster
+  loads ([code/game/g_bot.c:1573](../code/game/g_bot.c#L1573)); clan aliases
+  inherit their base's.
 - **Team games** (`g_forceTeamColors`, default `1`): every player on red or
   blue broadcasts `color1` `4` or `1`. `color2` stays the player's own. This
   is settled per broadcast, so changing it rebroadcasts every client.

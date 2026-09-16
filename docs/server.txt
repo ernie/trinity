@@ -32,6 +32,16 @@ g_predictPVS
 
 
 ========================
+g_botColors <0|1>
+
+    1 - the bots named in scripts/botcolors.txt use its effects colors: rail
+        core and grapple glow (color1), rail spiral (color2)
+    0 - bots use their scripts/bots.txt colors, red / magenta by default
+
+    default is 1, latched: applies from the next map load to bots added after
+
+
+========================
 g_forceTeamColors <0|1>
 
     1 - in team games every player's effects color (color1) is their team's,

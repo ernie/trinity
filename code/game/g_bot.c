@@ -1567,6 +1567,77 @@ static void G_LoadBotsFromFile( const char *filename ) {
 
 /*
 ===============
+G_LoadBotColors
+===============
+*/
+static void G_LoadBotColors( void ) {
+	static const char *keys[] = { "color1", "color2" };
+	const char		*filename = "scripts/botcolors.txt";
+	int				len, count, applied, i, n, k;
+	fileHandle_t	f;
+	char			buf[MAX_BOTS_TEXT];
+	char			*infos[MAX_BOTS];
+	char			name[MAX_NETNAME];
+	char			info[MAX_INFO_STRING];
+	const char		*value;
+	char			*copy;
+
+	if ( !g_botColors.integer ) {
+		return;
+	}
+
+	len = trap_FS_FOpenFile( filename, &f, FS_READ );
+	if ( f == FS_INVALID_HANDLE ) {
+		trap_Print( va( S_COLOR_RED "file not found: %s\n", filename ) );
+		return;
+	}
+	if ( len >= MAX_BOTS_TEXT ) {
+		trap_Print( va( S_COLOR_RED "file too large: %s is %i, max allowed is %i\n", filename, len, MAX_BOTS_TEXT ) );
+		trap_FS_FCloseFile( f );
+		return;
+	}
+
+	trap_FS_Read( buf, len, f );
+	trap_FS_FCloseFile( f );
+	buf[ len ] = '\0';
+
+	count = G_ParseInfos( buf, MAX_BOTS, infos );
+
+	applied = 0;
+	for ( i = 0; i < count; i++ ) {
+		Q_strncpyz( name, Info_ValueForKey( infos[i], "name" ), sizeof( name ) );
+		for ( n = 0; n < g_numBots; n++ ) {
+			if ( !Q_stricmp( Info_ValueForKey( g_botInfos[n], "name" ), name ) ) {
+				break;
+			}
+		}
+		if ( n == g_numBots ) {
+			continue;
+		}
+
+		// infos are allocated to fit
+		Q_strncpyz( info, g_botInfos[n], sizeof( info ) );
+		for ( k = 0; k < ARRAY_LEN( keys ); k++ ) {
+			value = Info_ValueForKey( infos[i], keys[k] );
+			if ( *value ) {
+				Info_SetValueForKey( info, keys[k], value );
+			}
+		}
+		copy = G_Alloc( strlen( info ) + 1 );
+		if ( !copy ) {
+			return;
+		}
+		strcpy( copy, info );
+		g_botInfos[n] = copy;
+		applied++;
+	}
+
+	trap_Print( va( "%i bot colors applied\n", applied ) );
+}
+
+
+/*
+===============
 G_LoadBots
 ===============
 */
@@ -1607,6 +1678,8 @@ static void G_LoadBots( void ) {
 		}
 	}
 	trap_Print( va( "%i bots parsed\n", g_numBots ) );
+
+	G_LoadBotColors();
 }
 
 

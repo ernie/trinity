@@ -1,0 +1,205 @@
+// 1 blue, 2 green, 3 cyan, 4 red, 5 magenta, 6 yellow, 7 white
+
+{
+name		Anarki
+color1		2
+color2		7
+}
+
+{
+name		Angel
+color1		7
+color2		4
+}
+
+{
+name		Biker
+color1		1
+color2		7
+}
+
+{
+name		Bitterman
+color1		6
+color2		2
+}
+
+{
+name		Bones
+color1		3
+color2		7
+}
+
+{
+name		Cadavre
+color1		4
+color2		7
+}
+
+{
+name		Crash
+color1		7
+color2		6
+}
+
+{
+name		Daemia
+color1		4
+color2		6
+}
+
+{
+name		Doom
+color1		2
+color2		7
+}
+
+{
+name		Fritzkrieg
+color1		3
+color2		6
+}
+
+{
+name		Gorre
+color1		4
+color2		6
+}
+
+{
+name		Grunt
+color1		2
+color2		4
+}
+
+{
+name		Hossman
+color1		5
+color2		7
+}
+
+{
+name		Hunter
+color1		2
+color2		7
+}
+
+{
+name		Keel
+color1		6
+color2		4
+}
+
+{
+name		Klesk
+color1		4
+color2		6
+}
+
+{
+name		Lucy
+color1		5
+color2		6
+}
+
+{
+name		Major
+color1		6
+color2		4
+}
+
+{
+name		Mynx
+color1		4
+color2		6
+}
+
+{
+name		Orbb
+color1		4
+color2		7
+}
+
+{
+name		Patriot
+color1		1
+color2		4
+}
+
+{
+name		Phobos
+color1		6
+color2		4
+}
+
+{
+name		Pi
+color1		7
+color2		4
+}
+
+{
+name		Ranger
+color1		6
+color2		4
+}
+
+{
+name		Razor
+color1		4
+color2		7
+}
+
+{
+name		Sarge
+color1		7
+color2		4
+}
+
+{
+name		Slash
+color1		7
+color2		1
+}
+
+{
+name		Sorlag
+color1		1
+color2		4
+}
+
+{
+name		Stripe
+color1		3
+color2		6
+}
+
+{
+name		TankJr
+color1		6
+color2		1
+}
+
+{
+name		Uriel
+color1		4
+color2		7
+}
+
+{
+name		Visor
+color1		6
+color2		4
+}
+
+{
+name		Wrack
+color1		6
+color2		7
+}
+
+{
+name		Xaero
+color1		4
+color2		6
+}
