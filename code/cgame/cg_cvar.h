@@ -20,7 +20,8 @@
 
 // Several stock defaults are deliberately different here, on every platform
 // (not VR-gated): cg_drawAttacker 0, cg_drawCrosshairNames 0, cg_scorePlums 0,
-// cg_smoothClients 1, cg_oldRocket 0, cg_trueLightning 1.
+// cg_smoothClients 1, cg_oldRail 0, cg_oldRocket 0, cg_oldPlasma 0,
+// cg_trueLightning 1.
 
 CG_CVAR( cg_ignore, "cg_ignore", "0", 0 ) // used for debugging
 CG_CVAR( cg_autoswitch, "cg_autoswitch", "1", CVAR_ARCHIVE )
@@ -151,9 +152,9 @@ CG_CVAR( cg_noTaunt, "cg_noTaunt", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_noProjectileTrail, "cg_noProjectileTrail", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_smallFont, "ui_smallFont", "0.25", CVAR_ARCHIVE )
 CG_CVAR( cg_bigFont, "ui_bigFont", "0.4", CVAR_ARCHIVE )
-CG_CVAR( cg_oldRail, "cg_oldRail", "1", CVAR_ARCHIVE )
+CG_CVAR( cg_oldRail, "cg_oldRail", "0", CVAR_ARCHIVE_ND )
 CG_CVAR( cg_oldRocket, "cg_oldRocket", "0", CVAR_ARCHIVE_ND )
-CG_CVAR( cg_oldPlasma, "cg_oldPlasma", "1", CVAR_ARCHIVE )
+CG_CVAR( cg_oldPlasma, "cg_oldPlasma", "0", CVAR_ARCHIVE_ND )
 CG_CVAR( cg_trueLightning, "cg_trueLightning", "1", CVAR_ARCHIVE_ND )
 CG_CVAR( cg_hitSounds, "cg_hitSounds", "0", CVAR_ARCHIVE )
 CG_CVAR( cg_enemyModel, "cg_enemyModel", "", CVAR_ARCHIVE )
