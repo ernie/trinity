@@ -713,6 +713,13 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	// colors
 	Q_strncpyz( c1, Info_ValueForKey( userinfo, "color1" ), sizeof( c1 ) );
 	Q_strncpyz( c2, Info_ValueForKey( userinfo, "color2" ), sizeof( c2 ) );
+	if ( g_forceTeamColors.integer && g_gametype.integer >= GT_TEAM ) {
+		if ( client->sess.sessionTeam == TEAM_RED ) {
+			Q_strncpyz( c1, "4", sizeof( c1 ) );
+		} else if ( client->sess.sessionTeam == TEAM_BLUE ) {
+			Q_strncpyz( c1, "1", sizeof( c1 ) );
+		}
+	}
 
 	// Detect trinity engine: presence of "vr" key in userinfo (even if "0")
 	// Stock ioquake3 clients don't send this key at all

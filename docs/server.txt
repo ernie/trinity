@@ -32,6 +32,16 @@ g_predictPVS
 
 
 ========================
+g_forceTeamColors <0|1>
+
+    1 - in team games every player's effects color (color1) is their team's,
+        red or blue; the rail spiral (color2) stays the player's own
+    0 - players show their own effects colors
+
+    default is 1, applies immediately
+
+
+========================
 g_rotation
 
     points to filename with rotation information, see rotation.txt for details

@@ -153,8 +153,12 @@ blue-channel-only = blue. The menu sorts by visible spectrum; the parser sorts
 by bit weight.
 
 **There is no `cg_color1` cvar** — only the lowercase `color1` userinfo, set
-by the UI ([§6](#6-ui-slider-translation-tables)) and broadcast unchanged by
-the server ([code/game/g_client.c:716](../code/game/g_client.c#L716)).
+by the UI ([§6](#6-ui-slider-translation-tables)) and broadcast by the server
+([code/game/g_client.c:713-722](../code/game/g_client.c#L713-L722)).
+
+- **Team games** (`g_forceTeamColors`, default `1`): every player on red or
+  blue broadcasts `color1` `4` or `1`. `color2` stays the player's own. This
+  is settled per broadcast, so changing it rebroadcasts every client.
 
 **Where the colors render:** rail-core color (`color1`) and rail-spiral color
 (`color2`) — [code/cgame/cg_weapons.c:196-290](../code/cgame/cg_weapons.c#L196-L290).

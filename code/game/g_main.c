@@ -313,6 +313,7 @@ static void G_UpdateCvars( void ) {
 	int			i;
 	cvarTable_t	*cv;
 	qboolean remapped = qfalse;
+	qboolean recolored = qfalse;
 
 	for ( i = 0, cv = gameCvarTable ; i < ARRAY_LEN( gameCvarTable ) ; i++, cv++ ) {
 		if ( cv->vmCvar ) {
@@ -330,12 +331,24 @@ static void G_UpdateCvars( void ) {
 				if (cv->teamShader) {
 					remapped = qtrue;
 				}
+
+				if ( cv->vmCvar == &g_forceTeamColors ) {
+					recolored = qtrue;
+				}
 			}
 		}
 	}
 
 	if (remapped) {
 		G_RemapTeamShaders();
+	}
+
+	if ( recolored ) {
+		for ( i = 0; i < level.maxclients; i++ ) {
+			if ( level.clients[i].pers.connected != CON_DISCONNECTED ) {
+				ClientUserinfoChanged( i );
+			}
+		}
 	}
 }
 
