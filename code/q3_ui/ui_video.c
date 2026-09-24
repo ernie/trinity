@@ -227,7 +227,6 @@ GRAPHICS OPTIONS MENU
 #define ID_DISPLAY		107
 #define ID_SOUND		108
 #define ID_NETWORK		109
-#define ID_HDR			110
 #define ID_SHADOWS		112
 #define ID_MSAA			115
 
@@ -254,7 +253,6 @@ typedef struct {
 	menulist_s  	texturebits;
 	menulist_s  	colordepth;
 	menuradiobutton_s compressed;
-	menuradiobutton_s hdr;
 	menulist_s  	modeldetail;
 	menulist_s  	curvedetail;
 	menulist_s  	filter;
@@ -281,7 +279,6 @@ typedef struct
 	// the fields below carry no template values: s_ivo_templates' positional
 	// initializers stop at filter, so every preset leaves them zero, and
 	// preset selection neither applies nor matches them
-	int hdr;
 	int shadows;
 	int msaa;
 	int compressed;
@@ -330,7 +327,6 @@ static void GraphicsOptions_GetInitialVideo( void )
 	s_ivo.filter      = s_graphicsoptions.filter.curvalue;
 	s_ivo.texturebits = s_graphicsoptions.texturebits.curvalue;
 	s_ivo.compressed  = s_graphicsoptions.compressed.curvalue;
-	s_ivo.hdr         = s_graphicsoptions.hdr.curvalue;
 	s_ivo.shadows     = s_graphicsoptions.shadows.curvalue;
 	s_ivo.msaa        = s_graphicsoptions.msaa.curvalue;
 }
@@ -444,10 +440,6 @@ static void GraphicsOptions_UpdateMenuItems( void )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
-	if ( s_ivo.hdr != s_graphicsoptions.hdr.curvalue )
-	{
-		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
-	}
 	if ( s_ivo.msaa != s_graphicsoptions.msaa.curvalue )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
@@ -498,11 +490,6 @@ static void GraphicsOptions_ApplyChanges( void *unused, int notification )
 	}
 
 	trap_Cvar_SetValue( "r_ext_compressed_textures", s_graphicsoptions.compressed.curvalue );
-	// a write would create the cvar on an engine without HDR output, and its
-	// existence is what enables every HDR item
-	if ( UI_HDR_Available() ) {
-		trap_Cvar_SetValue( "r_hdrDisplay", s_graphicsoptions.hdr.curvalue );
-	}
 
 	// the r_mode-class rows exist only on flatscreen; the runtime owns the
 	// display under VR
@@ -559,7 +546,7 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 		s_graphicsoptions.curvedetail.curvalue = ivo->curvedetail;
 		s_graphicsoptions.filter.curvalue      = ivo->filter;
 		// presets carry no values for the newer rows (compress textures,
-		// HDR, the instant rows), which stay untouched by preset selection
+		// the instant rows), which stay untouched by preset selection
 		if ( !graphicsOptions_vr ) {
 			s_graphicsoptions.mode.curvalue        = ivo->mode;
 			s_graphicsoptions.colordepth.curvalue  = ivo->colordepth;
@@ -740,7 +727,6 @@ static void GraphicsOptions_SetMenuItems( void )
 	}
 
 	s_graphicsoptions.compressed.curvalue = trap_Cvar_VariableValue( "r_ext_compressed_textures" ) != 0;
-	s_graphicsoptions.hdr.curvalue = trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0;
 
 	switch ( (int) trap_Cvar_VariableValue( "cg_shadows" ) )
 	{
@@ -979,12 +965,12 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.network.color				= color_red;
 
 	if( graphicsOptions_vr ) {
-		// 11 settings rows + Driver Info link = 12 slots centered on the frame
-		y = 242 - ( 12 * (BIGCHAR_HEIGHT + 2) ) / 2;
+		// 10 settings rows + Driver Info link = 11 slots centered on the frame
+		y = 242 - ( 11 * (BIGCHAR_HEIGHT + 2) ) / 2;
 	}
 	else {
-		// 14 settings rows + Driver Info link = 15 slots centered on the frame
-		y = 242 - ( 15 * (BIGCHAR_HEIGHT + 2) ) / 2;
+		// 13 settings rows + Driver Info link = 14 slots centered on the frame
+		y = 242 - ( 14 * (BIGCHAR_HEIGHT + 2) ) / 2;
 	}
 
 	s_graphicsoptions.list.generic.type     = MTYPE_SPINCONTROL;
@@ -1038,6 +1024,10 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.msaa.generic.callback		= GraphicsOptions_Event;
 	s_graphicsoptions.msaa.generic.id			= ID_MSAA;
 	s_graphicsoptions.msaa.numitems				= NUM_MSAA;
+	// MSAA renders into the frame buffer, so it does nothing while that is off
+	if ( UI_HDR_FBOOff() ) {
+		s_graphicsoptions.msaa.generic.flags |= QMF_GRAYED;
+	}
 	y += BIGCHAR_HEIGHT+2;
 
 	// references/modifies "r_vertexLight"
@@ -1116,19 +1106,6 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.compressed.generic.y		= y;
 	y += BIGCHAR_HEIGHT+2;
 
-	// references/modifies "r_hdrDisplay"
-	s_graphicsoptions.hdr.generic.type		= MTYPE_RADIOBUTTON;
-	s_graphicsoptions.hdr.generic.name		= "HDR Display:";
-	s_graphicsoptions.hdr.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_graphicsoptions.hdr.generic.callback	= GraphicsOptions_Event;
-	s_graphicsoptions.hdr.generic.id		= ID_HDR;
-	s_graphicsoptions.hdr.generic.x		= 400;
-	s_graphicsoptions.hdr.generic.y		= y;
-	if ( !UI_HDR_Available() ) {
-		s_graphicsoptions.hdr.generic.flags |= QMF_GRAYED;
-	}
-	y += BIGCHAR_HEIGHT+2;
-
 	s_graphicsoptions.driverinfo.generic.type     = MTYPE_PTEXT;
 	s_graphicsoptions.driverinfo.generic.flags    = QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_graphicsoptions.driverinfo.generic.callback = GraphicsOptions_Event;
@@ -1185,7 +1162,6 @@ void GraphicsOptions_MenuInit( void )
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.texturebits );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.filter );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.compressed );
-	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.hdr );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.driverinfo );
 
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.back );

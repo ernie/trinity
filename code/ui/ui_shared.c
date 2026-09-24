@@ -1168,6 +1168,55 @@ void Script_Orbit(itemDef_t *item, char **args) {
   }
 }
 
+qboolean Item_EnableShowViaCvar(itemDef_t *item, int flag);
+
+static qboolean Item_Shown(itemDef_t *item) {
+	return (item->window.flags & WINDOW_VISIBLE) &&
+		(!(item->cvarFlags & (CVAR_SHOW | CVAR_HIDE)) || Item_EnableShowViaCvar(item, CVAR_SHOW));
+}
+
+// collapseHidden <top> <bottom>: a row hidden by its cvar test, starting in [top, bottom) with no shown twin at
+// its y, gives its height to the rows of its group below it, so a section has no hole. The row stays collapsed
+// for the menu's lifetime, so its cvar test must not change while the menu is loaded.
+void Script_CollapseHidden(itemDef_t *item, char **args) {
+	menuDef_t *menu = (menuDef_t*)item->parent;
+	int top, bottom, i, j;
+
+	if (!menu || !Int_Parse(args, &top) || !Int_Parse(args, &bottom)) {
+		return;
+	}
+	for (i = 0; i < menu->itemCount; i++) {
+		itemDef_t *row = menu->items[i];
+		float y = row->window.rectClient.y, h = row->window.rectClient.h;
+		if (!(row->window.flags & WINDOW_VISIBLE) || h <= 0 || y < top || y >= bottom || !row->window.group ||
+			Item_Shown(row)) {
+			continue;
+		}
+		for (j = 0; j < menu->itemCount; j++) {
+			itemDef_t *twin = menu->items[j];
+			if (twin != row && twin->window.rectClient.y == y && twin->window.rectClient.h > 0 && twin->window.group &&
+				Q_stricmp(twin->window.group, row->window.group) == 0 && Item_Shown(twin)) {
+				break;
+			}
+		}
+		if (j < menu->itemCount) {
+			continue;
+		}
+		for (j = 0; j < menu->itemCount; j++) {
+			itemDef_t *below = menu->items[j];
+			if (below != row && (below->window.flags & WINDOW_VISIBLE) && below->window.group &&
+				Q_stricmp(below->window.group, row->window.group) == 0 &&
+				below->window.rectClient.y >= y + h && below->window.rectClient.y < bottom) {
+				below->window.rectClient.y -= h;
+				Item_UpdatePosition(below);
+			}
+		}
+		// a zero height keeps a later run from shifting the rows again
+		row->window.rectClient.h = 0;
+		Item_UpdatePosition(row);
+	}
+}
+
 
 
 void Script_SetFocus(itemDef_t *item, char **args) {
@@ -1256,7 +1305,8 @@ commandDef_t commandList[] =
   {"exec", &Script_Exec},           // group/name
   {"play", &Script_Play},           // group/name
   {"playlooped", &Script_playLooped},           // group/name
-  {"orbit", &Script_Orbit}                      // group/name
+  {"orbit", &Script_Orbit},                     // group/name
+  {"collapseHidden", &Script_CollapseHidden}    // top bottom
 };
 
 int scriptCommandCount = sizeof(commandList) / sizeof(commandDef_t);

@@ -728,6 +728,7 @@ void UI_DisplayOptionsMenu( void );
 // ui_hdr.c
 //
 qboolean	UI_HDR_Available( void );
+qboolean	UI_HDR_FBOOff( void );
 void		UI_HDRCalibrationMenu( void );
 void		UI_HDRCalibrationMenu_Cache( void );
 

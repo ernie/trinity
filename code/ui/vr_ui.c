@@ -107,6 +107,8 @@ void UI_VR_Init( void ) {
 #else
 	dll_com_trapGetValue = 0;
 #endif
+	trap_Cvar_Set("ui_vrModeSwitchAvailable", UI_VR_CanSwitchMode() ? "1" : "0");
+
 	vrActive = qfalse;
 	bindCaptureAvailable = qfalse;
 	memset( &vr_state, 0, sizeof( vr_state ) );
@@ -298,7 +300,14 @@ UI_VR_RunMenuScript
 ===============
 */
 qboolean UI_VR_RunMenuScript( const char *name ) {
-	if ( Q_stricmp( name, "vrBindCancel" ) == 0 ) {
+	// the Display Mode row binds ui_vrEnabled; vr_enabled is latched, so the choice goes through the console
+	if ( Q_stricmp( name, "vrModeSetup" ) == 0 ) {
+		trap_Cvar_Set( "ui_vrEnabled", UI_VR_ModeChoice() ? "1" : "0" );
+		return qtrue;
+	} else if ( Q_stricmp( name, "vrModeChanged" ) == 0 ) {
+		UI_VR_ChooseMode( trap_Cvar_VariableValue( "ui_vrEnabled" ) != 0 );
+		return qtrue;
+	} else if ( Q_stricmp( name, "vrBindCancel" ) == 0 ) {
 		VRBM_Cancel();
 		return qtrue;
 	} else if ( Q_stricmp( name, "vrMirrorSetup" ) == 0 ) {

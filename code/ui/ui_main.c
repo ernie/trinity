@@ -4598,6 +4598,14 @@ static void UI_UpdateHDRAvail( void ) {
 		// name still fails
 		avail = (qboolean)( buf[0] == '\0' || Q_stricmp( buf, "vulkan" ) == 0 );
 	}
+	// HDR output needs the frame buffer path; without it the toggle is inert, so it reads off and stays disabled
+	trap_Cvar_VariableStringBuffer( "r_fbo", buf, sizeof( buf ) );
+	if ( buf[0] != '\0' && atoi( buf ) == 0 ) {
+		avail = qfalse;
+		if ( trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0 ) {
+			trap_Cvar_Set( "r_hdrDisplay", "0" );
+		}
+	}
 	trap_Cvar_Set( "ui_hdrAvail", avail ? "1" : "0" );
 }
 
@@ -5059,6 +5067,8 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cvar_SetValue( "r_hdrPeak", (int)( trap_Cvar_VariableValue( "r_hdrPeak" ) + 0.5f ) );
 			trap_Cvar_SetValue( "r_hdrHighlight", trap_Cvar_VariableValue( "r_hdrHighlight" ) );
 			trap_Cvar_SetValue( "r_hdrPaperWhite", 0 );  // keep paper-white on auto; experts set it via console
+		} else if ( Q_stricmp( name, "systemSettingsApply" ) == 0 ) {
+			trap_Cmd_ExecuteText( EXEC_APPEND, "snd_restart\n" );
 		} else if ( UI_VR_RunMenuScript( name ) ) {
 			// handled
 		}

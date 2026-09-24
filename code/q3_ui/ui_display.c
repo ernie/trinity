@@ -24,6 +24,14 @@ DISPLAY OPTIONS MENU
 #define ID_SCREENSIZE		15
 #define ID_BACK				16
 #define ID_HDRCALIB			17
+#define ID_VRMODE			18
+#define ID_APPLY			19
+#define ID_FBO				20
+#define ID_HDR				21
+#define ID_BLOOM			22
+#define ID_FLARES			23
+#define ART_APPLY0 "menu/art/accept_0"
+#define ART_APPLY1 "menu/art/accept_1"
 
 
 typedef struct {
@@ -39,16 +47,90 @@ typedef struct {
 	menutext_s		network;
 
 	menuslider_s	brightness;
+	menuradiobutton_s	fbo;
+	menuradiobutton_s	hdr;
+	menuradiobutton_s	bloom;
+	menuradiobutton_s	flares;
 	menuslider_s	screensize;
 
 	menutext_s		hdrcalib;
 
+	menulist_s mode;
+	menubitmap_s apply;
 	menubitmap_s	back;
+
+	// latched values as the page opened; Apply lights when a row differs
+	int				initialFbo;
+	int				initialHdr;
+	int				initialBloom;
 } displayOptionsInfo_t;
 
 static displayOptionsInfo_t	displayOptionsInfo;
+static const char *displayModes[] = { "Flatscreen", "VR", NULL };
 
 static qboolean				displayOptions_vr;
+
+
+/*
+=================
+UI_DisplayOptionsMenu_UpdateItems
+
+Gates the frame-buffer rows on the pending Frame Buffer value and lights Apply
+=================
+*/
+static void UI_DisplayOptionsMenu_UpdateItems( void ) {
+	qboolean fbo = displayOptionsInfo.fbo.curvalue != 0;
+	qboolean hdrAvail = fbo && UI_HDR_Available();
+
+	// HDR output without the frame buffer never takes effect, so it reads off
+	if ( !fbo ) {
+		displayOptionsInfo.hdr.curvalue = 0;
+	}
+
+	if ( hdrAvail ) {
+		displayOptionsInfo.hdr.generic.flags &= ~QMF_GRAYED;
+		displayOptionsInfo.hdrcalib.generic.flags &= ~QMF_GRAYED;
+	} else {
+		displayOptionsInfo.hdr.generic.flags |= QMF_GRAYED;
+		displayOptionsInfo.hdrcalib.generic.flags |= QMF_GRAYED;
+	}
+	if ( fbo ) {
+		displayOptionsInfo.bloom.generic.flags &= ~QMF_GRAYED;
+	} else {
+		displayOptionsInfo.bloom.generic.flags |= QMF_GRAYED;
+	}
+
+	if ( displayOptionsInfo.fbo.curvalue != displayOptionsInfo.initialFbo ||
+		displayOptionsInfo.hdr.curvalue != displayOptionsInfo.initialHdr ||
+		displayOptionsInfo.bloom.curvalue != displayOptionsInfo.initialBloom ||
+		UI_VR_ModePending() ) {
+		displayOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	} else {
+		displayOptionsInfo.apply.generic.flags |= QMF_HIDDEN|QMF_INACTIVE;
+	}
+}
+
+
+/*
+=================
+UI_DisplayOptionsMenu_ApplyChanges
+=================
+*/
+static void UI_DisplayOptionsMenu_ApplyChanges( void ) {
+	// only changed rows are written, so a console value outside the toggle's 0/1 survives
+	if ( displayOptionsInfo.fbo.curvalue != displayOptionsInfo.initialFbo ) {
+		trap_Cvar_SetValue( "r_fbo", displayOptionsInfo.fbo.curvalue );
+	}
+	// a write would create the cvar on an engine without HDR output, and its
+	// existence is what enables every HDR item
+	if ( displayOptionsInfo.hdr.curvalue != displayOptionsInfo.initialHdr && UI_HDR_Available() ) {
+		trap_Cvar_SetValue( "r_hdrDisplay", displayOptionsInfo.hdr.curvalue );
+	}
+	if ( displayOptionsInfo.bloom.curvalue != displayOptionsInfo.initialBloom ) {
+		trap_Cvar_SetValue( "r_bloom", displayOptionsInfo.bloom.curvalue );
+	}
+	trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
+}
 
 
 /*
@@ -83,11 +165,30 @@ static void UI_DisplayOptionsMenu_Event( void* ptr, int event ) {
 	case ID_BRIGHTNESS:
 		trap_Cvar_SetValue( "r_gamma", displayOptionsInfo.brightness.curvalue / 10.0f );
 		break;
-	
+
 	case ID_SCREENSIZE:
 		if ( !displayOptions_vr ) {
 			trap_Cvar_SetValue( "cg_viewsize", displayOptionsInfo.screensize.curvalue * 10 );
 		}
+		break;
+
+	case ID_FBO:
+	case ID_HDR:
+	case ID_BLOOM:
+		UI_DisplayOptionsMenu_UpdateItems();
+		break;
+
+	case ID_FLARES:
+		trap_Cvar_SetValue( "r_flares", displayOptionsInfo.flares.curvalue );
+		break;
+
+	case ID_VRMODE:
+		UI_VR_ChooseMode( displayOptionsInfo.mode.curvalue != 0 );
+		UI_DisplayOptionsMenu_UpdateItems();
+		break;
+
+	case ID_APPLY:
+		UI_DisplayOptionsMenu_ApplyChanges();
 		break;
 
 	case ID_HDRCALIB:
@@ -108,6 +209,7 @@ UI_DisplayOptionsMenu_Init
 */
 static void UI_DisplayOptionsMenu_Init( void ) {
 	int		y;
+	int		rows;
 
 	memset( &displayOptionsInfo, 0, sizeof(displayOptionsInfo) );
 
@@ -129,7 +231,7 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.framel.generic.type		= MTYPE_BITMAP;
 	displayOptionsInfo.framel.generic.name		= ART_FRAMEL;
 	displayOptionsInfo.framel.generic.flags		= QMF_INACTIVE;
-	displayOptionsInfo.framel.generic.x			= 0;  
+	displayOptionsInfo.framel.generic.x			= 0;
 	displayOptionsInfo.framel.generic.y			= 78;
 	displayOptionsInfo.framel.width				= 256;
 	displayOptionsInfo.framel.height			= 329;
@@ -182,14 +284,29 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.network.style				= UI_RIGHT;
 	displayOptionsInfo.network.color				= color_red;
 
-	// content column centered on the frame: Brightness + gap + HDR Calibration
-	// link (3 slots) under VR, plus the Screen Size row (4 slots) on flatscreen
-	if( displayOptions_vr ) {
-		y = 242 - ( 3 * (BIGCHAR_HEIGHT+2) ) / 2;
+	// rows counted for centering the content column, including the optional Display Mode and Screen Size
+	rows = 7;
+	if ( UI_VR_CanSwitchMode() ) {
+		rows++;
 	}
-	else {
-		y = 242 - ( 4 * (BIGCHAR_HEIGHT+2) ) / 2;
+	if ( !displayOptions_vr ) {
+		rows++;
 	}
+	y = 242 - ( rows * (BIGCHAR_HEIGHT+2) ) / 2;
+
+	if (UI_VR_CanSwitchMode()) {
+		displayOptionsInfo.mode.generic.type = MTYPE_SPINCONTROL;
+		displayOptionsInfo.mode.generic.flags = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+		displayOptionsInfo.mode.generic.x = 400;
+		displayOptionsInfo.mode.generic.y = y;
+		displayOptionsInfo.mode.generic.id = ID_VRMODE;
+		displayOptionsInfo.mode.generic.callback = UI_DisplayOptionsMenu_Event;
+		displayOptionsInfo.mode.generic.name = "Display Mode:";
+		displayOptionsInfo.mode.itemnames = displayModes;
+		displayOptionsInfo.mode.curvalue = UI_VR_ModeChoice();
+		y += BIGCHAR_HEIGHT+2;
+	}
+
 	displayOptionsInfo.brightness.generic.type		= MTYPE_SLIDER;
 	displayOptionsInfo.brightness.generic.name		= "Brightness:";
 	displayOptionsInfo.brightness.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -201,10 +318,46 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.brightness.maxvalue			= 20;
 	// the brightness slider sets r_gamma, which is always valid, so the row
 	// is never grayed
+	y += BIGCHAR_HEIGHT+2;
+
+	displayOptionsInfo.fbo.generic.type			= MTYPE_RADIOBUTTON;
+	displayOptionsInfo.fbo.generic.name			= "Frame Buffer:";
+	displayOptionsInfo.fbo.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	displayOptionsInfo.fbo.generic.callback		= UI_DisplayOptionsMenu_Event;
+	displayOptionsInfo.fbo.generic.id			= ID_FBO;
+	displayOptionsInfo.fbo.generic.x			= 400;
+	displayOptionsInfo.fbo.generic.y			= y;
+	y += BIGCHAR_HEIGHT+2;
+
+	displayOptionsInfo.hdr.generic.type			= MTYPE_RADIOBUTTON;
+	displayOptionsInfo.hdr.generic.name			= "HDR Display:";
+	displayOptionsInfo.hdr.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	displayOptionsInfo.hdr.generic.callback		= UI_DisplayOptionsMenu_Event;
+	displayOptionsInfo.hdr.generic.id			= ID_HDR;
+	displayOptionsInfo.hdr.generic.x			= 400;
+	displayOptionsInfo.hdr.generic.y			= y;
+	y += BIGCHAR_HEIGHT+2;
+
+	displayOptionsInfo.bloom.generic.type		= MTYPE_RADIOBUTTON;
+	displayOptionsInfo.bloom.generic.name		= "Bloom:";
+	displayOptionsInfo.bloom.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	displayOptionsInfo.bloom.generic.callback	= UI_DisplayOptionsMenu_Event;
+	displayOptionsInfo.bloom.generic.id			= ID_BLOOM;
+	displayOptionsInfo.bloom.generic.x			= 400;
+	displayOptionsInfo.bloom.generic.y			= y;
+	y += BIGCHAR_HEIGHT+2;
+
+	displayOptionsInfo.flares.generic.type		= MTYPE_RADIOBUTTON;
+	displayOptionsInfo.flares.generic.name		= "Flares:";
+	displayOptionsInfo.flares.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	displayOptionsInfo.flares.generic.callback	= UI_DisplayOptionsMenu_Event;
+	displayOptionsInfo.flares.generic.id		= ID_FLARES;
+	displayOptionsInfo.flares.generic.x			= 400;
+	displayOptionsInfo.flares.generic.y			= y;
+	y += BIGCHAR_HEIGHT+2;
 
 	// Screen Size is a flatscreen-only control; the runtime owns the view under VR
 	if( !displayOptions_vr ) {
-		y += BIGCHAR_HEIGHT+2;
 		displayOptionsInfo.screensize.generic.type		= MTYPE_SLIDER;
 		displayOptionsInfo.screensize.generic.name		= "Screen Size:";
 		displayOptionsInfo.screensize.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -214,10 +367,10 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 		displayOptionsInfo.screensize.generic.y			= y;
 		displayOptionsInfo.screensize.minvalue			= 3;
 		displayOptionsInfo.screensize.maxvalue			= 10;
+		y += BIGCHAR_HEIGHT+2;
 	}
 
-	y += BIGCHAR_HEIGHT+2;
-	y += BIGCHAR_HEIGHT+2;	// extra gap to separate the link from the sliders
+	y += BIGCHAR_HEIGHT+2;	// extra gap to separate the link from the rows
 	displayOptionsInfo.hdrcalib.generic.type		= MTYPE_PTEXT;
 	displayOptionsInfo.hdrcalib.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	displayOptionsInfo.hdrcalib.generic.id			= ID_HDRCALIB;
@@ -227,9 +380,17 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.hdrcalib.string				= "HDR Calibration";
 	displayOptionsInfo.hdrcalib.style				= UI_CENTER|UI_SMALLFONT;
 	displayOptionsInfo.hdrcalib.color				= color_red;
-	if ( !UI_HDR_Available() ) {
-		displayOptionsInfo.hdrcalib.generic.flags |= QMF_GRAYED;
-	}
+
+	displayOptionsInfo.apply.generic.type		= MTYPE_BITMAP;
+	displayOptionsInfo.apply.generic.name		= ART_APPLY0;
+	displayOptionsInfo.apply.generic.flags		= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_HIDDEN|QMF_INACTIVE;
+	displayOptionsInfo.apply.generic.x			= 640;
+	displayOptionsInfo.apply.generic.y			= 416;
+	displayOptionsInfo.apply.generic.id			= ID_APPLY;
+	displayOptionsInfo.apply.generic.callback	= UI_DisplayOptionsMenu_Event;
+	displayOptionsInfo.apply.width				= 128;
+	displayOptionsInfo.apply.height				= 64;
+	displayOptionsInfo.apply.focuspic			= ART_APPLY1;
 
 	displayOptionsInfo.back.generic.type		= MTYPE_BITMAP;
 	displayOptionsInfo.back.generic.name		= ART_BACK0;
@@ -249,17 +410,39 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.display );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.sound );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.network );
+	if (UI_VR_CanSwitchMode()) {
+		Menu_AddItem(&displayOptionsInfo.menu, &displayOptionsInfo.mode);
+	}
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.brightness );
+	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.fbo );
+	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.hdr );
+	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.bloom );
+	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.flares );
 	if( !displayOptions_vr ) {
 		Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.screensize );
 	}
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.hdrcalib );
+	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.apply );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.back );
 
 	displayOptionsInfo.brightness.curvalue  = trap_Cvar_VariableValue("r_gamma") * 10;
 	if( !displayOptions_vr ) {
 		displayOptionsInfo.screensize.curvalue  = trap_Cvar_VariableValue( "cg_viewsize")/10;
 	}
+
+	// an HDR request without the frame buffer never takes effect, so switch it off rather than show it on
+	if ( UI_HDR_FBOOff() && trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0 ) {
+		trap_Cvar_Set( "r_hdrDisplay", "0" );
+	}
+	displayOptionsInfo.fbo.curvalue		= !UI_HDR_FBOOff();
+	displayOptionsInfo.hdr.curvalue		= trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0;
+	displayOptionsInfo.bloom.curvalue	= trap_Cvar_VariableValue( "r_bloom" ) != 0;
+	displayOptionsInfo.flares.curvalue	= trap_Cvar_VariableValue( "r_flares" ) != 0;
+	displayOptionsInfo.initialFbo		= displayOptionsInfo.fbo.curvalue;
+	displayOptionsInfo.initialHdr		= displayOptionsInfo.hdr.curvalue;
+	displayOptionsInfo.initialBloom		= displayOptionsInfo.bloom.curvalue;
+
+	UI_DisplayOptionsMenu_UpdateItems();
 }
 
 
@@ -269,6 +452,8 @@ UI_DisplayOptionsMenu_Cache
 ===============
 */
 void UI_DisplayOptionsMenu_Cache( void ) {
+	trap_R_RegisterShaderNoMip(ART_APPLY0);
+	trap_R_RegisterShaderNoMip(ART_APPLY1);
 	trap_R_RegisterShaderNoMip( ART_FRAMEL );
 	trap_R_RegisterShaderNoMip( ART_FRAMER );
 	trap_R_RegisterShaderNoMip( ART_BACK0 );

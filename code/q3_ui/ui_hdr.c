@@ -35,6 +35,13 @@ qboolean UI_HDR_Available( void ) {
 	return (qboolean)( buf[0] == '\0' || Q_stricmp( buf, "vulkan" ) == 0 );
 }
 
+// HDR output, bloom and MSAA need the frame buffer path; without it those cvars do nothing
+qboolean UI_HDR_FBOOff( void ) {
+	char buf[8];
+	trap_Cvar_VariableStringBuffer( "r_fbo", buf, sizeof( buf ) );
+	return (qboolean)( buf[0] != '\0' && atoi( buf ) == 0 );
+}
+
 static int UI_HDR_NearestIndex( int value, const int* table, int count ) {
 	int i, best = 0, bestDiff = abs( value - table[0] );
 	for ( i = 1; i < count; i++ ) {

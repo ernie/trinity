@@ -12,7 +12,7 @@ menuDef {
     	disableColor .5 .5 .5 1
     	style 1
     	border 1
-	onOpen { setitemcolor fadebox backcolor 0 0 0 1 ; fadeout fadebox ; hide grpSystem ; show graphics ; uiScript updateHDRAvail }
+	onOpen { uiScript vrModeSetup ; setitemcolor fadebox backcolor 0 0 0 1 ; fadeout fadebox ; hide grpSystem ; show graphics ; uiScript updateHDRAvail }
 	onEsc { close system_menu ; close setup_menu ; open main }
 
 
@@ -114,6 +114,8 @@ itemDef {
 		textscale .333
 		forecolor 1 1 1 1
 		visible 0
+		cvarTest "r_fbo"
+		disableCvar { "0" }
 	}
 
 	itemDef {
@@ -250,30 +252,13 @@ itemDef {
 		}
 
 	itemDef {
-		name graphics
-		group grpSystem
-		type ITEM_TYPE_YESNO
-		text "HDR Display:"
-		cvar "r_hdrDisplay"
-		rect 99 243 256 20
-		textalign ITEM_ALIGN_RIGHT
-		textalignx 128
-		textaligny 20
-		textscale .333
-		forecolor 1 1 1 1
-		visible 0
-		cvarTest "ui_hdrAvail"
-		enableCvar { 1 }
-	}
-
-	itemDef {
    		name graphics
 		group grpSystem
    		type ITEM_TYPE_MULTI	
 		text "Video Mode:"
 		cvar "r_mode"
 		cvarFloatList { "320*240" 0 "400*300" 1 "512*384" 2 "640*480" 3 "800*600" 4 "960*720" 5 "1024*768" 6 "1152*864" 7 "1280*1024" 8 "1600*1200" 9 "2048*1536" 10 "856*480 Wide Screen" 11 }
-		rect 99 263 256 20
+		rect 99 243 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -292,7 +277,7 @@ itemDef {
 		text "Color Depth:"
 		cvar "r_colorbits"
 		cvarFloatList { "Desktop Default" 0 "16-bit" 16 "32-bit" 32 }
-		rect 99 283 256 20
+		rect 99 263 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -310,7 +295,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Fullscreen:"
 		cvar "r_fullscreen"
-		rect 99 303 256 20
+		rect 99 283 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -760,7 +745,7 @@ itemDef {
 	backcolor .37 .1 .1 1 
 	visible 1
 	action { play "sound/misc/kcaction.wav" ;
-	hide grpSystem ; show other ; show ctr_hdrcalib }
+	hide grpSystem ; show other ; show ctr_hdrcalib ; collapseHidden 28 190 }
 	mouseEnter { show message_other ; setitemcolor ctr_other backcolor .1 .37 .1 1 } 
 	mouseExit { hide message_other ; setitemcolor ctr_other backcolor .37 .1 .1 1} 	
 	}
@@ -795,7 +780,7 @@ itemDef {
 itemDef {
 	name other
 	group grpSystem
-	rect 2 4 439 94	
+	rect 2 4 439 186
 	style WINDOW_STYLE_FILLED
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -808,7 +793,7 @@ itemDef {
 itemDef {
 	name other
 	group grpSystem
-	rect 2 114 439 52
+	rect 2 194 439 52
 	style WINDOW_STYLE_FILLED
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -833,26 +818,30 @@ itemDef {
     	}
 	
 	itemDef {
-      		name other
+		name other
 		group grpSystem
-      		type ITEM_TYPE_SLIDER
-		text "Brightness:"
-		cvarfloat "r_gamma" 1 0.5 2
+		type ITEM_TYPE_MULTI
+		text "Display Mode:"
+		cvar "ui_vrEnabled"
+		cvarFloatList { "Flatscreen" 0 "VR" 1 }
 		rect 99 28 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
 		textscale .333
-      		forecolor 1 1 1 1
-      		visible 0
-    		}
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "ui_vrModeSwitchAvailable"
+		showCvar { "1" }
+		action { uiScript vrModeChanged }
+	}
 
 	itemDef {
       		name other
 		group grpSystem
       		type ITEM_TYPE_SLIDER
-		text "Screen Size:"
-		cvarfloat "cg_viewsize" 100 30 100
+		text "Brightness:"
+		cvarfloat "r_gamma" 1 0.5 2
 		rect 99 48 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
@@ -863,6 +852,73 @@ itemDef {
     		}
 
 	itemDef {
+		name other
+		group grpSystem
+		type ITEM_TYPE_YESNO
+		text "Frame Buffer:"
+		cvar "r_fbo"
+		rect 99 68 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .333
+		forecolor 1 1 1 1
+		visible 0
+		action { uiScript glCustom ; uiScript updateHDRAvail }
+	}
+
+	itemDef {
+		name other
+		group grpSystem
+		type ITEM_TYPE_YESNO
+		text "HDR Display:"
+		cvar "r_hdrDisplay"
+		rect 99 88 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .333
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "ui_hdrAvail"
+		enableCvar { 1 }
+		action { uiScript glCustom ; uiScript updateHDRAvail }
+	}
+
+	itemDef {
+		name other
+		group grpSystem
+		type ITEM_TYPE_YESNO
+		text "Bloom:"
+		cvar "r_bloom"
+		rect 99 108 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .333
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "r_fbo"
+		disableCvar { "0" }
+		action { uiScript glCustom ; uiScript updateHDRAvail }
+	}
+
+	itemDef {
+		name other
+		group grpSystem
+		type ITEM_TYPE_YESNO
+		text "Flares:"
+		cvar "r_flares"
+		rect 99 128 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .333
+		forecolor 1 1 1 1
+		visible 0
+	}
+
+	itemDef {
 		name ctr_hdrcalib
 		text "HDR Calibration"
 		type 1
@@ -870,7 +926,7 @@ itemDef {
 		textscale .3
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 136 68 170 26
+		rect 136 160 170 26
 		textalign 1
 		textalignx 85
 		textaligny 20
@@ -889,7 +945,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/framebutton.tga"
-		rect 136 68 170 26
+		rect 136 160 170 26
 		visible 0
 		decoration
 	}
@@ -899,7 +955,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/leftbutton.tga"
-		rect 124 68 13 26
+		rect 124 160 13 26
 		visible 0
 		decoration
 	}
@@ -909,7 +965,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/rightbutton.tga"
-		rect 305 68 13 26
+		rect 305 160 13 26
 		visible 0
 		decoration
 	}
@@ -919,7 +975,7 @@ itemDef {
 	group grpSystem
       	style 1
 	text "Network"
-	rect 163 118 128 20
+	rect 163 198 128 20
       	textalign 1
       	textalignx 64 
       	textaligny 20
@@ -936,7 +992,7 @@ itemDef {
 		text "Net Data Rate:"
 		cvar "rate"
 		cvarFloatList { "<=28.8k" 2500 "33.6k" 3000 "56k" 4000 "ISDN" 5000 "LAN/CABLE/xDSl" 25000  }
-		rect 99 142 256 20
+		rect 99 222 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -954,14 +1010,14 @@ itemDef {
 		textscale .3
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 171 176 100 26
+		rect 171 256 100 26
 		textalign 1
 		textalignx 50
 		textaligny 20
 		forecolor 1 1 1 1
 		backcolor .37 .1 .1 1
 		visible 1
-		action { play "sound/misc/kcaction.wav" ; exec "snd_restart" }
+		action { play "sound/misc/kcaction.wav" ; open vid_restart_popmenu }
 		mouseEnter { setcolor backcolor .1 .37 .1 1 }
 		mouseExit { setcolor backcolor .37 .1 .1 1 }
 	}
@@ -971,7 +1027,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/framebutton.tga"
-		rect 171 176 100 26
+		rect 171 256 100 26
 		visible 1
 		decoration
 	}
@@ -981,7 +1037,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/leftbutton.tga"
-		rect 159 176 13 26
+		rect 159 256 13 26
 		visible 1
 		decoration
 	}
@@ -991,7 +1047,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/rightbutton.tga"
-		rect 270 176 13 26
+		rect 270 256 13 26
 		visible 1
 		decoration
 	}

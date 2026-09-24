@@ -777,6 +777,14 @@ the couplings behind the screens:
   `cg_draw3dIcons 1`.
 - **`vr_switchThumbsticks`.** A swap-in-place edit of the affected button
   mappings.
+- **The display mode.** `vr_enabled` is latched: a module's own cvar
+  write would force it in, so the choice goes through the console
+  (`UI_VR_ChooseMode`) and applies at the next video restart. Team Arena's
+  Display Mode row binds the shadow cvar `ui_vrEnabled`; the menu's
+  `onOpen` runs `uiScript vrModeSetup` to copy the current choice in and
+  the row's `action` runs `uiScript vrModeChanged` to write it, both
+  handled by `UI_VR_RunMenuScript`. baseq3's Display page calls
+  `UI_VR_ModeChoice` and `UI_VR_ChooseMode` directly.
 - **The desktop-mirror Apply.** `vr_mirrorEnabled` / `vr_mirrorFullscreen` with
   `vr_mirrorWidth` / `vr_mirrorHeight` are staged, then applied
   with a `vid_restart` on confirm.

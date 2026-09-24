@@ -107,6 +107,8 @@ void UI_VR_Init( void ) {
 #else
 	dll_com_trapGetValue = 0;
 #endif
+	trap_Cvar_Set("ui_vrModeSwitchAvailable", UI_VR_CanSwitchMode() ? "1" : "0");
+
 	vrActive = qfalse;
 	bindCaptureAvailable = qfalse;
 	memset( &vr_state, 0, sizeof( vr_state ) );

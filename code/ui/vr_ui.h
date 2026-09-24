@@ -34,4 +34,9 @@ void UI_VR_LoadMenus( void );
 qboolean UI_VR_UpdateSettingsCvar( const char *name, int val );
 qboolean UI_VR_RunMenuScript( const char *name );
 
+qboolean UI_VR_CanSwitchMode(void);
+qboolean UI_VR_ModeChoice(void);
+void UI_VR_ChooseMode(qboolean vr);
+qboolean UI_VR_ModePending(void);
+
 #endif
