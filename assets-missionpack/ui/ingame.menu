@@ -207,8 +207,8 @@ itemDef {
       	forecolor 1 1 1 1
 	backcolor 0 .17 0 1
       	visible 1
-	cvarTest "vr_platform"
-	showCvar { "pc" ; "standalone" }
+	cvarTest "ui_vrActive"
+	showCvar { "1" }
       	action { open ingame_vroptions }
 	mouseEnter { setitemcolor vrtab backcolor .1 .37 .1 1 }
       	mouseExit { setitemcolor vrtab backcolor 0 .17 0 1 }
@@ -229,8 +229,8 @@ itemDef {
       	forecolor 1 1 1 1
 	backcolor 0 .17 0 1
       	visible 1
-	cvarTest "vr_platform"
-	hideCvar { "pc" ; "standalone" }
+	cvarTest "ui_vrActive"
+	hideCvar { "1" }
       	action { open ingame_controls }
 	mouseEnter { setitemcolor controls backcolor .1 .37 .1 1 }
       	mouseExit { setitemcolor controls backcolor 0 .17 0 1 }

@@ -108,8 +108,8 @@ static void VRMirror_SetPreviousResolutionOption( void )
 		return;
 	}
 
-	currentWidth = trap_Cvar_VariableValue("r_customdesktopwidth");
-	currentHeight = trap_Cvar_VariableValue("r_customdesktopheight");
+	currentWidth = trap_Cvar_VariableValue("vr_mirrorWidth");
+	currentHeight = trap_Cvar_VariableValue("vr_mirrorHeight");
 	if (currentWidth <= 0 || currentHeight <= 0)
 	{
 		return;
@@ -204,9 +204,9 @@ static void VRMirror_SetMenuItems( void ) {
 
 	// s_vrmirror.resolution and s_ivo_resolution are handled elsewhere
 	// Desktop mirror UI: 0=off, 1=windowed, 2=fullscreen
-	// Reads vr_desktopMode (0=off, 1=on) and r_fullscreen (0=windowed, 1=fullscreen)
-	mirror = trap_Cvar_VariableValue( "vr_desktopMode" );
-	fullscreen = trap_Cvar_VariableValue( "r_fullscreen" );
+	// Reads vr_mirrorEnabled (0=off, 1=on) and vr_mirrorFullscreen (0=windowed, 1=fullscreen)
+	mirror = trap_Cvar_VariableValue( "vr_mirrorEnabled" );
+	fullscreen = trap_Cvar_VariableValue( "vr_mirrorFullscreen" );
 	if (mirror == 0) {
 		s_vrmirror.mode.curvalue = 0; // Off
 	} else if (fullscreen == 0) {
@@ -243,18 +243,18 @@ static void VRMirror_ApplyChanges( void *unused, int notification )
 	if (s_ivo_desktopmode != s_vrmirror.mode.curvalue)
 	{
 		// UI curvalue: 0=off, 1=windowed, 2=fullscreen
-		// Set vr_desktopMode (0=off, 1=on) and r_fullscreen (0=windowed, 1=fullscreen)
+		// Set vr_mirrorEnabled (0=off, 1=on) and vr_mirrorFullscreen (0=windowed, 1=fullscreen)
 		if (s_vrmirror.mode.curvalue == 0) {
 			// Off
-			trap_Cvar_SetValue( "vr_desktopMode", 0 );
+			trap_Cvar_SetValue( "vr_mirrorEnabled", 0 );
 		} else if (s_vrmirror.mode.curvalue == 1) {
 			// Windowed
-			trap_Cvar_SetValue( "vr_desktopMode", 1 );
-			trap_Cvar_SetValue( "r_fullscreen", 0 );
+			trap_Cvar_SetValue( "vr_mirrorEnabled", 1 );
+			trap_Cvar_SetValue( "vr_mirrorFullscreen", 0 );
 		} else {
 			// Fullscreen
-			trap_Cvar_SetValue( "vr_desktopMode", 1 );
-			trap_Cvar_SetValue( "r_fullscreen", 1 );
+			trap_Cvar_SetValue( "vr_mirrorEnabled", 1 );
+			trap_Cvar_SetValue( "vr_mirrorFullscreen", 1 );
 		}
 	}
 
@@ -264,8 +264,8 @@ static void VRMirror_ApplyChanges( void *unused, int notification )
 		Q_strncpyz( w, resolutions[ s_vrmirror.resolution.curvalue ], sizeof( w ) );
 		*strchr( w, 'x' ) = 0;
 		Q_strncpyz( h, strchr( resolutions[ s_vrmirror.resolution.curvalue ], 'x' ) + 1, sizeof( h ) );
-		trap_Cvar_Set( "r_customdesktopwidth", w );
-		trap_Cvar_Set( "r_customdesktopheight", h );
+		trap_Cvar_Set( "vr_mirrorWidth", w );
+		trap_Cvar_Set( "vr_mirrorHeight", h );
 	}
 
 	trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
@@ -387,7 +387,7 @@ static void VRMirror_MenuInit( void ) {
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrmirror.resolution.generic.type     = MTYPE_SPINCONTROL;
-	s_vrmirror.resolution.generic.name     = "Resolution:";
+	s_vrmirror.resolution.generic.name     = "Window Resolution:";
 	s_vrmirror.resolution.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_vrmirror.resolution.generic.x        = VR_X_POS;
 	s_vrmirror.resolution.generic.y        = y;

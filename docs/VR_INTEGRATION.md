@@ -98,7 +98,7 @@ relative to `code/`):
 
 You also need the VR settings screens, for each UI you build. baseq3: five C
 menu files (`ui_vroptions.c`, the hub, plus `ui_vrcomfort.c`,
-`ui_vrcontrols.c`, `ui_vrhud.c`, `ui_vrmirror.c`); one build serves both
+`ui_vrcontrols.c`, `ui_vrhud_display.c`, `ui_vrmirror.c`); one build serves both
 platforms. Team Arena: the VR `.menu` files together with **both** manifests
 (`vrmenus_pc.txt`, `vrmenus_standalone.txt`) — bundle the pc and standalone
 variants both, because the same `ui.qvm` may be loaded by either engine and
@@ -256,9 +256,9 @@ init prints:
 ```
 
 **Decode head data.** `G_VR_ClientThink` unpacks the head bits out of the
-button field and sets or clears `EF_VR_PLAYER`. Self-gating (a non-VR client
-never sets those bits); place it in `ClientThink_real` after the button
-latch:
+button field and sets or clears `EF_VR_PLAYER`. It decodes only for clients
+whose userinfo reports `vr 1` - the flag the userinfo hook below recorded for
+the slot gates it. Place it in `ClientThink_real` after the button latch:
 
 ```diff
  	client->oldbuttons = client->buttons;
@@ -272,10 +272,12 @@ The remaining server call-outs are one line each, at their obvious sites:
 
 - `ClientEndFrame` (g_active.c) → `G_VR_ClientEndFrame( client, ent )` copies
   the head angles onto the entity and packs the head stats.
-- `ClientUserinfoChanged` (g_client.c) → append `\vr\%s` with
-  `G_VR_ClientIsVR( userinfo ) ? "1" : "0"` to the **player** configstring
-  format only. Bots and vanilla servers simply omit the key; every reader
-  treats a missing key as not-VR.
+- `ClientUserinfoChanged` (g_client.c) → call
+  `G_VR_ClientUserinfoChanged( client, userinfo )` once per userinfo change,
+  for every client including bots, so each slot records its own VR flag for
+  the head-bit decode. Its return feeds `\vr\%s` in the **player**
+  configstring format only. Bots and vanilla servers simply omit the key;
+  every reader treats a missing key as not-VR.
 - `CalcMuzzlePointOrigin` (g_weapon.c) → `if ( !G_VR_MuzzlePoint( ent, ... ) )`
   wraps the stock muzzle math; `qtrue` means it wrote a 6DOF muzzle.
 - `FireWeapon` and `CheckGauntletAttack` (g_weapon.c) →
@@ -793,8 +795,8 @@ the couplings behind the screens:
   recomputes the other so the button map stays consistent.
 - **`vr_switchThumbsticks`.** A swap-in-place edit of the affected button
   mappings.
-- **The desktop-mirror Apply.** `vr_desktopMode` with
-  `r_customdesktopwidth` / `r_customdesktopheight` are staged, then applied
+- **The desktop-mirror Apply.** `vr_mirrorEnabled` / `vr_mirrorFullscreen` with
+  `vr_mirrorWidth` / `vr_mirrorHeight` are staged, then applied
   with a `vid_restart` on confirm.
 - **Reachable VR menus are fullscreen.** The engine's laser pointer can land
   a click anywhere on the virtual screen; a non-fullscreen menu treats a
@@ -849,8 +851,8 @@ writes these names.
 | `vr_thirdPersonSpectator` | transient | Written each frame so the renderer drops sky in spectator views |
 | `vr_platform` | ROM (engine-set) | `pc` / `quest`; read **only** through `UI_VR_Platform()` (see below) |
 | `vr_6dof` | archived | Seeds `use_6dof` (singleplayer only) |
-| `vr_desktopMode` | archived | Desktop-mirror mode, staged/applied by the menu scripts |
-| `r_customdesktopwidth`, `r_customdesktopheight` | archived (PC engine only) | Desktop-mirror resolution, staged and written by the mirror Apply (Step 7); unregistered on other engines, where the writes are inert |
+| `vr_mirrorEnabled` / `vr_mirrorFullscreen` | archived | Desktop-mirror mode, staged/applied by the menu scripts |
+| `vr_mirrorWidth`, `vr_mirrorHeight` | archived (PC engine only) | Desktop-mirror resolution, staged and written by the mirror Apply (Step 7); unregistered on other engines, where the writes are inert |
 | `vr_lasersight`, `vr_twoHandedWeapons`, `vr_showItemInHand`, `vr_rollWhenHit`, `vr_weaponAdjust`, `vr_weaponSelectorMode`, `vr_weaponSelectorWithHud` | archived | Gameplay/comfort toggles read by the client hooks |
 | `vr_uturn`, `vr_controlSchema`, `vr_switchThumbsticks` | archived | Control-scheme handlers (see Step 7) |
 | `vr_button_map_*` family | archived | Per-button remaps: `A`, `B`, `X`, `Y`, `PRIMARYGRIP`, `PRIMARYTHUMBSTICK`, and the `RTHUMB{FORWARD,BACK,LEFT,RIGHT}` set with their `_ALT` variants |
@@ -892,17 +894,19 @@ Team Arena's `UI_VR_LoadMenus()` is double-gated the same way.
 ## Appendix B: Bootstrap trap keys
 
 `trap_GetValue(value, valueSize, key)` returns non-zero and writes the
-resolved trap number into `value` when the engine answers for `key`. One key
-is the gate: if `trap_VR_RegisterState` does not resolve, the module stays
-dormant and nothing else is attempted. Every other key is part of the
-**required v1 contract** — an engine that answers the handshake provides all
-of them — so the bootstraps bind them unconditionally and the hooks call
-them without guards; there are no per-feature capability flags. Growing the
-set with new traps is what a `VR_API_MINOR` bump is for.
+resolved trap number into `value` when the engine answers for `key`. Every
+key in the table is part of the **required v1 contract**. Each bootstrap
+resolves its feature keys first and returns dormant if any one is missing;
+only then does it call `VR_RegisterMirror`, whose `trap_VR_RegisterState`
+resolve is the last step and sets `vrActive` / `g_vrActive`. An engine that
+does not answer `trap_VR_RegisterState` (trinity-engine in flatscreen mode)
+therefore leaves the module dormant even though it answers the others.
+There are no per-feature capability flags; growing the set with new traps is
+what a `VR_API_MINOR` bump is for.
 
 | Key | Modules |
 |-----|---------|
-| `trap_VR_RegisterState` | all (**the gate**: its resolve sets `vrActive` / `g_vrActive`) |
+| `trap_VR_RegisterState` | all (resolved last, inside VR_RegisterMirror; its success sets vrActive / g_vrActive) |
 | `trap_R_SceneComplete` | cgame |
 | `trap_R_HUDBufferStart` / `trap_R_HUDBufferEnd` | cgame |
 | `trap_HapticEvent` | cgame, both UI |
@@ -975,7 +979,7 @@ crosshair-color cvar to your own scheme, or plain white).
 tree; this tree keeps a mod-local copy at `code/cgame/tr_types.h`).**
 `RF_OVERBRIGHT`,
 `RF_WORLD_ORIENTED`, `RF_VIEW_ORIENTED`, `RT_LASERSIGHT`,
-`refEntity_t.invert`, and `refdef_t.isHUD`. The two struct fields are
+and `refdef_t.isHUD`. The `isHUD` field is
 **tail-appended and must stay last**: the stock prefix is what keeps the
 layout compatible with engines that do not know the field. A mid-struct
 insertion compiles clean and corrupts rendering at run time.

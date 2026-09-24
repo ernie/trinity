@@ -1,7 +1,4 @@
-// VR API bootstrap for the Team Arena UI module. Name-resolves the extension
-// traps and registers the vr_shared_t mirror so the UI runs VR-aware under the
-// VR engine, and degrades to normal mouse mode on a flatscreen engine. Mirrors the
-// field-proven cgame bootstrap (vr_cgame.c).
+// VR UI registration and input helpers.
 #include "ui_local.h"
 #include "../game/vr_shared.h"
 #include "../game/vr_trap.h"
@@ -44,6 +41,13 @@ vrPlatform_t UI_VR_Platform( void ) {
 
 void UI_VR_Init( void ) {
 	char ext[64];
+#ifdef Q3_VM
+	trap_GetValue = NULL;
+#else
+	dll_com_trapGetValue = 0;
+#endif
+	vrActive = qfalse;
+	memset( &vr_state, 0, sizeof( vr_state ) );
 
 	// keep the sentinel referenced so the toolchain retains it in the image
 	if ( vr_api_sentinel[0] != 'T' )
@@ -59,38 +63,21 @@ void UI_VR_Init( void ) {
 	dll_com_trapGetValue = atoi( ext );
 #endif
 
-	// trap_VR_RegisterState is the VR handshake; an engine can expose
-	// trap_GetValue for non-VR extensions yet not answer this, which means
-	// "not a VR engine" - stay dormant.
-	if ( !VR_RESOLVE( trap_VR_RegisterState, ext ) )
+	if ( !VR_RESOLVE( trap_HapticEvent, ext ) ||
+	     !VR_RESOLVE( trap_VKeyboard_Show, ext ) ||
+	     !VR_RESOLVE( trap_VKeyboard_Hide, ext ) ||
+	     !VR_RESOLVE( trap_VKeyboard_IsActive, ext ) ||
+	     !VR_RESOLVE( trap_VKeyboard_HandleKey, ext ) ) {
 		return;
-
-	vr_state.structSize = sizeof( vr_state );
-	vr_state.apiVersion = VR_API_MAJOR;
-	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_MAJOR, VR_API_MINOR );
-	vrActive = qtrue;
-
-	// The rest of the VR trap set is part of the v1 contract, so a registered
-	// engine provides all of it - bind unconditionally.
-	VR_RESOLVE( trap_HapticEvent, ext );
-	VR_RESOLVE( trap_VKeyboard_Show, ext );
-	VR_RESOLVE( trap_VKeyboard_Hide, ext );
-	VR_RESOLVE( trap_VKeyboard_IsActive, ext );
-	VR_RESOLVE( trap_VKeyboard_HandleKey, ext );
-
-	// engine cursor-registration replacement: the UI owns the menu cursor
-	vr->menuCursorActive = qtrue;
+	}
+	vrActive = VR_RegisterMirror( &vr_state );
+	if ( !vrActive )
+		return;
+	vr->menuYawLocked = qfalse;
+	vr->menuCursorActive = vrActive;
 }
-
-/*
-================
-UI_VR_Shutdown
-
-Mirror unwind on UI shutdown - releases the menu cursor.
-Safe on a dormant mirror (writes into the local zeroed struct).
-================
-*/
 void UI_VR_Shutdown( void ) {
+	vrActive = qfalse;
 	vr->menuCursorActive = qfalse;
 }
 
@@ -332,21 +319,16 @@ qboolean UI_VR_UpdateSettingsCvar( const char *name, int val ) {
 /*
 ===============
 UI_VR_RunMenuScript
-
-VR desktop-mirror script commands, dispatched from UI_RunMenuScript's
-else-if chain. Returns qtrue when name matched one of the vrMirror*
-commands (regardless of whether the platform gate let the body run), so
-the caller's chain continues exactly as before for unmatched names.
 ===============
 */
 qboolean UI_VR_RunMenuScript( const char *name ) {
 	if ( Q_stricmp( name, "vrMirrorSetup" ) == 0 ) {
 		// Stage the restart-class desktop-mirror values into ui_ cvars.
-		// Mode: 0=Off, 1=Windowed, 2=Fullscreen from vr_desktopMode + r_fullscreen.
+		// Mode: 0=Off, 1=Windowed, 2=Fullscreen from vr_mirrorEnabled + vr_mirrorFullscreen.
 		if ( UI_VR_Platform() != VRP_NONE ) {
 			int mirror, fullscreen, w, h;
-			mirror = (int)trap_Cvar_VariableValue( "vr_desktopMode" );
-			fullscreen = (int)trap_Cvar_VariableValue( "r_fullscreen" );
+			mirror = (int)trap_Cvar_VariableValue( "vr_mirrorEnabled" );
+			fullscreen = (int)trap_Cvar_VariableValue( "vr_mirrorFullscreen" );
 			if ( mirror == 0 ) {
 				trap_Cvar_Set( "ui_vrDesktopMode", "0" );
 			} else if ( fullscreen == 0 ) {
@@ -354,8 +336,8 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 			} else {
 				trap_Cvar_Set( "ui_vrDesktopMode", "2" );
 			}
-			w = (int)trap_Cvar_VariableValue( "r_customdesktopwidth" );
-			h = (int)trap_Cvar_VariableValue( "r_customdesktopheight" );
+			w = (int)trap_Cvar_VariableValue( "vr_mirrorWidth" );
+			h = (int)trap_Cvar_VariableValue( "vr_mirrorHeight" );
 			if ( w > 0 && h > 0 ) {
 				trap_Cvar_Set( "ui_vrDesktopRes", va( "%dx%d", w, h ) );
 			} else {
@@ -395,15 +377,14 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 		}
 		return qtrue;
 	} else if ( Q_stricmp( name, "vrMirrorApply" ) == 0 ) {
-		// Write the staged desktop-mirror values and vid_restart (R5
-		// staged-Apply pattern). No-op when nothing changed.
+		// Restart only when staged mirror settings changed.
 		if ( UI_VR_Platform() != VRP_NONE ) {
 			int stagedMode, curMode, mirror, fullscreen, dirty;
 			char res[32];
 			char *xp;
 			dirty = 0;
-			mirror = (int)trap_Cvar_VariableValue( "vr_desktopMode" );
-			fullscreen = (int)trap_Cvar_VariableValue( "r_fullscreen" );
+			mirror = (int)trap_Cvar_VariableValue( "vr_mirrorEnabled" );
+			fullscreen = (int)trap_Cvar_VariableValue( "vr_mirrorFullscreen" );
 			if ( mirror == 0 ) {
 				curMode = 0;
 			} else if ( fullscreen == 0 ) {
@@ -414,13 +395,13 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 			stagedMode = (int)trap_Cvar_VariableValue( "ui_vrDesktopMode" );
 			if ( stagedMode != curMode ) {
 				if ( stagedMode == 0 ) {
-					trap_Cvar_SetValue( "vr_desktopMode", 0 );
+					trap_Cvar_SetValue( "vr_mirrorEnabled", 0 );
 				} else if ( stagedMode == 1 ) {
-					trap_Cvar_SetValue( "vr_desktopMode", 1 );
-					trap_Cvar_SetValue( "r_fullscreen", 0 );
+					trap_Cvar_SetValue( "vr_mirrorEnabled", 1 );
+					trap_Cvar_SetValue( "vr_mirrorFullscreen", 0 );
 				} else {
-					trap_Cvar_SetValue( "vr_desktopMode", 1 );
-					trap_Cvar_SetValue( "r_fullscreen", 1 );
+					trap_Cvar_SetValue( "vr_mirrorEnabled", 1 );
+					trap_Cvar_SetValue( "vr_mirrorFullscreen", 1 );
 				}
 				dirty = 1;
 			}
@@ -431,11 +412,11 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 				*xp = '\0';
 				stagedW = atoi( res );
 				stagedH = atoi( xp + 1 );
-				curW = (int)trap_Cvar_VariableValue( "r_customdesktopwidth" );
-				curH = (int)trap_Cvar_VariableValue( "r_customdesktopheight" );
+				curW = (int)trap_Cvar_VariableValue( "vr_mirrorWidth" );
+				curH = (int)trap_Cvar_VariableValue( "vr_mirrorHeight" );
 				if ( stagedW > 0 && stagedH > 0 && ( stagedW != curW || stagedH != curH ) ) {
-					trap_Cvar_Set( "r_customdesktopwidth", va( "%d", stagedW ) );
-					trap_Cvar_Set( "r_customdesktopheight", va( "%d", stagedH ) );
+					trap_Cvar_Set( "vr_mirrorWidth", va( "%d", stagedW ) );
+					trap_Cvar_Set( "vr_mirrorHeight", va( "%d", stagedH ) );
 					dirty = 1;
 				}
 			}
@@ -447,3 +428,10 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 	}
 	return qfalse;
 }
+
+#ifndef Q3_VM
+// Capability marker for trusted native-module preflight.
+DLLEXPORT int TrinityVRAPI( void ) {
+	return ( VR_API_MAJOR << 16 ) | VR_API_MINOR;
+}
+#endif

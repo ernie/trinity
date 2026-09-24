@@ -1,13 +1,4 @@
-// Mod-side helper for binding the VR integration traps. trap_GetValue is the
-// engine's GENERAL extension-discovery interface - it also answers for non-VR
-// extensions like voip and trap_R_ProjectDecal - and VR is just one client of
-// it. VR_RESOLVE looks a VR trap up by its own name and binds it to the
-// module's callable, returning whether the engine answered. Only the VR
-// handshake trap gates on that return; the rest of the v1 trap set is
-// guaranteed once the handshake succeeds, so it is bound unconditionally. The
-// trap is passed by its C identifier, which is also its lookup key.
-// trap_GetValue itself bootstraps by hand: it cannot discover itself, and its
-// DLL number lives in dll_com_trapGetValue.
+// Name-based VR trap negotiation shared by the QVM and native modules.
 #ifndef __VR_TRAP_H
 #define __VR_TRAP_H
 
@@ -18,5 +9,17 @@
 #define VR_RESOLVE( trap, ext ) \
 	( trap_GetValue( (ext), sizeof( ext ), #trap ) ? ( dll_##trap = atoi( ext ), qtrue ) : qfalse )
 #endif
+
+// Registration during INIT establishes VR activity for this module's lifetime.
+static qboolean VR_RegisterMirror( vr_shared_t *state ) {
+	char ext[64];
+	if ( !VR_RESOLVE( trap_VR_RegisterState, ext ) ) {
+		return qfalse;
+	}
+	state->structSize = sizeof( *state );
+	state->apiVersion = VR_API_MAJOR;
+	trap_VR_RegisterState( state, sizeof( *state ), VR_API_MAJOR, VR_API_MINOR );
+	return qtrue;
+}
 
 #endif

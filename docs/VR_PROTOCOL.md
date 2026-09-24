@@ -61,13 +61,16 @@ The game QVM includes a `vr` key in the `CS_PLAYERS` configstring so all
 clients know which players are VR:
 
 ```c
-// In ClientUserinfoChanged (g_client.c):
-s = va("n\\%s\\...\\vr\\%s", ..., G_VR_ClientIsVR(userinfo) ? "1" : "0");
+// In ClientUserinfoChanged (g_client.c), for every client including bots:
+vrClient = G_VR_ClientUserinfoChanged(client, userinfo);
+s = va("n\\%s\\...\\vr\\%s", ..., vrClient ? "1" : "0");
 trap_SetConfigstring(CS_PLAYERS + clientNum, s);
 ```
 
-`G_VR_ClientIsVR` (vendored `vr_game.c`) value-gates the flag: it reads the
-userinfo value with `atoi`, not mere presence.
+`G_VR_ClientUserinfoChanged` (vendored `vr_game.c`) value-gates the flag: it
+reads the userinfo value with `atoi`, not mere presence. It also records the
+flag for the client slot, where the head-bit decode reads it, which is why the
+host calls it for every client and not only the ones that get the `vr` field.
 
 Client-side, this is parsed into `clientInfo_t.vrPlayer` for scoreboard icons
 and other UI.
@@ -216,21 +219,22 @@ code below shows what the hooks do.
 `G_VR_ClientThink` runs after standard button processing:
 
 ```c
-if (ucmd->buttons & 0x03FFF000) {
-    vrHeadOrient_t *head = &vr_headOrient[client - level.clients];
+vrClient_t *vrc = &vr_clients[client - level.clients];
+
+if (vrc->vrClient && (ucmd->buttons & 0x03FFF000)) {
     int pitchPacked = (ucmd->buttons >> 12) & 0x7F;
     int yawPacked   = (ucmd->buttons >> 19) & 0x7F;
 
-    head->pitch     = (pitchPacked * 180.0f / 127.0f) - 90.0f;
-    head->yawOffset = (yawPacked   * 180.0f / 127.0f) - 90.0f;
+    vrc->head.pitch     = (pitchPacked * 180.0f / 127.0f) - 90.0f;
+    vrc->head.yawOffset = (yawPacked   * 180.0f / 127.0f) - 90.0f;
     client->ps.eFlags |= EF_VR_PLAYER;
 } else {
     client->ps.eFlags &= ~EF_VR_PLAYER;
 }
 ```
 
-The decoded angles are per-client module state inside `vr_game.c`
-(`vr_headOrient` above), not fields on `gclient_t`.
+The flag and the decoded angles share one per-client record inside
+`vr_game.c` (`vr_clients` above), not fields on `gclient_t`.
 
 ### Transmitting in ClientEndFrame (g_active.c)
 
@@ -239,7 +243,7 @@ data to the entity for network transmission:
 
 ```c
 if (client->ps.eFlags & EF_VR_PLAYER) {
-    const vrHeadOrient_t *head = &vr_headOrient[client - level.clients];
+    const vrHeadOrient_t *head = &vr_clients[client - level.clients].head;
     ent->s.angles2[PITCH] = head->pitch;
     ent->s.angles2[ROLL]  = head->yawOffset;  // ROLL slot repurposed
 
@@ -462,8 +466,8 @@ surface.
    `ent->s.angles2[PITCH/ROLL]` and packs into stats
 4. In `BG_PlayerStateToEntityState`: `BG_VR_HeadToEntityState` derives
    `angles2` from stats for the local player
-5. In `ClientUserinfoChanged`: `G_VR_ClientIsVR` value-gates the `vr` flag in
-   the `CS_PLAYERS` configstring
+5. In `ClientUserinfoChanged`: `G_VR_ClientUserinfoChanged` value-gates the
+   `vr` flag in the `CS_PLAYERS` configstring and records it for the decode
 
 **Client-side game:**
 1. In `CG_PlayerAngles`: the `CG_VR_Player*` hooks LerpAngle-interpolate the

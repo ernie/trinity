@@ -95,9 +95,6 @@ typedef struct {
 	float		radius;
 	float		rotation;
 
-	// VR-engine extension; must remain last so the stock ioq3 prefix
-	// stays layout-compatible with engines that do not know this field
-	qboolean	invert;
 } refEntity_t;
 
 

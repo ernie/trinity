@@ -587,6 +587,7 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	gentity_t *ent;
 	int		teamTask, teamLeader, health;
 	int		isTrinityEngine;
+	qboolean	vrClient;
 	char	*s;
 	char	model[MAX_QPATH];
 	char	headModel[MAX_QPATH];
@@ -725,6 +726,9 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 	// Stock ioquake3 clients don't send this key at all
 	isTrinityEngine = Info_ValueForKey( userinfo, "vr" )[0] != '\0' ? 1 : 0;
 
+	// Runs for bots too, so every slot records its own VR flag
+	vrClient = G_VR_ClientUserinfoChanged( client, userinfo );
+
 	// send over a subset of the userinfo keys so other clients can
 	// print scoreboards, display models, and play custom sounds
 	// tu enum: 0 = not authenticated, 1 = verified user, 2 = admin.
@@ -742,7 +746,7 @@ qboolean ClientUserinfoChanged( int clientNum ) {
 		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d\\vr\\%s\\voip\\%s\\tu\\%i",
 			client->pers.netname, client->sess.sessionTeam, model, headModel, c1, c2,
 			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader,
-			G_VR_ClientIsVR( userinfo ) ? "1" : "0",
+			vrClient ? "1" : "0",
 			*voipProto ? voipProto : "",
 			client->sess.trinityUserType );
 	}

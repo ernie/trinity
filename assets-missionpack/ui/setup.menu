@@ -12,7 +12,7 @@ menuDef {
     	focusColor 1 .75 0 1
     	style 1
     	border 1
-	onOpen { setitemcolor fadebox backcolor 0 0 0 1 ; 
+	onOpen { setitemcolor fadebox backcolor 0 0 0 1 ;
 		playlooped "music/fla_mp03.wav" ;
 		fadeout fadebox ;
 		hide back_alt ;
@@ -233,8 +233,7 @@ itemDef {
 	}
 
 // VR Options	//
-// VR engines only: vr_platform is unset on flatscreen, so the item hides and
-// the column keeps its stock shape.
+// Only expose these pages while the UI has an active VR API.
 
 itemDef {
       	name vroptions
@@ -249,8 +248,8 @@ itemDef {
 	textaligny 32
 	forecolor 1 1 1 1
 	visible 1
-	cvarTest "vr_platform"
-	showCvar { "pc" ; "standalone" }
+	cvarTest "ui_vrActive"
+	showCvar { "1" }
 	action { play "sound/misc/kcaction.wav" ;
 	close control_menu ;
 	close system_menu ;

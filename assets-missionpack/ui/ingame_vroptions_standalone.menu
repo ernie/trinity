@@ -455,7 +455,7 @@ itemDef {
 	group grpVR
 	type ITEM_TYPE_SLIDER
 	text "Smooth turn speed:"
-	cvarfloat "sensitivity" 100 50 150
+	cvarfloat "vr_sensitivity" 100 50 150
 	rect 28 122 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180

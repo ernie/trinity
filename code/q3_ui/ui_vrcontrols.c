@@ -115,7 +115,7 @@ static void VRControls_SetMenuItems( void ) {
 	s_vrcontrols.twohanded.curvalue			= trap_Cvar_VariableValue( "vr_twoHandedWeapons" );
 	s_vrcontrols.directionmode.curvalue		= (int)trap_Cvar_VariableValue( "vr_directionMode" ) % NUM_DIRECTIONMODE;
 	s_vrcontrols.snapturn.curvalue			= (int)trap_Cvar_VariableValue( "vr_snapturn" ) / 45;
-	s_vrcontrols.sensitivity.curvalue		= UI_ClampCvar( 50, 150, trap_Cvar_VariableValue( "sensitivity" ) );
+	s_vrcontrols.sensitivity.curvalue		= UI_ClampCvar( 50, 150, trap_Cvar_VariableValue( "vr_sensitivity" ) );
 	s_vrcontrols.uturn.curvalue				= trap_Cvar_VariableValue( "vr_uturn" ) != 0;
 	s_vrcontrols.righthanded.curvalue		= trap_Cvar_VariableValue( "vr_righthanded" ) != 0;
 	s_vrcontrols.switchthumbsticks.curvalue	= trap_Cvar_VariableValue( "vr_switchThumbsticks" ) != 0;
@@ -154,7 +154,7 @@ static void VRControls_MenuEvent( void* ptr, int notification ) {
 			break;
 
 		case ID_SENSITIVITY:
-			trap_Cvar_SetValue( "sensitivity", s_vrcontrols.sensitivity.curvalue );
+			trap_Cvar_SetValue( "vr_sensitivity", s_vrcontrols.sensitivity.curvalue );
 			break;
 
 		case ID_UTURN:
@@ -309,10 +309,10 @@ static void VRControls_MenuEvent( void* ptr, int notification ) {
 
 static void VRControls_SensitivityStatusBar( void *self )
 {
-	const int currentValue = (int)UI_ClampCvar( 50, 150, trap_Cvar_VariableValue( "sensitivity" ) );
+	const float currentValue = UI_ClampCvar( 50, 150, trap_Cvar_VariableValue( "vr_sensitivity" ) );
 
 	char buf[128] = { 0 };
-	Com_sprintf( buf, sizeof(buf), "Current value: %d (default: 100)", currentValue );
+	Com_sprintf( buf, sizeof(buf), "Current value: %.1f (default: 100)", currentValue );
 
 	UI_DrawString( SCREEN_WIDTH * 0.50, s_vrcontrols_hintY, buf, UI_SMALLFONT|UI_CENTER, colorWhite );
 }

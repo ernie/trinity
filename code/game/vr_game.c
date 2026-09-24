@@ -2,7 +2,6 @@
 #include "g_local.h"
 #include "vr_bg.h"
 #include "vr_game.h"
-#include "vr_trap.h"
 
 // VR shared-state mirror. The engine's VR-aware QVM ladder scans each
 // module's .qvm for this sentinel, so the game module carries its own copy.
@@ -18,6 +17,8 @@ void (*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int api
 int dll_trap_VR_RegisterState;
 #endif
 
+#include "vr_trap.h" // its VR_RegisterMirror uses the trap pointer above
+
 /*
 ============
 G_VR_Init
@@ -32,6 +33,8 @@ are harmless when dormant.
 */
 void G_VR_Init( void ) {
 	char ext[64];
+	g_vrActive = qfalse;
+	memset( &vr_state, 0, sizeof( vr_state ) );
 
 	// keep the sentinel referenced so the toolchain retains it in the data segment
 	if ( vr_api_sentinel[0] != 'T' )
@@ -45,12 +48,7 @@ void G_VR_Init( void ) {
 		dll_com_trapGetValue = atoi( ext );
 #endif
 
-		if ( VR_RESOLVE( trap_VR_RegisterState, ext ) ) {
-			vr_state.structSize = sizeof( vr_state );
-			vr_state.apiVersion = VR_API_MAJOR;
-			trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_MAJOR, VR_API_MINOR );
-			g_vrActive = qtrue;
-		}
+		g_vrActive = VR_RegisterMirror( &vr_state );
 	}
 
 	// module-owned config block (engine sync-out publishes it after this call)
@@ -80,33 +78,31 @@ qboolean G_VR_Active( void ) {
 	return g_vrActive;
 }
 
-// VR head orientation (from usercmd), per client slot - module storage
-// (formerly gclient_t.vrHeadPitch/vrHeadYawOffset). Roll is sent via
-// standard cmd->angles[ROLL] mechanism. Zeroed at module load rather than
-// at ClientConnect/ClientSpawn: safe because G_VR_ClientEndFrame's read is
-// EF_VR_PLAYER-gated, connect and spawn both clear that flag on ps, and
-// only G_VR_ClientThink sets it - right after writing fresh values here.
-static vrHeadOrient_t vr_headOrient[MAX_CLIENTS];
+// Zeroed only at module load: every read is EF_VR_PLAYER-gated and connect/spawn clear that flag.
+typedef struct {
+	qboolean		vrClient;	// `vr 1` in the client's userinfo
+	vrHeadOrient_t	head;		// decoded from the head bits
+} vrClient_t;
+
+static vrClient_t vr_clients[MAX_CLIENTS];
 
 /*
 ============
 G_VR_ClientThink
 
-Unpack VR head orientation from upper bits of buttons (bits 12-25).
-VR clients pack head pitch and yaw offset in these bits when connecting to
-VR-aware servers. Roll is sent via the standard cmd->angles[ROLL] mechanism
-(vr_sendRollToServer). Non-VR clients never set these bits, so this is
-self-gating - no mirror or active check needed.
+Unpack VR head orientation from buttons bits 12-25; the userinfo vr flag gates
+the decode, so a flatscreen client's stray bits never mark it as a VR player.
 ============
 */
 void G_VR_ClientThink( struct gclient_s *client, const usercmd_t *ucmd ) {
-	if (ucmd->buttons & 0x03FFF000) {
-		vrHeadOrient_t *head = &vr_headOrient[client - level.clients];
+	vrClient_t *vrc = &vr_clients[client - level.clients];
+
+	if (vrc->vrClient && (ucmd->buttons & 0x03FFF000)) {
 		int pitchPacked = (ucmd->buttons >> 12) & 0x7F;
 		int yawPacked = (ucmd->buttons >> 19) & 0x7F;
 
-		head->pitch = (pitchPacked * 180.0f / 127.0f) - 90.0f;
-		head->yawOffset = (yawPacked * 180.0f / 127.0f) - 90.0f;
+		vrc->head.pitch = (pitchPacked * 180.0f / 127.0f) - 90.0f;
+		vrc->head.yawOffset = (yawPacked * 180.0f / 127.0f) - 90.0f;
 		client->ps.eFlags |= EF_VR_PLAYER;
 	} else {
 		client->ps.eFlags &= ~EF_VR_PLAYER;
@@ -126,7 +122,7 @@ player: range [-180, 180] -> [-32768, 32767] (182.04 = 32767/180).
 */
 void G_VR_ClientEndFrame( struct gclient_s *client, struct gentity_s *ent ) {
 	if (client->ps.eFlags & EF_VR_PLAYER) {
-		const vrHeadOrient_t *head = &vr_headOrient[client - level.clients];
+		const vrHeadOrient_t *head = &vr_clients[client - level.clients].head;
 		ent->s.angles2[PITCH] = head->pitch;
 		ent->s.angles2[ROLL] = head->yawOffset;
 		client->ps.stats[STAT_VR_HEAD_PITCH] = (short)(head->pitch * 182.04f);
@@ -136,14 +132,18 @@ void G_VR_ClientEndFrame( struct gclient_s *client, struct gentity_s *ent ) {
 
 /*
 ============
-G_VR_ClientIsVR
+G_VR_ClientUserinfoChanged
 
 Value-gate for the `vr` userinfo key (presence is NOT the signal - flatscreen
-trinity-engine clients send vr\0). Feeds the CS_PLAYERS `vr\` field.
+trinity-engine clients send vr\0). Feeds the head-bit decode gate and the
+CS_PLAYERS `vr\` field.
 ============
 */
-qboolean G_VR_ClientIsVR( const char *userinfo ) {
-	return atoi( Info_ValueForKey( userinfo, "vr" ) ) ? qtrue : qfalse;
+qboolean G_VR_ClientUserinfoChanged( struct gclient_s *client, const char *userinfo ) {
+	vrClient_t *vrc = &vr_clients[client - level.clients];
+
+	vrc->vrClient = atoi( Info_ValueForKey( userinfo, "vr" ) ) == 1;
+	return vrc->vrClient;
 }
 
 static void rotateAboutOrigin(float x, float y, float rotation, vec2_t out)

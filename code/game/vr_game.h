@@ -18,7 +18,7 @@ void G_VR_Init( void );
 qboolean G_VR_Active( void );
 void G_VR_ClientThink( struct gclient_s *client, const usercmd_t *ucmd );
 void G_VR_ClientEndFrame( struct gclient_s *client, struct gentity_s *ent );
-qboolean G_VR_ClientIsVR( const char *userinfo );
+qboolean G_VR_ClientUserinfoChanged( struct gclient_s *client, const char *userinfo );
 qboolean G_VR_MuzzlePoint( struct gentity_s *ent, const vec3_t forward, const vec3_t right, const vec3_t up, vec3_t origin, vec3_t muzzlePoint );
 qboolean G_VR_AimAngles( struct gentity_s *ent, vec3_t angles );
 

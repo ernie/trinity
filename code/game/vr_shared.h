@@ -1,16 +1,12 @@
-// hand-synced from trinity-vr code/vrcommon/vr_shared.h: do not edit here
+// Engine <-> module VR state ABI, shared by trinity-engine, trinity-standalone and the mods; append fields only.
 #ifndef __VR_SHARED
 #define __VR_SHARED
 
 #include "q_shared.h"
 #include "vr_safe_types.h"
 
-// Engine <-> game-module VR state ABI. QVM-safe: 4-byte scalar types only,
-// no pointers, identical layout on 64-bit host and 32-bit QVM.
-// LAYOUT IS FROZEN once published: append to a block, never reorder/remove.
-// Additive changes (new tail field, new trap) bump the MINOR; reordering,
-// removing, or retyping an existing field or trap bumps the MAJOR. The engine
-// runs a QVM whose major matches and whose minor it can meet or exceed.
+// QVM-safe: 4-byte scalar types only, no pointers, identical layout on 64-bit host and 32-bit QVM.
+// Additive changes bump the MINOR; layout changes bump the MAJOR.
 #define VR_API_MAJOR 1
 #define VR_API_MINOR 0
 #define VR_API_STR2(x) #x
@@ -81,8 +77,8 @@ typedef struct vr_shared_s {
 	// ---- uiShared block: cgame+ui-writable ----
 	float menuYaw;
 	int   menuYawLocked;
-	int   menuCursorActive;       // replaces int* cursor registration
-	int   scoreboardCursorActive; // replaces int* cursor registration
+	int   menuCursorActive;       // menu cursor tracking requested
+	int   scoreboardCursorActive; // scoreboard cursor tracking requested
 
 	// ---- cfg block: cgame+game-writable ----
 	int   no_crosshair;
@@ -93,7 +89,7 @@ typedef struct vr_shared_s {
 	int   menuStickNavActive;   // engine: thumbstick is driving menu nav -> UI freezes hover + hides cursor
 } vr_shared_t;
 
-// Block-start field markers; the engine pins their offsets with ABI asserts.
+// Block starts; vr_shared_sync.c pins their offsets at compile time.
 #define VR_SHARED_CG_FIRST   weapon_select
 #define VR_SHARED_UI_FIRST   menuYaw
 #define VR_SHARED_CFG_FIRST  no_crosshair

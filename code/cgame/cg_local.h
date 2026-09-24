@@ -1346,7 +1346,7 @@ typedef struct {
 	int				teamLastChatPos;
 
 #ifdef MISSIONPACK
-	qboolean eventHandling;
+	cgame_event_t eventHandling;
 	qboolean mouseCaptured;
 	qboolean sizingHud;
 	void *capturedItem;

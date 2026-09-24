@@ -1,7 +1,4 @@
-// VR API bootstrap for the baseq3 UI module. Name-resolves the extension traps
-// and registers the vr_shared_t mirror so the UI runs VR-aware under the VR
-// engine, and degrades to normal mouse mode on a flatscreen engine. Mirrors the
-// field-proven cgame bootstrap (vr_cgame.c).
+// VR UI registration and input helpers.
 #include "ui_local.h"
 #include "../game/vr_shared.h"
 #include "../game/vr_trap.h"
@@ -44,6 +41,13 @@ vrPlatform_t UI_VR_Platform( void ) {
 
 void UI_VR_Init( void ) {
 	char ext[64];
+#ifdef Q3_VM
+	trap_GetValue = NULL;
+#else
+	dll_com_trapGetValue = 0;
+#endif
+	vrActive = qfalse;
+	memset( &vr_state, 0, sizeof( vr_state ) );
 
 	// keep the sentinel referenced so the toolchain retains it in the image
 	if ( vr_api_sentinel[0] != 'T' )
@@ -59,38 +63,21 @@ void UI_VR_Init( void ) {
 	dll_com_trapGetValue = atoi( ext );
 #endif
 
-	// trap_VR_RegisterState is the VR handshake; an engine can expose
-	// trap_GetValue for non-VR extensions yet not answer this, which means
-	// "not a VR engine" - stay dormant.
-	if ( !VR_RESOLVE( trap_VR_RegisterState, ext ) )
+	if ( !VR_RESOLVE( trap_HapticEvent, ext ) ||
+	     !VR_RESOLVE( trap_VKeyboard_Show, ext ) ||
+	     !VR_RESOLVE( trap_VKeyboard_Hide, ext ) ||
+	     !VR_RESOLVE( trap_VKeyboard_IsActive, ext ) ||
+	     !VR_RESOLVE( trap_VKeyboard_HandleKey, ext ) ) {
 		return;
-
-	vr_state.structSize = sizeof( vr_state );
-	vr_state.apiVersion = VR_API_MAJOR;
-	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_MAJOR, VR_API_MINOR );
-	vrActive = qtrue;
-
-	// The rest of the VR trap set is part of the v1 contract, so a registered
-	// engine provides all of it - bind unconditionally.
-	VR_RESOLVE( trap_HapticEvent, ext );
-	VR_RESOLVE( trap_VKeyboard_Show, ext );
-	VR_RESOLVE( trap_VKeyboard_Hide, ext );
-	VR_RESOLVE( trap_VKeyboard_IsActive, ext );
-	VR_RESOLVE( trap_VKeyboard_HandleKey, ext );
-
-	// engine cursor-registration replacement: the UI owns the menu cursor
-	vr->menuCursorActive = qtrue;
+	}
+	vrActive = VR_RegisterMirror( &vr_state );
+	if ( !vrActive )
+		return;
+	vr->menuYawLocked = qfalse;
+	vr->menuCursorActive = vrActive;
 }
-
-/*
-================
-UI_VR_Shutdown
-
-Mirror unwind on UI shutdown - releases the menu cursor.
-Safe on a dormant mirror (writes into the local zeroed struct).
-================
-*/
 void UI_VR_Shutdown( void ) {
+	vrActive = qfalse;
 	vr->menuCursorActive = qfalse;
 }
 
@@ -325,3 +312,10 @@ void UI_VR_CompensateModelFov( refdef_t *rd, float desiredFovX, float desiredFov
 		rd->fov_y = desiredFovY;
 	}
 }
+
+#ifndef Q3_VM
+// Capability marker for trusted native-module preflight.
+DLLEXPORT int TrinityVRAPI( void ) {
+	return ( VR_API_MAJOR << 16 ) | VR_API_MINOR;
+}
+#endif

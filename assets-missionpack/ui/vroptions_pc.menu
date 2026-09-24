@@ -324,7 +324,7 @@ itemDef {
 	group grpVR
 	type ITEM_TYPE_SLIDER
 	text "Smooth turn speed:"
-	cvarfloat "sensitivity" 100 50 150
+	cvarfloat "vr_sensitivity" 100 50 150
 	rect 301 128 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
@@ -661,10 +661,9 @@ itemDef {
 itemDef {
 	name hud
 	group grpVR
-	type ITEM_TYPE_MULTI
-	text "Virtual screen shape:"
-	cvar "vr_virtualScreenShape"
-	cvarFloatList { "Curved" 0 "Flat" 1 }
+	type ITEM_TYPE_SLIDER
+	text "Screen Curvature:"
+	cvarfloat "vr_screenCurvature" 0 0 1
 	rect 301 260 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
@@ -782,7 +781,7 @@ itemDef {
 itemDef {
 	name mirror
 	group grpVR
-	text "Resolution:"
+	text "Window Resolution:"
 	rect 301 168 128 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128

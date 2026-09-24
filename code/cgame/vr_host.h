@@ -106,11 +106,8 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //   your statIndex_t tail (VR_INTEGRATION.md Step 4).
 // * Q_sscanf: this tree provides it in bg_lib; a stock tree maps it in
 //   vr_host_config.h (#define Q_sscanf sscanf).
-// * tr_types.h: RF_OVERBRIGHT, RF_WORLD_ORIENTED, RF_VIEW_ORIENTED, and the
-//   tail-appended refEntity_t.invert are referenced by the drop; RT_LASERSIGHT and the
-//   tail-appended refdef_t.isHUD are consumed by the host's own CG_LaserSight
-//   and 2D passes. The two struct fields must remain LAST (see the guide's
-//   Appendix E).
+// * tr_types.h: RF_OVERBRIGHT, RF_WORLD_ORIENTED, RF_VIEW_ORIENTED, RT_LASERSIGHT and the
+//   tail-appended refdef_t.isHUD, which must stay last (Appendix E).
 // * cg_t / cgs_t: no additions are required. All VR view/camera/HUD/selector
 //   state the drop uses lives as module state inside vr_cgame.c; the host
 //   reads what it needs through accessors (CG_VR_DrawingZoomedHUD,

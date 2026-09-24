@@ -54,12 +54,11 @@ VR HUD & DISPLAY OPTIONS MENU
 #define ID_SHOWCONSOLE			134
 #define ID_LASERSIGHT			135
 #define ID_SUPERSAMPLING		136
-#define ID_VIRTUALSCREENSHAPE	137
-#define ID_SCREENCURVATURE		138
-#define ID_REFRESHRATE			139
-#define ID_APPLY				140
-#define ID_FOVEATION			141
-#define ID_FOVEATIONSTRENGTH	142
+#define ID_SCREENCURVATURE		137
+#define ID_REFRESHRATE			138
+#define ID_APPLY				139
+#define ID_FOVEATION			140
+#define ID_FOVEATIONSTRENGTH	141
 
 #define ID_BACK					150
 
@@ -83,7 +82,6 @@ typedef struct {
 	menuradiobutton_s	showconsole;
 	menuradiobutton_s	lasersight;
 	menulist_s			supersampling;
-	menulist_s			virtualscreenshape;
 	menuslider_s		screencurvature;
 	menulist_s			refreshrate;
 	menulist_s			foveation;
@@ -94,9 +92,6 @@ typedef struct {
 } vrhud_display_t;
 
 static vrhud_display_t s_vrhud_display;
-
-static qboolean s_vrhud_display_isPC;
-static qboolean s_vrhud_display_isStandalone;
 
 // Display rates the engine's runtime supports, from vr_refreshrates
 static int			s_refreshRates[MAX_REFRESH_RATES];
@@ -206,7 +201,6 @@ static void VRHudDisplay_SetMenuItems( void ) {
 		}
 	}
 
-	s_vrhud_display.virtualscreenshape.curvalue	= trap_Cvar_VariableValue( "vr_virtualScreenShape" );
 	s_vrhud_display.screencurvature.curvalue	= trap_Cvar_VariableValue( "vr_screenCurvature" );
 
 	// nearest, since an archived vr_refreshrate may not be in this headset's list
@@ -297,10 +291,6 @@ static void VRHudDisplay_MenuEvent( void* ptr, int notification ) {
 			trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
 			break;
 
-		case ID_VIRTUALSCREENSHAPE:
-			trap_Cvar_SetValue( "vr_virtualScreenShape", s_vrhud_display.virtualscreenshape.curvalue );
-			break;
-
 		case ID_SCREENCURVATURE:
 			trap_Cvar_SetValue( "vr_screenCurvature", s_vrhud_display.screencurvature.curvalue );
 			break;
@@ -343,22 +333,12 @@ static void VRHudDisplay_MenuInit( void ) {
 		NULL,
 	};
 
-	static const char *s_virtualScreenShapes[] =
-	{
-		"Curved",
-		"Flat",
-		NULL,
-	};
-
 	static const char *s_supersampling_names[] =
 	{
 		"0.5", "0.6", "0.7", "0.8", "0.9", "1.0", "1.1",
 		"1.2", "1.3", "1.4", "1.5", "1.75", "2.0",
 		NULL,
 	};
-
-	s_vrhud_display_isPC         = ( UI_VR_Platform() == VRP_PC );
-	s_vrhud_display_isStandalone = ( UI_VR_Platform() == VRP_STANDALONE );
 
 	memset( &s_vrhud_display, 0, sizeof(vrhud_display_t) );
 
@@ -394,9 +374,8 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.framer.height			= 334;
 
 	// Center the small-font row block in the frame interior. 10 base rows,
-	// +1 on PC (virtual screen shape), +1 on standalone (screen curvature),
-	// +1 for refresh rate (every platform), +2 with foveation.
-	y = VR_FRAME_CENTER_Y - ( ( (10 + (s_vrhud_display_isPC ? 1 : 0) + (s_vrhud_display_isStandalone ? 1 : 0) + 1 + (s_numFoveationItems ? 2 : 0)) - 1 ) * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
+	// +1 for screen curvature, +1 for refresh rate, +2 with foveation.
+	y = VR_FRAME_CENTER_Y - ( ( (10 + 1 + 1 + (s_numFoveationItems ? 2 : 0)) - 1 ) * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
 	s_vrhud_display.hudmode.generic.type		= MTYPE_SPINCONTROL;
 	s_vrhud_display.hudmode.generic.name		= "HUD Mode:";
 	s_vrhud_display.hudmode.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -497,32 +476,16 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.supersampling.itemnames		= s_supersampling_names;
 	s_vrhud_display.supersampling.numitems		= 13;
 
-	// PC-only tail: Virtual screen shape
-	if ( s_vrhud_display_isPC ) {
-		y += BIGCHAR_HEIGHT+2;
-		s_vrhud_display.virtualscreenshape.generic.type		= MTYPE_SPINCONTROL;
-		s_vrhud_display.virtualscreenshape.generic.x		= VR_X_POS;
-		s_vrhud_display.virtualscreenshape.generic.y		= y;
-		s_vrhud_display.virtualscreenshape.generic.flags	= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-		s_vrhud_display.virtualscreenshape.generic.name		= "Virtual screen shape:";
-		s_vrhud_display.virtualscreenshape.generic.id		= ID_VIRTUALSCREENSHAPE;
-		s_vrhud_display.virtualscreenshape.generic.callback	= VRHudDisplay_MenuEvent;
-		s_vrhud_display.virtualscreenshape.itemnames		= s_virtualScreenShapes;
-		s_vrhud_display.virtualscreenshape.numitems			= 2;
-	}
-
-	if ( s_vrhud_display_isStandalone ) {
-		y += BIGCHAR_HEIGHT+2;
-		s_vrhud_display.screencurvature.generic.type		= MTYPE_SLIDER;
-		s_vrhud_display.screencurvature.generic.x			= VR_X_POS;
-		s_vrhud_display.screencurvature.generic.y			= y;
-		s_vrhud_display.screencurvature.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-		s_vrhud_display.screencurvature.generic.name		= "Screen Curvature:";
-		s_vrhud_display.screencurvature.generic.id			= ID_SCREENCURVATURE;
-		s_vrhud_display.screencurvature.generic.callback	= VRHudDisplay_MenuEvent;
-		s_vrhud_display.screencurvature.minvalue			= 0.0f;
-		s_vrhud_display.screencurvature.maxvalue			= 1.0f;
-	}
+	y += BIGCHAR_HEIGHT+2;
+	s_vrhud_display.screencurvature.generic.type		= MTYPE_SLIDER;
+	s_vrhud_display.screencurvature.generic.x			= VR_X_POS;
+	s_vrhud_display.screencurvature.generic.y			= y;
+	s_vrhud_display.screencurvature.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_vrhud_display.screencurvature.generic.name		= "Screen Curvature:";
+	s_vrhud_display.screencurvature.generic.id			= ID_SCREENCURVATURE;
+	s_vrhud_display.screencurvature.generic.callback		= VRHudDisplay_MenuEvent;
+	s_vrhud_display.screencurvature.minvalue			= 0.0f;
+	s_vrhud_display.screencurvature.maxvalue			= 1.0f;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrhud_display.refreshrate.generic.type		= MTYPE_SPINCONTROL;
@@ -596,12 +559,7 @@ static void VRHudDisplay_MenuInit( void ) {
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.showconsole );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.lasersight );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.supersampling );
-	if ( s_vrhud_display_isPC ) {
-		Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.virtualscreenshape );
-	}
-	if ( s_vrhud_display_isStandalone ) {
-		Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.screencurvature );
-	}
+	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.screencurvature );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.refreshrate );
 	if ( s_numFoveationItems > 0 ) {
 		Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.foveation );

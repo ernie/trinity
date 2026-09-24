@@ -10,6 +10,7 @@ const char vr_api_sentinel[] = VR_API_SENTINEL;
 vr_shared_t vr_state;
 vr_shared_t *vr = &vr_state;
 qboolean vrActive = qfalse;
+static void CG_VR_ResetState( void );
 static int probeFrame = 0;
 static int lastEchoSent = 0;
 static int echoFailures = 0;
@@ -49,6 +50,7 @@ static qboolean vrc_portraitInitialized;
 static qhandle_t vrc_reticleShader;
 static qhandle_t vrc_hudShader;
 static qhandle_t vrc_smallSphereModel;
+static float vrc_hudYawX, vrc_hudYawY, vrc_hudPitch;
 
 // Drop-owned vmCvars, registered in CG_VR_Init and refreshed in CG_VR_Frame;
 // no host cvar-table entries are required.
@@ -118,7 +120,11 @@ int dll_trap_HapticEvent;
 #endif
 
 void CG_VR_Init( void ) {
-	char ext[64];
+	char ext[64], buf[16];
+
+	vrActive = qfalse;
+	memset( &vr_state, 0, sizeof( vr_state ) );
+	CG_VR_ResetState();
 
 	// drop-owned cvars: registered before the dormancy early-outs so archived
 	// values persist and the probe toggle works on flatscreen engines too
@@ -131,9 +137,6 @@ void CG_VR_Init( void ) {
 	trap_Cvar_Register( &cg_weaponSelectorWeapons, "cg_weaponSelectorWeapons", "", 0 );
 	trap_Cvar_Register( &cg_firstPersonBodyScale, "cg_firstPersonBodyScale", "0", CVAR_ARCHIVE );
 	trap_Cvar_Register( &cg_smoothFollow, "cg_smoothFollow", "0", CVAR_ARCHIVE );
-
-	vrc_deathCamTime = -1;
-	vrc_followLastClientNum = -1;
 
 	// keep the sentinel referenced so the toolchain retains it in the data segment
 	if ( vr_api_sentinel[0] != 'T' )
@@ -149,39 +152,31 @@ void CG_VR_Init( void ) {
 	dll_com_trapGetValue = atoi( ext );
 #endif
 
-	// trap_VR_RegisterState is the VR handshake: a flatscreen engine may expose
-	// trap_GetValue for non-VR extensions but won't answer this, so its absence
-	// means "not a VR engine" - stay dormant.
-	if ( !VR_RESOLVE( trap_VR_RegisterState, ext ) )
+	if ( !VR_RESOLVE( trap_R_SceneComplete, ext ) ||
+	     !VR_RESOLVE( trap_R_HUDBufferStart, ext ) ||
+	     !VR_RESOLVE( trap_R_HUDBufferEnd, ext ) ||
+	     !VR_RESOLVE( trap_HapticEvent, ext ) ) {
 		return;
-
-	vr_state.structSize = sizeof( vr_state );
-	vr_state.apiVersion = VR_API_MAJOR;
-	trap_VR_RegisterState( &vr_state, sizeof( vr_state ), VR_API_MAJOR, VR_API_MINOR );
-	vrActive = qtrue;
-
-	// The rest of the VR trap set is part of the v1 contract, so a registered
-	// engine provides all of it - bind unconditionally.
-	VR_RESOLVE( trap_R_SceneComplete, ext );
-	VR_RESOLVE( trap_R_HUDBufferStart, ext );
-	VR_RESOLVE( trap_R_HUDBufferEnd, ext );
-	VR_RESOLVE( trap_HapticEvent, ext );
-
-	if ( vrActive ) {
-		char buf[16];
+	}
+	vrActive = VR_RegisterMirror( &vr_state );
+	if ( !vrActive )
+		return;
+	trap_Cvar_Set( "vr_thirdPersonSpectator", "0" );
+	vrc_hudYawX = cos( DEG2RAD( vr->hmdorientation[YAW] ) );
+	vrc_hudYawY = sin( DEG2RAD( vr->hmdorientation[YAW] ) );
+	vrc_hudPitch = vr->hmdorientation[PITCH];
 
 #ifdef MISSIONPACK
-		trap_Cvar_VariableStringBuffer( "ui_singlePlayerActive", buf, sizeof( buf ) );
-		vr->single_player = ( atof( buf ) != 0.0f );
+	trap_Cvar_VariableStringBuffer( "ui_singlePlayerActive", buf, sizeof( buf ) );
+	vr->single_player = ( atof( buf ) != 0.0f );
 #else
-		trap_Cvar_VariableStringBuffer( "g_gametype", buf, sizeof( buf ) );
-		vr->single_player = ( atof( buf ) == GT_SINGLE_PLAYER );
+	trap_Cvar_VariableStringBuffer( "g_gametype", buf, sizeof( buf ) );
+	vr->single_player = ( atof( buf ) == GT_SINGLE_PLAYER );
 #endif
 
-		// engine recomputes use_6dof per input frame; this write seeds the local mirror only
-		trap_Cvar_VariableStringBuffer( "vr_6dof", buf, sizeof( buf ) );
-		vr->use_6dof = vr->single_player && ( atof( buf ) != 0.0f );
-	}
+	// engine recomputes use_6dof per input frame; this write seeds the local mirror only
+	trap_Cvar_VariableStringBuffer( "vr_6dof", buf, sizeof( buf ) );
+	vr->use_6dof = vr->single_player && ( atof( buf ) != 0.0f );
 }
 
 void CG_VR_Frame( void ) {
@@ -344,6 +339,7 @@ void CG_VR_Shutdown( void ) {
 #endif
 		vr->scoreboardCursorActive = qfalse;
 	}
+	vrActive = qfalse;
 }
 
 // ---- Host accessors and reset call-outs (drop state, host call sites) -----
@@ -375,8 +371,9 @@ qhandle_t CG_VR_ReticleShader( void ) {
 CG_VR_ClientIsVR
 
 Whether the server flagged this client as a VR player - the vr\ field of
-the player configstring, written by G_VR_ClientIsVR. Host convenience for
-marking VR players on the scoreboard or HUD; reads the local gamestate.
+the player configstring, written by G_VR_ClientUserinfoChanged. Host
+convenience for marking VR players on the scoreboard or HUD; reads the local
+gamestate.
 ============
 */
 qboolean CG_VR_ClientIsVR( int clientNum ) {
@@ -471,8 +468,8 @@ qboolean CG_VR_IsThirdPersonFollow( VR_FollowMode followMode )
 {
 	qboolean isFollowing;
 
-	// CG_VR_Frame runs during the loading screen, before the first snapshot
-	if ( !cg.snap ) {
+	// Intermission keeps its own camera and world scale; cg.snap is NULL while loading.
+	if ( !cg.snap || cg.snap->ps.pm_type == PM_INTERMISSION ) {
 		return qfalse;
 	}
 	isFollowing = (cg.snap->ps.pm_flags & PMF_FOLLOW) || cg.demoPlayback || VR_HostTVPlayback();
@@ -2539,29 +2536,26 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			         !(cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)))
 			{
 				// Normal gameplay: account for the yaw of the player vs worldspace
-				static float hmd_yaw_x = 0.0f;
-				static float hmd_yaw_y = 1.0f;
-				static float prevPitch = 0.0f;
 
 				// Smooth only the HMD orientation
-				hmd_yaw_x = 0.95f * hmd_yaw_x + 0.05f * cos(DEG2RAD(vr->hmdorientation[YAW]));
-				hmd_yaw_y = 0.95f * hmd_yaw_y + 0.05f * sin(DEG2RAD(vr->hmdorientation[YAW]));
+				vrc_hudYawX = 0.95f * vrc_hudYawX + 0.05f * cos(DEG2RAD(vr->hmdorientation[YAW]));
+				vrc_hudYawY = 0.95f * vrc_hudYawY + 0.05f * sin(DEG2RAD(vr->hmdorientation[YAW]));
 
 				if (!vr->use_6dof)
 				{
 					// Fake 6DoF: use clientviewangles logic
 					float viewYaw = CG_VR_DeltaYaw() +
 					    (vr->clientviewangles[YAW] - vr->hmdorientation[YAW]);
-					angles[YAW] = viewYaw + RAD2DEG(atan2(hmd_yaw_y, hmd_yaw_x));
+					angles[YAW] = viewYaw + RAD2DEG(atan2(vrc_hudYawY, vrc_hudYawX));
 				}
 				else
 				{
 					// Single player: use refdefViewAngles - HMD offset + smoothed HMD
-					angles[YAW] = cg.refdefViewAngles[YAW] - vr->hmdorientation[YAW] + RAD2DEG(atan2(hmd_yaw_y, hmd_yaw_x));
+					angles[YAW] = cg.refdefViewAngles[YAW] - vr->hmdorientation[YAW] + RAD2DEG(atan2(vrc_hudYawY, vrc_hudYawX));
 				}
 
-				angles[PITCH] = 0.95f * prevPitch + 0.05f * vr->hmdorientation[PITCH];
-				prevPitch = angles[PITCH];
+				angles[PITCH] = 0.95f * vrc_hudPitch + 0.05f * vr->hmdorientation[PITCH];
+				vrc_hudPitch = angles[PITCH];
 				angles[ROLL] = 0;
 				AngleVectors(angles, forward, right, up);
 
@@ -2588,10 +2582,9 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			VectorCopy(endpos, ent.origin);
 
 			ent.radius = radius;
-			ent.invert = qtrue;
 			ent.customShader = vrc_hudShader;
 
-			trap_R_AddRefEntityToScene(&ent);
+			trap_R_AddRefEntityToScene( &ent );
 		}
 	}
 
@@ -3800,3 +3793,24 @@ float CG_VR_MenuPointerYaw( void ) {
 
 	return controllerYaw;
 }
+
+static void CG_VR_ResetState( void ) {
+	vrc_deathCamTime = -1;
+	vrc_followLastClientNum = -1;
+	vrc_smoothFollow_initialized = qfalse;
+	vrc_portraitInitialized = qfalse;
+	vrc_weaponSelectorSelection = 0;
+	vrc_weaponSelectorTime = 0;
+	vrc_drawingHUD = vrc_drawingZoomedHUD = qfalse;
+	vr_hmdYaw = 0;
+	CG_VR_FollowHeadViewReset();
+	weaponAdjustParam = weaponAdjustWeaponId = 0;
+	weaponAdjustParamCycled = qfalse;
+	weaponAdjustResetHoldStart = 0;
+}
+#ifndef Q3_VM
+// Capability marker for trusted native-module preflight.
+DLLEXPORT int TrinityVRAPI( void ) {
+	return ( VR_API_MAJOR << 16 ) | VR_API_MINOR;
+}
+#endif
