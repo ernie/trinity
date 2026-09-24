@@ -398,8 +398,8 @@ handlers in your `cg_consolecmds.c` command table:
 ```c
 	{ "weapon_select", CG_WeaponSelectorSelect_f },
 	{ "weapon_adjust", CG_WeaponAdjust_f },
-	{ "weapon_adjust_reset", CG_WeaponAdjustReset_f },
-	{ "weapon_adjust_reset_all", CG_WeaponAdjustResetAll_f },
+	{ "+adjust_reset", CG_WeaponAdjustResetDown_f },
+	{ "-adjust_reset", CG_WeaponAdjustResetUp_f },
 ```
 
 **The one whole-frame fork.** `CG_VR_DrawFrame` is the only place the drop
@@ -666,8 +666,8 @@ Two placement details:
    weapon-adjust step, `CG_WeaponAdjustFrame()`, stays in
    `CG_DrawActiveFrame` after `CG_ProcessSnapshots`, right before
    `CG_AddViewWeapon`, so it reads a fresh snapshot; folding it into
-   `CG_VR_Frame` would feed it a stale one. The draw half,
-   `CG_WeaponAdjustDraw()`, sits at the tail of `CG_DrawScreen2D`.
+   `CG_VR_Frame` would feed it a stale one. The overlay draws from the
+   drop's HUD pass, so there is no draw half to place.
 2. **Most event hooks keep their call-site identity gate.** A `void` hook
    like `CG_VR_OnFall(severity)` cannot re-derive which client the event
    belongs to, so it keeps the local-player gate already at the call site.

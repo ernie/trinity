@@ -185,9 +185,8 @@ float    CG_VR_MenuPointerYaw( void );
 void CG_WeaponAdjust_f( void );
 void CG_WeaponAdjust_Enter( void );
 void CG_WeaponAdjust_Exit( void );
-void CG_WeaponAdjustReset_f( void );
-void CG_WeaponAdjustResetAll_f( void );
+void CG_WeaponAdjustResetDown_f( void );
+void CG_WeaponAdjustResetUp_f( void );
 void CG_WeaponAdjustFrame( void );
-void CG_WeaponAdjustDraw( void );
 
 #endif
