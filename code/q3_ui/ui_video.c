@@ -293,19 +293,19 @@ static graphicsoptions_t		s_graphicsoptions;
 static InitialVideoOptions_s s_ivo_templates[] =
 {
 	{
-		4, qtrue, 2, 0, 2, 2, 3, 3, 1	// JDC: this was tq 3
+		4, qtrue, 2, 0, 2, 2, 1, 1, 1	// JDC: this was tq 3
 	},
 	{
-		3, qtrue, 2, 0, 0, 0, 3, 3, 0
+		3, qtrue, 2, 0, 0, 0, 1, 1, 0
 	},
 	{
-		2, qtrue, 1, 0, 1, 0, 3, 4, 0
+		2, qtrue, 1, 0, 1, 0, 1, 0, 0
 	},
 	{
-		2, qtrue, 1, 1, 1, 0, 3, 4, 0
+		2, qtrue, 1, 1, 1, 0, 1, 0, 0
 	},
 	{
-		3, qtrue, 1, 0, 0, 0, 3, 3, 0
+		3, qtrue, 1, 0, 0, 0, 1, 1, 0
 	}
 };
 
@@ -463,13 +463,13 @@ GraphicsOptions_ApplyChanges
 */
 static void GraphicsOptions_ApplyChanges( void *unused, int notification )
 {
-	static const int subdivisions[] = { 1, 2, 4, 12, 20 };
+	static const int subdivisions[] = { 20, 12, 4, 2, 1 };
 
 	if (notification != QM_ACTIVATED)
 		return;
 
 	// each detail control writes only its own cvar
-	trap_Cvar_SetValue( "r_lodBias", s_graphicsoptions.modeldetail.curvalue - 2 );
+	trap_Cvar_SetValue( "r_lodBias", 2 - s_graphicsoptions.modeldetail.curvalue );
 	trap_Cvar_SetValue( "r_subdivisions", subdivisions[ s_graphicsoptions.curvedetail.curvalue ] );
 
 	trap_Cvar_SetValue( "r_picmip", 3 - s_graphicsoptions.tq.curvalue );
@@ -681,16 +681,16 @@ static void GraphicsOptions_SetMenuItems( void )
 	{
 		lodbias = 2;
 	}
-	s_graphicsoptions.modeldetail.curvalue = lodbias + 2;
+	s_graphicsoptions.modeldetail.curvalue = 2 - lodbias;
 
 	subdivisions = trap_Cvar_VariableValue( "r_subdivisions" );
 	if ( subdivisions <= 1 )
 	{
-		s_graphicsoptions.curvedetail.curvalue = 0;
+		s_graphicsoptions.curvedetail.curvalue = 4;
 	}
 	else if ( subdivisions <= 2 )
 	{
-		s_graphicsoptions.curvedetail.curvalue = 1;
+		s_graphicsoptions.curvedetail.curvalue = 3;
 	}
 	else if ( subdivisions <= 4 )
 	{
@@ -698,11 +698,11 @@ static void GraphicsOptions_SetMenuItems( void )
 	}
 	else if ( subdivisions <= 12 )
 	{
-		s_graphicsoptions.curvedetail.curvalue = 3;
+		s_graphicsoptions.curvedetail.curvalue = 1;
 	}
 	else
 	{
-		s_graphicsoptions.curvedetail.curvalue = 4;
+		s_graphicsoptions.curvedetail.curvalue = 0;
 	}
 
 	s_graphicsoptions.tq.curvalue = 3-trap_Cvar_VariableValue( "r_picmip");
@@ -871,11 +871,11 @@ void GraphicsOptions_MenuInit( void )
 	};
 	static const char *detail_names[] =
 	{
-		"Very High",
-		"High",
-		"Medium",
-		"Low",
 		"Very Low",
+		"Low",
+		"Medium",
+		"High",
+		"Very High",
 		NULL
 	};
 	static const char *enabled_names[] =

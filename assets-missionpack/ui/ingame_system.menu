@@ -251,7 +251,7 @@ itemDef {
       		type ITEM_TYPE_MULTI
 		text "Model Detail:"
 		cvar "r_lodbias"
-		cvarFloatList { "Very High" -2 "High" -1 "Medium" 0 "Low" 1 "Very Low" 2 }
+		cvarFloatList { "Very Low" 2 "Low" 1 "Medium" 0 "High" -1 "Very High" -2 }
 		rect 0 152 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
@@ -268,7 +268,7 @@ itemDef {
       		type ITEM_TYPE_MULTI
 		text "Curve Detail:"
 		cvar "r_subdivisions"
-		cvarFloatList { "Very High" 1 "High" 2 "Medium" 4 "Low" 12 "Very Low" 20 }
+		cvarFloatList { "Very Low" 20 "Low" 12 "Medium" 4 "High" 2 "Very High" 1 }
 		rect 0 171 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
