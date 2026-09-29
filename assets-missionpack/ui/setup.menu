@@ -46,6 +46,34 @@ itemDef {
 
 
 
+// VR takes the Controls slot: its bindings page replaces the flatscreen one.
+
+itemDef {
+      	name vroptions
+      	text "VR Options"
+      	style 0
+	type 1
+	textstyle 6
+      	textscale .5
+      	rect 0 70 200 40
+      	textalign 3		// center
+      	textalignx 20  		// x alignment point for text
+	textaligny 32
+	forecolor 1 1 1 1
+	visible 1
+	cvarTest "ui_vrActive"
+	showCvar { "1" }
+	action { play "sound/misc/kcaction.wav" ;
+	close control_menu ;
+	close system_menu ;
+	close options_menu ; 
+	close cdkey_menu ;
+	close default_menu ;   
+	close resetscore_menu ; 
+	open vroptions_menu }
+	}
+
+
 itemDef {
 	name controls
 	text "Controls"
@@ -53,13 +81,15 @@ itemDef {
 	style 0	
 	type 1
 	textstyle 6
-	rect 0 45 200 40
+	rect 0 70 200 40
 	textalign 3	 
 	textalignx 20  	
        	textaligny 32        
 	backcolor 0 0 0 0
 	forecolor 1 1 1 1
 	visible 1 
+	cvarTest "ui_vrActive"
+	hideCvar { "1" }
 	action { play "sound/misc/kcaction.wav" ; 
 	close control_menu ; 
 	close system_menu ;
@@ -86,7 +116,7 @@ itemDef {
 	type 1
 	textstyle 6
       	textscale .5	
-      	rect 0 95 200 40
+      	rect 0 120 200 40
       	textalign 3		// center
       	textalignx 20  		// x alignment point for text
           			// use it to offset left/right text from the edge 
@@ -118,7 +148,7 @@ itemDef {
 	type 1
 	textstyle 6
       	textscale .5	
-      	rect 0 145 200 40
+      	rect 0 170 200 40
       	textalign 3		// center
       	textalignx 20  		// x alignment point for text
           			// use it to offset left/right text from the edge 
@@ -151,7 +181,7 @@ itemDef {
 	type 1
       	textscale .5
 	textstyle 6
-      	rect 0 195 200 40
+      	rect 0 220 200 40
       	textalign 3		// center
       	textalignx 20  		// x alignment point for text
           			// use it to offset left/right text from the edge 
@@ -182,7 +212,7 @@ itemDef {
 	type 1
 	textstyle 6
       	textscale .5
-      	rect 0 245 200 40
+      	rect 0 270 200 40
       	textalign 3		// center
       	textalignx 20  		// x alignment point for text
           			// use it to offset left/right text from the edge 
@@ -212,7 +242,7 @@ itemDef {
 	type 1
 	textstyle 6
       	textscale .5
-      	rect 0 295 200 40
+      	rect 0 320 200 40
       	textalign 3		// center
       	textalignx 20  		// x alignment point for text
           			// use it to offset left/right text from the edge 
@@ -232,33 +262,6 @@ itemDef {
 	open resetscore_menu }
 	}
 
-// VR Options	//
-// Only expose these pages while the UI has an active VR API.
-
-itemDef {
-      	name vroptions
-      	text "VR Options"
-      	style 0
-	type 1
-	textstyle 6
-      	textscale .5
-      	rect 0 345 200 40
-      	textalign 3		// center
-      	textalignx 20  		// x alignment point for text
-	textaligny 32
-	forecolor 1 1 1 1
-	visible 1
-	cvarTest "ui_vrActive"
-	showCvar { "1" }
-	action { play "sound/misc/kcaction.wav" ;
-	close control_menu ;
-	close system_menu ;
-	close options_menu ; 
-	close cdkey_menu ;
-	close default_menu ;   
-	close resetscore_menu ; 
-	open vroptions_menu }
-	}
 
 
 

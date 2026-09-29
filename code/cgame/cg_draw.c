@@ -3197,7 +3197,7 @@ static qboolean CG_DrawScoreboard( void ) {
 		menuScoreboard->window.flags &= ~WINDOW_FORCED;
 	}
 
-	if ( scoreboardCursorActive ) {
+	if ( scoreboardCursorActive && !CG_VR_HideCursor() ) {
 		CG_DrawPic( cgs.cursorX - 12, cgs.cursorY - 12, 24, 24, cgDC.Assets.cursor );
 	}
 
@@ -4174,7 +4174,7 @@ void CG_Draw2D( stereoFrame_t stereoFrame )
 	CG_DrawTVOverlay();
 
 #ifndef MISSIONPACK
-	if ( cgs.score_catched ) {
+	if ( cgs.score_catched && !CG_VR_HideCursor() ) {
 		float x, y, w, h;
 		trap_R_SetColor( NULL );
 		x = cgs.cursorX - 12;

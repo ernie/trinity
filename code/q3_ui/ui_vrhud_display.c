@@ -30,6 +30,7 @@ VR HUD & DISPLAY OPTIONS MENU
 
 
 #include "ui_local.h"
+#include "../game/vr_supersample.h"
 
 
 #define ART_FRAMEL				"menu/art/frame2_l"
@@ -59,6 +60,7 @@ VR HUD & DISPLAY OPTIONS MENU
 #define ID_APPLY				139
 #define ID_FOVEATION			140
 #define ID_FOVEATIONSTRENGTH	141
+#define ID_SCREENCONTROLLERS	142
 
 #define ID_BACK					150
 
@@ -77,11 +79,14 @@ typedef struct {
 	menuslider_s		hudscale;
 	menuslider_s		hudyoffset;
 	menulist_s			virtualscreenmode;
+	menuradiobutton_s	screencontrollers;
 	menuradiobutton_s	selectorwithhud;
 	menuradiobutton_s	showinhand;
 	menuradiobutton_s	showconsole;
 	menuradiobutton_s	lasersight;
-	menulist_s			supersampling;
+	menuslider_s		supersampling;
+	menutext_s			supersamplingmult;
+	menutext_s			supersamplingres;
 	menuslider_s		screencurvature;
 	menulist_s			refreshrate;
 	menulist_s			foveation;
@@ -106,17 +111,28 @@ static int			s_numFoveationItems;
 static const char	*s_foveationStrengthItems[] = { "Low", "Medium", "High", NULL };
 
 static float		s_vrhud_display_activeSupersampling;
+static char			s_vrhud_display_supersamplingMult[8];
+static char			s_vrhud_display_supersamplingRes[24];
+static int			s_vrhud_display_eyeSize[4];   // recommended w h, maximum w h; zeros outside VR
 
 
-static float VRHudDisplay_SupersamplingFromIndex( int index ) {
-	static const float steps[] = { 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.75f, 2.0f };
+// The slider holds tenths, so the knob only lands on 1.0, 1.1 .. 2.0.
+static int VRHudDisplay_SupersamplingTenths( void ) {
+	return VRSS_Tenths( ( (int)( s_vrhud_display.supersampling.curvalue + 0.5f ) ) / 10.0f );
+}
 
-	return ( index >= 0 && index < ARRAY_LEN( steps ) ) ? steps[index] : 1.0f;
+
+static void VRHudDisplay_UpdateSupersamplingLabel( void ) {
+	const int *e = s_vrhud_display_eyeSize;
+	VRSS_Multiplier( VRHudDisplay_SupersamplingTenths(), s_vrhud_display_supersamplingMult,
+					 sizeof( s_vrhud_display_supersamplingMult ) );
+	VRSS_Resolution( VRHudDisplay_SupersamplingTenths(), e[0], e[1], e[2], e[3], s_vrhud_display_supersamplingRes,
+					 sizeof( s_vrhud_display_supersamplingRes ) );
 }
 
 
 static void VRHudDisplay_UpdateApply( void ) {
-	float picked = VRHudDisplay_SupersamplingFromIndex( s_vrhud_display.supersampling.curvalue );
+	float picked = VRSS_Value( VRHudDisplay_SupersamplingTenths() );
 
 	if ( fabs( picked - s_vrhud_display_activeSupersampling ) > 0.001f ) {
 		s_vrhud_display.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
@@ -179,7 +195,7 @@ static void VRHudDisplay_ReadRefreshRates( void ) {
 
 
 static void VRHudDisplay_SetMenuItems( void ) {
-	float superSampling;
+	char eyeSize[64];
 	int i;
 
 	s_vrhud_display.hudmode.curvalue			= trap_Cvar_VariableValue( "vr_hudDrawStatus" );
@@ -187,19 +203,19 @@ static void VRHudDisplay_SetMenuItems( void ) {
 	s_vrhud_display.hudscale.curvalue			= trap_Cvar_VariableValue( "vr_hudScale" );
 	s_vrhud_display.hudyoffset.curvalue			= trap_Cvar_VariableValue( "vr_hudYOffset" ) + 200;
 	s_vrhud_display.virtualscreenmode.curvalue	= trap_Cvar_VariableValue( "vr_virtualScreenMode" );
+	s_vrhud_display.screencontrollers.curvalue	= trap_Cvar_VariableValue( "vr_controllerModels" ) != 0;
 	s_vrhud_display.selectorwithhud.curvalue	= trap_Cvar_VariableValue( "vr_weaponSelectorWithHud" ) != 0;
 	s_vrhud_display.showinhand.curvalue			= trap_Cvar_VariableValue( "vr_showItemInHand" ) != 0;
 	s_vrhud_display.showconsole.curvalue		= trap_Cvar_VariableValue( "vr_showConsoleMessages" ) != 0;
 	s_vrhud_display.lasersight.curvalue			= trap_Cvar_VariableValue( "vr_lasersight" ) != 0;
 
-	superSampling = trap_Cvar_VariableValue( "vr_superSampling" );
-	s_vrhud_display.supersampling.curvalue = 5;   // 1.0, if the cvar names nothing on the list
-	for ( i = 0; i < s_vrhud_display.supersampling.numitems; i++ ) {
-		if ( fabs( VRHudDisplay_SupersamplingFromIndex( i ) - superSampling ) < 0.001f ) {
-			s_vrhud_display.supersampling.curvalue = i;
-			break;
-		}
+	s_vrhud_display.supersampling.curvalue = VRSS_Tenths( trap_Cvar_VariableValue( "vr_superSampling" ) );
+	if ( !trap_GetValue( eyeSize, sizeof( eyeSize ), "vr_eyesize" ) ||
+		 !VRSS_ParseEyeSize( eyeSize, &s_vrhud_display_eyeSize[0], &s_vrhud_display_eyeSize[1],
+							 &s_vrhud_display_eyeSize[2], &s_vrhud_display_eyeSize[3] ) ) {
+		memset( s_vrhud_display_eyeSize, 0, sizeof( s_vrhud_display_eyeSize ) );
 	}
+	VRHudDisplay_UpdateSupersamplingLabel();
 
 	s_vrhud_display.screencurvature.curvalue	= trap_Cvar_VariableValue( "vr_screenCurvature" );
 
@@ -266,6 +282,10 @@ static void VRHudDisplay_MenuEvent( void* ptr, int notification ) {
 			trap_Cvar_SetValue( "vr_virtualScreenMode", s_vrhud_display.virtualscreenmode.curvalue );
 			break;
 
+		case ID_SCREENCONTROLLERS:
+			trap_Cvar_SetValue( "vr_controllerModels", s_vrhud_display.screencontrollers.curvalue );
+			break;
+
 		case ID_SELECTORWITHHUD:
 			trap_Cvar_SetValue( "vr_weaponSelectorWithHud", s_vrhud_display.selectorwithhud.curvalue );
 			break;
@@ -283,7 +303,10 @@ static void VRHudDisplay_MenuEvent( void* ptr, int notification ) {
 			break;
 
 		case ID_SUPERSAMPLING:
-			trap_Cvar_SetValue( "vr_superSampling", VRHudDisplay_SupersamplingFromIndex( s_vrhud_display.supersampling.curvalue ) );
+			// a mouse drag lands between steps; snap the knob before anything reads it
+			s_vrhud_display.supersampling.curvalue = VRHudDisplay_SupersamplingTenths();
+			trap_Cvar_SetValue( "vr_superSampling", VRSS_Value( VRHudDisplay_SupersamplingTenths() ) );
+			VRHudDisplay_UpdateSupersamplingLabel();
 			VRHudDisplay_UpdateApply();
 			break;
 
@@ -333,13 +356,6 @@ static void VRHudDisplay_MenuInit( void ) {
 		NULL,
 	};
 
-	static const char *s_supersampling_names[] =
-	{
-		"0.5", "0.6", "0.7", "0.8", "0.9", "1.0", "1.1",
-		"1.2", "1.3", "1.4", "1.5", "1.75", "2.0",
-		NULL,
-	};
-
 	memset( &s_vrhud_display, 0, sizeof(vrhud_display_t) );
 
 	UI_VRHudDisplay_Cache();
@@ -373,9 +389,9 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.framer.width			= 256;
 	s_vrhud_display.framer.height			= 334;
 
-	// Center the small-font row block in the frame interior. 10 base rows,
+	// Center the small-font row block in the frame interior. 11 base rows,
 	// +1 for screen curvature, +1 for refresh rate, +2 with foveation.
-	y = VR_FRAME_CENTER_Y - ( ( (10 + 1 + 1 + (s_numFoveationItems ? 2 : 0)) - 1 ) * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
+	y = VR_FRAME_CENTER_Y - ( ( (11 + 1 + 1 + (s_numFoveationItems ? 2 : 0)) - 1 ) * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
 	s_vrhud_display.hudmode.generic.type		= MTYPE_SPINCONTROL;
 	s_vrhud_display.hudmode.generic.name		= "HUD Mode:";
 	s_vrhud_display.hudmode.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -430,6 +446,15 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.virtualscreenmode.numitems			= 2;
 
 	y += BIGCHAR_HEIGHT+2;
+	s_vrhud_display.screencontrollers.generic.type		= MTYPE_RADIOBUTTON;
+	s_vrhud_display.screencontrollers.generic.name		= "Virtual screen controllers:";
+	s_vrhud_display.screencontrollers.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_vrhud_display.screencontrollers.generic.callback	= VRHudDisplay_MenuEvent;
+	s_vrhud_display.screencontrollers.generic.id		= ID_SCREENCONTROLLERS;
+	s_vrhud_display.screencontrollers.generic.x			= VR_X_POS;
+	s_vrhud_display.screencontrollers.generic.y			= y;
+
+	y += BIGCHAR_HEIGHT+2;
 	s_vrhud_display.selectorwithhud.generic.type		= MTYPE_RADIOBUTTON;
 	s_vrhud_display.selectorwithhud.generic.name		= "Draw HUD On Weapon Wheel:";
 	s_vrhud_display.selectorwithhud.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -466,15 +491,27 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.lasersight.generic.y			= y;
 
 	y += BIGCHAR_HEIGHT+2;
-	s_vrhud_display.supersampling.generic.type		= MTYPE_SPINCONTROL;
+	s_vrhud_display.supersampling.generic.type		= MTYPE_SLIDER;
 	s_vrhud_display.supersampling.generic.name		= "Supersampling:";
 	s_vrhud_display.supersampling.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 	s_vrhud_display.supersampling.generic.x			= VR_X_POS;
 	s_vrhud_display.supersampling.generic.y			= y;
 	s_vrhud_display.supersampling.generic.callback	= VRHudDisplay_MenuEvent;
 	s_vrhud_display.supersampling.generic.id		= ID_SUPERSAMPLING;
-	s_vrhud_display.supersampling.itemnames		= s_supersampling_names;
-	s_vrhud_display.supersampling.numitems		= 13;
+	s_vrhud_display.supersampling.minvalue			= VRSS_MIN_TENTHS;
+	s_vrhud_display.supersampling.maxvalue			= VRSS_MAX_TENTHS;
+
+	// the multiplier over the eye size it renders at, centered in a bar's width right of the bar, the pair centered on it
+	s_vrhud_display.supersamplingmult.generic.type		= MTYPE_TEXT;
+	s_vrhud_display.supersamplingmult.generic.flags	= QMF_INACTIVE|QMF_SMALLFONT;
+	s_vrhud_display.supersamplingmult.generic.x		= VR_X_POS + 2 * SMALLCHAR_WIDTH + 96 + 96 / 2;
+	s_vrhud_display.supersamplingmult.generic.y		= y - SMALLCHAR_HEIGHT / 2;
+	s_vrhud_display.supersamplingmult.string			= s_vrhud_display_supersamplingMult;
+	s_vrhud_display.supersamplingmult.style			= UI_CENTER|UI_SMALLFONT;
+	s_vrhud_display.supersamplingmult.color			= text_color_normal;
+	s_vrhud_display.supersamplingres					= s_vrhud_display.supersamplingmult;
+	s_vrhud_display.supersamplingres.generic.y			= y + SMALLCHAR_HEIGHT / 2;
+	s_vrhud_display.supersamplingres.string			= s_vrhud_display_supersamplingRes;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrhud_display.screencurvature.generic.type		= MTYPE_SLIDER;
@@ -554,11 +591,14 @@ static void VRHudDisplay_MenuInit( void ) {
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.hudscale );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.hudyoffset );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.virtualscreenmode );
+	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.screencontrollers );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.selectorwithhud );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.showinhand );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.showconsole );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.lasersight );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.supersampling );
+	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.supersamplingmult );
+	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.supersamplingres );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.screencurvature );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.refreshrate );
 	if ( s_numFoveationItems > 0 ) {

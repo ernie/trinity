@@ -114,7 +114,7 @@ qboolean UI_VKeyboardHandleKey( int key ) {
 }
 
 qboolean UI_VR_StickNavActive( void ) {
-	return vrActive && vr->menuStickNavActive;
+	return vrActive && vr->pointerMode == VR_POINTER_STICK;
 }
 
 /*
@@ -134,7 +134,7 @@ qboolean UI_VR_KeyEvent( int key ) {
 }
 
 qboolean UI_VR_CursorOverride( float *x, float *y ) {
-	if ( vrActive && vr->menuCursorActive && !vr->menuStickNavActive ) {
+	if ( vrActive && vr->menuCursorActive && vr->pointerMode != VR_POINTER_STICK ) {
 		*x = vr->menuCursorX;
 		*y = vr->menuCursorY;
 		return qtrue;
@@ -143,7 +143,7 @@ qboolean UI_VR_CursorOverride( float *x, float *y ) {
 }
 
 qboolean UI_VR_HideCursor( void ) {
-	return UI_VKeyboardIsActive() || ( vrActive && vr->menuStickNavActive );
+	return UI_VKeyboardIsActive() || ( vrActive && vr->pointerMode != VR_POINTER_CURSOR );
 }
 
 void UI_VR_OnMenuMove( void ) {

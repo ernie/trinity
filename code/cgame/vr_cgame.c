@@ -2423,7 +2423,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 		trap_Cvar_VariableStringBuffer( "vr_currentHudDrawStatus", cvarBuf, sizeof( cvarBuf ) );
 		// A missing sprites/vr/hud shader drops the panel entirely, never a
 		// default-shader quad (Appendix C's degrade contract)
-		drawHUDSprite = vrc_hudShader && ((atof( cvarBuf ) != 2.0f &&
+		drawHUDSprite = vrc_hudShader && ((atof( cvarBuf ) == 1.0f &&
 		                  !vr->weapon_zoomed && !vr->virtual_screen) || isSPIntermission);
 
 		if (drawHUDSprite)
@@ -2473,24 +2473,19 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			{
 				// Normal gameplay: account for the yaw of the player vs worldspace
 
+				// the smoothing settles at the same rate whatever the frame rate: 5% per frame at 90 Hz
+				float k = cg.frametime / ( cg.frametime + 211.0f );
+
 				// Smooth only the HMD orientation
-				vrc_hudYawX = 0.95f * vrc_hudYawX + 0.05f * cos(DEG2RAD(vr->hmdorientation[YAW]));
-				vrc_hudYawY = 0.95f * vrc_hudYawY + 0.05f * sin(DEG2RAD(vr->hmdorientation[YAW]));
+				vrc_hudYawX = ( 1.0f - k ) * vrc_hudYawX + k * cos(DEG2RAD(vr->hmdorientation[YAW]));
+				vrc_hudYawY = ( 1.0f - k ) * vrc_hudYawY + k * sin(DEG2RAD(vr->hmdorientation[YAW]));
 
-				if (!vr->use_6dof)
-				{
-					// Fake 6DoF: use clientviewangles logic
-					float viewYaw = CG_VR_DeltaYaw() +
-					    (vr->clientviewangles[YAW] - vr->hmdorientation[YAW]);
-					angles[YAW] = viewYaw + RAD2DEG(atan2(vrc_hudYawY, vrc_hudYawX));
-				}
-				else
-				{
-					// Single player: use refdefViewAngles - HMD offset + smoothed HMD
-					angles[YAW] = cg.refdefViewAngles[YAW] - vr->hmdorientation[YAW] + RAD2DEG(atan2(vrc_hudYawY, vrc_hudYawX));
-				}
+				// body yaw from the client's own view angles and the head pose the same input frame sampled,
+				// not the predicted player state, whose command lags the pose by a variable frame
+				angles[YAW] = CG_VR_DeltaYaw() + (vr->clientviewangles[YAW] - vr->hmdorientation[YAW]) +
+				              RAD2DEG(atan2(vrc_hudYawY, vrc_hudYawX));
 
-				angles[PITCH] = 0.95f * vrc_hudPitch + 0.05f * vr->hmdorientation[PITCH];
+				angles[PITCH] = ( 1.0f - k ) * vrc_hudPitch + k * vr->hmdorientation[PITCH];
 				vrc_hudPitch = angles[PITCH];
 				angles[ROLL] = 0;
 				AngleVectors(angles, forward, right, up);
@@ -3720,6 +3715,11 @@ qboolean CG_VR_ScoreboardCursor( float *x, float *y ) {
 	*x = vr->scoreboardCursorX;
 	*y = vr->scoreboardCursorY;
 	return qtrue;
+}
+
+// The engine draws the pointer itself (its ray and pool of light), so the cursor picture stays away.
+qboolean CG_VR_HideCursor( void ) {
+	return vrActive && vr->pointerMode != VR_POINTER_CURSOR;
 }
 
 void CG_VR_SetVoteActive( qboolean active ) {

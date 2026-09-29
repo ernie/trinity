@@ -38,7 +38,7 @@ ifeq ($(CONFIG),missionpack)
 UI_SRC = \
  ui_main $(UIDIR)/ui_syscalls.asm \
  ui_atoms ui_gameinfo ui_players ui_shared ui_util vr_ui vr_uishared \
- bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform \
+ bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_supersample \
  q_math q_shared \
 
 else
@@ -53,7 +53,7 @@ UI_SRC = \
  ui_sparena ui_specifyserver ui_splevel ui_sppostgame ui_spskill \
  ui_startserver ui_team ui_teamorders ui_video ui_vrcomfort ui_vrcontrols \
  ui_vrhud_display ui_vrmirror ui_vroptions vr_ui \
- bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform \
+ bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_supersample \
  q_math q_shared \
 
 endif

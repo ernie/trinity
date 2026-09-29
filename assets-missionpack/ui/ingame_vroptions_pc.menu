@@ -681,9 +681,23 @@ itemDef {
 	name hud
 	group grpVR
 	type ITEM_TYPE_YESNO
+	text "Virtual screen controllers:"
+	cvar "vr_controllerModels"
+	rect 28 140 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	type ITEM_TYPE_YESNO
 	text "Draw HUD On Weapon Wheel:"
 	cvar "vr_weaponSelectorWithHud"
-	rect 28 140 340 18
+	rect 28 158 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -697,7 +711,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Show Item In Hand:"
 	cvar "vr_showItemInHand"
-	rect 28 158 340 18
+	rect 28 176 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -711,7 +725,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Show Console Messages:"
 	cvar "vr_showConsoleMessages"
-	rect 28 176 340 18
+	rect 28 194 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -725,7 +739,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Laser Sight:"
 	cvar "vr_lasersight"
-	rect 28 194 340 18
+	rect 28 212 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -736,11 +750,11 @@ itemDef {
 itemDef {
 	name hud
 	group grpVR
-	type ITEM_TYPE_MULTI
+	type ITEM_TYPE_OWNERDRAW
 	text "Supersampling:"
-	cvar "vr_superSampling"
-	cvarFloatList { "0.5" 0.5 "0.6" 0.6 "0.7" 0.7 "0.8" 0.8 "0.9" 0.9 "1.0" 1.0 "1.1" 1.1 "1.2" 1.2 "1.3" 1.3 "1.4" 1.4 "1.5" 1.5 "1.75" 1.75 "2.0" 2.0 }
-	rect 28 212 340 18
+	ownerdraw UI_VRSUPERSAMPLING
+	special 169
+	rect 28 230 356 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -754,7 +768,7 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Screen Curvature:"
 	cvarfloat "vr_screenCurvature" 0 0 1
-	rect 28 230 340 18
+	rect 28 248 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -768,7 +782,7 @@ itemDef {
 	type ITEM_TYPE_OWNERDRAW
 	text "Refresh Rate:"
 	ownerdraw UI_REFRESHRATE
-	rect 28 248 340 18
+	rect 28 266 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -782,7 +796,7 @@ itemDef {
 	type ITEM_TYPE_OWNERDRAW
 	text "Foveated Rendering:"
 	ownerdraw UI_FOVEATION
-	rect 28 266 340 18
+	rect 28 284 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -796,7 +810,7 @@ itemDef {
 	type ITEM_TYPE_OWNERDRAW
 	text "Foveation Strength:"
 	ownerdraw UI_FOVEATION_STRENGTH
-	rect 28 284 340 18
+	rect 28 302 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -812,7 +826,7 @@ itemDef {
 	textscale .25
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 159 308 100 20
+	rect 159 326 100 20
 	textalign 1
 	textalignx 50
 	textaligny 15

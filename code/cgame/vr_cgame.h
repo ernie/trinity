@@ -177,6 +177,7 @@ void     CG_VR_LockMenuYaw( float yaw );
 void     CG_VR_UnlockMenuYaw( float yaw );
 void     CG_VR_SetScoreboardCursor( qboolean active );
 qboolean CG_VR_ScoreboardCursor( float *x, float *y );
+qboolean CG_VR_HideCursor( void );
 void     CG_VR_SetVoteActive( qboolean active );
 int      CG_VR_VoteHolding( void );
 float    CG_VR_MenuPointerYaw( void );

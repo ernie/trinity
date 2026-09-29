@@ -15,6 +15,7 @@ USER INTERFACE MAIN
 #include "../game/ui_swatches.h"
 #include "../game/bg_mode.h"
 #include "../game/bg_hostlabels.h"
+#include "../game/vr_supersample.h"
 
 extern displayContextDef_t *DC;
 
@@ -2819,6 +2820,93 @@ static void UI_DrawWeaponPitch(rectDef_t *rect, float scale, vec4_t color, int t
 	Text_Paint(rect->x, rect->y, scale, color, UI_WeaponPitchText(), 0, 0, textStyle);
 }
 
+// vr_superSampling as a 1.0..2.0 slider in tenths, with the eye size each step renders at beside it.
+static rectDef_t uiSuperSamplingBar;   // the bar's window from its last paint, so a click can land on it
+static int uiEyeSize[4];               // recommended w h, maximum w h; zeros outside VR
+static int uiEyeSizeTime = -1;
+static qboolean uiSuperSamplingDrag;   // a press on the bar follows the pointer until the button lets go
+
+static void UI_ReadEyeSize(void) {
+	char eyeSize[64];
+	if (uiEyeSizeTime >= 0 && uiInfo.uiDC.realTime - uiEyeSizeTime < 1000) {
+		return;
+	}
+	uiEyeSizeTime = uiInfo.uiDC.realTime;
+	if (!trap_GetValue(eyeSize, sizeof(eyeSize), "vr_eyesize") ||
+		!VRSS_ParseEyeSize(eyeSize, &uiEyeSize[0], &uiEyeSize[1], &uiEyeSize[2], &uiEyeSize[3])) {
+		memset(uiEyeSize, 0, sizeof(uiEyeSize));
+	}
+}
+
+// the step under the pointer, with the pointer held to the bar
+static int UI_SuperSampling_TenthsAt(float cursorx) {
+	float t = (cursorx - uiSuperSamplingBar.x) / uiSuperSamplingBar.w;
+	if (t < 0) {
+		t = 0;
+	} else if (t > 1) {
+		t = 1;
+	}
+	return VRSS_MIN_TENTHS + (int)(t * (VRSS_MAX_TENTHS - VRSS_MIN_TENTHS) + 0.5f);
+}
+
+static void UI_DrawSuperSampling(rectDef_t *rect, float span, float scale, vec4_t color, int textStyle) {
+	int tenths = VRSS_Tenths(trap_Cvar_VariableValue("vr_superSampling"));
+	// rect->y is the row's text baseline; the bar sits on it like the stock slider sits in its row
+	const float top = rect->y - SLIDER_HEIGHT, gap = 4, bar = SLIDER_WIDTH;
+	const int textHeight = Text_Height("0", scale, 0);
+	float cx, y;
+	char mult[8], res[24];
+
+	if (uiSuperSamplingDrag) {
+		if (!trap_Key_IsDown(K_MOUSE1)) {
+			uiSuperSamplingDrag = qfalse;
+		} else if (uiSuperSamplingBar.w > 0 && UI_SuperSampling_TenthsAt(uiInfo.uiDC.cursorx) != tenths) {
+			tenths = UI_SuperSampling_TenthsAt(uiInfo.uiDC.cursorx);
+			trap_Cvar_SetValue("vr_superSampling", VRSS_Value(tenths));
+		}
+	}
+	UI_ReadEyeSize();
+	VRSS_Multiplier(tenths, mult, sizeof(mult));
+	VRSS_Resolution(tenths, uiEyeSize[0], uiEyeSize[1], uiEyeSize[2], uiEyeSize[3], res, sizeof(res));
+	if (span <= bar + gap) {
+		span = bar + gap + bar;
+	}
+	uiSuperSamplingBar.x = rect->x;
+	uiSuperSamplingBar.y = top;
+	uiSuperSamplingBar.w = bar;
+	uiSuperSamplingBar.h = SLIDER_HEIGHT;
+	trap_R_SetColor(color);
+	UI_DrawHandlePic(rect->x, top, bar, SLIDER_HEIGHT, uiInfo.uiDC.Assets.sliderBar);
+	UI_DrawHandlePic(rect->x + (tenths - VRSS_MIN_TENTHS) * bar / (VRSS_MAX_TENTHS - VRSS_MIN_TENTHS) - SLIDER_THUMB_WIDTH / 2,
+					 top - 2, SLIDER_THUMB_WIDTH, SLIDER_THUMB_HEIGHT, uiInfo.uiDC.Assets.sliderThumb);
+	trap_R_SetColor(NULL);
+	// two lines, each centered in what is left of the span, the pair centered on the bar
+	cx = rect->x + bar + gap + (span - bar - gap) / 2;
+	y = top + SLIDER_HEIGHT / 2 - (textHeight + 3) / 2.0f + textHeight / 2.0f;
+	Text_Paint(cx - Text_Width(mult, scale, 0) / 2, y, scale, color, mult, 0, 0, textStyle);
+	Text_Paint(cx - Text_Width(res, scale, 0) / 2, y + textHeight + 3, scale, color, res, 0, 0, textStyle);
+}
+
+static qboolean UI_SuperSampling_HandleKey(int flags, float *special, int key) {
+	int tenths = VRSS_Tenths(trap_Cvar_VariableValue("vr_superSampling"));
+	const float cx = uiInfo.uiDC.cursorx, cy = uiInfo.uiDC.cursory;
+	int select;
+
+	if (key == K_MOUSE1 && cx >= uiSuperSamplingBar.x && cx < uiSuperSamplingBar.x + uiSuperSamplingBar.w &&
+		cy >= uiSuperSamplingBar.y - 2 && cy < uiSuperSamplingBar.y + uiSuperSamplingBar.h + 2) {
+		tenths = UI_SuperSampling_TenthsAt(cx);
+		uiSuperSamplingDrag = qtrue;
+	} else {
+		select = UI_SelectForKey(key);
+		if (select == 0) {
+			return qfalse;
+		}
+		tenths += select;
+	}
+	trap_Cvar_SetValue("vr_superSampling", VRSS_Value(VRSS_Tenths(tenths / 10.0f)));
+	return qtrue;
+}
+
 static void UI_DrawFoveationStrength(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	Text_Paint(rect->x, rect->y, scale, color, UI_FoveationStrengthText(), 0, 0, textStyle);
 }
@@ -3050,6 +3138,9 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 			break;
 		case UI_WEAPONPITCH:
 			UI_DrawWeaponPitch(&rect, scale, color, textStyle);
+			break;
+		case UI_VRSUPERSAMPLING:
+			UI_DrawSuperSampling(&rect, special, scale, color, textStyle);
 			break;
 		case UI_DYNAMICLIGHTS:
 			UI_DrawDynamicLights(&rect, scale, color, textStyle);
@@ -3671,6 +3762,8 @@ static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, 
       break;
     case UI_REFRESHRATE:
       return UI_RefreshRate_HandleKey(flags, special, key);
+    case UI_VRSUPERSAMPLING:
+      return UI_SuperSampling_HandleKey(flags, special, key);
       break;
     case UI_FOVEATION:
       return UI_Foveation_HandleKey(flags, special, key);
