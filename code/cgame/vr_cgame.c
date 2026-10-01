@@ -501,9 +501,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 		// smooth turning gets the orbit camera; snap turning keeps the teleporting one
 		if ( vr_snapturn.value <= 0.0f )
 		{
-			int primaryThumb;
 			float yawInput, pitchInput;
-			int secondaryThumb;
 			float distanceInput;
 			int ft;
 			float dt;
@@ -524,14 +522,12 @@ static void CG_OffsetVRThirdPersonView( void ) {
 				CG_InitSmoothFollow();
 			}
 
-			// Primary thumbstick: controls camera rotation and height
-			primaryThumb = vr->right_handed ? THUMB_RIGHT : THUMB_LEFT;
-			yawInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[primaryThumb][0];
-			pitchInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[primaryThumb][1];
+			// Turn stick: camera rotation and height
+			yawInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[VR_STICK_TURN][0];
+			pitchInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[VR_STICK_TURN][1];
 
-			// Secondary thumbstick: controls camera distance
-			secondaryThumb = vr->right_handed ? THUMB_LEFT : THUMB_RIGHT;
-			distanceInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[secondaryThumb][1];
+			// Move stick: camera distance
+			distanceInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[VR_STICK_MOVE][1];
 
 			// Framerate-independent input scaling
 			// Use real time when paused so camera still works at timescale 0
@@ -715,8 +711,8 @@ static void CG_OffsetVRThirdPersonView( void ) {
 			deltaYaw = (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)) ? 0.0f : CG_VR_DeltaYaw();
 			angles[YAW] += deltaYaw + (vr->clientviewangles[YAW] - vr->hmdorientation[YAW]);
 			AngleVectors(angles, forward, right, up);
-			VectorMA(vrc_vieworigin, vr->thumbstick_location[THUMB_LEFT][1] * 5.0f, forward, vrc_vieworigin);
-			VectorMA(vrc_vieworigin, vr->thumbstick_location[THUMB_LEFT][0] * 5.0f, right, vrc_vieworigin);
+			VectorMA(vrc_vieworigin, vr->thumbstick_location[VR_STICK_MOVE][1] * 5.0f, forward, vrc_vieworigin);
+			VectorMA(vrc_vieworigin, vr->thumbstick_location[VR_STICK_MOVE][0] * 5.0f, right, vrc_vieworigin);
 		}
 	}
 
@@ -1795,7 +1791,6 @@ void CG_DrawWeaponSelector( void )
 	float frac;
 	vec3_t controllerOrigin, controllerAngles, controllerOffset, selectorOrigin;
 	vec3_t wheelAngles, wheelOrigin, beamOrigin, wheelForward, wheelRight, wheelUp;
-	int switchThumbsticks;
 	int thumb;
 	float thumbstickAxisX;
 	float thumbstickAxisY;
@@ -1887,9 +1882,7 @@ void CG_DrawWeaponSelector( void )
 	VectorMA(wheelOrigin, (dist * ((selectorMode == WS_CONTROLLER) ? frac : 1.0f)), wheelForward, wheelOrigin);
 	VectorCopy(wheelOrigin, selectorOrigin);
 
-	trap_Cvar_VariableStringBuffer( "vr_switchThumbsticks", cvarBuf, sizeof( cvarBuf ) );
-	switchThumbsticks = (int)atof( cvarBuf );
-	thumb = switchThumbsticks !=0 ? THUMB_LEFT : THUMB_RIGHT;
+	thumb = VR_STICK_TURN;
 
 	thumbstickAxisX = 0.0f;
 	thumbstickAxisY = 0.0f;
@@ -2782,13 +2775,10 @@ void CG_WeaponAdjust_Exit( void ) {
 }
 
 void CG_WeaponAdjust_f( void ) {
-	char enabledBuf[16];
-
 	if ( vr->weapon_adjust ) {
 		CG_WeaponAdjust_Exit();
 	} else {
-		trap_Cvar_VariableStringBuffer( "vr_weaponAdjust", enabledBuf, sizeof(enabledBuf) );
-		if ( !vrActive || atof( enabledBuf ) == 0 ) {
+		if ( !vrActive ) {
 			return;
 		}
 		if ( !cg.snap ) return;
@@ -2826,8 +2816,6 @@ void CG_WeaponAdjustResetAll_f( void ) {
 
 void CG_WeaponAdjustFrame( void ) {
 	playerState_t *ps;
-	int primaryThumb;
-	int offhandThumb;
 	float offhandX;
 	float primaryY;
 	float deadzone;
@@ -2851,12 +2839,8 @@ void CG_WeaponAdjustFrame( void ) {
 		CG_WeaponAdjust_LoadWeapon( ps->weapon );
 	}
 
-	// Off-hand thumbstick left/right cycles params, weapon-hand thumbstick up/down adjusts value
-	primaryThumb = vr->right_handed ? THUMB_RIGHT : THUMB_LEFT;
-	offhandThumb = vr->right_handed ? THUMB_LEFT : THUMB_RIGHT;
-
-	// --- Parameter cycling (off-hand thumbstick left/right) ---
-	offhandX = vr->thumbstick_location[offhandThumb][0];
+	// --- Parameter cycling (move stick left/right) ---
+	offhandX = vr->thumbstick_location[VR_STICK_MOVE][0];
 	if ( offhandX > 0.5f && !weaponAdjustParamCycled ) {
 		weaponAdjustParam = ( weaponAdjustParam + 1 ) % WEAPADJUST_NUM_PARAMS;
 		weaponAdjustParamCycled = qtrue;
@@ -2867,8 +2851,8 @@ void CG_WeaponAdjustFrame( void ) {
 		weaponAdjustParamCycled = qfalse;
 	}
 
-	// --- Value adjustment (weapon-hand thumbstick up/down) ---
-	primaryY = vr->thumbstick_location[primaryThumb][1];
+	// --- Value adjustment (turn stick up/down) ---
+	primaryY = vr->thumbstick_location[VR_STICK_TURN][1];
 	deadzone = 0.15f;
 	absY = fabs( primaryY );
 

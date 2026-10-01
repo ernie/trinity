@@ -240,25 +240,9 @@ itemDef {
       		name controls
 		group grpControls
       		type ITEM_TYPE_YESNO
-		text "Quick U-Turn:"
-		cvar "vr_uturn"
-		rect 30 110 200 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 143
-      		textaligny 17
-		textscale .25        
-      		forecolor 1 1 1 1
-      		visible 1
-			action { uiScript update "vr_uturn" }
-    		}
-
-	itemDef {
-      		name controls
-		group grpControls
-      		type ITEM_TYPE_YESNO
 		text "Right-Handed:"
 		cvar "vr_righthanded"
-		rect 30 128 200 20
+		rect 30 110 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -273,7 +257,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Switch Thumbsticks:"
 		cvar "vr_switchThumbsticks"
-		rect 30 146 200 20
+		rect 30 128 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -289,7 +273,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Trigger Sensitivity:"
 		cvarfloat "vr_triggerSensitivity" 0.1 0.1 0.9
-		rect 30 164 200 20
+		rect 30 146 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -304,7 +288,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Weapon Pitch:"
 		cvarfloat "vr_weaponPitch" 0 -25 25
-		rect 30 182 200 20
+		rect 30 164 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -320,7 +304,7 @@ itemDef {
 		text "Weapon Wheel Mode:"
 		cvar "vr_weaponSelectorMode"
 		cvarFloatList { "VR Style / Pointing" 0 "Classic / Thumbstick" 1 }
-		rect 30 200 200 20
+		rect 30 182 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -328,60 +312,13 @@ itemDef {
       		forecolor 1 1 1 1
       		visible 1
     		}
-
-	itemDef {
-      		name controls
-		group grpControls
-      		type ITEM_TYPE_MULTI
-		text "Control Schema:"
-		cvar "vr_controlSchema"
-		cvarFloatList { "Weapon Wheel on Grip" 0 "Weapon Wheel on Stick" 1 "Weapon Wheel Disabled" 2 }
-		rect 30 218 200 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 143
-      		textaligny 17
-		textscale .25
-      		forecolor 1 1 1 1
-      		visible 1
-			action { uiScript update "vr_controlSchema" }
-    		}
-
-	itemDef {
-      		name controls
-		group grpControls
-      		type ITEM_TYPE_YESNO
-		text "Weapon Adjustment:"
-		cvar "vr_weaponAdjust"
-		rect 30 236 200 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 143
-      		textaligny 17
-		textscale .25
-      		forecolor 1 1 1 1
-      		visible 1
-		mouseEnter { show message_weaponadjust }
-		mouseExit { hide message_weaponadjust }
-    		}
-
-	itemDef {
-		name message_weaponadjust
-		text "Hold both grips for 1s to adjust"
-		rect 10 253 360 14
-		textalign ITEM_ALIGN_CENTER
-		textalignx 180
-		textaligny 12
-		textscale .2
-		forecolor 1 .75 0 1
-		visible 0
-		decoration
-		}
 
 	itemDef {
       		name controls
 		group grpControls
       	style 1
 		text "Comfort Options"
-		rect 100 265 100 20
+		rect 100 229 100 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -396,7 +333,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Comfort Vignette:"
 		cvarfloat "vr_comfortVignette" 0.2 0 1
-		rect 30 285 200 20
+		rect 30 249 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -410,7 +347,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Height Adjust:"
 		cvarfloat "vr_heightAdjust" 0.2 0 1
-		rect 30 305 200 20
+		rect 30 269 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -424,7 +361,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Roll When Hit:"
 		cvar "vr_rollWhenHit"
-		rect 30 325 200 20
+		rect 30 289 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -438,7 +375,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Haptic Intensity:"
 		cvarfloat "vr_hapticIntensity" 0.2 0 1
-		rect 30 345 200 20
+		rect 30 309 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -452,7 +389,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "HUD Depth:"
 		cvarfloat "vr_hudDepth" 1 0 5
-		rect 30 365 200 20
+		rect 30 329 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17
@@ -466,7 +403,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "HUD Vertical Position:"
 		cvarfloat "vr_hudYOffset" 20 -200 200
-		rect 30 385 200 20
+		rect 30 349 200 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 143
       		textaligny 17

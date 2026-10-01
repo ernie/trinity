@@ -456,24 +456,9 @@ itemDef {
 	name controls
 	group grpVR
 	type ITEM_TYPE_YESNO
-	text "Quick U-Turn:"
-	cvar "vr_uturn"
-	rect 28 140 340 18
-	textalign ITEM_ALIGN_RIGHT
-	textalignx 180
-	textaligny 14
-	textscale .25
-	forecolor 1 1 1 1
-	visible 0
-	action { uiScript update "vr_uturn" }
-	}
-itemDef {
-	name controls
-	group grpVR
-	type ITEM_TYPE_YESNO
 	text "Right-Handed:"
 	cvar "vr_righthanded"
-	rect 28 158 340 18
+	rect 28 140 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -487,14 +472,13 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Switch Thumbsticks:"
 	cvar "vr_switchThumbsticks"
-	rect 28 176 340 18
+	rect 28 158 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 0
-	action { uiScript update "vr_switchThumbsticks" }
 	}
 itemDef {
 	name controls
@@ -502,7 +486,7 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Trigger Sensitivity:"
 	cvarfloat "vr_triggerSensitivity" 0.5 0.1 0.9
-	rect 28 194 340 18
+	rect 28 176 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -516,7 +500,7 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Weapon Pitch:"
 	cvarfloat "vr_weaponPitch" 0 -25 25
-	rect 28 212 286 18
+	rect 28 194 286 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -529,7 +513,7 @@ itemDef {
 	group grpVR
 	type ITEM_TYPE_OWNERDRAW
 	ownerdraw UI_WEAPONPITCH
-	rect 313 212 18 18
+	rect 313 194 18 18
 	textalign ITEM_ALIGN_LEFT
 	textaligny 14
 	textscale .25
@@ -545,7 +529,7 @@ itemDef {
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
 	backcolor .37 .1 .1 1
-	rect 333 212 40 18
+	rect 333 194 40 18
 	textalign ITEM_ALIGN_CENTER
 	textalignx 18
 	textaligny 13
@@ -561,37 +545,7 @@ itemDef {
 	text "Weapon Wheel Mode:"
 	cvar "vr_weaponSelectorMode"
 	cvarFloatList { "VR Style / Pointing" 0 "Classic / Thumbstick" 1 }
-	rect 28 230 340 18
-	textalign ITEM_ALIGN_RIGHT
-	textalignx 180
-	textaligny 14
-	textscale .25
-	forecolor 1 1 1 1
-	visible 0
-	}
-itemDef {
-	name controls
-	group grpVR
-	type ITEM_TYPE_MULTI
-	text "Control Schema:"
-	cvar "vr_controlSchema"
-	cvarFloatList { "Weapon Wheel on Grip" 0 "Weapon Wheel on Stick" 1 "Weapon Wheel Disabled" 2 }
-	rect 28 248 340 18
-	textalign ITEM_ALIGN_RIGHT
-	textalignx 180
-	textaligny 14
-	textscale .25
-	forecolor 1 1 1 1
-	visible 0
-	action { uiScript update "vr_controlSchema" }
-	}
-itemDef {
-	name controls
-	group grpVR
-	type ITEM_TYPE_YESNO
-	text "Weapon Adjustment:"
-	cvar "vr_weaponAdjust"
-	rect 28 266 340 18
+	rect 28 212 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -605,7 +559,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Simple Items (Weapon Wheel):"
 	cvar "cg_weaponSelectorSimple2DIcons"
-	rect 28 284 340 18
+	rect 28 230 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -619,7 +573,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Autoswitch Weapons:"
 	cvar "cg_autoswitch"
-	rect 28 302 340 18
+	rect 28 248 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -633,7 +587,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Send Roll Angle:"
 	cvar "vr_sendRollToServer"
-	rect 28 320 340 18
+	rect 28 266 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14

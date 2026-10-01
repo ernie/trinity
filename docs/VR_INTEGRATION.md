@@ -775,8 +775,6 @@ the couplings behind the screens:
 - **`vr_hudDrawStatus` → `cg_draw3dIcons`.** The value `2` (no status bar)
   also sets `cg_draw3dIcons 0`; **every other value** sets
   `cg_draw3dIcons 1`.
-- **`vr_uturn` ↔ `vr_controlSchema`.** These interlock; changing one
-  recomputes the other so the button map stays consistent.
 - **`vr_switchThumbsticks`.** A swap-in-place edit of the affected button
   mappings.
 - **The desktop-mirror Apply.** `vr_mirrorEnabled` / `vr_mirrorFullscreen` with
@@ -829,7 +827,7 @@ writes these names.
 | `vr_mirrorEnabled` / `vr_mirrorFullscreen` | archived | Desktop-mirror mode, staged/applied by the menu scripts |
 | `vr_mirrorWidth`, `vr_mirrorHeight` | archived (PC engine only) | Desktop-mirror resolution, staged and written by the mirror Apply (Step 7); unregistered on other engines, where the writes are inert |
 | `vr_lasersight`, `vr_twoHandedWeapons`, `vr_showItemInHand`, `vr_rollWhenHit`, `vr_weaponAdjust`, `vr_weaponSelectorMode`, `vr_weaponSelectorWithHud` | archived | Gameplay/comfort toggles read by the client hooks |
-| `vr_uturn`, `vr_controlSchema`, `vr_switchThumbsticks` | archived | Control-scheme handlers (see Step 7) |
+| `vr_controlSchema`, `vr_switchThumbsticks` | archived | Control-scheme handlers (see Step 7) |
 | `vr_button_map_*` family | archived | Per-button remaps: `A`, `B`, `X`, `Y`, `PRIMARYGRIP`, `PRIMARYTHUMBSTICK`, and the `RTHUMB{FORWARD,BACK,LEFT,RIGHT}` set with their `_ALT` variants |
 
 There is no `vr_stabilised` cvar; weapon stabilization is a mirror flag, not
