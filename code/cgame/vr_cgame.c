@@ -1,5 +1,3 @@
-// VR API conformance probe: registers the vr_shared_t mirror and renders
-// live engine state + a sync round-trip check. Gated by cg_vrApiProbe.
 #include "cg_local.h"
 #include "../game/vr_bg.h"
 #include "../game/vr_shared.h"
@@ -11,9 +9,6 @@ vr_shared_t vr_state;
 vr_shared_t *vr = &vr_state;
 qboolean vrActive = qfalse;
 static void CG_VR_ResetState( void );
-static int probeFrame = 0;
-static int lastEchoSent = 0;
-static int echoFailures = 0;
 
 // 4x4 matrix for the world-oriented entity math below (drop-local type).
 typedef vec_t vr_matrix4x4[4][4];
@@ -54,7 +49,6 @@ static float vrc_hudYawX, vrc_hudYawY, vrc_hudPitch;
 
 // Drop-owned vmCvars, registered in CG_VR_Init and refreshed in CG_VR_Frame;
 // no host cvar-table entries are required.
-static vmCvar_t cg_vrApiProbe;
 static vmCvar_t cg_debugWeaponAiming;
 static vmCvar_t cg_weaponSelectorSimple2DIcons;
 static vmCvar_t cg_weaponSelectorWeapons;
@@ -126,9 +120,7 @@ void CG_VR_Init( void ) {
 	memset( &vr_state, 0, sizeof( vr_state ) );
 	CG_VR_ResetState();
 
-	// drop-owned cvars: registered before the dormancy early-outs so archived
-	// values persist and the probe toggle works on flatscreen engines too
-	trap_Cvar_Register( &cg_vrApiProbe, "cg_vrApiProbe", "0", 0 );
+	// drop-owned cvars: registered before the dormancy early-outs so archived values persist
 	trap_Cvar_Register( &cg_debugWeaponAiming, "cg_debugWeaponAiming", "0", CVAR_ARCHIVE );
 	trap_Cvar_Register( &cg_weaponSelectorSimple2DIcons, "cg_weaponSelectorSimple2DIcons", "0", CVAR_ARCHIVE );
 	// deliberately not archived: the value is weapon-set-relative, and an
@@ -180,7 +172,6 @@ void CG_VR_Init( void ) {
 }
 
 void CG_VR_Frame( void ) {
-	trap_Cvar_Update( &cg_vrApiProbe );
 	trap_Cvar_Update( &cg_debugWeaponAiming );
 	trap_Cvar_Update( &cg_weaponSelectorSimple2DIcons );
 	trap_Cvar_Update( &cg_firstPersonBodyScale );
@@ -240,67 +231,6 @@ void CG_VRHaptic( const char *event, int position, int channel, int intensity, f
 	if ( !vrActive )
 		return;
 	trap_HapticEvent( event, position, channel, intensity, yaw, height );
-}
-
-static void ProbeLine( int *y, const char *text ) {
-	CG_DrawStringExt( 8, *y, text, colorWhite, qtrue, qfalse, 6, 10, 0 );
-	*y += 10;
-}
-
-void CG_VRProbe_Draw( void ) {
-	char buf[128];
-	int y = 40;
-
-	if ( !cg_vrApiProbe.integer )
-		return;
-
-	probeFrame++;
-
-	Com_sprintf( buf, sizeof( buf ), "VR API %s  frame %d", vrActive ? "ACTIVE" : "ABSENT", probeFrame );
-	ProbeLine( &y, buf );
-	if ( !vrActive )
-		return;
-
-	// sync round-trip: engine must reflect last frame's probeEcho into
-	// probeEchoBack at the next sync-in
-	if ( lastEchoSent && vr_state.probeEchoBack != lastEchoSent )
-		echoFailures++;
-	Com_sprintf( buf, sizeof( buf ), "echo sent %d back %d failures %d  [%s]",
-		lastEchoSent, vr_state.probeEchoBack, echoFailures, echoFailures ? "FAIL" : "PASS" );
-	ProbeLine( &y, buf );
-	vr_state.probeEcho = probeFrame;
-	lastEchoSent = probeFrame;
-
-	Com_sprintf( buf, sizeof( buf ), "hmd pos %.2f %.2f %.2f  orient %.1f %.1f %.1f",
-		vr_state.hmdposition[0], vr_state.hmdposition[1], vr_state.hmdposition[2],
-		vr_state.hmdorientation[0], vr_state.hmdorientation[1], vr_state.hmdorientation[2] );
-	ProbeLine( &y, buf );
-	Com_sprintf( buf, sizeof( buf ), "weapon ang %.1f %.1f %.1f  pos %.2f %.2f %.2f",
-		vr_state.weaponangles[0], vr_state.weaponangles[1], vr_state.weaponangles[2],
-		vr_state.weaponposition[0], vr_state.weaponposition[1], vr_state.weaponposition[2] );
-	ProbeLine( &y, buf );
-	Com_sprintf( buf, sizeof( buf ), "offhand ang %.1f %.1f %.1f",
-		vr_state.offhandangles[0], vr_state.offhandangles[1], vr_state.offhandangles[2] );
-	ProbeLine( &y, buf );
-	Com_sprintf( buf, sizeof( buf ), "fov %.1f x %.1f  eyeL %.3f/%.3f eyeR %.3f/%.3f",
-		vr_state.fov_x, vr_state.fov_y,
-		vr_state.eye_fov_angle_left[0], vr_state.eye_fov_angle_right[0],
-		vr_state.eye_fov_angle_left[1], vr_state.eye_fov_angle_right[1] );
-	ProbeLine( &y, buf );
-	Com_sprintf( buf, sizeof( buf ), "sticks L %.2f %.2f  R %.2f %.2f",
-		vr_state.thumbstick_location[0][0], vr_state.thumbstick_location[0][1],
-		vr_state.thumbstick_location[1][0], vr_state.thumbstick_location[1][1] );
-	ProbeLine( &y, buf );
-	Com_sprintf( buf, sizeof( buf ), "flags vs=%d fpf=%d 6dof=%d rh=%d fm=%d stab=%d zoom=%d",
-		vr_state.virtual_screen, vr_state.first_person_following, vr_state.use_6dof,
-		vr_state.right_handed, vr_state.follow_mode, vr_state.weapon_stabilised,
-		vr_state.weapon_zoomed );
-	ProbeLine( &y, buf );
-	Com_sprintf( buf, sizeof( buf ), "cursor menu %d,%d sb %d,%d  client %d  cvyd %.2f",
-		vr_state.menuCursorX, vr_state.menuCursorY,
-		vr_state.scoreboardCursorX, vr_state.scoreboardCursorY,
-		vr_state.clientNum, vr_state.clientview_yaw_delta );
-	ProbeLine( &y, buf );
 }
 
 void CG_VR_RegisterMedia( void ) {
@@ -2625,7 +2555,6 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 
 		// Draw screen 2D overlays directly to the XR swapchain
 		CG_DrawScreen2D();
-		CG_VRProbe_Draw();
 
 		if (vr->weapon_zoomed)
 		{

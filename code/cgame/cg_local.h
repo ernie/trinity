@@ -2049,7 +2049,7 @@ extern int dll_trap_R_AddPolysToScene2;
 extern int dll_trap_VR_RegisterState;
 #endif
 
-// VR API conformance probe (vr_cgame.c)
+// VR shared-state mirror (vr_cgame.c)
 extern vr_shared_t vr_state;
 extern vr_shared_t *vr;
 extern qboolean vrActive;

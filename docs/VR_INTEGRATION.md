@@ -38,8 +38,8 @@ flatscreen engine; with no VR player in view they too do nothing.
 A short list of placements is the sanctioned exception: they read the
 `vrActive` dormancy signal directly, because an unconditional call there
 would double-draw in VR or visibly change flatscreen rendering. They are
-the lightning-gun bolt origin, the flatscreen follow crosshair, and the
-flatscreen probe draw (Step 5); Team Arena's `ui_shared.c` transform fork
+the lightning-gun bolt origin and the flatscreen follow crosshair (Step 5);
+Team Arena's `ui_shared.c` transform fork
 and the connect-screen background fill in both UIs (Step 6). Each is
 flagged at its site; every other call-out stays unconditional.
 
@@ -62,8 +62,7 @@ relative to `code/`):
   edit. The mirror grows only at its tail with a `VR_API_MINOR` bump (layout
   changes bump `VR_API_MAJOR`), and the engine rejects a size or version it
   cannot meet — but the gate catches skew only; a hand-reordered layout under
-  an unchanged version is exactly what the never-edit rule and the Step 7
-  probe exist to catch.
+  an unchanged version is exactly what the never-edit rule exists to catch.
 - **`game/vr_trap.h`**: the `VR_RESOLVE` binding macro the bootstraps use to
   look traps up by name (Step 3).
 - **`cgame/vr_host.h`**: the host contract — everything the drop consumes
@@ -87,9 +86,9 @@ relative to `code/`):
   more than one module.
 - **`game/vr_game.c` / `.h`**: the server side — bootstrap, head-bit codec,
   6DOF aim/muzzle overrides, config-block seed.
-- **`cgame/vr_cgame.c` / `.h`**: the client side — bootstrap, conformance
-  probe, view pipeline, view weapon, other players' head rendering, follow
-  head view, event hooks, HUD, embodiment, cvar accessors.
+- **`cgame/vr_cgame.c` / `.h`**: the client side: bootstrap, view pipeline,
+  view weapon, other players' head rendering, follow head view, event hooks,
+  HUD, embodiment, cvar accessors.
 - **`q3_ui/vr_ui.c` / `.h`**: the baseq3 UI side (bootstrap, cursor/input
   hooks, menu-scale transform, virtual-keyboard traps).
 - **`ui/vr_ui.c` / `.h`**: the same contract, Team Arena implementation.
@@ -368,8 +367,7 @@ derive the head orientation for demos and first-person follow.
 
 > **Build and check.** Rebuild game and cgame. Nothing visible changes on a
 > flatscreen engine, but a VR client connecting to a server running this
-> game is now flagged `EF_VR_PLAYER` and its head data flows. The visible
-> result is verified by Step 7's probe.
+> game is now flagged `EF_VR_PLAYER` and its head data flows.
 
 ---
 
@@ -657,20 +655,6 @@ Two sites are bigger than one line; take their shape from this tree:
   machinery runs only under `!vr`. Pair it with the `CG_VR_PortraitReset()`
   call-out above.
 
-One more call-out pairs with Step 7: the probe's flatscreen half. The VR
-draw tail renders the probe inside the protected 2D bracket, so the host
-site is a sanctioned `vrActive` gate at the end of `CG_DrawActiveFrame`:
-
-```diff
- 	// actually issue the rendering calls
- 	CG_DrawActive( stereoView );
-+
-+	// VR API conformance probe overlay; when VR is active the draw tail
-+	// renders it inside the protected 2D bracket instead
-+	if ( !vrActive )
-+		CG_VRProbe_Draw();
-```
-
 The families above are the reading guide, not the inventory; the
 authoritative call-out list is the diff itself — this tree's `cg_*` delta
 against stock, or the mod template's Step 5 commit.
@@ -818,15 +802,6 @@ binds page is flatscreen-only). Dormancy-safe: on a flatscreen engine the
 menu is stock. Team Arena needs no wiring — the `vrmenus` manifests packed
 into the missionpack pak are the only load path, and `UI_VR_LoadMenus`
 (Step 6) reads them.
-
-> **Build, run, and read the probe.** Set `cg_vrApiProbe 1` and connect a VR
-> client. The probe draws an overlay at the top-left: `VR API ACTIVE` (or
-> `ABSENT` on a flatscreen engine), then the sync round-trip check — `PASS`
-> while the engine echoes the mirror back correctly each frame, `FAIL` if a
-> sync is dropped — then live HMD position/orientation, weapon angles, FOV,
-> thumbsticks, and state flags. `ACTIVE` plus a steady `PASS` with sensible,
-> moving numbers means the drop is wired end-to-end. Turn it off with
-> `cg_vrApiProbe 0`.
 
 ---
 

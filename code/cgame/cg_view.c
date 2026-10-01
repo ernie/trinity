@@ -1752,11 +1752,6 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// actually issue the rendering calls
 	CG_DrawActive( stereoView );
 
-	// VR API conformance probe overlay; when VR is active the draw tail
-	// renders it inside the protected 2D bracket instead
-	if ( !vrActive )
-		CG_VRProbe_Draw();
-
 	// this counter will be bumped for every valid scene we generate
 	cg.clientFrame++;
 

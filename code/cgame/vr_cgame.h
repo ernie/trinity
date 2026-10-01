@@ -1,7 +1,4 @@
-// Vendored VR API - cgame module hooks (vr_cgame). Bootstrap, config mirror,
-// haptic wrapper, and the conformance probe overlay. Dormancy-safe: on a
-// flatscreen engine CG_VR_Init leaves the mirror zeroed and vrActive false;
-// the haptic wrapper and probe draw no-op.
+// Vendored VR API - cgame module hooks (vr_cgame): bootstrap, config mirror, haptic wrapper. Dormancy-safe: on a flatscreen engine the mirror stays zeroed and the hooks no-op.
 #ifndef VR_CGAME_H
 #define VR_CGAME_H
 
@@ -15,7 +12,6 @@ void CG_VR_Shutdown( void );
 void CG_VR_RegisterMedia( void );
 void CG_VR_Frame( void );
 void CG_VRHaptic( const char *event, int position, int channel, int intensity, float yaw, float height );
-void CG_VRProbe_Draw( void );
 
 // cg_view.c per-frame view-pipeline hooks: FOV override, forced third-person
 // camera modes, view-kick suppression, and damage view-punch scale. Each is
