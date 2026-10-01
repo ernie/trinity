@@ -125,6 +125,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define UI_SHOW_NETANYNONTEAMGAME	 				0x00000400
 #define UI_SHOW_NETANYTEAMGAME		 				0x00000800
 #define UI_SHOW_NOTFAVORITESERVERS				0x00001000
+#define UI_SHOW_VRBINDINGS 0x00002000
 
 
 
@@ -284,6 +285,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define UI_FOVEATION 266
 #define UI_FOVEATION_STRENGTH 267
 #define UI_WEAPONPITCH 268
+#define UI_VRBIND 269
+#define UI_VRBIND_ALT 270
+#define UI_VRBIND_STATUS 271
 #define UI_VRSUPERSAMPLING 272
 
 #define VOICECHAT_GETFLAG			"getflag"				// command someone to get the flag

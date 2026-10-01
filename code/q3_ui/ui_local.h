@@ -29,6 +29,7 @@ extern void		(*trap_VKeyboard_Show)( void );
 extern void		(*trap_VKeyboard_Hide)( void );
 extern qboolean	(*trap_VKeyboard_IsActive)( void );
 extern qboolean	(*trap_VKeyboard_HandleKey)( int key );
+extern void		(*trap_VR_BindCapture)( void );
 #else
 qboolean	trap_GetValue( char *value, int valueSize, const char *key );
 void		trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
@@ -37,6 +38,7 @@ void		trap_VKeyboard_Show( void );
 void		trap_VKeyboard_Hide( void );
 qboolean	trap_VKeyboard_IsActive( void );
 qboolean	trap_VKeyboard_HandleKey( int key );
+void		trap_VR_BindCapture( void );
 extern int	dll_com_trapGetValue;
 extern int	dll_trap_VR_RegisterState;
 extern int	dll_trap_HapticEvent;
@@ -44,10 +46,12 @@ extern int	dll_trap_VKeyboard_Show;
 extern int	dll_trap_VKeyboard_Hide;
 extern int	dll_trap_VKeyboard_IsActive;
 extern int	dll_trap_VKeyboard_HandleKey;
+extern int	dll_trap_VR_BindCapture;
 #endif
 
 // Unified VR options menu (ui_vroptions.c + page files): presence-gated on UI_VR_Platform
 void UI_VROptionsMenu( void );
+void UI_VRBindingsMenu( void );
 void UI_VROptions_Cache( void );
 void UI_VRComfortMenu( void );
 void UI_VRComfort_Cache( void );

@@ -2,6 +2,7 @@
 #include "ui_local.h"
 #include "../game/vr_shared.h"
 #include "../game/vr_trap.h"
+#include "../game/vr_bindmenu.h"
 
 const char vr_api_sentinel[] = VR_API_SENTINEL;
 
@@ -17,6 +18,7 @@ void	(*trap_VKeyboard_Show)( void );
 void	(*trap_VKeyboard_Hide)( void );
 qboolean (*trap_VKeyboard_IsActive)( void );
 qboolean (*trap_VKeyboard_HandleKey)( int key );
+void	(*trap_VR_BindCapture)( void );
 #else
 int dll_com_trapGetValue;
 int dll_trap_VR_RegisterState;
@@ -25,7 +27,66 @@ int dll_trap_VKeyboard_Show;
 int dll_trap_VKeyboard_Hide;
 int dll_trap_VKeyboard_IsActive;
 int dll_trap_VKeyboard_HandleKey;
+int dll_trap_VR_BindCapture;
 #endif
+
+static qboolean bindCaptureAvailable;
+// The engine's first VR key code; engines number their keys differently.
+static int vrKeyFirst;
+
+int UI_VR_KeyIndex( int key ) {
+	return bindCaptureAvailable && key >= vrKeyFirst && key < vrKeyFirst + VRBM_KEYS ? key - vrKeyFirst : -1;
+}
+
+static void UI_VRBind_Read( const char *context, int key, char *buf, int size ) {
+	if ( !trap_GetValue( buf, size, va( "vr_binding %s %i", context, vrKeyFirst + key ) ) )
+		buf[0] = '\0';
+}
+
+static void UI_VRBind_Bind( const char *context, int key, const char *command ) {
+	char name[32];
+	trap_Key_KeynumToStringBuf( vrKeyFirst + key, name, sizeof( name ) );
+	trap_Cmd_ExecuteText( EXEC_NOW, va( "vrbind %s %s \"%s\"\n", context, name, command ) );
+}
+
+static void UI_VRBind_Unbind( const char *context, int key ) {
+	char name[32];
+	trap_Key_KeynumToStringBuf( vrKeyFirst + key, name, sizeof( name ) );
+	trap_Cmd_ExecuteText( EXEC_NOW, va( "vrunbind %s %s\n", context, name ) );
+}
+
+static void UI_VRBind_KeyName( int key, char *buf, int size ) {
+	if ( !trap_GetValue( buf, size, va( "vr_keyname %i", vrKeyFirst + key ) ) )
+		Q_strncpyz( buf, "???", size );
+}
+
+static void UI_VRBind_CancelName( char *buf, int size ) {
+	if ( !trap_GetValue( buf, size, "vr_menu_cancel_button" ) )
+		Q_strncpyz( buf, "Menu", size );
+}
+
+static void UI_VRBind_Capture( void ) {
+	trap_VR_BindCapture();
+}
+
+static int UI_VRBind_Defaults( const char *context, const char *command, int keys[2] ) {
+	char value[16];
+	int count = 0;
+	while ( count < 2 && trap_GetValue( value, sizeof( value ), va( "vr_keydefault %s %i %s", context, count, command ) ) ) {
+		keys[count] = atoi( value ) - vrKeyFirst;
+		if ( keys[count] < 0 || keys[count] >= VRBM_KEYS )
+			break;
+		count++;
+	}
+	return count;
+}
+
+static const vrbmIO_t uiVRBindIO = {UI_VRBind_Read, UI_VRBind_Bind, UI_VRBind_Unbind,
+									UI_VRBind_KeyName, UI_VRBind_CancelName, UI_VRBind_Capture, UI_VRBind_Defaults};
+
+qboolean UI_VR_BindingsAvailable( void ) {
+	return vrActive && bindCaptureAvailable;
+}
 
 /*
 ================
@@ -47,6 +108,7 @@ void UI_VR_Init( void ) {
 	dll_com_trapGetValue = 0;
 #endif
 	vrActive = qfalse;
+	bindCaptureAvailable = qfalse;
 	memset( &vr_state, 0, sizeof( vr_state ) );
 
 	// keep the sentinel referenced so the toolchain retains it in the image
@@ -73,6 +135,12 @@ void UI_VR_Init( void ) {
 	vrActive = VR_RegisterMirror( &vr_state );
 	if ( !vrActive )
 		return;
+	if ( VR_RESOLVE( trap_VR_BindCapture, ext ) && trap_GetValue( ext, sizeof( ext ), "vr_keyfirst" ) ) {
+		vrKeyFirst = atoi( ext );
+		bindCaptureAvailable = qtrue;
+		VRBM_SetIO( &uiVRBindIO );
+		trap_Cvar_Set( "ui_vrBindAlt", "0" );
+	}
 	vr->menuYawLocked = qfalse;
 	vr->menuCursorActive = vrActive;
 }
@@ -230,7 +298,10 @@ UI_VR_RunMenuScript
 ===============
 */
 qboolean UI_VR_RunMenuScript( const char *name ) {
-	if ( Q_stricmp( name, "vrMirrorSetup" ) == 0 ) {
+	if ( Q_stricmp( name, "vrBindCancel" ) == 0 ) {
+		VRBM_Cancel();
+		return qtrue;
+	} else if ( Q_stricmp( name, "vrMirrorSetup" ) == 0 ) {
 		// Stage the restart-class desktop-mirror values into ui_ cvars.
 		// Mode: 0=Off, 1=Windowed, 2=Fullscreen from vr_mirrorEnabled + vr_mirrorFullscreen.
 		if ( UI_VR_Platform() != VRP_NONE ) {

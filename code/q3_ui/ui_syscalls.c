@@ -405,3 +405,7 @@ qboolean trap_VKeyboard_IsActive( void ) {
 qboolean trap_VKeyboard_HandleKey( int key ) {
 	return syscall( dll_trap_VKeyboard_HandleKey, key );
 }
+
+void trap_VR_BindCapture( void ) {
+	syscall( dll_trap_VR_BindCapture );
+}

@@ -41,7 +41,7 @@ itemDef {
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 100 178 40
+	rect 0 70 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
@@ -60,7 +60,7 @@ itemDef {
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 150 178 40
+	rect 0 120 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
@@ -73,13 +73,33 @@ itemDef {
 	}
 
 itemDef {
+	name sb_bindings
+	text "Bindings"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 170 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 1
+	ownerdrawflag UI_SHOW_VRBINDINGS
+	action { play "sound/misc/kcaction.wav" ; close vroptions_menu ; open vrbindings_menu }
+	mouseEnter { setitemcolor sb_bindings forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_bindings forecolor 1 1 1 1 }
+	}
+
+itemDef {
 	name sb_hud
 	text "HUD & Display"
 	style 0
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 200 178 40
+	rect 0 220 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
@@ -98,7 +118,7 @@ itemDef {
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 250 178 40
+	rect 0 270 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
@@ -117,7 +137,7 @@ itemDef {
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 300 178 40
+	rect 0 320 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28

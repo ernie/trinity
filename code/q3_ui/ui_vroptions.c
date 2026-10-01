@@ -49,6 +49,7 @@ VR OPTIONS HUB MENU
 #define ID_MIRROR			13
 #define ID_CONSOLE			14
 #define ID_BACK				15
+#define ID_BINDINGS			16
 
 
 typedef struct {
@@ -60,6 +61,7 @@ typedef struct {
 
 	menutext_s		comfort;
 	menutext_s		controls;
+	menutext_s		bindings;
 	menutext_s		hud;
 	menutext_s		mirror;
 	menutext_s		console;
@@ -84,6 +86,10 @@ static void VROptions_Event( void *ptr, int event ) {
 		UI_VRControlsMenu();
 		break;
 
+	case ID_BINDINGS:
+		UI_VRBindingsMenu();
+		break;
+
 	case ID_HUD:
 		UI_VRHudDisplayMenu();
 		break;
@@ -106,8 +112,10 @@ static void VROptions_Event( void *ptr, int event ) {
 static void VROptions_MenuInit( void ) {
 	int		y;
 	qboolean isPC;
+	qboolean bindings;
 
 	isPC = ( UI_VR_Platform() == VRP_PC );
+	bindings = UI_VR_BindingsAvailable();
 
 	UI_VROptions_Cache();
 
@@ -139,8 +147,8 @@ static void VROptions_MenuInit( void ) {
 	s_vroptions.framer.height			= 334;
 
 	// Center the spoke block (rows use PROP text, PROP_HEIGHT tall) in the
-	// frame: PC has 5 rows (adds DESKTOP MIRROR), non-PC has 4.
-	y = VR_FRAME_CENTER_Y - ( ( (isPC ? 5 : 4) - 1 ) * VR_MENU_VERTICAL_SPACING + PROP_HEIGHT ) / 2;
+	// frame: PC has 5 rows (adds DESKTOP MIRROR), non-PC has 4, and BINDINGS adds one when the engine can capture.
+	y = VR_FRAME_CENTER_Y - ( ( (isPC ? 5 : 4) + (bindings ? 1 : 0) - 1 ) * VR_MENU_VERTICAL_SPACING + PROP_HEIGHT ) / 2;
 	s_vroptions.comfort.generic.type		= MTYPE_PTEXT;
 	s_vroptions.comfort.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_vroptions.comfort.generic.x			= 320;
@@ -161,6 +169,19 @@ static void VROptions_MenuInit( void ) {
 	s_vroptions.controls.string				= "CONTROLS";
 	s_vroptions.controls.color				= color_red;
 	s_vroptions.controls.style				= UI_CENTER;
+
+	if ( bindings ) {
+		y += VR_MENU_VERTICAL_SPACING;
+		s_vroptions.bindings.generic.type		= MTYPE_PTEXT;
+		s_vroptions.bindings.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+		s_vroptions.bindings.generic.x			= 320;
+		s_vroptions.bindings.generic.y			= y;
+		s_vroptions.bindings.generic.id			= ID_BINDINGS;
+		s_vroptions.bindings.generic.callback	= VROptions_Event;
+		s_vroptions.bindings.string				= "BINDINGS";
+		s_vroptions.bindings.color				= color_red;
+		s_vroptions.bindings.style				= UI_CENTER;
+	}
 
 	y += VR_MENU_VERTICAL_SPACING;
 	s_vroptions.hud.generic.type			= MTYPE_PTEXT;
@@ -213,6 +234,9 @@ static void VROptions_MenuInit( void ) {
 	Menu_AddItem( &s_vroptions.menu, &s_vroptions.framer );
 	Menu_AddItem( &s_vroptions.menu, &s_vroptions.comfort );
 	Menu_AddItem( &s_vroptions.menu, &s_vroptions.controls );
+	if ( bindings ) {
+		Menu_AddItem( &s_vroptions.menu, &s_vroptions.bindings );
+	}
 	Menu_AddItem( &s_vroptions.menu, &s_vroptions.hud );
 	if ( isPC ) {
 		Menu_AddItem( &s_vroptions.menu, &s_vroptions.mirror );

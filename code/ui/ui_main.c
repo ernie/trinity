@@ -15,6 +15,7 @@ USER INTERFACE MAIN
 #include "../game/ui_swatches.h"
 #include "../game/bg_mode.h"
 #include "../game/bg_hostlabels.h"
+#include "../game/vr_bindmenu.h"
 #include "../game/vr_supersample.h"
 
 extern displayContextDef_t *DC;
@@ -2907,6 +2908,135 @@ static qboolean UI_SuperSampling_HandleKey(int flags, float *special, int key) {
 	return qtrue;
 }
 
+// Where each row's clear glyph starts, from its last paint; a click right of it clears instead of binding.
+static float vrBindGlyphX[VRBM_ROW_COUNT];
+// Each row's and the Alt switch's window, from their last paint: focus outlives hover, so clicks must land inside.
+static rectDef_t vrBindHit[VRBM_ROW_COUNT];
+static rectDef_t vrBindAltHit;
+
+static void UI_VRBind_SetHit( rectDef_t *hit, float x, float y, float w, float h ) {
+	hit->x = x;
+	hit->y = y;
+	hit->w = w;
+	hit->h = h;
+}
+
+static qboolean UI_VRBind_Inside( const rectDef_t *hit ) {
+	const float x = uiInfo.uiDC.cursorx, y = uiInfo.uiDC.cursory;
+	return x >= hit->x && x < hit->x + hit->w && y >= hit->y && y < hit->y + hit->h;
+}
+
+static qboolean UI_VRBind_IsArrow( int c ) {
+	return c == 134 || c == 135 || c == 136 || c == 141;
+}
+
+// Text_Paint, with the arrow bytes drawn from the character sheet as the on-screen keyboard draws them: the font pages
+// have no glyphs there.
+static void UI_VRBind_Paint( float x, float y, float scale, vec4_t color, const char *text, int style ) {
+	static qhandle_t charset;
+	char run[256];
+	const float size = Text_Height( "A", scale, 0 ) * 1.4f;
+	int n = 0;
+
+	if ( !charset ) {
+		charset = trap_R_RegisterShaderNoMip( "gfx/2d/bigchars" );
+	}
+	for ( ;; text++ ) {
+		const int c = *text & 255;
+		if ( c && !UI_VRBind_IsArrow( c ) && n < (int)sizeof( run ) - 1 ) {
+			run[n++] = (char)c;
+			continue;
+		}
+		run[n] = '\0';
+		if ( n ) {
+			Text_Paint( x, y, scale, color, run, 0, 0, style );
+			x += Text_Width( run, scale, 0 );
+			n = 0;
+		}
+		if ( !c ) {
+			break;
+		}
+		if ( UI_VRBind_IsArrow( c ) ) {
+			float ax = x, ay = y - size * 0.85f, aw = size, ah = size;
+			const float s = ( c & 15 ) * 0.0625f, t = ( c >> 4 ) * 0.0625f;
+			UI_AdjustFrom640( &ax, &ay, &aw, &ah );
+			trap_R_SetColor( color );
+			trap_R_DrawStretchPic( ax, ay, aw, ah, s, t, s + 0.0625f, t + 0.0625f, charset );
+			trap_R_SetColor( NULL );
+			x += size;
+		}
+	}
+}
+
+static void UI_DrawVRBind( rectDef_t *rect, int index, float scale, vec4_t color, int textStyle ) {
+	const vrbmRow_t *row;
+	char names[128];
+
+	VRBM_Tick( uiInfo.uiDC.realTime );
+	if ( index < 0 || index >= VRBM_ROW_COUNT ) {
+		return;
+	}
+	row = &vrbmRows[index];
+	if ( row->flags & VRBM_HEADER ) {
+		Text_Paint( rect->x, rect->y, scale, color, row->label, 0, 0, textStyle );
+		return;
+	}
+	if ( !VRBM_Editable( row, vrbm.altView ) ) {
+		VRBM_Names( row, 0, names, sizeof( names ) );
+		Text_Paint( rect->x, rect->y, scale, color, row->label, 0, 0, textStyle );
+		UI_VRBind_Paint( rect->x + 170, rect->y, scale, color, names, textStyle );
+		return;
+	}
+	VRBM_Names( row, vrbm.altView, names, sizeof( names ) );
+	Text_Paint( rect->x, rect->y, scale, color, row->label, 0, 0, textStyle );
+	UI_VRBind_Paint( rect->x + 170, rect->y, scale, color, vrbm.waiting == index ? "..." : names, textStyle );
+	vrBindGlyphX[index] = rect->x + rect->w - 20;
+	Text_Paint( vrBindGlyphX[index], rect->y, scale, color, "X", 0, 0, textStyle );
+}
+
+static qboolean UI_VRBind_HandleKey( float *special, int key ) {
+	const int index = (int)*special;
+
+	if ( key != K_MOUSE1 && key != K_ENTER && key != K_KP_ENTER ) {
+		return qfalse;
+	}
+	if ( index < 0 || index >= VRBM_ROW_COUNT || VRBM_Waiting() || !VRBM_Editable( &vrbmRows[index], vrbm.altView ) ) {
+		return qtrue;
+	}
+	if ( key == K_MOUSE1 && !UI_VRBind_Inside( &vrBindHit[index] ) ) {
+		return qtrue;
+	}
+	if ( key == K_MOUSE1 && !UI_VR_StickNavActive() && uiInfo.uiDC.cursorx >= vrBindGlyphX[index] ) {
+		VRBM_Clear( &vrbmRows[index], vrbm.altView );
+	} else {
+		VRBM_Start( index );
+	}
+	return qtrue;
+}
+
+static void UI_DrawVRBindStatus( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
+	char status[256];
+	VRBM_Status( status, sizeof( status ) );
+	UI_VRBind_Paint( rect->x, rect->y, scale, color, status, textStyle );
+}
+
+// While a row waits for a button, every key belongs to the bindings model; closing the menu ends the wait.
+static qboolean UI_VRBind_KeyEvent( int key, qboolean down ) {
+	if ( !VRBM_Waiting() ) {
+		return qfalse;
+	}
+	if ( down ) {
+		if ( key == K_ESCAPE ) {
+			VRBM_Cancel();
+		} else if ( UI_VR_KeyIndex( key ) >= 0 ) {
+			VRBM_Capture( UI_VR_KeyIndex( key ) );
+		} else {
+			VRBM_OtherKey();
+		}
+	}
+	return qtrue;
+}
+
 static void UI_DrawFoveationStrength(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	Text_Paint(rect->x, rect->y, scale, color, UI_FoveationStrengthText(), 0, 0, textStyle);
 }
@@ -3142,6 +3272,19 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 		case UI_VRSUPERSAMPLING:
 			UI_DrawSuperSampling(&rect, special, scale, color, textStyle);
 			break;
+		case UI_VRBIND:
+			if ( (int)special >= 0 && (int)special < VRBM_ROW_COUNT ) {
+				UI_VRBind_SetHit( &vrBindHit[(int)special], x, y, w, h );
+			}
+			UI_DrawVRBind( &rect, (int)special, scale, color, textStyle );
+			break;
+		case UI_VRBIND_ALT:
+			UI_VRBind_SetHit( &vrBindAltHit, x, y, w, h );
+			Text_Paint( rect.x, rect.y, scale, color, vrbm.altView ? "Alt held: Yes" : "Alt held: No", 0, 0, textStyle );
+			break;
+		case UI_VRBIND_STATUS:
+			UI_DrawVRBindStatus( &rect, scale, color, textStyle );
+			break;
 		case UI_DYNAMICLIGHTS:
 			UI_DrawDynamicLights(&rect, scale, color, textStyle);
 			break;
@@ -3233,6 +3376,13 @@ static qboolean UI_OwnerDrawVisible(int flags) {
 	qboolean vis = qtrue;
 
 	while (flags) {
+
+		if ( flags & UI_SHOW_VRBINDINGS ) {
+			if ( !UI_VR_BindingsAvailable() ) {
+				vis = qfalse;
+			}
+			flags &= ~UI_SHOW_VRBINDINGS;
+		}
 
 		if (flags & UI_SHOW_FFA) {
 			if (trap_Cvar_VariableValue("g_gametype") != GT_FFA) {
@@ -3751,6 +3901,15 @@ static qboolean UI_SelectedPlayer_HandleKey(int flags, float *special, int key) 
 
 static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, int key) {
   switch (ownerDraw) {
+    case UI_VRBIND:
+      return UI_VRBind_HandleKey( special, key );
+    case UI_VRBIND_ALT:
+      if ( ( key == K_MOUSE1 && UI_VRBind_Inside( &vrBindAltHit ) ) || key == K_ENTER || key == K_KP_ENTER ) {
+        vrbm.altView = !vrbm.altView;
+        trap_Cvar_Set( "ui_vrBindAlt", vrbm.altView ? "1" : "0" );
+        return qtrue;
+      }
+      break;
     case UI_HANDICAP:
       return UI_Handicap_HandleKey(flags, special, key);
       break;
@@ -6722,6 +6881,10 @@ UI_KeyEvent
 =================
 */
 void _UI_KeyEvent( int key, qboolean down ) {
+
+  if ( UI_VRBind_KeyEvent( key, down ) ) {
+    return;
+  }
 
   if (Menu_Count() > 0) {
     menuDef_t *menu = Menu_GetFocused();

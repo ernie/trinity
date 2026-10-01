@@ -3,4 +3,5 @@
 {
 	loadMenu { "ui/vroptions_standalone.menu" }
 	loadMenu { "ui/ingame_vroptions_standalone.menu" }
+	loadMenu { "ui/vrbindings.menu" }
 }

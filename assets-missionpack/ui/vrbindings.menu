@@ -1,0 +1,654 @@
+#include "ui/menudef.h"
+
+{
+\\ VR BINDINGS - per-tab VR controller actions, bound by pressing the button \\
+
+menuDef {
+	name "vrbindings_menu"
+	visible 0
+	fullscreen 1
+	rect 0 0 640 480
+	background "menuback_a"
+	focusColor 1 .75 0 1
+	disableColor .5 .5 .5 1
+	style 1
+	border 1
+	// Resets only the back arrow's hover state; the tabs keep what the player left showing.
+	onOpen { hide back_alt ; show back ; hide grpmessage }
+	onEsc { close vrbindings_menu ; open vroptions_menu }
+	onClose { uiScript vrBindCancel }
+
+// SIDEBAR //
+
+itemDef {
+	name solid_box
+	style 1
+	rect 4 2 178 426
+	border 1
+	bordersize 1
+	bordercolor .5 .5 .5 .5
+	backcolor 0 0 .75 .25
+	visible 1
+	decoration
+	}
+
+itemDef {
+	name sb_move
+	text "Move"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 100 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_move ; show vb_alt }
+	mouseEnter { setitemcolor sb_move forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_move forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_actions
+	text "Shoot"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 150 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_actions ; show vb_alt }
+	mouseEnter { setitemcolor sb_actions forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_actions forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_follow
+	text "Watch"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 200 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_follow ; show vb_alt }
+	mouseEnter { setitemcolor sb_follow forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_follow forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_system
+	text "Misc"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 250 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_system ; show vb_alt }
+	mouseEnter { setitemcolor sb_system forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_system forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_reset
+	text "Reset All"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 330 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; open vrbindings_confirm }
+	mouseEnter { setitemcolor sb_reset forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_reset forecolor 1 1 1 1 }
+	}
+
+// CONTENT PANEL //
+
+itemDef {
+	name window
+	rect 186 2 450 426
+	style WINDOW_STYLE_FILLED
+	border 1
+	bordercolor .5 .5 .5 .5
+	backcolor 0 0 0 .25
+	visible 1
+	decoration
+	}
+
+itemDef {
+	name vb_alt
+	group grpVB
+	ownerdraw UI_VRBIND_ALT
+	rect 196 30 200 20
+	textaligny 16
+	textscale .3
+	forecolor 1 .75 0 1
+	visible 1
+	}
+
+itemDef {
+	name status
+	ownerdraw UI_VRBIND_STATUS
+	rect 196 400 436 20
+	textaligny 16
+	textscale .25
+	forecolor 1 1 1 1
+	visible 1
+	decoration
+	}
+
+// MOVE (rows 0-4) //
+
+itemDef {
+	name vb_move
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 0
+	rect 196 60 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 1
+	}
+itemDef {
+	name vb_move
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 1
+	rect 196 82 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 1
+	}
+itemDef {
+	name vb_move
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 2
+	rect 196 104 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 1
+	}
+itemDef {
+	name vb_move
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 3
+	rect 196 126 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 1
+	}
+itemDef {
+	name vb_move
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 4
+	rect 196 148 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 1
+	}
+
+// SHOOT (rows 5-12) //
+
+itemDef {
+	name vb_actions
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 5
+	rect 196 60 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_actions
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 6
+	rect 196 82 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_actions
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 7
+	rect 196 104 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_actions
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 8
+	rect 196 126 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_actions
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 9
+	rect 196 148 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_actions
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 10
+	rect 196 170 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_actions
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 11
+	rect 196 192 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_actions
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 12
+	rect 196 214 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+
+// WATCH (rows 13-20) //
+
+itemDef {
+	name vb_follow
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 13
+	rect 196 60 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_follow
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 14
+	rect 196 82 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_follow
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 15
+	rect 196 104 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_follow
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 16
+	rect 196 126 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_follow
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 17
+	rect 196 148 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_follow
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 18
+	rect 196 170 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_follow
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 19
+	rect 196 192 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_follow
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 20
+	rect 196 214 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+
+// MISC (rows 21-31; 26 and 29 are headers) //
+
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 21
+	rect 196 60 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 22
+	rect 196 82 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	cvarTest "ui_vrBindAlt"
+	disableCvar { 1 }
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 23
+	rect 196 104 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 24
+	rect 196 126 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 25
+	rect 196 148 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 26
+	rect 196 170 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 .75 0 1
+	visible 0
+	decoration
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 27
+	rect 196 192 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 28
+	rect 196 214 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 29
+	rect 196 236 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 .75 0 1
+	visible 0
+	decoration
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 30
+	rect 196 258 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 31
+	rect 196 280 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+
+itemDef {
+	name back
+	style 3
+	background "ui/assets/backarrow.tga"
+	rect 16 424 50 50
+	visible 1
+	action { close vrbindings_menu ; open vroptions_menu }
+	mouseEnter { hide back ; show back_alt ; show message_back }
+	}
+
+itemDef {
+	name back_alt
+	style WINDOW_STYLE_SHADER
+	background "ui/assets/backarrow_alt.tga"
+	rect 14 422 54 54
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 0
+	type ITEM_TYPE_BUTTON
+	action { close vrbindings_menu ; open vroptions_menu }
+	mouseExit { hide back_alt ; show back ; hide message_back }
+	}
+
+itemDef {
+	name message_back
+	group grpmessage
+	style 0
+	rect 320 430 128 30
+	textstyle 1
+	textalign 1
+	textalignx 0
+	textaligny 25
+	textscale .4
+	text "Back to VR Options"
+	forecolor 1 1 1 1
+	decoration
+	visible 0
+	}
+
+}
+
+// RESET CONFIRM: a popup, so it owns the pointer and the rows beneath can't take clicks //
+
+menuDef {
+	name "vrbindings_confirm"
+	visible 0
+	fullscreen 0
+	// 242 wide: the longest line is under 193.5 at scale .3 (fontImage_16 xSkip sum x .3 x glyphScale 3), with 24 or more each side
+	rect 199 158 242 144
+	focusColor 1 .75 0 1
+	style WINDOW_STYLE_FILLED
+	border 1
+	bordercolor .5 .5 .5 1
+	backcolor 0 0 0 .9
+	popup
+	onESC { close vrbindings_confirm ; open vrbindings_menu }
+
+itemDef {
+	name confirm_title
+	text "RESET BINDINGS?"
+	rect 0 14 242 20
+	textalign ITEM_ALIGN_CENTER
+	textalignx 121
+	textaligny 16
+	textscale .35
+	forecolor 1 1 1 1
+	visible 1
+	decoration
+	}
+
+itemDef {
+	name confirm_text
+	text "All VR buttons will get"
+	rect 0 42 242 20
+	textalign ITEM_ALIGN_CENTER
+	textalignx 121
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 1
+	decoration
+	}
+
+itemDef {
+	name confirm_text2
+	text "this controller's defaults."
+	rect 0 64 242 20
+	textalign ITEM_ALIGN_CENTER
+	textalignx 121
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 1
+	decoration
+	}
+
+itemDef {
+	name confirm_yes
+	text "Yes"
+	type 1
+	rect 21 100 80 30
+	textalign ITEM_ALIGN_CENTER
+	textalignx 40
+	textaligny 22
+	textscale .35
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; exec "vr_bindreset" ; close vrbindings_confirm ; open vrbindings_menu }
+	}
+
+itemDef {
+	name confirm_no
+	text "No"
+	type 1
+	rect 141 100 80 30
+	textalign ITEM_ALIGN_CENTER
+	textalignx 40
+	textaligny 22
+	textscale .35
+	forecolor 1 1 1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; close vrbindings_confirm ; open vrbindings_menu }
+	}
+
+}
+
+}
