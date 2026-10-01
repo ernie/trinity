@@ -53,7 +53,7 @@ static vmCvar_t cg_debugWeaponAiming;
 static vmCvar_t cg_weaponSelectorSimple2DIcons;
 static vmCvar_t cg_weaponSelectorWeapons;
 static vmCvar_t cg_firstPersonBodyScale;
-static vmCvar_t cg_smoothFollow;
+static vmCvar_t vr_snapturn;
 
 // Optional host features, routed through one gate each (vr_host_config.h).
 static void VR_HostWarmupEvents( void ) {
@@ -128,7 +128,7 @@ void CG_VR_Init( void ) {
 	// the search path. A customized list belongs in autoexec.cfg.
 	trap_Cvar_Register( &cg_weaponSelectorWeapons, "cg_weaponSelectorWeapons", "", 0 );
 	trap_Cvar_Register( &cg_firstPersonBodyScale, "cg_firstPersonBodyScale", "0", CVAR_ARCHIVE );
-	trap_Cvar_Register( &cg_smoothFollow, "cg_smoothFollow", "0", CVAR_ARCHIVE );
+	trap_Cvar_Register( &vr_snapturn, "vr_snapturn", "0", 0 );
 
 	// keep the sentinel referenced so the toolchain retains it in the data segment
 	if ( vr_api_sentinel[0] != 'T' )
@@ -175,7 +175,7 @@ void CG_VR_Frame( void ) {
 	trap_Cvar_Update( &cg_debugWeaponAiming );
 	trap_Cvar_Update( &cg_weaponSelectorSimple2DIcons );
 	trap_Cvar_Update( &cg_firstPersonBodyScale );
-	trap_Cvar_Update( &cg_smoothFollow );
+	trap_Cvar_Update( &vr_snapturn );
 
 	if ( vrActive && vr->scoreboardCursorActive ) {
 		cgs.cursorX = vr->scoreboardCursorX;
@@ -494,12 +494,12 @@ static void CG_OffsetVRThirdPersonView( void ) {
 		vrc_followLastClientNum = currentClient;
 	}
 
-	//Follow mode 1
  	if ( CG_VR_IsThirdPersonFollow(VRFM_THIRDPERSON_1) )
 	{
 		scale *= SPECTATOR_WORLDSCALE_MULTIPLIER;
 
-		if (cg_smoothFollow.integer)
+		// smooth turning gets the orbit camera; snap turning keeps the teleporting one
+		if ( vr_snapturn.value <= 0.0f )
 		{
 			int primaryThumb;
 			float yawInput, pitchInput;

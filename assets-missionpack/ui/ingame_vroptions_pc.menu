@@ -355,24 +355,10 @@ itemDef {
 itemDef {
 	name comfort
 	group grpVR
-	type ITEM_TYPE_YESNO
-	text "Smooth Follow:"
-	cvar "cg_smoothFollow"
-	rect 28 122 340 18
-	textalign ITEM_ALIGN_RIGHT
-	textalignx 180
-	textaligny 14
-	textscale .25
-	forecolor 1 1 1 1
-	visible 0
-	}
-itemDef {
-	name comfort
-	group grpVR
 	type ITEM_TYPE_SLIDER
 	text "Haptic Intensity:"
 	cvarfloat "vr_hapticIntensity" 1.0 0 1
-	rect 28 140 340 18
+	rect 28 122 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -386,7 +372,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "bHaptics Support:"
 	cvar "vr_bhaptics"
-	rect 28 158 340 18
+	rect 28 140 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14

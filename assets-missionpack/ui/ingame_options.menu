@@ -439,7 +439,7 @@ itemDef {
 	text "Follow Camera:"
 	type ITEM_TYPE_MULTI
 	cvar "cg_followMode"
-	cvarFloatList { "First-person" 0 "Orbit" 1 }
+	cvarFloatList { "First-person" 0 "Third-person" 1 }
 	rect 3 320 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146

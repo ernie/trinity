@@ -834,6 +834,7 @@ typedef struct {
 	qboolean		orbitInitialized;		// set once orbit state has been seeded
 
 	int				followLastClientNum;	// detect followed-player changes
+	int				tvFollowReturn;			// camera TV free-fly resumes: 0 first person, 1 third
 
 	// Free-fly camera state (TV / demo)
 	vec3_t			freeFlyOrigin;
@@ -1474,6 +1475,8 @@ void CG_FollowCam_f( void );
 void CG_FollowZoomIn_f( void );
 void CG_FollowZoomOut_f( void );
 void CG_FollowRecenter_f( void );
+void CG_TVStopFollowing( void );
+void CG_TVResumeFollowing( void );
 
 
 //

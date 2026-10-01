@@ -464,6 +464,7 @@ static void CG_Camera_f( void ) {
 
 static void CG_FollowNext_f( void ) {
 	if ( cgs.tvPlayback ) {
+		CG_TVResumeFollowing();
 		trap_SendConsoleCommand( "tv_view_next\n" );
 	} else {
 		trap_SendClientCommand( "follownext" );
@@ -472,6 +473,7 @@ static void CG_FollowNext_f( void ) {
 
 static void CG_FollowPrev_f( void ) {
 	if ( cgs.tvPlayback ) {
+		CG_TVResumeFollowing();
 		trap_SendConsoleCommand( "tv_view_prev\n" );
 	} else {
 		trap_SendClientCommand( "followprev" );
@@ -482,11 +484,16 @@ static void CG_Follow_f( void ) {
 	char arg[MAX_TOKEN_CHARS];
 
 	if ( trap_Argc() < 2 ) {
-		trap_SendClientCommand( "follow" );
+		if ( cgs.tvPlayback ) {
+			CG_TVStopFollowing();
+		} else if ( !cg.demoPlayback ) {
+			trap_SendClientCommand( "follow" );
+		}
 		return;
 	}
 	trap_Argv( 1, arg, sizeof( arg ) );
 	if ( cgs.tvPlayback ) {
+		CG_TVResumeFollowing();
 		trap_SendConsoleCommand( va( "tv_view %s\n", arg ) );
 	} else {
 		trap_SendClientCommand( va( "follow %s", arg ) );

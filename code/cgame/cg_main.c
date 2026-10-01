@@ -1812,10 +1812,8 @@ static void CG_FeederSelection(float feederID, int index) {
 		qboolean alreadyFollowing = (cg.snap->ps.pm_flags & PMF_FOLLOW) &&
 		                            (cg.snap->ps.clientNum == clientNum);
 		if ( spectator && !alreadyFollowing && cg.scores[cg.selectedScore].team != TEAM_SPECTATOR ) {
-			if ( cgs.tvPlayback ) {
-				trap_SendConsoleCommand( va( "tv_view %i\n", clientNum ) );
-			} else if ( !cg.demoPlayback ) {
-				trap_SendClientCommand( va( "follow %i", clientNum ) );
+			if ( cgs.tvPlayback || !cg.demoPlayback ) {
+				trap_SendConsoleCommand( va( "follow %i\n", clientNum ) );
 			}
 		}
 	}

@@ -125,7 +125,7 @@ static const char *blood_names[] =
 static const char *followmode_names[] =
 {
 	"First-person",
-	"Orbit",
+	"Third-person",
 	NULL
 };
 

@@ -43,7 +43,7 @@ All of these settings are available in the options menu.
 - `cg_damagePlums`: Quake Live style colored damage numbers on hit (requires server support for clients)
 - `cg_damageEffect`: Modern red-border damage indication, directionally-weighted
 - `com_blood`: `0` off, `1` classic blood, `2` modern (default) — animated blood gouts, gib blood spray, dense trails, and richer surface splats color-matched to Q3's dark blood. On Trinity servers, modern blood is aggregated per victim and scaled by damage; on vanilla servers it falls back to per-hit. Set in the Game Options menu.
-- `cg_followMode`: Orbit camera for spectating and demo playback. Mouse orbits around the followed player, forward/back keys zoom in and out. When following, weapon next/prev and zoom keys adjust distance and toggle follow mode, respectively, toggling between first and third-person.
+- `cg_followMode`: Third-person camera for spectating and demo playback. Mouse orbits around the followed player, forward/back keys zoom in and out. When following, weapon next/prev and zoom keys adjust distance and toggle follow mode, respectively, toggling between first and third-person.
 - Playback of TV demos (TrinityVision, of course :wink:). These `.tvd` files are server-side recorded, and work like other MVD systems. Requires the client engine support. Currently, [specific to trinity-engine](https://github.com/ernie/trinity-engine)
 
 You can also set your own bindings. The default ones behave like this, but only in follow mode, so they don't override normal gameplay:
@@ -65,8 +65,8 @@ Other TVD playback binds:
 ```
 bind leftarrow tv_backward   # skip backward (cg_tvSkip seconds, default 10)
 bind rightarrow tv_forward   # skip forward
-bind uparrow tv_next         # next player
-bind downarrow tv_prev       # previous player
+bind uparrow follownext      # next player
+bind downarrow followprev    # previous player
 ```
 
 **VR Support**

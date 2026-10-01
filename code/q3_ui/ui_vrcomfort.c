@@ -46,7 +46,6 @@ VR COMFORT OPTIONS MENU
 #define ID_HEIGHTADJUST			128
 #define ID_SIXDOF				129
 #define ID_ROLLHIT				130
-#define ID_SMOOTHFOLLOW			131
 #define ID_HAPTICINTENSITY		132
 #define ID_BHAPTICS				133
 
@@ -64,7 +63,6 @@ typedef struct {
 	menuslider_s		heightadjust;
 	menuradiobutton_s	sixdof;
 	menuradiobutton_s	rollhit;
-	menuradiobutton_s	smoothfollow;
 	menuslider_s		hapticintensity;
 	menuradiobutton_s	bhaptics;
 
@@ -83,7 +81,6 @@ static void VRComfort_SetMenuItems( void ) {
 	s_vrcomfort.heightadjust.curvalue		= trap_Cvar_VariableValue( "vr_heightAdjust" );
 	s_vrcomfort.sixdof.curvalue				= trap_Cvar_VariableValue( "vr_6dof" ) != 0;
 	s_vrcomfort.rollhit.curvalue			= trap_Cvar_VariableValue( "vr_rollWhenHit" ) != 0;
-	s_vrcomfort.smoothfollow.curvalue		= trap_Cvar_VariableValue( "cg_smoothFollow" ) != 0;
 	s_vrcomfort.hapticintensity.curvalue	= trap_Cvar_VariableValue( "vr_hapticIntensity" );
 	s_vrcomfort.bhaptics.curvalue			= trap_Cvar_VariableValue( "vr_bhaptics" ) != 0;
 }
@@ -109,10 +106,6 @@ static void VRComfort_MenuEvent( void* ptr, int notification ) {
 
 		case ID_ROLLHIT:
 			trap_Cvar_SetValue( "vr_rollWhenHit", s_vrcomfort.rollhit.curvalue );
-			break;
-
-		case ID_SMOOTHFOLLOW:
-			trap_Cvar_SetValue( "cg_smoothFollow", s_vrcomfort.smoothfollow.curvalue );
 			break;
 
 		case ID_HAPTICINTENSITY:
@@ -162,8 +155,8 @@ static void VRComfort_MenuInit( void ) {
 	s_vrcomfort.framer.width			= 256;
 	s_vrcomfort.framer.height			= 334;
 
-	// Center the 7-row block (small-font rows) in the frame interior.
-	y = VR_FRAME_CENTER_Y - ( 6 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
+	// Center the 6-row block (small-font rows) in the frame interior.
+	y = VR_FRAME_CENTER_Y - ( 5 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
 	s_vrcomfort.comfortvignette.generic.type		= MTYPE_SLIDER;
 	s_vrcomfort.comfortvignette.generic.x			= VR_X_POS;
 	s_vrcomfort.comfortvignette.generic.y			= y;
@@ -205,15 +198,6 @@ static void VRComfort_MenuInit( void ) {
 	s_vrcomfort.rollhit.generic.y			= y;
 
 	y += BIGCHAR_HEIGHT+2;
-	s_vrcomfort.smoothfollow.generic.type		= MTYPE_RADIOBUTTON;
-	s_vrcomfort.smoothfollow.generic.name		= "Smooth Follow:";
-	s_vrcomfort.smoothfollow.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_vrcomfort.smoothfollow.generic.callback	= VRComfort_MenuEvent;
-	s_vrcomfort.smoothfollow.generic.id			= ID_SMOOTHFOLLOW;
-	s_vrcomfort.smoothfollow.generic.x			= VR_X_POS;
-	s_vrcomfort.smoothfollow.generic.y			= y;
-
-	y += BIGCHAR_HEIGHT+2;
 	s_vrcomfort.hapticintensity.generic.type		= MTYPE_SLIDER;
 	s_vrcomfort.hapticintensity.generic.x			= VR_X_POS;
 	s_vrcomfort.hapticintensity.generic.y			= y;
@@ -252,7 +236,6 @@ static void VRComfort_MenuInit( void ) {
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.heightadjust );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.sixdof );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.rollhit );
-	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.smoothfollow );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.hapticintensity );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.bhaptics );
 

@@ -222,6 +222,39 @@ static void CG_InitOrbitCamera( void ) {
 }
 
 
+static void CG_SetFollowMode( int mode ) {
+	trap_Cvar_Set( "cg_followMode", va( "%i", mode ) );
+	if ( mode == 1 ) {
+		CG_InitOrbitCamera();
+	} else {
+		cg.orbitInitialized = qfalse;
+	}
+	cg.freeFlyInitialized = qfalse;
+	if ( vrActive ) {
+		vr->realign = 3;
+	}
+}
+
+/* First and third person; TV free-fly is reached by leaving follow, as live spectating is. */
+static void CG_CycleFollowMode( void ) {
+	CG_SetFollowMode( cg_followMode.integer == 1 ? 0 : 1 );
+}
+
+/* TV free-fly remembers the camera it left, so switching players resumes it. */
+void CG_TVStopFollowing( void ) {
+	if ( cg_followMode.integer == 2 ) {
+		return;
+	}
+	cg.tvFollowReturn = cg_followMode.integer;
+	CG_SetFollowMode( 2 );
+}
+
+void CG_TVResumeFollowing( void ) {
+	if ( cg_followMode.integer == 2 ) {
+		CG_SetFollowMode( cg.tvFollowReturn );
+	}
+}
+
 /*
 ===============
 CG_FollowCam_f
@@ -253,22 +286,10 @@ void CG_FollowCam_f( void ) {
 		if ( mode == 2 && !cgs.tvPlayback ) {
 			mode = 0;
 		}
-	} else if ( cgs.tvPlayback ) {
-		// cycle: first -> third -> freefly -> first
-		mode = ( cg_followMode.integer + 1 ) % 3;
-	} else {
-		// cycle: first -> third -> first
-		mode = ( cg_followMode.integer == 1 ) ? 0 : 1;
+		CG_SetFollowMode( mode );
+		return;
 	}
-
-	trap_Cvar_Set( "cg_followMode", va( "%i", mode ) );
-
-	if ( mode == 1 ) {
-		CG_InitOrbitCamera();
-	} else {
-		cg.orbitInitialized = qfalse;
-	}
-	cg.freeFlyInitialized = qfalse;
+	CG_CycleFollowMode();
 }
 
 
@@ -908,20 +929,7 @@ void CG_OffsetFirstPersonView( void ) {
 
 void CG_ZoomDown_f( void ) {
 	if ( cg.snap && (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW)) ) {
-		int mode;
-		if ( cgs.tvPlayback ) {
-			// cycle: first -> third -> freefly -> first
-			mode = ( cg_followMode.integer + 1 ) % 3;
-		} else {
-			mode = ( cg_followMode.integer == 1 ) ? 0 : 1;
-		}
-		trap_Cvar_Set( "cg_followMode", va( "%i", mode ) );
-		if ( mode == 1 ) {
-			CG_InitOrbitCamera();
-		} else {
-			cg.orbitInitialized = qfalse;
-		}
-		cg.freeFlyInitialized = qfalse;
+		CG_CycleFollowMode();
 		return;
 	}
 	if ( cg.zoomed ) {
@@ -1439,16 +1447,10 @@ static int CG_CalcViewValues( void ) {
 		// free-fly camera: only available in TV playback
 		if ( (cg.demoPlayback || (cg.snap->ps.pm_flags & PMF_FOLLOW))
 				&& cg_followMode.integer == 2 ) {
-			if ( !cgs.tvPlayback ) {
-				// reset: freefly not available outside TV
-				trap_Cvar_Set( "cg_followMode", "0" );
-				cg.freeFlyInitialized = qfalse;
-			} else {
-				CG_UpdateFreeFlyInput();
-				CG_OffsetFreeFlyView();
-				AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
-				return CG_CalcFov();
-			}
+			CG_UpdateFreeFlyInput();
+			CG_OffsetFreeFlyView();
+			AnglesToAxis( cg.refdefViewAngles, cg.refdef.viewaxis );
+			return CG_CalcFov();
 		}
 
 		if ( cg.renderingThirdPerson ) {
@@ -1592,6 +1594,14 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// update cvars
 	CG_UpdateCvars();
 
+	// the engine derives the VR follow mode by this rule; keep the cvar inside it
+	if ( cg_followMode.integer < 0 || cg_followMode.integer > 2 ||
+			( cg_followMode.integer == 2 && !cgs.tvPlayback ) ) {
+		trap_Cvar_Set( "cg_followMode", "0" );
+		trap_Cvar_Update( &cg_followMode );
+		cg.freeFlyInitialized = qfalse;
+	}
+
 	// update VOIP state
 	CG_UpdateVoipLevels();
 	CG_UpdateVoipChannelState();
@@ -1666,7 +1676,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 		cmdNum = trap_GetCurrentCmdNumber();
 		if ( trap_GetUserCmd( cmdNum, &cmd ) ) {
 			if ( ( cmd.buttons & BUTTON_ATTACK ) && !( tvLastButtons & BUTTON_ATTACK ) ) {
-				trap_SendConsoleCommand( "tv_view_next\n" );
+				trap_SendConsoleCommand( "follownext\n" );
 			}
 			tvLastButtons = cmd.buttons;
 		}
