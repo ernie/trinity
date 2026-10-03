@@ -663,8 +663,8 @@ static void CG_DrawStatusBar( void ) {
 
 	CG_DrawStatusBarHead( 185 + CHAR_WIDTH*3 + TEXT_ICON_SPACE );
 
-	// VOIP target/transmit indicator on player portrait
-	{
+	// VOIP target/transmit indicator on player portrait; live play shows it only while this client's VOIP is on
+	if ( cg.demoPlayback || cgs.tvPlayback || cgs.clientinfo[cg.clientNum].voipEnabled ) {
 		vec4_t txColor;
 		qboolean transmitting;
 		qboolean muted;

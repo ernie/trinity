@@ -42,9 +42,9 @@ itemDef {
 	group grpSystembutton
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 56 395 100 26
+	rect 18 395 84 26
 	textalign 1
-	textalignx 50
+	textalignx 42
 	textaligny 20
 	forecolor 1 1 1 1
 	backcolor .37 .1 .1 1 
@@ -59,7 +59,7 @@ itemDef {
       	name ctr_graphics
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/framebutton.tga"
- 	rect 56 395 100 26
+ 	rect 18 395 84 26
       	visible 1 
 	decoration  	  
     	}
@@ -68,7 +68,7 @@ itemDef {
       	name ctr_graphics
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/leftbutton.tga"
-      	rect 44 395 13 26
+      	rect 6 395 13 26
       	visible 1 
 	decoration  	  
     	}
@@ -77,7 +77,7 @@ itemDef {
       	name ctr_graphics
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/rightbutton.tga"
-      	rect 155 395 13 26
+      	rect 101 395 13 26
       	visible 1 
 	decoration  	  
     	}
@@ -385,9 +385,9 @@ itemDef {
 	group grpSystembutton
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 181 395 100 26
+	rect 126 395 84 26
 	textalign 1
-	textalignx 50
+	textalignx 42
 	textaligny 20
 	forecolor 1 1 1 1
 	backcolor .37 .1 .1 1 
@@ -402,7 +402,7 @@ itemDef {
       	name ctr_driver
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/framebutton.tga"
- 	rect 181 395 100 26
+ 	rect 126 395 84 26
       	visible 1 
 	decoration  	  
     	}
@@ -411,7 +411,7 @@ itemDef {
       	name ctr_driver
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/leftbutton.tga"
-      	rect 169 395 13 26
+      	rect 114 395 13 26
       	visible 1 
 	decoration  	  
     	}
@@ -420,7 +420,7 @@ itemDef {
       	name ctr_driver
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/rightbutton.tga"
-      	rect 280 395 13 26
+      	rect 209 395 13 26
       	visible 1 
 	decoration  	  
     	}
@@ -458,6 +458,293 @@ itemDef {
 
 
 itemDef {
+	name ctr_sound
+	text "Sound"
+	type 1
+	textscale .3
+	group grpSystembutton
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 234 395 84 26
+	textalign 1
+	textalignx 42
+	textaligny 20
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1 
+	visible 1
+	action { play "sound/misc/kcaction.wav" ; 
+	hide grpSystem ; show sound }
+	mouseEnter { setitemcolor ctr_sound backcolor .1 .37 .1 1 } 
+	mouseExit { setitemcolor ctr_sound backcolor .37 .1 .1 1 } 
+	}
+
+itemDef {
+      	name ctr_sound
+	style WINDOW_STYLE_SHADER
+	background "ui/assets/framebutton.tga"
+ 	rect 234 395 84 26
+      	visible 1 
+	decoration  	  
+    	}
+
+itemDef {
+      	name ctr_sound
+	style WINDOW_STYLE_SHADER
+	background "ui/assets/leftbutton.tga"
+      	rect 222 395 13 26
+      	visible 1 
+	decoration  	  
+    	}
+
+itemDef {
+      	name ctr_sound
+	style WINDOW_STYLE_SHADER
+	background "ui/assets/rightbutton.tga"
+      	rect 317 395 13 26
+      	visible 1 
+	decoration  	  
+    	}
+
+
+itemDef {
+	name sound
+	group grpSystem
+	rect 2 4 439 256
+	style WINDOW_STYLE_FILLED
+	border 1
+	bordercolor .5 .5 .5 .5
+	forecolor 1 1 1 1
+	backcolor 0 0 0 .25
+	visible 0
+	decoration
+}
+
+itemDef {
+      	name sound
+	group grpSystem
+      	style 1
+	text "Sound"
+	rect 163 8 128 20
+      	textalign ITEM_ALIGN_CENTER
+      	textalignx 64 
+      	textaligny 20
+	textscale .333
+      	forecolor .4 .4 .65 1
+      	visible 0 
+	decoration
+    	}
+
+	
+
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_SLIDER
+		text "Effects Volume:"
+		cvarfloat "s_volume" 0.7 0 1
+		rect 99 33 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333       
+      		forecolor 1 1 1 1
+      		visible 0 
+    		}
+	
+	
+
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_SLIDER
+		text "Music Volume:"
+		cvarfloat "s_musicvolume" 0.25 0 1
+		rect 99 58 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
+    		}
+
+	
+
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_MULTI
+      		text "VOIP:"
+      		cvar "cl_voip"
+      		cvarFloatList { "Off" 0 "On" 1 }
+		rect 99 83 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
+    		}
+
+	
+
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_MULTI
+      		text "Activation:"
+      		cvar "cl_voipUseVAD"
+      		cvarFloatList { "Push to talk" 0 "When speaking" 1 }
+		rect 99 108 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
+    		}
+
+	
+
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_SLIDER
+      		text "Threshold:"
+      		cvarfloat "cl_voipVADThreshold" 0.1 0 1
+		rect 99 133 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333       
+      		forecolor 1 1 1 1
+      		visible 0 
+    		}
+	
+	
+
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_SLIDER
+		text "VOIP Volume:"
+		cvarfloat "cl_voipVolume" 1 0 2
+		rect 99 158 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
+    		}
+
+	
+
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_MULTI
+		text "Sound System:"
+		cvar "s_useOpenAL"
+		cvarFloatList { "SDL" 0 "OpenAL" 1 }
+		rect 99 183 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
+    		}
+
+	
+
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_MULTI
+		text "SDL Sound Quality:"
+		cvar "s_khz"
+		cvarFloatList { "44 khz (high)" 44 "22 khz (medium)" 22 "11 khz (low)" 11 }
+		rect 99 208 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
+		cvarTest "s_useOpenAL"
+		enableCvar { 0 }
+    		}
+
+	
+
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_YESNO
+		text "Doppler Sound:"
+		cvar "s_doppler"
+		rect 99 233 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
+    		}
+
+	itemDef {
+		name sound
+		text "Apply"
+		type 1
+		group grpSystem
+		textscale .3
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/button_back.tga"
+		rect 171 268 100 26
+		textalign 1
+		textalignx 50
+		textaligny 20
+		forecolor 1 1 1 1
+		backcolor .37 .1 .1 1
+		visible 1
+		action { play "sound/misc/kcaction.wav" ; uiScript systemSettingsApply }
+		mouseEnter { setcolor backcolor .1 .37 .1 1 }
+		mouseExit { setcolor backcolor .37 .1 .1 1 }
+	}
+
+	itemDef {
+		name sound
+		group grpSystem
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/framebutton.tga"
+		rect 171 268 100 26
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name sound
+		group grpSystem
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/leftbutton.tga"
+		rect 159 268 13 26
+		visible 1
+		decoration
+	}
+
+	itemDef {
+		name sound
+		group grpSystem
+		style WINDOW_STYLE_SHADER
+		background "ui/assets/rightbutton.tga"
+		rect 270 268 13 26
+		visible 1
+		decoration
+	}
+
+
+itemDef {
 	name ctr_other
 	text "Other"
 	type 1
@@ -465,9 +752,9 @@ itemDef {
 	group grpSystembutton
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 306 395 100 26
+	rect 342 395 84 26
 	textalign 1
-	textalignx 50
+	textalignx 42
 	textaligny 20
 	forecolor 1 1 1 1
 	backcolor .37 .1 .1 1 
@@ -482,7 +769,7 @@ itemDef {
       	name ctr_other
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/framebutton.tga"
- 	rect 306 395 100 26
+ 	rect 342 395 84 26
       	visible 1 
 	decoration  	  
     	}
@@ -491,7 +778,7 @@ itemDef {
       	name ctr_other
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/leftbutton.tga"
-      	rect 294 395 13 26
+      	rect 330 395 13 26
       	visible 1 
 	decoration  	  
     	}
@@ -500,7 +787,7 @@ itemDef {
       	name ctr_other
 	style WINDOW_STYLE_SHADER
 	background "ui/assets/rightbutton.tga"
-      	rect 405 395 13 26
+      	rect 425 395 13 26
       	visible 1 
 	decoration  	  
     	}
@@ -521,19 +808,7 @@ itemDef {
 itemDef {
 	name other
 	group grpSystem
-	rect 2 102 439 222
-	style WINDOW_STYLE_FILLED
-	border 1
-	bordercolor .5 .5 .5 .5
-	forecolor 1 1 1 1
-	backcolor 0 0 0 .25
-	visible 0
-	decoration
-}
-itemDef {
-	name other
-	group grpSystem
-	rect 2 328 439 52
+	rect 2 114 439 52
 	style WINDOW_STYLE_FILLED
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -640,122 +915,11 @@ itemDef {
 	}
 
 itemDef {
-      	name other
-	group grpSystem
-      	style 1
-	text "Sound"
-	rect 163 106 128 20
-      	textalign ITEM_ALIGN_CENTER
-      	textalignx 64 
-      	textaligny 20
-	textscale .333
-      	forecolor .4 .4 .65 1
-      	visible 0 
-	decoration
-    	}
-
-	itemDef {
-      		name other
-		group grpSystem
-      		type ITEM_TYPE_SLIDER
-		text "Effects Volume:"
-		cvarfloat "s_volume" 0.7 0 1
-		rect 99 131 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
-		textscale .333       
-      		forecolor 1 1 1 1
-      		visible 0 
-    		}
-	
-	itemDef {
-      		name other
-		group grpSystem
-      		type ITEM_TYPE_SLIDER
-		text "Music Volume:"
-		cvarfloat "s_musicvolume" 0.25 0 1
-		rect 99 158 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
-		textscale .333
-      		forecolor 1 1 1 1
-      		visible 0
-    		}
-
-	itemDef {
-      		name other
-		group grpSystem
-      		type ITEM_TYPE_SLIDER
-		text "VOIP Volume:"
-		cvarfloat "cl_voipVolume" 1 0 2
-		rect 99 185 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
-		textscale .333
-      		forecolor 1 1 1 1
-      		visible 0
-    		}
-
-	itemDef {
-      		name other
-		group grpSystem
-      		type ITEM_TYPE_MULTI
-		text "Sound System:"
-		cvar "s_useOpenAL"
-		cvarFloatList { "SDL" 0 "OpenAL" 1 }
-		rect 99 212 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
-		textscale .333
-      		forecolor 1 1 1 1
-      		visible 0
-    		}
-
-	itemDef {
-      		name other
-		group grpSystem
-      		type ITEM_TYPE_MULTI
-		text "SDL Sound Quality:"
-		cvar "s_khz"
-		cvarFloatList { "44 khz (high)" 44 "22 khz (medium)" 22 "11 khz (low)" 11 }
-		rect 99 239 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
-		textscale .333
-      		forecolor 1 1 1 1
-      		visible 0
-		cvarTest "s_useOpenAL"
-		enableCvar { 0 }
-    		}
-
-	itemDef {
-      		name other
-		group grpSystem
-      		type ITEM_TYPE_YESNO
-		text "Doppler Sound:"
-		cvar "s_doppler"
-		rect 99 266 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
-		textscale .333
-      		forecolor 1 1 1 1
-      		visible 0
-    		}
-
-
-
-itemDef {
       	name other			
 	group grpSystem
       	style 1
 	text "Network"
-	rect 163 330 128 20
+	rect 163 118 128 20
       	textalign 1
       	textalignx 64 
       	textaligny 20
@@ -772,7 +936,7 @@ itemDef {
 		text "Net Data Rate:"
 		cvar "rate"
 		cvarFloatList { "<=28.8k" 2500 "33.6k" 3000 "56k" 4000 "ISDN" 5000 "LAN/CABLE/xDSl" 25000  }
-		rect 99 354 256 20
+		rect 99 142 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -790,7 +954,7 @@ itemDef {
 		textscale .3
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 181 292 100 26
+		rect 171 176 100 26
 		textalign 1
 		textalignx 50
 		textaligny 20
@@ -807,7 +971,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/framebutton.tga"
-		rect 181 292 100 26
+		rect 171 176 100 26
 		visible 1
 		decoration
 	}
@@ -817,7 +981,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/leftbutton.tga"
-		rect 169 292 13 26
+		rect 159 176 13 26
 		visible 1
 		decoration
 	}
@@ -827,7 +991,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/rightbutton.tga"
-		rect 280 292 13 26
+		rect 270 176 13 26
 		visible 1
 		decoration
 	}

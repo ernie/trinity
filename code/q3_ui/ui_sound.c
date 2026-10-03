@@ -30,6 +30,9 @@ SOUND OPTIONS MENU
 #define ID_VOIPVOLUME		19
 #define ID_SOUNDSYSTEM		20
 #define ID_APPLY			21
+#define ID_VOIP				22
+#define ID_VOIPVAD			23
+#define ID_VOIPTHRESHOLD	24
 
 
 static const char *quality_items[] = {
@@ -41,6 +44,14 @@ static const char *quality_items[] = {
 
 static const char *soundSystem_items[] = {
 	"SDL", "OpenAL", NULL
+};
+
+static const char *voip_items[] = {
+	"Off", "On", NULL
+};
+
+static const char *voipVad_items[] = {
+	"Push to talk", "When speaking", NULL
 };
 
 typedef struct {
@@ -57,6 +68,9 @@ typedef struct {
 
 	menuslider_s		sfxvolume;
 	menuslider_s		musicvolume;
+	menulist_s			voip;
+	menulist_s			voipVad;
+	menuslider_s		voipThreshold;
 	menulist_s			quality;
 //	menuradiobutton_s	a3d;
 	menuslider_s		voipvolume;
@@ -68,6 +82,9 @@ typedef struct {
 	float				sfxvolume_original;
 	float				musicvolume_original;
 	float				voipvolume_original;
+	int					voip_original;
+	int					voipVad_original;
+	float				voipThreshold_original;
 	int					soundSystem_original;
 	int					quality_original;
 } soundOptionsInfo_t;
@@ -127,6 +144,15 @@ static void UI_SoundOptionsMenu_Event( void* ptr, int event ) {
 
 		trap_Cvar_SetValue( "cl_voipVolume", soundOptionsInfo.voipvolume.curvalue / 5 );
 		soundOptionsInfo.voipvolume_original = soundOptionsInfo.voipvolume.curvalue;
+
+		trap_Cvar_SetValue( "cl_voip", soundOptionsInfo.voip.curvalue );
+		soundOptionsInfo.voip_original = soundOptionsInfo.voip.curvalue;
+
+		trap_Cvar_SetValue( "cl_voipUseVAD", soundOptionsInfo.voipVad.curvalue );
+		soundOptionsInfo.voipVad_original = soundOptionsInfo.voipVad.curvalue;
+
+		trap_Cvar_SetValue( "cl_voipVADThreshold", soundOptionsInfo.voipThreshold.curvalue / 20 );
+		soundOptionsInfo.voipThreshold_original = soundOptionsInfo.voipThreshold.curvalue;
 
 		// Check if something changed that requires the sound system to be restarted.
 		if (soundOptionsInfo.quality_original != soundOptionsInfo.quality.curvalue
@@ -199,6 +225,18 @@ static void SoundOptions_UpdateMenuItems( void )
 	{
 		soundOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
+	if ( soundOptionsInfo.voip_original != soundOptionsInfo.voip.curvalue )
+	{
+		soundOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( soundOptionsInfo.voipVad_original != soundOptionsInfo.voipVad.curvalue )
+	{
+		soundOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( soundOptionsInfo.voipThreshold_original != soundOptionsInfo.voipThreshold.curvalue )
+	{
+		soundOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
 }
 
 /*
@@ -209,6 +247,11 @@ SoundOptions_MenuDraw
 void SoundOptions_MenuDraw (void)
 {
 	SoundOptions_UpdateMenuItems();
+
+	// The engine turns cl_voip back off when the rate is too low for it.
+	if ( soundOptionsInfo.voip_original && !trap_Cvar_VariableValue( "cl_voip" ) ) {
+		soundOptionsInfo.voip.curvalue = soundOptionsInfo.voip_original = 0;
+	}
 
 	Menu_Draw( &soundOptionsInfo.menu );
 }
@@ -295,8 +338,8 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.network.style				= UI_RIGHT;
 	soundOptionsInfo.network.color				= color_red;
 
-	// content column (5 rows) centered on the frame
-	y = 242 - ( 5 * (BIGCHAR_HEIGHT + 2) ) / 2;
+	// content column (8 rows) centered on the frame
+	y = 242 - ( 8 * (BIGCHAR_HEIGHT + 2) ) / 2;
 	soundOptionsInfo.sfxvolume.generic.type		= MTYPE_SLIDER;
 	soundOptionsInfo.sfxvolume.generic.name		= "Effects Volume:";
 	soundOptionsInfo.sfxvolume.generic.flags	= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -317,6 +360,37 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.musicvolume.generic.y			= y;
 	soundOptionsInfo.musicvolume.minvalue			= 0;
 	soundOptionsInfo.musicvolume.maxvalue			= 10;
+
+	y += BIGCHAR_HEIGHT+2;
+	soundOptionsInfo.voip.generic.type		= MTYPE_SPINCONTROL;
+	soundOptionsInfo.voip.generic.name		= "VOIP:";
+	soundOptionsInfo.voip.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	soundOptionsInfo.voip.generic.callback	= UI_SoundOptionsMenu_Event;
+	soundOptionsInfo.voip.generic.id		= ID_VOIP;
+	soundOptionsInfo.voip.generic.x			= 400;
+	soundOptionsInfo.voip.generic.y			= y;
+	soundOptionsInfo.voip.itemnames			= voip_items;
+
+	y += BIGCHAR_HEIGHT+2;
+	soundOptionsInfo.voipVad.generic.type		= MTYPE_SPINCONTROL;
+	soundOptionsInfo.voipVad.generic.name		= "Activation:";
+	soundOptionsInfo.voipVad.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	soundOptionsInfo.voipVad.generic.callback	= UI_SoundOptionsMenu_Event;
+	soundOptionsInfo.voipVad.generic.id			= ID_VOIPVAD;
+	soundOptionsInfo.voipVad.generic.x			= 400;
+	soundOptionsInfo.voipVad.generic.y			= y;
+	soundOptionsInfo.voipVad.itemnames			= voipVad_items;
+
+	y += BIGCHAR_HEIGHT+2;
+	soundOptionsInfo.voipThreshold.generic.type		= MTYPE_SLIDER;
+	soundOptionsInfo.voipThreshold.generic.name		= "Threshold:";
+	soundOptionsInfo.voipThreshold.generic.flags	= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	soundOptionsInfo.voipThreshold.generic.callback	= UI_SoundOptionsMenu_Event;
+	soundOptionsInfo.voipThreshold.generic.id		= ID_VOIPTHRESHOLD;
+	soundOptionsInfo.voipThreshold.generic.x		= 400;
+	soundOptionsInfo.voipThreshold.generic.y		= y;
+	soundOptionsInfo.voipThreshold.minvalue		= 0;
+	soundOptionsInfo.voipThreshold.maxvalue		= 20;
 
 	y += BIGCHAR_HEIGHT+2;
 	soundOptionsInfo.voipvolume.generic.type			= MTYPE_SLIDER;
@@ -389,6 +463,9 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.network );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.sfxvolume );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.musicvolume );
+	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.voip );
+	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.voipVad );
+	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.voipThreshold );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.voipvolume );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.soundSystem );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.quality );
@@ -399,6 +476,9 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.sfxvolume.curvalue = soundOptionsInfo.sfxvolume_original = trap_Cvar_VariableValue( "s_volume" ) * 10;
 	soundOptionsInfo.musicvolume.curvalue = soundOptionsInfo.musicvolume_original = trap_Cvar_VariableValue( "s_musicvolume" ) * 10;
 	soundOptionsInfo.voipvolume.curvalue = soundOptionsInfo.voipvolume_original = trap_Cvar_VariableValue( "cl_voipVolume" ) * 5;
+	soundOptionsInfo.voip.curvalue = soundOptionsInfo.voip_original = trap_Cvar_VariableValue( "cl_voip" ) != 0;
+	soundOptionsInfo.voipVad.curvalue = soundOptionsInfo.voipVad_original = trap_Cvar_VariableValue( "cl_voipUseVAD" ) != 0;
+	soundOptionsInfo.voipThreshold.curvalue = soundOptionsInfo.voipThreshold_original = trap_Cvar_VariableValue( "cl_voipVADThreshold" ) * 20;
 
 	if (trap_Cvar_VariableValue( "s_useOpenAL" ))
 		soundOptionsInfo.soundSystem_original = UISND_OPENAL;

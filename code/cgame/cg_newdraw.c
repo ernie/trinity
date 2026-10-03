@@ -1517,6 +1517,10 @@ static void CG_DrawPlayerVoipBadge(rectDef_t *rect) {
 		}
 	} else {
 		cn = cg.clientNum;
+		// with this client's VOIP off there is nothing to show
+		if (!cgs.clientinfo[cn].voipEnabled) {
+			return;
+		}
 		(void)CG_GetVoipChannelColor(txColor);
 		transmitting = cg.voipTalking[cn];
 		muted = CG_LocalVoipMuted();

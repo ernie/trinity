@@ -3373,7 +3373,9 @@ static bind_t g_bindings[] =
 	{"messagemode",  -1,					-1,		-1, -1},
 	{"messagemode2", -1,						-1,		-1, -1},
 	{"messagemode3", -1,						-1,		-1, -1},
-	{"messagemode4", -1,						-1,		-1, -1}
+	{"messagemode4", -1,						-1,		-1, -1},
+	{"+voiprecord", -1,						-1,		-1, -1},
+	{"voiptarget", -1,						-1,		-1, -1}
 };
 
 
