@@ -34,7 +34,7 @@ typedef struct bot_consolemessage_s
 //match variable
 typedef struct bot_matchvariable_s
 {
-	char offset;
+	short offset;
 	int length;
 } bot_matchvariable_t;
 //returned to AI when a match is found
