@@ -81,3 +81,15 @@ gfx/trinity/flameball
 		tcmod rotate -35
 	}
 }
+
+// The engine console and the menu charsets register this name; cgame reads bigchars.cfg itself
+gfx/2d/bigchars
+{
+	nopicmip
+	{
+		map gfx/2d/bigchars_64.tga
+		blendFunc blend
+		rgbGen vertex
+		alphaGen vertex
+	}
+}
