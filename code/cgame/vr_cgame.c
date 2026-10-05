@@ -364,8 +364,8 @@ void CG_VR_DeathCamReset( void ) {
 	vrc_deathCamTime = -1;
 }
 
-// HUD-portrait EMA re-seed: the host calls this when the portrait's subject
-// changes (e.g. the crosshair-target face swaps).
+// HUD-portrait EMA re-seed for a timeline jump the snapshots don't flag as a
+// teleport (a demo seek); a follow switch re-seeds on its own.
 void CG_VR_PortraitReset( void ) {
 	vrc_portraitInitialized = qfalse;
 }

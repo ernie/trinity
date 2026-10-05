@@ -118,7 +118,7 @@ void CG_VR_CvarSet( const char *name, float value );
 // Drop-state accessors and reset call-outs (the VR state these touch lives
 // inside vr_cgame.c; hosts read and re-arm it only through these).
 void CG_VR_DeathCamReset( void );          // local player (re)spawn / new gamestate
-void CG_VR_PortraitReset( void );          // HUD portrait subject changed
+void CG_VR_PortraitReset( void );          // timeline jump without a teleport (demo seek)
 qboolean CG_VR_DrawingZoomedHUD( void );   // inside the zoom minimal-HUD pass
 qhandle_t CG_VR_ReticleShader( void );     // zoom scope mask, 0 until media loads
 qboolean CG_VR_ClientIsVR( int clientNum ); // server-flagged VR player (vr\ configstring field)

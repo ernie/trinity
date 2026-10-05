@@ -3,7 +3,7 @@
 This document describes how VR head orientation is networked in Quake 3 mods
 that support VR clients. It covers the three layers involved:
 
-1. **VR Client Engine** (e.g. trinity-vr, trinity-quest): packs head angles into usercmds
+1. **VR Client Engine** (e.g. trinity-engine, trinity-standalone): packs head angles into usercmds
 2. **Server Engine** (e.g. [trinity-engine](https://github.com/ernie/trinity-engine)): reads extended button bits from VR clients
 3. **Game Mod / QVM** (e.g. [Trinity](https://github.com/ernie/trinity)): unpacks, stores, transmits, and renders head orientation through the vendored `vr_*` modules (see [`VR_INTEGRATION.md`](VR_INTEGRATION.md)). VR clients run the game/cgame modules as VR-aware QVMs, with native builds of the same source as the fallback.
 

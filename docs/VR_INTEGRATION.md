@@ -69,7 +69,8 @@ relative to `code/`):
   it). If your tree satisfies this header, the drop compiles.
 - **`cgame/vr_host_config.h`**: the **one file in the drop you are meant to
   edit**. Declares which optional host features exist (`VR_HOST_HAS_TV`,
-  `VR_HOST_HAS_WARMUP_EVENTS` — a stock tree sets both to 0), maps small
+  `VR_HOST_HAS_WARMUP_EVENTS`, `VR_HOST_HAS_GRAPPLE`,
+  `VR_HOST_HAS_TRACE_RENDER`; a stock tree sets all four to 0), maps small
   contract gaps (`#define Q_sscanf sscanf`), and may set the weapon wheel's
   default set (`VR_WHEEL_DEFAULT_WEAPONS`). Its tokens are
   whitespace-separated — commas are **not** separators. A token is a
@@ -93,13 +94,27 @@ relative to `code/`):
 - **`ui/vr_ui.c` / `.h`**: the same contract, Team Arena implementation.
 - **`ui/vr_uishared.c` / `.h`**: the shared VR screen transform and model-FOV
   compensation. Team Arena only; links into two targets (Step 2).
+- **`game/vr_ui_mode.c`**: the flatscreen/VR display-mode choice the
+  settings screens offer, written to the latched `vr_enabled` through the
+  console so it applies at the next video restart. Both UI targets.
+- **`game/vr_bindmenu.c` / `.h`**: the VR bindings menu's model (rows,
+  bind rules, the waiting state), shared by both UIs. It makes no engine
+  calls; each `vr_ui.c` supplies its I/O (Step 7).
+- **`game/vr_supersample.c` / `.h`**: the supersampling picker's math
+  (1.0 to 2.0 in tenths, the per-eye size each step renders at). Both UI
+  targets.
+- **`game/vr_glyph.c` / `.h`**: VR button glyphs in text: glyph name to
+  atlas cell, key markers, and laying out text runs and glyphs together.
+  It makes no engine calls; each module supplies its I/O and font. The
+  cgame and both UI targets.
 
-You also need the VR settings screens, for each UI you build. baseq3: five C
-menu files (`ui_vroptions.c`, the hub, plus `ui_vrcomfort.c`,
-`ui_vrcontrols.c`, `ui_vrhud_display.c`, `ui_vrmirror.c`); one build serves both
-platforms. Team Arena: the VR `.menu` files together with **both** manifests
-(`vrmenus_pc.txt`, `vrmenus_standalone.txt`) — bundle the pc and standalone
-variants both, because the same `ui.qvm` may be loaded by either engine and
+You also need the VR settings screens, for each UI you build. baseq3: six C
+menu files (`ui_vroptions.c`, the hub, plus `ui_vrbindings.c`,
+`ui_vrcomfort.c`, `ui_vrcontrols.c`, `ui_vrhud_display.c`, `ui_vrmirror.c`);
+one build serves both platforms. Team Arena: the VR `.menu` files
+(`vroptions_*`, `ingame_vroptions_*`, `vrbindings.menu`) together with
+**both** manifests (`vrmenus_pc.txt`, `vrmenus_standalone.txt`). Bundle the
+pc and standalone variants both, because the same `ui.qvm` may be loaded by either engine and
 `UI_VR_LoadMenus` picks the manifest at runtime from the platform. Step 7
 explains why the screens are required and what a replacement must reproduce.
 
@@ -118,6 +133,8 @@ Add the copied sources to your build's module lists.
 | `q3_ui/vr_ui.c` | baseq3 UI |
 | `ui/vr_ui.c` | missionpack UI |
 | `ui/vr_uishared.c` | missionpack cgame **and** missionpack UI |
+| `vr_ui_mode.c`, `vr_bindmenu.c`, `vr_supersample.c` | both UI targets |
+| `vr_glyph.c` | cgame **and** both UI targets |
 | baseq3 VR menu C files | baseq3 UI |
 
 The five contract headers carry no compile line; make them reachable on every
@@ -145,8 +162,8 @@ on baseq3, so ship the files in your own pak.
 
 ## Building the QVMs
 
-Neither VR engine ships a QVM compiler. trinity-vr and trinity-quest load
-QVMs; they never produce them — your mod tree is the only source of QVMs,
+Neither VR engine ships a QVM compiler. trinity-engine and trinity-standalone
+load QVMs; they never produce them, so your mod tree is the only source of QVMs,
 and this section is about the toolchain that turns it into them.
 
 **What this tree uses.** A vendored lcc 4.2 (`tools/q3lcc`, built as
@@ -401,6 +418,38 @@ handlers in your `cg_consolecmds.c` command table:
 	{ "-adjust_reset", CG_WeaponAdjustResetUp_f },
 ```
 
+In adjust mode a tap of `+adjust_reset` resets the selected parameter and
+a 2 s hold resets them all. `weapon_adjust` toggles the mode wherever it is
+bound; run from the console or a menu, it sends `returntogame` and enters
+the mode once the game shows. The drop draws the adjust overlay itself,
+into the HUD buffer in place of the HUD and across its width (with the HUD
+off, through the buffer as the notify lines are drawn; the engines hide
+the notify lines while it is up). Its footer names the buttons, and while
+`+adjust_reset` is held it says what letting go does over a bar that fills
+toward resetting every parameter. The host places no draw call for it.
+
+**Engine-routed input.** The engine routes every controller input through
+its bindings (Step 7) before the module sees it, so the drop never picks
+a stick or a hand itself:
+
+- `thumbstick_location[]` holds the sticks by role,
+  `[VR_STICK_MOVE]` and `[VR_STICK_TURN]`, deadzone-processed, with
+  handedness and `vr_switchThumbsticks` already applied.
+- `pointerMode` says who presents the menu selection:
+  `VR_POINTER_CURSOR` (0), the controller ray moves the hover and the module
+  draws its cursor; `VR_POINTER_STICK` (1), a thumbstick moves the
+  selection, with no hover, cursor or ray; `VR_POINTER_DRAWN` (2), the ray
+  moves the hover and the engine draws the ray and its pool of light, so the
+  module hides its cursor. The drop's UI hooks read it for you; a cursor
+  your cgame draws itself (a clickable scoreboard) adds
+  `&& !CG_VR_HideCursor()` to its draw condition.
+- The VR follow camera comes from `cg_followMode`, which the engine reads
+  every frame: 0 first person, 1 third person, 2 free-fly (TV playback
+  only; anything else reads as first person). A mod with its own follow
+  camera keeps that cvar the source of truth. In third person the drop
+  orbits the followed player under smooth turning and keeps the teleporting
+  camera under snap turning (`vr_snapturn`).
+
 **The one whole-frame fork.** `CG_VR_DrawFrame` is the only place the drop
 takes over an entire subsystem: `qtrue` means it fully drew the VR frame and
 the caller returns; on a flatscreen engine it returns `qfalse` and your
@@ -631,8 +680,11 @@ five shapes:
   dormancy-safe.
 - **Drop-state resets and reads.** Call `CG_VR_DeathCamReset()` wherever the
   local player (re)spawns or a new gamestate begins (this tree: the `CG_Init`
-  seed and `CG_Respawn`), and `CG_VR_PortraitReset()` where your HUD
-  portrait's subject changes. For your own drawing,
+  seed and `CG_Respawn`), and `CG_VR_PortraitReset()` where your timeline
+  jumps without the snapshots flagging a teleport (this tree: the demo
+  seek). A follow switch needs no call, since the portrait re-seeds on the
+  snapshot teleport, so a tree without such a jump has no site for it.
+  For your own drawing,
   `CG_VR_DrawingZoomedHUD()` is qtrue inside the zoom minimal-HUD pass and
   `CG_VR_ReticleShader()` returns the zoom scope mask shader. Dormant, the
   resets no-op and the reads return qfalse/0.
@@ -763,6 +815,25 @@ UI_VR_FillScreen( menu->window.background );` before the stock
 `UI_VR_CompensateModelFov` is called from `Item_Model_Paint` in both links
 and from `UI_DrawPlayer`.
 
+The Team Arena VR menus draw their settings and bindings rows as
+owner-draws in the drop (Step 7). Each of `ui_main.c`'s three owner-draw
+switches hands its `default:` case to the drop, with the same arguments:
+
+```diff
+     default:
+-      break;
++      UI_VR_OwnerDraw(x, y, w, h, text_x, text_y, ownerDraw, ownerDrawFlags, align, special, scale, color, shader, textStyle);
++      break;
+```
+
+`UI_OwnerDrawHandleKey`'s becomes
+`return UI_VR_OwnerDrawHandleKey(ownerDraw, flags, special, key);` and
+`UI_OwnerDrawWidth`'s `return UI_VR_OwnerDrawWidth(ownerDraw, scale);`.
+`UI_VR_KeyEvent( key, down )` runs first in `_UI_KeyEvent`: a bindings
+row waiting for a button takes every key, and under stick navigation left
+and right step the focused slider. The bindings menu's `onClose` runs
+`uiScript vrBindCancel`, so closing it ends a wait.
+
 Appendix D lists the deliberate differences between the two UIs.
 
 ---
@@ -781,8 +852,6 @@ the couplings behind the screens:
   `cg_draw3dIcons 1`. Team Arena's HUD Mode rows run
   `uiScript vrHudDrawStatusChanged` in their `action`, handled by
   `UI_VR_RunMenuScript`.
-- **`vr_switchThumbsticks`.** A swap-in-place edit of the affected button
-  mappings.
 - **The display mode.** `vr_enabled` is latched: a module's own cvar
   write would force it in, so the choice goes through the console
   (`UI_VR_ChooseMode`) and applies at the next video restart. Team Arena's
@@ -797,8 +866,9 @@ the couplings behind the screens:
 - **Reachable VR menus are fullscreen.** The engine's laser pointer can land
   a click anywhere on the virtual screen; a non-fullscreen menu treats a
   click outside its own rect as out-of-bounds and dismisses. Every shipped
-  standalone VR screen sets `fullscreen 1` — the five q3_ui screens
-  (`menu.fullscreen = qtrue`) and Team Arena's `vroptions_*.menu`. The
+  standalone VR screen sets `fullscreen 1`: the six q3_ui screens
+  (`menu.fullscreen = qtrue`) and Team Arena's `vroptions_*.menu` and
+  `vrbindings.menu`. The
   in-game `ingame_vroptions_*.menu` panels are the deliberate exception:
   `fullscreen 0` with `outOfBoundsClick`, so a click outside the panel
   closes it back to the game. A replacement full-screen menu that omits
@@ -807,13 +877,74 @@ the couplings behind the screens:
 The straightforward path is to take the shipped screens as-is; the couplings
 come along for free.
 
+**The bindings menu.** Controller inputs are keys the engine binds per
+context: `vrbind <context>[+alt] <key> <command>`, with the contexts
+`global`, `menu`, `adjust`, `scrub`, `scoreboard`, `vote`, `wheel`,
+`follow` and `gameplay`, each also as `<context>+alt` for the layer used
+while Alt is held. The controller keys name roles (weapon hand, off hand,
+move stick, turn stick), not sides, so handedness and the thumbstick swap
+change the glyph a key shows, never its bindings. The bindings screen
+is **required** in each UI you build: without it a VR player rebinds at
+the console. Both shipped forms
+(baseq3's `ui_vrbindings.c`, Team Arena's `vrbindings.menu` with the
+drop's owner-draws) sit on `vr_bindmenu`; the menu shows Button and
+Alt + Button columns, and each row's X clears both; stick left/right move
+between cells, and glyphs name the buttons; the waiting state is shared.
+The drop's `vr_ui.c` connects it to the engine through value keys read
+with `trap_GetValue` and one trap:
+
+| Key | Answer |
+|-----|--------|
+| `vr_keyfirst` | The engine's first VR key code; VR key *n* is that plus *n* (0 to 35). Read at UI init. |
+| `vr_binding <context> <keycode>` | The command bound there, empty when unbound |
+| `vr_keyglyph <keycode>` | The key's glyph name in the mod's atlas (`trigger_l`, `stick_up_r`, `a`, `menu`, `dpad_left`, …), after handedness and the stick swap |
+| `vr_bindkeys <context> <command>` | The key codes the router would run that command with in that context, by the router's own rules: an Alt combo first, as `<altcode>+<code>`, else one plain key; keys the controller lacks never count |
+| `vr_keydefault <context> <index> <command>` | The controller's default key code for that command, `<index>` 0 or 1; no answer when there is none |
+| `vr_eyesize` | `recW recH maxW maxH`: the recommended per-eye size supersampling scales and the most the headset allows |
+| `trap_VR_BindCapture` | A trap, armed only while the UI has key focus: the next VR button gesture reaches the UI as its key code, once its buttons are let go, instead of running a binding |
+
+Writes go through the console commands `vrbind` and `vrunbind`. The model
+writes each cell's keys as `vr_glyph` key markers. A UI drives `VRBM_Tick(
+realtime )` and `VRG_Tick` each frame and paints the cells and the status
+line with its module's glyph glue (`UI_VR_GlyphPaint` in Team Arena,
+`UI_VR_GlyphString` in baseq3); the model keeps the names it reads,
+refreshing them after an edit or every half second.
+`UI_VR_BindingsAvailable()` is qtrue when the engine answered both
+`trap_VR_BindCapture` and `vr_keyfirst`; the screens hide their bindings
+entry otherwise. Team Arena's Bindings button reads it as
+`cvarTest "ui_vrBindingsAvailable"`, which `UI_VR_Init` sets.
+
+**Team Arena owner-draws.** The drop's `vr_ui.c` draws the VR menus'
+owner-draw rows, reached through the Step 6 `default:` cases. The bindings
+menu uses `UI_VRBIND` (269, one per row, the row index in the item's
+`special`) and `UI_VRBIND_STATUS` (270). The option
+menus use `UI_REFRESHRATE` (265, cycles `vr_refreshrate` through the
+`vr_refreshrates` list), `UI_FOVEATION` and `UI_FOVEATION_STRENGTH`
+(266, 267, `vr_foveation` capped by `vr_foveationCaps`, and
+`vr_foveationStrength`), `UI_WEAPONPITCH` (268, the `vr_weaponPitch`
+value beside its slider) and `UI_VRSUPERSAMPLING` (271, `vr_superSampling`
+as a 1.0 to 2.0 slider in tenths with the eye size each step renders at,
+through `vr_supersample` and `vr_eyesize`). Your `ui/menudef.h` carries
+the IDs at these values (Appendix E), and your missionpack pak ships it:
+the `.menu` files resolve the names through the first `ui/menudef.h` the
+game finds (Appendix C). baseq3's screens carry the same rows in their C
+files.
+
 **Making them reachable.** baseq3: in `ui_setup.c`, the SETUP menu swaps
 its flatscreen CONTROLS entry for a VR OPTIONS entry when
 `UI_VR_Platform() != VRP_NONE` (VR binds live in VR OPTIONS; the keyboard
 binds page is flatscreen-only). Dormancy-safe: on a flatscreen engine the
-menu is stock. Team Arena needs no wiring — the `vrmenus` manifests packed
-into the missionpack pak are the only load path, and `UI_VR_LoadMenus`
-(Step 6) reads them.
+menu is stock. The VR OPTIONS hub opens the bindings screen. Team Arena:
+the `vrmenus` manifests packed into the missionpack pak are the only load
+path, `UI_VR_LoadMenus` (Step 6) reads them, and they load
+`vrbindings.menu` beside the option menus. The entries that open them go
+in your own menus, on `cvarTest "ui_vrActive"`: in `setup.menu`, a VR
+Options item in the Controls slot (`open vroptions_menu`) with the
+Controls item hidden under VR; in `ingame.menu`, a VR tab in the Controls
+tab's place (`open ingame_vroptions`); and the Display Mode row on the
+System pages (above). `UI_VR_Init` registers that cvar `CVAR_ROM` and sets
+it from `vrActive`, so a flatscreen engine reads `0`. The mod template
+carries these edits on retail's menus.
 
 ---
 
@@ -835,14 +966,18 @@ writes these names.
 | `vr_worldscaleScaler` | archived | Spectator/zoom scale factor; **written** each frame by the drop's view code (spectator multipliers, zoom coefficient) and read back for HUD-panel placement; the engine's renderers read it too |
 | `vr_hudDrawStatus`, `vr_hudDepth`, `vr_hudScale`, `vr_hudYOffset` | archived | HUD visibility preference and in-world placement |
 | `vr_currentHudDrawStatus`, `vr_currentHudDepth` | transient | Written by `CG_VR_Frame` for the renderer to read |
-| `vr_thirdPersonSpectator` | transient | Written each frame so the renderer drops sky in spectator views |
-| `vr_platform` | ROM (engine-set) | `pc` / `quest`; read **only** through `UI_VR_Platform()` (see below) |
+| `vr_thirdPersonSpectator` | transient | Written each frame; read only by trinity-standalone's renderer, which drops sky in spectator views |
+| `vr_platform` | ROM (engine-set) | `pc` (trinity-engine) or `standalone` (trinity-standalone); read **only** through `UI_VR_Platform()` (see below) |
 | `vr_6dof` | archived | Seeds `use_6dof` (singleplayer only) |
 | `vr_mirrorEnabled` / `vr_mirrorFullscreen` | archived | Desktop-mirror mode, staged/applied by the menu scripts |
 | `vr_mirrorWidth`, `vr_mirrorHeight` | archived (PC engine only) | Desktop-mirror resolution, staged and written by the mirror Apply (Step 7); unregistered on other engines, where the writes are inert |
-| `vr_lasersight`, `vr_twoHandedWeapons`, `vr_showItemInHand`, `vr_rollWhenHit`, `vr_weaponAdjust`, `vr_weaponSelectorMode`, `vr_weaponSelectorWithHud` | archived | Gameplay/comfort toggles read by the client hooks |
-| `vr_controlSchema`, `vr_switchThumbsticks` | archived | Control-scheme handlers (see Step 7) |
-| `vr_button_map_*` family | archived | Per-button remaps: `A`, `B`, `X`, `Y`, `PRIMARYGRIP`, `PRIMARYTHUMBSTICK`, and the `RTHUMB{FORWARD,BACK,LEFT,RIGHT}` set with their `_ALT` variants |
+| `vr_lasersight`, `vr_twoHandedWeapons`, `vr_showItemInHand`, `vr_rollWhenHit`, `vr_weaponSelectorMode`, `vr_weaponSelectorWithHud` | archived | Gameplay/comfort toggles read by the client hooks |
+| `vr_switchThumbsticks` | archived | Swaps the move and turn stick roles; the engine applies it, the settings screens only write it |
+| `vr_snapturn` | archived | Snap-turn angle, 0 for smooth turning; also picks the third-person follow camera (Step 5) |
+| `vr_controllerModels` | archived, default 1, live | The pointer ray, its pool of light and the runtime's controller models on the virtual screen |
+| `vr_screenCurvature` | archived, default 0.5 | Virtual screen curvature: 0 flat, 1 the tightest curve |
+| `vr_refreshrate`, `vr_foveation`, `vr_foveationStrength`, `vr_weaponPitch`, `vr_superSampling` | archived | Headset settings written by the settings rows (Step 7) |
+| `vr_refreshrates`, `vr_foveationCaps` | ROM (engine-set) | What the headset offers: its refresh rates, and `none` / `fixed` / `eyetracked` |
 
 There is no `vr_stabilised` cvar; weapon stabilization is a mirror flag, not
 a cvar.
@@ -865,8 +1000,8 @@ vrPlatform_t VR_Platform( qboolean vrActive ) {
 	if ( !Q_stricmp( buf, "pc" ) ) {
 		return VRP_PC;
 	}
-	if ( !Q_stricmp( buf, "quest" ) ) {
-		return VRP_QUEST;
+	if ( !Q_stricmp( buf, "standalone" ) ) {
+		return VRP_STANDALONE;
 	}
 	return VRP_NONE;
 }
@@ -899,6 +1034,11 @@ what a `VR_API_MINOR` bump is for.
 | `trap_HapticEvent` | cgame, both UI |
 | `trap_VKeyboard_Show` / `_Hide` / `_IsActive` / `_HandleKey` | both UI |
 
+One pair sits outside that rule. After registration the UI modules ask for
+`trap_VR_BindCapture` and the `vr_keyfirst` value (Step 7); when either is
+missing the module stays VR-active and only the bindings screen is
+unavailable (`UI_VR_BindingsAvailable()` is qfalse).
+
 ## Appendix C: Asset dependencies
 
 Each asset degrades cleanly when absent: a missing asset drops its feature,
@@ -915,6 +1055,27 @@ it never crashes.
 hover sphere, `models/powerups/health/small_sphere.md3`) itself. The laser
 beam draws through the host's `CG_LaserSight` (`vr_host.h`). Comfort
 vignettes are cvar-driven (`vr_comfortVignette`) and rendered engine-side.
+
+A second set comes from the Trinity pak in the base game (`pak8t.pk3` in
+baseq3, `pak3t.pk3` in missionpack), which every Trinity install carries.
+Your mod needs no copies; a mod pak overrides nothing it does not define.
+The one exception is `ui/menudef.h`: ship your own in your missionpack pak,
+with this tree's owner-draw values (Appendix E).
+
+| Asset (Trinity pak) | Used by | Without it |
+|-------|---------|-----------|
+| `fonts/fontImage_24.dat` with its page `fonts/fontImage_0_24.tga`, `gfx/vkb/cap`, `panel`, `glow`, `icons` (`.tga`) and their shaders in `scripts/vkb.shader` | the engine's VR keyboard | The keyboard draws flat text keys |
+| `gfx/2d/bigchars_64.tga` and the `gfx/2d/bigchars` entry in `scripts/trinity.shader` | the console, notify lines and q3_ui small text | Retail's 16 px sheet, pixelated on the virtual screen |
+| `gfx/vr/glyphs.tga` and `scripts/vrglyphs.shader` | the atlas of VR button glyphs, drawn by `code/game/vr_glyph.c` (generated by `tools/generate_vr_glyphs.py`): the bindings cells and status line, and the cancel-key prompts | Glyph cells draw the engine's missing-shader image (or nothing) in place of the buttons; there is no text fallback |
+
+In missionpack the Trinity pak also replaces 22 of retail's Team Arena
+menus and `ui/menus.txt`, and its menus call this tree's own UI scripts.
+A Team Arena mod pak beside it ships its own copy of each menu it uses,
+with its own `ui/menus.txt`, so its UI never loads Trinity's set; the mod
+template carries retail's, with the Step 7 entries added. Retail's menus
+use about 0.9 MB of the UI's `MEM_POOL_SIZE` and the VR menus add about
+110 KB, which leaves stock's 1 MB 3% to spare; the template raises it to
+1.5 MB. Out of pool, the menus fail to load and the main menu hangs.
 
 ## Appendix D: Differences between the two UIs
 
@@ -950,7 +1111,12 @@ framebuffer's size from `CG_GetViewable4x3Dimensions` (it answers in
 framebuffer pixels) and `320/240` from `CG_GetProjectionCenter`, and draw
 nothing in `CG_DrawScreen2D`; the
 anchor pair may be empty on a host with no widescreen anchoring. Take this
-tree's implementations if you want the full behavior.
+tree's implementations if you want the full behavior. Four more exist only
+behind their `vr_host_config.h` gates: `CG_WarmupEvents`
+(`VR_HOST_HAS_WARMUP_EVENTS`), `CG_GrappleLatchAnchor` and
+`CG_GrappleOwnerRGBA` (`VR_HOST_HAS_GRAPPLE`), and `CG_TraceRender`
+(`VR_HOST_HAS_TRACE_RENDER`); a host with a gate at 0 provides none of
+them.
 
 **Six stock exports.** Functions that are `static` in stock 1.32 and must
 lose it: `CG_Draw2D`, `CG_DrawCrosshair3D`, `CG_WeaponSelectable`,
@@ -1007,7 +1173,10 @@ storage live in `cg_main.c` and `g_main.c` (the rest ships inside the
 vendored files — `vr_game.c`, `vr_cgame.c`, and the UI modules' storage
 entirely in `vr_ui.c`). Mechanical — copy the blocks from this tree's
 files. Float arguments cross the DLL boundary through `PASSFLOAT`; miss it
-and native builds pass garbage.
+and native builds pass garbage. The UI modules also declare and trampoline
+`trap_VR_BindCapture` (Appendix B) beside the virtual-keyboard traps, and
+q3_ui's `ui_local.h` declares the settings screens' entry points, the
+bindings screen's `UI_VRBindingsMenu` among them.
 
 **Small pieces.** `Q_sscanf` (stock trees: `#define Q_sscanf sscanf` in
 `vr_host_config.h`); the two stat enum entries (Step 4); the tunables
@@ -1018,7 +1187,9 @@ predefined by the host; if you wire the scoreboard-cursor pair (Step 5),
 `CG_VR_ScoreboardCursor` writes the cursor through `float *`; and
 `cgs.media.friendShader` (`sprites/foe`) must be registered in every
 gametype, not just `GT_TEAM` — the weapon wheel's selection marker draws
-through it.
+through it. The bot chat match record, `bot_matchvariable_t` in
+`be_ai_chat.h`, carries `offset` as a `short` (stock: `char`) to match
+both engines' botlib; the struct stays 8 bytes with `length` at byte 4.
 
 **UI substrate.** baseq3: `uiStatic_t` gains `float biasY` beside stock's
 `xscale` / `yscale` / `bias`, and the vertical transform adds it in
@@ -1037,3 +1208,42 @@ same cursor-override reason. `ui/menudef.h` defines the VR owner-draw IDs
 If a symbol is still unresolved after `vr_host.h` is satisfied, it is a bug
 in the contract — report it; Step 2's failing build output is otherwise your
 complete work list.
+
+## Appendix F: The 1.0 API at a glance
+
+What a module built against `VR_API_MAJOR` 1, `VR_API_MINOR` 0 can rely on,
+on trinity-engine and trinity-standalone alike:
+
+- **The mirror.** `vr_shared_t` is 344 bytes; the cgame, shared-UI and
+  config blocks start at 236, 312 and 328. `thumbstick_location[]` holds
+  the sticks by role (`VR_STICK_MOVE`, `VR_STICK_TURN`), deadzone-processed
+  with handedness and the stick swap applied. `pointerMode`, the tail
+  field, is `VR_POINTER_CURSOR` 0, `VR_POINTER_STICK` 1 or
+  `VR_POINTER_DRAWN` 2 (Step 5).
+- **Registration.** `trap_VR_RegisterState` with the mirror's size and
+  the 1.0 pair, the `TRINITY_VR_API/1.0` sentinel in every QVM, the
+  bootstrap keys of Appendix B (Step 3).
+- **Bindings.** Controller inputs are keys bound per context with
+  `vrbind <context>[+alt] <key> <command>`; the engine routes them before
+  the module sees input. The UI reads them through the value keys
+  `vr_keyfirst`, `vr_binding`, `vr_keyglyph`, `vr_bindkeys` and
+  `vr_keydefault`, and
+  captures a press with the one-shot `trap_VR_BindCapture` (Step 7). Both
+  UIs ship a bindings screen built on `vr_bindmenu`.
+- **Commands.** The cgame registers `weapon_select`, `weapon_adjust` and
+  `+adjust_reset` / `-adjust_reset`; `weapon_adjust` from the console or a
+  menu sends `returntogame` first (Step 5).
+- **Follow camera.** The engine derives the VR follow camera from
+  `cg_followMode` every frame (0 first person, 1 third person, 2 free-fly
+  in TV playback); `vr_snapturn` picks orbit or teleport in third person.
+- **Settings.** `vr_controllerModels`, `vr_screenCurvature`,
+  `vr_switchThumbsticks` as a plain archived cvar, and the headset rows
+  with `vr_eyesize` and `vr_supersample` behind supersampling (Appendix A,
+  Step 7).
+- **Drop files.** `vr_bindmenu.c/.h`, `vr_supersample.c/.h` and
+  `vr_glyph.c/.h` are in the drop; the bindings screen
+  (`ui_vrbindings.c`, `vrbindings.menu`) is a companion (Step 1).
+- **Assets.** The VR keyboard art, the 64 px character sheet and the VR
+  button glyph atlas come from the Trinity pak in the base game
+  (Appendix C).
+- **Botlib.** `bot_matchvariable_t.offset` is a `short` (Appendix E).
