@@ -702,8 +702,10 @@ default values.
 #define CVAR_NORESTART		1024	// do not clear when a cvar_restart is issued
 
 #define CVAR_NODEFAULT		0x4000	// do not write to config if matching with default value
+#define CVAR_NOCLI			0x40000	// a command-line value lasts the session unsaved; kept through a game switch only with CVAR_NORESTART
 
 #define CVAR_ARCHIVE_ND		(CVAR_ARCHIVE | CVAR_NODEFAULT)
+#define CVAR_ARCHIVE_NOCLI	(CVAR_ARCHIVE | CVAR_NOCLI)
 
 #define	MAX_CVAR_VALUE_STRING	256
 
