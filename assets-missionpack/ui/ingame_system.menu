@@ -673,7 +673,7 @@ itemDef {
 		textscale .25
 		forecolor 1 1 1 1
 		visible 0
-		action { uiScript glCustom ; uiScript updateHDRAvail }
+		action { uiScript glCustom ; uiScript refreshHDRAvail }
 	}
 
 	itemDef {
@@ -681,7 +681,7 @@ itemDef {
 		group grpSystem
 		type ITEM_TYPE_YESNO
 		text "HDR Display:"
-		cvar "r_hdrDisplay"
+		cvar "ui_hdrDisplay"
 		rect 0 125 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
@@ -691,7 +691,7 @@ itemDef {
 		visible 0
 		cvarTest "ui_hdrAvail"
 		enableCvar { 1 }
-		action { uiScript glCustom ; uiScript updateHDRAvail }
+		action { uiScript glCustom ; uiScript refreshHDRAvail }
 	}
 
 	itemDef {
@@ -709,7 +709,7 @@ itemDef {
 		visible 0
 		cvarTest "r_fbo"
 		disableCvar { "0" }
-		action { uiScript glCustom ; uiScript updateHDRAvail }
+		action { uiScript glCustom ; uiScript refreshHDRAvail }
 	}
 
 	itemDef {
@@ -735,45 +735,18 @@ itemDef {
 		textscale .25
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 63 185 130 20
+		rect 63 189 130 20
 		textalign 1
 		textalignx 65
 		textaligny 16
 		forecolor 1 1 1 1
 		backcolor .37 .1 .1 1
 		visible 0
-		cvarTest "ui_hdrAvail"
+		cvarTest "ui_hdrCalibAvail"
 		enableCvar { 1 }
 		action { close ingame_system ; open calibration }
 		mouseEnter { setcolor backcolor .1 .37 .1 1 }
 		mouseExit  { setcolor backcolor .37 .1 .1 1 }
-	}
-	itemDef {
-		name other
-		group grpSystem
-		style WINDOW_STYLE_SHADER
-		background "ui/assets/framebutton.tga"
-		rect 63 185 130 20
-		visible 0
-		decoration
-	}
-	itemDef {
-		name other
-		group grpSystem
-		style WINDOW_STYLE_SHADER
-		background "ui/assets/leftbutton.tga"
-		rect 51 185 13 20
-		visible 0
-		decoration
-	}
-	itemDef {
-		name other
-		group grpSystem
-		style WINDOW_STYLE_SHADER
-		background "ui/assets/rightbutton.tga"
-		rect 192 185 13 20
-		visible 0
-		decoration
 	}
 
 itemDef {
@@ -781,7 +754,7 @@ itemDef {
 	group grpSystem
       	style 1
 	text "Network"
-	rect 0 205 128 20
+	rect 0 209 128 20
       	textalign ITEM_ALIGN_CENTER
       	textalignx 128
       	textaligny 17
@@ -798,7 +771,7 @@ itemDef {
 		text "Net Data Rate:"
 		cvar "rate"
 		cvarFloatList { "<=28.8k" 2500 "33.6k" 3000 "56k" 4000 "ISDN" 5000 "LAN/CABLE/xDSl" 25000  }
-		rect 0 225 256 20
+		rect 0 229 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -822,7 +795,7 @@ itemDef {
 	forecolor 1 1 1 1
 	backcolor .37 .1 .1 1
 	visible 0
-	action { exec "vid_restart" }
+	action { uiScript applyHDRDisplay ; exec "vid_restart" }
 	mouseEnter { setcolor backcolor .1 .37 .1 1 }
       	mouseExit { setcolor backcolor .37 .1 .1 1 }
 	}
@@ -842,7 +815,7 @@ itemDef {
 	forecolor 1 1 1 1
 	backcolor .37 .1 .1 1
 	visible 0
-	action { exec "vid_restart" }
+	action { uiScript applyHDRDisplay ; exec "vid_restart" }
 	mouseEnter { setcolor backcolor .1 .37 .1 1 }
 	mouseExit { setcolor backcolor .37 .1 .1 1 }
 }

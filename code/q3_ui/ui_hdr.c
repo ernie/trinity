@@ -21,18 +21,23 @@ typedef struct {
 
 static hdrCalibrationInfo_t	hdrInfo;
 
+static void UI_HDR_Status( char *status, int size ) {
+	trap_Cvar_VariableStringBuffer( "r_hdrStatus", status, size );
+}
+
+// nofbo still counts, so switching Frame Buffer on unlocks HDR before the restart
 qboolean UI_HDR_Available( void ) {
-	char buf[64];
-	trap_Cvar_VariableStringBuffer( "r_hdrDisplay", buf, sizeof( buf ) );
-	if ( buf[0] == '\0' ) {
-		return qfalse; // cvar absent -> engine has no HDR support
-	}
-	// Single-renderer VR builds (USE_RENDERER_DLOPEN off) never register
-	// cl_renderer, so it reads back empty; treat empty as the compiled-in
-	// Vulkan renderer. A present-but-non-vulkan cl_renderer (trinity-engine
-	// with another renderer selected) still disqualifies HDR.
-	trap_Cvar_VariableStringBuffer( "cl_renderer", buf, sizeof( buf ) );
-	return (qboolean)( buf[0] == '\0' || Q_stricmp( buf, "vulkan" ) == 0 );
+	char status[32];
+	UI_HDR_Status( status, sizeof( status ) );
+	return (qboolean)( !Q_stricmp( status, "active" ) || !Q_stricmp( status, "available" ) ||
+		!Q_stricmp( status, "nofbo" ) || !Q_stricmp( status, "ossetting" ) );
+}
+
+// calibration needs live HDR output, or output that only the OS HDR switch holds back
+qboolean UI_HDR_CalibrationAvailable( void ) {
+	char status[32];
+	UI_HDR_Status( status, sizeof( status ) );
+	return (qboolean)( !Q_stricmp( status, "active" ) || !Q_stricmp( status, "ossetting" ) );
 }
 
 // HDR output, bloom and MSAA need the frame buffer path; without it those cvars do nothing
@@ -40,6 +45,13 @@ qboolean UI_HDR_FBOOff( void ) {
 	char buf[8];
 	trap_Cvar_VariableStringBuffer( "r_fbo", buf, sizeof( buf ) );
 	return (qboolean)( buf[0] != '\0' && atoi( buf ) == 0 );
+}
+
+// QVMs have no platform define; the engine's version string carries its OS ("win_mingw64-x86_64")
+static qboolean UI_HDR_OnWindows( void ) {
+	char buf[MAX_CVAR_VALUE_STRING];
+	trap_Cvar_VariableStringBuffer( "version", buf, sizeof( buf ) );
+	return (qboolean)( strstr( buf, " win_" ) != NULL );
 }
 
 static int UI_HDR_NearestIndex( int value, const int* table, int count ) {
@@ -79,7 +91,7 @@ static sfxHandle_t UI_HDRCalibration_Key( int key ) {
 }
 
 static void UI_HDRCalibration_Draw( void ) {
-	char nitsStr[32];
+	char nitsStr[32], status[32];
 	vec4_t savedNormal, savedHigh;
 	static vec4_t dimFocus = { 0.5f, 0.4f, 0.0f, 1.0f };
 
@@ -109,7 +121,8 @@ static void UI_HDRCalibration_Draw( void ) {
 	}
 
 	// status + instructions below the test pattern
-	if ( trap_Cvar_VariableValue( "r_hdrActive" ) != 0 ) {
+	UI_HDR_Status( status, sizeof( status ) );
+	if ( !Q_stricmp( status, "active" ) ) {
 		// The HDR test pattern renders only on the desktop mirror (it is meaningless
 		// through the headset's SDR tonemap), so where the box would be, cue the
 		// player to look at the monitor. This sits inside the box footprint, so on
@@ -121,8 +134,10 @@ static void UI_HDRCalibration_Draw( void ) {
 		UI_DrawString( 320, 312, "Raise Peak until the inner rectangle's edge vanishes into the outer.",
 			UI_CENTER|UI_SMALLFONT, text_color_disabled );
 		UI_DrawString( 320, 328, "HDR: Active", UI_CENTER|UI_SMALLFONT, text_color_disabled );
-	} else {
-		UI_DrawString( 320, 328, "HDR is not active - enable HDR in Windows display settings, then restart video.",
+	} else if ( !Q_stricmp( status, "ossetting" ) ) {
+		UI_DrawString( 320, 328, UI_HDR_OnWindows()
+			? "HDR is off in Windows display settings - turn it on there, then restart video."
+			: "HDR is off in your display settings - turn it on there, then restart video.",
 			UI_CENTER|UI_SMALLFONT, color_red );
 	}
 }

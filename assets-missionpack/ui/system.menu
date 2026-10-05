@@ -864,7 +864,7 @@ itemDef {
 		textscale .333
 		forecolor 1 1 1 1
 		visible 0
-		action { uiScript glCustom ; uiScript updateHDRAvail }
+		action { uiScript glCustom ; uiScript refreshHDRAvail }
 	}
 
 	itemDef {
@@ -872,7 +872,7 @@ itemDef {
 		group grpSystem
 		type ITEM_TYPE_YESNO
 		text "HDR Display:"
-		cvar "r_hdrDisplay"
+		cvar "ui_hdrDisplay"
 		rect 99 88 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
@@ -882,7 +882,7 @@ itemDef {
 		visible 0
 		cvarTest "ui_hdrAvail"
 		enableCvar { 1 }
-		action { uiScript glCustom ; uiScript updateHDRAvail }
+		action { uiScript glCustom ; uiScript refreshHDRAvail }
 	}
 
 	itemDef {
@@ -900,7 +900,7 @@ itemDef {
 		visible 0
 		cvarTest "r_fbo"
 		disableCvar { "0" }
-		action { uiScript glCustom ; uiScript updateHDRAvail }
+		action { uiScript glCustom ; uiScript refreshHDRAvail }
 	}
 
 	itemDef {
@@ -933,7 +933,7 @@ itemDef {
 		forecolor 1 1 1 1
 		backcolor .37 .1 .1 1
 		visible 0
-		cvarTest "ui_hdrAvail"
+		cvarTest "ui_hdrCalibAvail"
 		enableCvar { 1 }
 		action { play "sound/misc/kcaction.wav" ; close system_menu ; open calibration }
 		mouseEnter { setitemcolor ctr_hdrcalib backcolor .1 .37 .1 1 }

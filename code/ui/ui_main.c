@@ -4586,27 +4586,42 @@ static void UI_Update(const char *name) {
 	}
 }
 
-static void UI_UpdateHDRAvail( void ) {
-	char buf[64];
-	qboolean avail;
-	trap_Cvar_VariableStringBuffer( "r_hdrDisplay", buf, sizeof( buf ) );
-	avail = (qboolean)( buf[0] != '\0' );
-	if ( avail ) {
-		trap_Cvar_VariableStringBuffer( "cl_renderer", buf, sizeof( buf ) );
-		// the single-renderer build never registers cl_renderer, so an empty
-		// readback is the compiled-in Vulkan renderer; a present-but-non-vulkan
-		// name still fails
-		avail = (qboolean)( buf[0] == '\0' || Q_stricmp( buf, "vulkan" ) == 0 );
+// ui_hdrDisplay is the HDR Display row's pending choice; reset reloads it from r_hdrDisplay, which only Apply writes
+static void UI_UpdateHDRAvail( qboolean reset ) {
+	char status[32], buf[MAX_CVAR_VALUE_STRING];
+	qboolean capable, avail, on;
+	trap_Cvar_VariableStringBuffer( "r_hdrStatus", status, sizeof( status ) );
+	// nofbo still counts, so switching Frame Buffer on unlocks the row before the restart
+	capable = (qboolean)( Q_stricmp( status, "active" ) == 0 || Q_stricmp( status, "available" ) == 0 ||
+		Q_stricmp( status, "nofbo" ) == 0 || Q_stricmp( status, "ossetting" ) == 0 );
+	avail = capable;
+	if ( reset ) {
+		// the row shows off where nothing shown can do HDR, keeping the saved choice for an output that can
+		trap_Cvar_Set( "ui_hdrDisplay", capable && trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0 ? "1" : "0" );
 	}
 	// HDR output needs the frame buffer path; without it the toggle is inert, so it reads off and stays disabled
 	trap_Cvar_VariableStringBuffer( "r_fbo", buf, sizeof( buf ) );
 	if ( buf[0] != '\0' && atoi( buf ) == 0 ) {
 		avail = qfalse;
+		trap_Cvar_Set( "ui_hdrDisplay", "0" );
 		if ( trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0 ) {
 			trap_Cvar_Set( "r_hdrDisplay", "0" );
 		}
 	}
+	on = (qboolean)( trap_Cvar_VariableValue( "ui_hdrDisplay" ) != 0 );
 	trap_Cvar_Set( "ui_hdrAvail", avail ? "1" : "0" );
+	// calibration tunes HDR output, so it needs the HDR Display choice on as well
+	trap_Cvar_Set( "ui_hdrCalibAvail", avail && on &&
+		( Q_stricmp( status, "active" ) == 0 || Q_stricmp( status, "ossetting" ) == 0 ) ? "1" : "0" );
+	// same wording and Windows test as q3_ui's calibration screen; QVMs have no platform define
+	if ( Q_stricmp( status, "ossetting" ) == 0 ) {
+		trap_Cvar_VariableStringBuffer( "version", buf, sizeof( buf ) );
+		trap_Cvar_Set( "ui_hdrWarning", strstr( buf, " win_" )
+			? "HDR is off in Windows display settings - turn it on there, then restart video."
+			: "HDR is off in your display settings - turn it on there, then restart video." );
+	} else {
+		trap_Cvar_Set( "ui_hdrWarning", "" );
+	}
 }
 
 // ROM availability cvar for menu-script cvarTest gating (ui_hdrAvail's
@@ -5059,7 +5074,15 @@ static void UI_RunMenuScript(char **args) {
 				UI_Update(name2);
 			}
 		} else if ( Q_stricmp( name, "updateHDRAvail" ) == 0 ) {
-			UI_UpdateHDRAvail();
+			UI_UpdateHDRAvail( qtrue );
+		} else if ( Q_stricmp( name, "refreshHDRAvail" ) == 0 ) {
+			UI_UpdateHDRAvail( qfalse );
+		} else if ( Q_stricmp( name, "applyHDRDisplay" ) == 0 ) {
+			// a console set keeps CVAR_LATCH, so a swapchain rebuild before the restart cannot pick the choice up
+			if ( trap_Cvar_VariableValue( "ui_hdrAvail" ) != 0 ) {
+				trap_Cmd_ExecuteText( EXEC_APPEND, trap_Cvar_VariableValue( "ui_hdrDisplay" ) != 0
+					? "set r_hdrDisplay 1\n" : "set r_hdrDisplay 0\n" );
+			}
 		} else if ( Q_stricmp( name, "snapHDRCvars" ) == 0 ) {
 			// Sliders write raw floats ("1000.000000") that never equal the default
 			// string, so CVAR_ARCHIVE_ND persists them even at default. Re-set via
@@ -6880,7 +6903,7 @@ void _UI_Init( qboolean inGameLoad ) {
 
 	trap_Cvar_Set("ui_actualNetGameType", va("%d", ui_netGameType.integer));
 
-	UI_UpdateHDRAvail();
+	UI_UpdateHDRAvail( qtrue );
 	UI_UpdateVRActive();
 }
 

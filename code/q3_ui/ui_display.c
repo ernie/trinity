@@ -82,16 +82,20 @@ static void UI_DisplayOptionsMenu_UpdateItems( void ) {
 	qboolean fbo = displayOptionsInfo.fbo.curvalue != 0;
 	qboolean hdrAvail = fbo && UI_HDR_Available();
 
-	// HDR output without the frame buffer never takes effect, so it reads off
-	if ( !fbo ) {
+	// HDR output never takes effect without the frame buffer or an output that can show it, so it reads off
+	if ( !hdrAvail ) {
 		displayOptionsInfo.hdr.curvalue = 0;
 	}
 
 	if ( hdrAvail ) {
 		displayOptionsInfo.hdr.generic.flags &= ~QMF_GRAYED;
-		displayOptionsInfo.hdrcalib.generic.flags &= ~QMF_GRAYED;
 	} else {
 		displayOptionsInfo.hdr.generic.flags |= QMF_GRAYED;
+	}
+	// calibration tunes HDR output, so it needs the HDR Display choice on as well
+	if ( hdrAvail && displayOptionsInfo.hdr.curvalue && UI_HDR_CalibrationAvailable() ) {
+		displayOptionsInfo.hdrcalib.generic.flags &= ~QMF_GRAYED;
+	} else {
 		displayOptionsInfo.hdrcalib.generic.flags |= QMF_GRAYED;
 	}
 	if ( fbo ) {
@@ -121,9 +125,7 @@ static void UI_DisplayOptionsMenu_ApplyChanges( void ) {
 	if ( displayOptionsInfo.fbo.curvalue != displayOptionsInfo.initialFbo ) {
 		trap_Cvar_SetValue( "r_fbo", displayOptionsInfo.fbo.curvalue );
 	}
-	// a write would create the cvar on an engine without HDR output, and its
-	// existence is what enables every HDR item
-	if ( displayOptionsInfo.hdr.curvalue != displayOptionsInfo.initialHdr && UI_HDR_Available() ) {
+	if ( displayOptionsInfo.hdr.curvalue != displayOptionsInfo.initialHdr ) {
 		trap_Cvar_SetValue( "r_hdrDisplay", displayOptionsInfo.hdr.curvalue );
 	}
 	if ( displayOptionsInfo.bloom.curvalue != displayOptionsInfo.initialBloom ) {
@@ -435,7 +437,8 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 		trap_Cvar_Set( "r_hdrDisplay", "0" );
 	}
 	displayOptionsInfo.fbo.curvalue		= !UI_HDR_FBOOff();
-	displayOptionsInfo.hdr.curvalue		= trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0;
+	// shown off where nothing shown can do HDR, keeping the choice for an output that can
+	displayOptionsInfo.hdr.curvalue		= UI_HDR_Available() && trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0;
 	displayOptionsInfo.bloom.curvalue	= trap_Cvar_VariableValue( "r_bloom" ) != 0;
 	displayOptionsInfo.flares.curvalue	= trap_Cvar_VariableValue( "r_flares" ) != 0;
 	displayOptionsInfo.initialFbo		= displayOptionsInfo.fbo.curvalue;

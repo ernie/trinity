@@ -9,7 +9,7 @@ menuDef {
 	rect 0 0 640 480
 	focusColor .5 .4 0 1
 	style 1
-	onOpen { uiScript updateHDRAvail ; setcvar r_hdrCalibrate 1 }
+	onOpen { uiScript refreshHDRAvail ; setcvar r_hdrCalibrate 1 }
 	onClose { setcvar r_hdrCalibrate 0 ; uiScript snapHDRCvars }
 	onEsc { setcvar r_hdrCalibrate 0 ; close calibration }
 
@@ -97,6 +97,21 @@ menuDef {
 		textaligny 12
 		textscale .25
 		forecolor .5 .5 .5 1
+		visible 1
+		decoration
+		cvarTest "r_hdrStatus"
+		showCvar { "active" }
+	}
+
+	itemDef {
+		name hdrwarning
+		cvar "ui_hdrWarning"
+		rect 0 330 640 16
+		textalign ITEM_ALIGN_CENTER
+		textalignx 320
+		textaligny 12
+		textscale .25
+		forecolor 1 0 0 1
 		visible 1
 		decoration
 	}
