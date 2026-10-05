@@ -4447,7 +4447,6 @@ static void UI_Update(const char *name) {
 					trap_Cvar_SetValue( "r_depthbits", 24 );
 					trap_Cvar_SetValue( "r_stencilbits", 8 );
 					trap_Cvar_SetValue( "r_picmip", 0 );
-					trap_Cvar_SetValue( "r_mode", 4 );
 					trap_Cvar_SetValue( "r_texturebits", 32 );
 					trap_Cvar_SetValue( "r_fastSky", 0 );
 					trap_Cvar_SetValue( "r_inGameVideo", 1 );
@@ -4464,7 +4463,6 @@ static void UI_Update(const char *name) {
 					trap_Cvar_SetValue( "r_depthbits", 0 );
 					trap_Cvar_Reset( "r_stencilbits" );
 					trap_Cvar_SetValue( "r_picmip", 1 );
-					trap_Cvar_SetValue( "r_mode", 3 );
 					trap_Cvar_SetValue( "r_texturebits", 0 );
 					trap_Cvar_SetValue( "r_fastSky", 0 );
 					trap_Cvar_SetValue( "r_inGameVideo", 1 );
@@ -4481,7 +4479,6 @@ static void UI_Update(const char *name) {
 					trap_Cvar_SetValue( "r_depthbits", 0 );
 					trap_Cvar_Reset( "r_stencilbits" );
 					trap_Cvar_SetValue( "r_picmip", 1 );
-					trap_Cvar_SetValue( "r_mode", 3 );
 					trap_Cvar_SetValue( "r_texturebits", 0 );
 					trap_Cvar_SetValue( "cg_shadows", 0 );
 					trap_Cvar_SetValue( "r_fastSky", 1 );
@@ -4497,7 +4494,6 @@ static void UI_Update(const char *name) {
 					trap_Cvar_SetValue( "r_colorbits", 16 );
 					trap_Cvar_SetValue( "r_depthbits", 16 );
 					trap_Cvar_SetValue( "r_stencilbits", 0 );
-					trap_Cvar_SetValue( "r_mode", 3 );
 					trap_Cvar_SetValue( "r_picmip", 2 );
 					trap_Cvar_SetValue( "r_texturebits", 16 );
 					trap_Cvar_SetValue( "cg_shadows", 0 );
@@ -4517,7 +4513,6 @@ static void UI_Update(const char *name) {
 					trap_Cvar_SetValue( "r_colorbits", 32 );
 					trap_Cvar_SetValue( "r_depthbits", 24 );
 					trap_Cvar_SetValue( "r_picmip", 0 );
-					trap_Cvar_SetValue( "r_mode", 4 );
 					trap_Cvar_SetValue( "r_texturebits", 32 );
 					trap_Cvar_SetValue( "r_fastSky", 0 );
 					trap_Cvar_SetValue( "r_inGameVideo", 1 );
@@ -4533,7 +4528,6 @@ static void UI_Update(const char *name) {
 					trap_Cvar_SetValue( "r_colorbits", 0 );
 					trap_Cvar_SetValue( "r_depthbits", 24 );
 					trap_Cvar_SetValue( "r_picmip", 1 );
-					trap_Cvar_SetValue( "r_mode", 3 );
 					trap_Cvar_SetValue( "r_texturebits", 0 );
 					trap_Cvar_SetValue( "r_fastSky", 0 );
 					trap_Cvar_SetValue( "r_inGameVideo", 1 );
@@ -4549,7 +4543,6 @@ static void UI_Update(const char *name) {
 					trap_Cvar_SetValue( "r_colorbits", 0 );
 					trap_Cvar_SetValue( "r_depthbits", 0 );
 					trap_Cvar_SetValue( "r_picmip", 1 );
-					trap_Cvar_SetValue( "r_mode", 3 );
 					trap_Cvar_SetValue( "r_texturebits", 0 );
 					trap_Cvar_SetValue( "cg_shadows", 0 );
 					trap_Cvar_SetValue( "r_fastSky", 1 );
@@ -4564,7 +4557,6 @@ static void UI_Update(const char *name) {
 					trap_Cvar_SetValue( "r_lodbias", 2 );
 					trap_Cvar_SetValue( "r_colorbits", 16 );
 					trap_Cvar_SetValue( "r_depthbits", 16 );
-					trap_Cvar_SetValue( "r_mode", 3 );
 					trap_Cvar_SetValue( "r_picmip", 2 );
 					trap_Cvar_SetValue( "r_texturebits", 16 );
 					trap_Cvar_SetValue( "cg_shadows", 0 );
@@ -5069,6 +5061,8 @@ static void UI_RunMenuScript(char **args) {
 			}
 		} else if (Q_stricmp(name, "glCustom") == 0) {
 			trap_Cvar_Set("ui_glCustom", "4");
+			// the Video Mode row writes r_mode; fullscreen reads r_modeFullscreen, so keep them together
+			trap_Cvar_Set("r_modeFullscreen", UI_Cvar_VariableString("r_mode"));
 		} else if (Q_stricmp(name, "update") == 0) {
 			if (String_Parse(args, &name2)) {
 				UI_Update(name2);

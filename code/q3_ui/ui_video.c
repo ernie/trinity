@@ -310,6 +310,37 @@ static InitialVideoOptions_s s_ivo_templates[] =
 
 static qboolean graphicsOptions_vr;
 
+// spinner indexes past the fixed list: r_mode -2 and -1
+#define MODE_DESKTOP 12
+#define MODE_CUSTOM  13
+
+// fullscreen reads r_modeFullscreen when it is set, so the row shows whichever mode applies
+static int GraphicsOptions_ModeIndex( void )
+{
+	char fs[8];
+	int mode;
+
+	trap_Cvar_VariableStringBuffer( "r_modeFullscreen", fs, sizeof( fs ) );
+	if ( trap_Cvar_VariableValue( "r_fullscreen" ) && fs[0] )
+		mode = atoi( fs );
+	else
+		mode = trap_Cvar_VariableValue( "r_mode" );
+	if ( mode == -1 )
+		return MODE_CUSTOM;
+	if ( mode < 0 || mode >= MODE_DESKTOP )
+		return MODE_DESKTOP;
+	return mode;
+}
+
+static const char *GraphicsOptions_ModeValue( int index )
+{
+	if ( index == MODE_CUSTOM )
+		return "-1";
+	if ( index < 0 || index >= MODE_DESKTOP )
+		return "-2";
+	return va( "%d", index );
+}
+
 /*
 =================
 GraphicsOptions_GetInitialVideo
@@ -347,8 +378,6 @@ static void GraphicsOptions_CheckConfig( void )
 		if ( !graphicsOptions_vr )
 		{
 			if ( s_ivo_templates[i].colordepth != s_graphicsoptions.colordepth.curvalue )
-				continue;
-			if ( s_ivo_templates[i].mode != s_graphicsoptions.mode.curvalue )
 				continue;
 			if ( s_ivo_templates[i].fullscreen != s_graphicsoptions.fs.curvalue )
 				continue;
@@ -495,7 +524,9 @@ static void GraphicsOptions_ApplyChanges( void *unused, int notification )
 	// display under VR
 	if ( !graphicsOptions_vr )
 	{
-		trap_Cvar_SetValue( "r_mode", s_graphicsoptions.mode.curvalue );
+		// both, so the choice holds whether the window is fullscreen or not
+		trap_Cvar_Set( "r_mode", GraphicsOptions_ModeValue( s_graphicsoptions.mode.curvalue ) );
+		trap_Cvar_Set( "r_modeFullscreen", GraphicsOptions_ModeValue( s_graphicsoptions.mode.curvalue ) );
 		trap_Cvar_SetValue( "r_fullscreen", s_graphicsoptions.fs.curvalue );
 
 		switch ( s_graphicsoptions.colordepth.curvalue )
@@ -548,7 +579,6 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 		// presets carry no values for the newer rows (compress textures,
 		// the instant rows), which stay untouched by preset selection
 		if ( !graphicsOptions_vr ) {
-			s_graphicsoptions.mode.curvalue        = ivo->mode;
 			s_graphicsoptions.colordepth.curvalue  = ivo->colordepth;
 			s_graphicsoptions.fs.curvalue          = ivo->fullscreen;
 		}
@@ -765,11 +795,7 @@ static void GraphicsOptions_SetMenuItems( void )
 		return;
 	}
 
-	s_graphicsoptions.mode.curvalue = trap_Cvar_VariableValue( "r_mode" );
-	if ( s_graphicsoptions.mode.curvalue < 0 )
-	{
-		s_graphicsoptions.mode.curvalue = 3;
-	}
+	s_graphicsoptions.mode.curvalue = GraphicsOptions_ModeIndex();
 	s_graphicsoptions.fs.curvalue = trap_Cvar_VariableValue("r_fullscreen");
 
 	switch ( ( int ) trap_Cvar_VariableValue( "r_colorbits" ) )
@@ -847,6 +873,8 @@ void GraphicsOptions_MenuInit( void )
 		"1600x1200",
 		"2048x1536",
 		"856x480 wide screen",
+		"Desktop",
+		"Custom",
 		0
 	};
 	static const char *filter_names[] =
