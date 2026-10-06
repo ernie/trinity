@@ -403,23 +403,12 @@ sfxHandle_t MenuField_Key( menufield_s* m, int* key )
 
 	switch ( keycode )
 	{
-		case K_MOUSE1:
-			// clicked on field - show virtual keyboard
-			if (m->generic.flags & QMF_HASMOUSEFOCUS) {
-				VirtualKeyboard_Show( m );
-			}
-			break;
-
 		case K_KP_ENTER:
 		case K_ENTER:
 		case K_JOY1:
 		case K_JOY2:
 		case K_JOY3:
 		case K_JOY4:
-			// If keyboard is active, don't navigate away
-			if (VirtualKeyboard_IsActive()) {
-				return 0;
-			}
 			// have enter go to next cursor point
 			*key = K_TAB;
 			break;
@@ -429,10 +418,6 @@ sfxHandle_t MenuField_Key( menufield_s* m, int* key )
 		case K_DOWNARROW:
 		case K_KP_UPARROW:
 		case K_UPARROW:
-			// If keyboard is active, block navigation - must use DONE to dismiss
-			if (VirtualKeyboard_IsActive()) {
-				return 0;
-			}
 			break;
 
 		default:
@@ -459,26 +444,11 @@ sfxHandle_t MenuField_Key( menufield_s* m, int* key )
 
 /*
 =================
-Virtual Keyboard wrappers
+VirtualKeyboard_IsActive
 
-These functions wrap the client-side virtual keyboard (cl_keyboard.c) via
-extension traps name-resolved in vr_ui.c; they no-op on a flatscreen
-host or an older VR engine that doesn't export the traps.
+qtrue while the VR keyboard is open; qfalse on a flatscreen engine.
 =================
 */
-
-void VirtualKeyboard_Show( menufield_s *field ) {
-	UI_VKeyboardShow();
-}
-
-void VirtualKeyboard_Hide( void ) {
-	UI_VKeyboardHide();
-}
-
 qboolean VirtualKeyboard_IsActive( void ) {
 	return UI_VKeyboardIsActive();
-}
-
-qboolean VirtualKeyboard_Key( int key ) {
-	return UI_VKeyboardHandleKey( key );
 }

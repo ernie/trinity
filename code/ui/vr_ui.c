@@ -174,26 +174,30 @@ void UI_VKeyboardShow( void ) {
 	trap_VKeyboard_Show();
 }
 
-void UI_VKeyboardHide( void ) {
-	if ( !vrActive )
-		return;
-	trap_VKeyboard_Hide();
-}
-
 qboolean UI_VKeyboardIsActive( void ) {
 	if ( !vrActive )
 		return qfalse;
 	return trap_VKeyboard_IsActive();
 }
 
-qboolean UI_VKeyboardHandleKey( int key ) {
-	if ( !vrActive )
-		return qfalse;
-	return trap_VKeyboard_HandleKey( key );
-}
-
 qboolean UI_VR_StickNavActive( void ) {
 	return vrActive && vr->pointerMode == VR_POINTER_STICK;
+}
+
+// The keyboard's own Tab, arrows and DONE send these; the field keeps focus until the keyboard closes.
+static qboolean UI_VR_KeyboardNavKey( int key ) {
+	switch ( key ) {
+	case K_TAB:
+	case K_UPARROW:
+	case K_KP_UPARROW:
+	case K_DOWNARROW:
+	case K_KP_DOWNARROW:
+	case K_ENTER:
+	case K_KP_ENTER:
+		return qtrue;
+	default:
+		return qfalse;
+	}
 }
 
 static itemDef_t *UI_VR_FocusedItem( void ) {
@@ -229,9 +233,10 @@ static qboolean UI_VR_StepSlider( int key ) {
 ================
 UI_VR_KeyEvent
 
-First-chance key routing: while a bindings row waits for a button, every key
-belongs to the bindings model; closing the menu ends the wait. Stick
-navigation steps the focused slider.
+First-chance key routing. While a bindings row waits for a button, every key
+belongs to the bindings model; closing the menu ends the wait. The engine
+hands an open keyboard its keys before the UI sees them; the edit field keeps
+focus while it is open. Stick navigation steps the focused slider.
 ================
 */
 qboolean UI_VR_KeyEvent( int key, qboolean down ) {
@@ -249,6 +254,9 @@ qboolean UI_VR_KeyEvent( int key, qboolean down ) {
 	}
 	if ( !down ) {
 		return qfalse;
+	}
+	if ( UI_VKeyboardIsActive() ) {
+		return UI_VR_KeyboardNavKey( key );
 	}
 	if ( UI_VR_StickNavActive() ) {
 		return UI_VR_StepSlider( key );
@@ -298,6 +306,11 @@ qboolean UI_VR_HideCursor( void ) {
 
 void UI_VR_OnMenuMove( void ) {
 	UI_VRHaptic( "menu_move", 0, 0, 30, 0, 0 );
+}
+
+// displayContextDef_t.vrEditField: an edit field started editing.
+void UI_VR_OnEditField( void ) {
+	UI_VKeyboardShow();
 }
 
 /*

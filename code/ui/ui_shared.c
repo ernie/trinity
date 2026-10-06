@@ -2255,15 +2255,6 @@ qboolean Item_TextField_HandleKey(itemDef_t *item, int key) {
 			}
 		}
 
-		// If virtual keyboard is active, block navigation keys
-		if (DC->vkeyboardIsActive && DC->vkeyboardIsActive()) {
-			if (key == K_TAB || key == K_DOWNARROW || key == K_KP_DOWNARROW ||
-			    key == K_UPARROW || key == K_KP_UPARROW ||
-			    key == K_ENTER || key == K_KP_ENTER) {
-				return qtrue;
-			}
-		}
-
 		if (key == K_TAB || key == K_DOWNARROW || key == K_KP_DOWNARROW) {
 			newItem = Menu_SetNextCursorItem(item->parent);
 			if (newItem && (newItem->type == ITEM_TYPE_EDITFIELD || newItem->type == ITEM_TYPE_NUMERICFIELD)) {
@@ -2782,27 +2773,14 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 	}
 
 	if (g_editingField && down) {
-		// If virtual keyboard is active, let it handle keys first
-		if (DC->vkeyboardIsActive && DC->vkeyboardIsActive()) {
-			if (DC->vkeyboardHandleKey && DC->vkeyboardHandleKey(key)) {
-				inHandler = qfalse;
-				return;
-			}
-		}
 		if (!Item_TextField_HandleKey(g_editItem, key)) {
 			g_editingField = qfalse;
 			g_editItem = NULL;
-			if (DC->vkeyboardHide) {
-				DC->vkeyboardHide();
-			}
 			inHandler = qfalse;
 			return;
 		} else if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_MOUSE3) {
 			g_editingField = qfalse;
 			g_editItem = NULL;
-			if (DC->vkeyboardHide) {
-				DC->vkeyboardHide();
-			}
 			Display_MouseMove(NULL, DC->cursorx, DC->cursory);
 		} else if (key == K_TAB || key == K_UPARROW || key == K_DOWNARROW) {
 			return;
@@ -2902,8 +2880,8 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 						g_editingField = qtrue;
 						g_editItem = item;
 						DC->setOverstrikeMode(qtrue);
-						if (DC->vkeyboardShow) {
-							DC->vkeyboardShow();
+						if (DC->vrEditField) {
+							DC->vrEditField();
 						}
 					}
 				} else {
@@ -2943,8 +2921,8 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 					g_editingField = qtrue;
 					g_editItem = item;
 					DC->setOverstrikeMode(qtrue);
-					if (DC->vkeyboardShow) {
-						DC->vkeyboardShow();
+					if (DC->vrEditField) {
+						DC->vrEditField();
 					}
 				} else {
 						Item_Action(item);
@@ -3268,13 +3246,7 @@ void Item_TextField_Paint(itemDef_t *item) {
 	offset = (item->text && *item->text) ? 8 : 0;
 	if (item->window.flags & WINDOW_HASFOCUS && g_editingField) {
 		char cursor = DC->getOverstrikeMode() ? '_' : '|';
-		// When virtual keyboard is active, show color codes literally (^1, ^2, etc.)
-		// instead of interpreting them, so user can edit color codes in names
-		if (DC->vkeyboardIsActive && DC->vkeyboardIsActive() && DC->drawTextWithCursor_NoColorEscape) {
-			DC->drawTextWithCursor_NoColorEscape(item->textRect.x + item->textRect.w + offset, item->textRect.y, item->textscale, newColor, buff + editPtr->paintOffset, item->cursorPos - editPtr->paintOffset, cursor, editPtr->maxPaintChars, item->textStyle);
-		} else {
-			DC->drawTextWithCursor(item->textRect.x + item->textRect.w + offset, item->textRect.y, item->textscale, newColor, buff + editPtr->paintOffset, item->cursorPos - editPtr->paintOffset , cursor, editPtr->maxPaintChars, item->textStyle);
-		}
+		DC->drawTextWithCursor(item->textRect.x + item->textRect.w + offset, item->textRect.y, item->textscale, newColor, buff + editPtr->paintOffset, item->cursorPos - editPtr->paintOffset , cursor, editPtr->maxPaintChars, item->textStyle);
 	} else {
 		DC->drawText(item->textRect.x + item->textRect.w + offset, item->textRect.y, item->textscale, newColor, buff + editPtr->paintOffset, 0, editPtr->maxPaintChars, item->textStyle);
 	}

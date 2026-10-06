@@ -291,10 +291,7 @@ extern void			MField_Draw( mfield_t *edit, int x, int y, int style, vec4_t color
 extern void			MenuField_Init( menufield_s* m );
 extern void			MenuField_Draw( menufield_s *f );
 extern sfxHandle_t	MenuField_Key( menufield_s* m, int* key );
-void			VirtualKeyboard_Show( menufield_s *field );
-void			VirtualKeyboard_Hide( void );
 qboolean		VirtualKeyboard_IsActive( void );
-qboolean		VirtualKeyboard_Key( int key );
 
 //
 // ui_menu.c

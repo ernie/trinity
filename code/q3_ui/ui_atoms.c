@@ -850,8 +850,7 @@ void UI_KeyEvent( int key, int down ) {
 		return;
 	}
 
-	// handle virtual keyboard input first
-	if ( UI_VR_KeyEvent( key ) ) {
+	if ( UI_VR_KeyEvent( key, down ) ) {
 		return;
 	}
 

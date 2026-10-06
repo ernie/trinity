@@ -779,9 +779,8 @@ void Text_PaintWithCursor(float x, float y, float scale, vec4_t color, const cha
   }
 }
 
-// Version of Text_PaintWithCursor that shows color codes literally (^1, ^2, etc)
-// instead of interpreting them. Used when virtual keyboard is active.
-void Text_PaintWithCursor_NoColorEscape(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style) {
+// Shows color codes literally, so the edit cursor stays on the character it counts.
+static void Text_PaintWithCursor_NoColorEscape(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style) {
   int len, count;
 	glyphInfo_t *glyph, *glyph2;
 	float yadj;
@@ -6325,7 +6324,7 @@ void _UI_Init( qboolean inGameLoad ) {
 	uiInfo.uiDC.getCVarString = trap_Cvar_VariableStringBuffer;
 	uiInfo.uiDC.getClipboardData = trap_GetClipboardData;
 	uiInfo.uiDC.getCVarValue = trap_Cvar_VariableValue;
-	uiInfo.uiDC.drawTextWithCursor = &Text_PaintWithCursor;
+	uiInfo.uiDC.drawTextWithCursor = &Text_PaintWithCursor_NoColorEscape;
 	uiInfo.uiDC.setOverstrikeMode = &trap_Key_SetOverstrikeMode;
 	uiInfo.uiDC.getOverstrikeMode = &trap_Key_GetOverstrikeMode;
 	uiInfo.uiDC.startLocalSound = &trap_S_StartLocalSound;
@@ -6349,11 +6348,7 @@ void _UI_Init( qboolean inGameLoad ) {
 	uiInfo.uiDC.stopCinematic = &UI_StopCinematic;
 	uiInfo.uiDC.drawCinematic = &UI_DrawCinematic;
 	uiInfo.uiDC.runCinematicFrame = &UI_RunCinematicFrame;
-	uiInfo.uiDC.drawTextWithCursor_NoColorEscape = &Text_PaintWithCursor_NoColorEscape;
-	uiInfo.uiDC.vkeyboardShow = &UI_VKeyboardShow;
-	uiInfo.uiDC.vkeyboardHide = &UI_VKeyboardHide;
-	uiInfo.uiDC.vkeyboardIsActive = &UI_VKeyboardIsActive;
-	uiInfo.uiDC.vkeyboardHandleKey = &UI_VKeyboardHandleKey;
+	uiInfo.uiDC.vrEditField = &UI_VR_OnEditField;
 
 	Init_Display(&uiInfo.uiDC);
 

@@ -693,8 +693,9 @@ applies to both.
 ```
 
 The rest are one-liners at their sites: `UI_VR_Shutdown()` beside
-`UI_Shutdown` in vmMain's `UI_SHUTDOWN` case; `UI_VR_KeyEvent(key)`
-first-chance in `UI_KeyEvent`; in `UI_MouseEvent`, the
+`UI_Shutdown` in vmMain's `UI_SHUTDOWN` case; `UI_VR_KeyEvent( key, down )`
+first in `UI_KeyEvent`, which also opens the VR keyboard when a click
+lands on a text field; in `UI_MouseEvent`, the
 `UI_VR_StickNavActive()` early-out,
 `UI_VR_CursorOverride( &uis.cursorx, &uis.cursory )`, the
 `UI_VKeyboardIsActive()` guard before the region test, and the
@@ -746,9 +747,11 @@ focused item (a slider's thumb) so stock key paths that test the cursor
 act on that item, with the cursor draw gated behind
 `!UI_VKeyboardIsActive()` and `!UI_VR_HideCursor()`; in `_UI_MouseEvent`,
 the `UI_VR_StickNavActive()` early-out and the same cursor override; the
-four `vkeyboard*` members wired into the display context and
-`Menu_HandleKey`'s edit-field interception — a deeper insertion this tree
-carries for in-headset text entry (Appendix D);
+keyboard opener wired into the display context
+(`uiInfo.uiDC.vrEditField = &UI_VR_OnEditField`), with `Menu_HandleKey`
+calling `DC->vrEditField()` where an edit field starts editing: after
+`g_editItem = item;` in its mouse-click and Enter cases, NULL-safe
+because the cgame link leaves it unset (Appendix D);
 `UI_VR_LoadMenus()` after every `UI_LoadMenus` wave — both `_UI_Init` and
 `UI_Load`; the connect-screen background gated the same way as baseq3's
 (`if ( vrActive && menu->window.background )
@@ -915,10 +918,13 @@ vignettes are cvar-driven (`vr_comfortVignette`) and rendered engine-side.
 
 Deliberate differences, noted so the two `vr_ui.c` files don't surprise you:
 
-- **Virtual-keyboard key routing.** baseq3 intercepts in `UI_KeyEvent` via
-  `UI_VR_KeyEvent(key)`. Team Arena intercepts deeper, inside
-  `Menu_HandleKey`'s edit-field path, because the `.menu` parser owns key
-  dispatch.
+- **Opening the virtual keyboard.** The engine hands an open keyboard its
+  keys before either UI sees them and closes it on DONE, Escape or a click
+  off it, so each UI only opens it and holds the field's focus meanwhile
+  (`UI_VR_KeyEvent` swallows Tab, the arrows and Enter). baseq3's
+  `UI_VR_KeyEvent` opens it on a click over a text field. Team Arena's
+  editing state is private to `ui_shared.c`, so `Menu_HandleKey` reports
+  the start through `DC->vrEditField`.
 - **On-screen model transform.** baseq3 bakes the VR scale into
   `uis.scale/biasX/biasY` once per frame and keeps `UI_AdjustFrom640` free
   of any VR branch — its body simply applies those fields (rewritten from
@@ -1024,9 +1030,8 @@ fields each frame. `UI_DrawPlayer` (ui_players.c) recomputes its fov from
 the transformed rect, keeping the origin math on the desired fov. And
 `uis.cursorx` / `uis.cursory` become `float` (stock: `int`), because
 `UI_VR_CursorOverride` writes the cursor through `float *`. Team Arena: the
-virtual-keyboard wiring adds the four `vkeyboard*` members to
-`displayContextDef_t` (Step 6), and that struct's `cursorx` / `cursory`
-become `float` for the
+`vrEditField` member on `displayContextDef_t`, wired to the drop's keyboard
+opener (Step 6), and that struct's `cursorx` / `cursory` become `float` for the
 same cursor-override reason. `ui/menudef.h` defines the VR owner-draw IDs
 (265 to 272, listed in Step 7), which the drop's `vr_ui.c` switches on.
 

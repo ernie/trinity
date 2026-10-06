@@ -323,7 +323,6 @@ typedef struct {
   void (*setCVar)(const char *cvar, const char *value);
   void (*getClipboardData)(char *buf, int bufsize);
   void (*drawTextWithCursor)(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style);
-  void (*drawTextWithCursor_NoColorEscape)(float x, float y, float scale, vec4_t color, const char *text, int cursorPos, char cursor, int limit, int style);
   void (*setOverstrikeMode)(qboolean b);
   qboolean (*getOverstrikeMode)();
   void (*startLocalSound)( sfxHandle_t sfx, int channelNum );
@@ -349,12 +348,6 @@ typedef struct {
 	void (*stopCinematic)(int handle);
 	void (*drawCinematic)(int handle, float x, float y, float w, float h);
 	void (*runCinematicFrame)(int handle);
-
-	// Virtual keyboard support (NULL in cgame context)
-	void (*vkeyboardShow)( void );
-	void (*vkeyboardHide)( void );
-	qboolean (*vkeyboardIsActive)( void );
-	qboolean (*vkeyboardHandleKey)( int key );
 
   float			yscale;
   float			xscale;
@@ -386,6 +379,8 @@ typedef struct {
 	float				screenYmax;
 	int					lastVideoCheck;
 
+	// Opens the VR keyboard at edit start; NULL in the cgame link.
+	void (*vrEditField)( void );
 
 } displayContextDef_t;
 

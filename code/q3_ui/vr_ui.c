@@ -164,40 +164,60 @@ void UI_VKeyboardShow( void ) {
 	trap_VKeyboard_Show();
 }
 
-void UI_VKeyboardHide( void ) {
-	if ( !vrActive )
-		return;
-	trap_VKeyboard_Hide();
-}
-
 qboolean UI_VKeyboardIsActive( void ) {
 	if ( !vrActive )
 		return qfalse;
 	return trap_VKeyboard_IsActive();
 }
 
-qboolean UI_VKeyboardHandleKey( int key ) {
-	if ( !vrActive )
-		return qfalse;
-	return trap_VKeyboard_HandleKey( key );
-}
-
 qboolean UI_VR_StickNavActive( void ) {
 	return vrActive && vr->pointerMode == VR_POINTER_STICK;
+}
+
+// The keyboard's own Tab, arrows and DONE send these; the field keeps focus until the keyboard closes.
+static qboolean UI_VR_KeyboardNavKey( int key ) {
+	switch ( key ) {
+	case K_TAB:
+	case K_UPARROW:
+	case K_KP_UPARROW:
+	case K_DOWNARROW:
+	case K_KP_DOWNARROW:
+	case K_ENTER:
+	case K_KP_ENTER:
+	case K_JOY1:
+	case K_JOY2:
+	case K_JOY3:
+	case K_JOY4:
+		return qtrue;
+	default:
+		return qfalse;
+	}
 }
 
 /*
 ================
 UI_VR_KeyEvent
 
-First-chance key routing: an active virtual keyboard consumes its keys.
-qfalse lets the stock menu key path run (including for unconsumed keys
-while the keyboard is up - stock behavior preserved).
+First-chance key routing. The engine hands an open keyboard its keys before
+the UI sees them; this opens the keyboard when a click lands on a text field
+and holds the field's focus while it is open.
 ================
 */
-qboolean UI_VR_KeyEvent( int key ) {
-	if ( UI_VKeyboardIsActive() && UI_VKeyboardHandleKey( key ) ) {
-		return qtrue;
+qboolean UI_VR_KeyEvent( int key, qboolean down ) {
+	menucommon_s *item;
+
+	if ( !vrActive || !down ) {
+		return qfalse;
+	}
+	if ( UI_VKeyboardIsActive() ) {
+		return UI_VR_KeyboardNavKey( key );
+	}
+	if ( key == K_MOUSE1 && uis.activemenu ) {
+		item = Menu_ItemAtCursor( uis.activemenu );
+		if ( item && item->type == MTYPE_FIELD && ( item->flags & QMF_HASMOUSEFOCUS ) &&
+			 !( item->flags & ( QMF_GRAYED | QMF_INACTIVE ) ) ) {
+			UI_VKeyboardShow();
+		}
 	}
 	return qfalse;
 }
