@@ -17,7 +17,7 @@ CG_SRC = \
  cg_localents cg_marks cg_newdraw cg_players cg_playerstate \
  cg_predict cg_scoreboard cg_servercmds cg_snapshot cg_trinity_announce cg_view vr_cgame cg_weapons \
  ui_shared vr_uishared \
- bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc vr_bg vr_platform \
+ bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc vr_bg vr_platform vr_glyph \
  q_math q_shared \
 
 else
@@ -27,7 +27,7 @@ CG_SRC = \
  cg_consolecmds cg_draw cg_drawtools cg_effects cg_ents cg_event cg_info \
  cg_localents cg_marks cg_players cg_playerstate cg_predict cg_scoreboard \
  cg_servercmds cg_snapshot cg_trinity_announce cg_view vr_cgame cg_weapons \
- bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc vr_bg vr_platform \
+ bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc vr_bg vr_platform vr_glyph \
  q_math q_shared \
 
 endif
@@ -38,7 +38,7 @@ ifeq ($(CONFIG),missionpack)
 UI_SRC = \
  ui_main $(UIDIR)/ui_syscalls.asm \
  ui_atoms ui_gameinfo ui_players ui_shared ui_util vr_ui vr_uishared \
- bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_ui_mode vr_bindmenu vr_supersample \
+ bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_ui_mode vr_bindmenu vr_glyph vr_supersample \
  q_math q_shared \
 
 else
@@ -53,7 +53,7 @@ UI_SRC = \
  ui_sparena ui_specifyserver ui_splevel ui_sppostgame ui_spskill \
  ui_startserver ui_team ui_teamorders ui_video ui_vrcomfort ui_vrcontrols \
  ui_vrhud_display ui_vrbindings ui_vrmirror ui_vroptions vr_ui \
- bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_ui_mode vr_bindmenu vr_supersample \
+ bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_ui_mode vr_bindmenu vr_glyph vr_supersample \
  q_math q_shared \
 
 endif

@@ -1,6 +1,7 @@
 // VR bindings: per-tab VR controller actions, bound by pressing the button.
 #include "ui_local.h"
 #include "../game/vr_bindmenu.h"
+#include "../game/vr_glyph.h"
 
 #define ART_BACK0	"menu/art/back_0"
 #define ART_BACK1	"menu/art/back_1"
@@ -10,18 +11,22 @@
 #define ART_RESET1	"menu/art/reset_1"
 
 #define ID_TAB		10	// + tab
-#define ID_ALT		20
 #define ID_RESET	21
 #define ID_BACK		22
 #define ID_ROW		100	// + row index
 
 #define VRB_ITEMS		12
 // Inside the frame art, as the stock Controls rows are: the right oval's inner edge sits near x 570.
-#define VRB_X			312
+#define VRB_LABEL_R		296
+#define VRB_PLAIN_X		304
+#define VRB_ALT_X		404
+#define VRB_CLEAR_X		528
 #define VRB_LEFT		160
-#define VRB_GLYPH_X		540
 #define VRB_RIGHT		552
 #define VRB_SPACING		18
+#define VRB_SECTION_GAP	6
+
+static vec4_t vrbDivider = {.5f, .5f, .5f, .6f};
 
 typedef struct {
 	menuframework_s	menu;
@@ -29,26 +34,34 @@ typedef struct {
 	menubitmap_s	framel;
 	menubitmap_s	framer;
 	menutext_s		tabs[VRBM_TABS];
-	menulist_s		alt;
 	menuaction_s	rows[VRB_ITEMS];
 	menubitmap_s	reset;
 	menubitmap_s	back;
 	int				tab;
+	int				headerY;
 } vrbindings_t;
 
 static vrbindings_t s_vrb;
 
 // Five letters at most, as the stock Controls tabs, so they stay inside the frame art.
 static const char *vrbTabNames[VRBM_TABS] = {"MOVE", "SHOOT", "WATCH", "MISC"};
-static const char *vrbAltNames[] = {"No", "Yes", NULL};
 
-static qboolean VRBindings_OnGlyph( menucommon_s *item ) {
-	return !UI_VR_StickNavActive() && uis.cursorx >= VRB_GLYPH_X - 4 && uis.cursory >= item->top &&
-		   uis.cursory < item->bottom;
+// The cell under the pointer in item's row, -1 off the row; the label counts as Plain.
+static int VRBindings_ColumnAt( menucommon_s *item ) {
+	if ( uis.cursory < item->top || uis.cursory >= item->bottom ) {
+		return -1;
+	}
+	if ( uis.cursorx >= VRB_CLEAR_X - 4 ) {
+		return VRBM_COL_CLEAR;
+	}
+	if ( uis.cursorx >= VRB_ALT_X - 4 ) {
+		return VRBM_COL_ALT;
+	}
+	return VRBM_COL_PLAIN;
 }
 
 static void VRBindings_Update( void ) {
-	int i, n, y;
+	int i, n, y, gaps;
 
 	n = 0;
 	for ( i = 0; i < VRB_ITEMS; i++ ) {
@@ -60,21 +73,27 @@ static void VRBindings_Update( void ) {
 		}
 		s_vrb.rows[n].generic.id = ID_ROW + i;
 		s_vrb.rows[n].generic.flags &= ~( QMF_HIDDEN | QMF_INACTIVE );
-		// Headers, and rows this view can't edit, show but are never selected.
-		if ( ( vrbmRows[i].flags & VRBM_HEADER ) || !VRBM_Editable( &vrbmRows[i], vrbm.altView ) ) {
+		// Headers show but are never selected.
+		if ( vrbmRows[i].flags & VRBM_HEADER ) {
 			s_vrb.rows[n].generic.flags |= QMF_INACTIVE;
 		}
 		n++;
 	}
 
-	// Rows sit below the "Alt held" switch, which every tab shows.
-	y = ( SCREEN_HEIGHT - n * VRB_SPACING ) / 2 + 12;
-	// The spin control's click bounds are set once when added, so they move with it.
-	s_vrb.alt.generic.y = y - 26;
-	s_vrb.alt.generic.top = y - 26;
-	s_vrb.alt.generic.bottom = y - 26 + SMALLCHAR_HEIGHT;
+	gaps = 0;
+	for ( i = 1; i < n; i++ ) {
+		if ( vrbmRows[s_vrb.rows[i].generic.id - ID_ROW].flags & VRBM_HEADER ) {
+			gaps += VRB_SECTION_GAP;
+		}
+	}
+	y = ( SCREEN_HEIGHT - n * VRB_SPACING - gaps ) / 2 + 12;
+	s_vrb.headerY = y - 26;
 	for ( i = 0; i < n; i++, y += VRB_SPACING ) {
-		s_vrb.rows[i].generic.x = VRB_X;
+		// a section header stands a little apart from the rows above it
+		if ( i > 0 && ( vrbmRows[s_vrb.rows[i].generic.id - ID_ROW].flags & VRBM_HEADER ) ) {
+			y += VRB_SECTION_GAP;
+		}
+		s_vrb.rows[i].generic.x = VRB_PLAIN_X;
 		s_vrb.rows[i].generic.y = y;
 		s_vrb.rows[i].generic.left = VRB_LEFT;
 		s_vrb.rows[i].generic.right = VRB_RIGHT;
@@ -95,56 +114,87 @@ static void VRBindings_DrawRow( void *self ) {
 	const int index = a->generic.id - ID_ROW;
 	const vrbmRow_t *row = &vrbmRows[index];
 	const qboolean waiting = ( vrbm.waiting == index );
+	char cell[VRBM_CELL];
 	qboolean focused;
-	char names[128];
 	float *color;
-	int style;
+	int c, column, x;
 
 	VRBM_Tick( uis.realtime );
+	VRG_Tick( uis.realtime );
 	if ( row->flags & VRBM_HEADER ) {
-		UI_DrawString( VRB_X, a->generic.y, row->label, UI_CENTER | UI_SMALLFONT, color_yellow );
-		return;
-	}
-	if ( !VRBM_Editable( row, vrbm.altView ) ) {
-		VRBM_Names( row, 0, names, sizeof( names ) );
-		UI_DrawString( VRB_X - SMALLCHAR_WIDTH, a->generic.y, row->label, UI_RIGHT | UI_SMALLFONT, text_color_disabled );
-		UI_DrawString( VRB_X + SMALLCHAR_WIDTH, a->generic.y, names, UI_LEFT | UI_SMALLFONT, text_color_disabled );
+		UI_DrawString( ( VRB_LEFT + VRB_RIGHT ) / 2, a->generic.y, row->label, UI_CENTER | UI_SMALLFONT, color_yellow );
 		return;
 	}
 	focused = ( Menu_ItemAtCursor( a->generic.parent ) == a );
-	color = focused || waiting ? text_color_highlight : text_color_normal;
-	if ( focused || waiting ) {
+	if ( focused && !UI_VR_StickNavActive() && !VRBM_Waiting() ) {
+		c = VRBindings_ColumnAt( &a->generic );
+		if ( c >= 0 ) {
+			VRBM_Point( row, c );
+		}
+	}
+	column = waiting ? ( vrbm.waitingAlt ? VRBM_COL_ALT : VRBM_COL_PLAIN ) : focused ? VRBM_Column( row ) : -1;
+	if ( column >= 0 ) {
 		UI_FillRect( a->generic.left, a->generic.top, a->generic.right - a->generic.left + 1,
 					 a->generic.bottom - a->generic.top + 1, listbar_color );
 	}
-	VRBM_Names( row, vrbm.altView, names, sizeof( names ) );
-	UI_DrawString( VRB_X - SMALLCHAR_WIDTH, a->generic.y, row->label, UI_RIGHT | UI_SMALLFONT, color );
-	style = UI_LEFT | UI_SMALLFONT;
-	if ( waiting ) {
-		style |= UI_PULSE;
+	UI_DrawString( VRB_LABEL_R, a->generic.y, row->label, UI_RIGHT | UI_SMALLFONT,
+				   column >= 0 ? text_color_highlight : text_color_normal );
+	// exactly one row pitch tall, so the rows' dividers butt into one line without overlapping (the overlap shows at 0.6 alpha)
+	UI_FillRect( VRB_ALT_X - 6, a->generic.top - 1, 1, VRB_SPACING, vrbDivider );
+	for ( c = VRBM_COL_PLAIN; c <= VRBM_COL_ALT; c++ ) {
+		x = c == VRBM_COL_ALT ? VRB_ALT_X : VRB_PLAIN_X;
+		color = c == column ? text_color_highlight : text_color_normal;
+		if ( c == VRBM_COL_ALT && !VRBM_Editable( row, 1 ) ) {
+			// centered in the cell's highlight span, and as thin as the divider
+			UI_FillRect( x - 4 + ( VRB_ALT_X - VRB_PLAIN_X - 8 ) / 2 - 12, a->generic.top + SMALLCHAR_HEIGHT / 2, 24, 1,
+						 vrbDivider );
+			continue;
+		}
+		if ( c == column ) {
+			UI_FillRect( x - 4, a->generic.top, VRB_ALT_X - VRB_PLAIN_X - 8, a->generic.bottom - a->generic.top + 1,
+						 listbar_color );
+		}
+		if ( waiting && c == column ) {
+			UI_DrawString( x, a->generic.y, "...", UI_LEFT | UI_SMALLFONT | UI_PULSE, color );
+			continue;
+		}
+		VRBM_Cell( row, c == VRBM_COL_ALT, cell, sizeof( cell ) );
+		UI_VR_GlyphString( x, a->generic.y, cell, UI_LEFT | UI_SMALLFONT, color );
 	}
-	UI_DrawString( VRB_X + SMALLCHAR_WIDTH, a->generic.y, waiting ? "..." : names, style, color );
-	UI_DrawChar( VRB_GLYPH_X, a->generic.y, 'X', UI_LEFT | UI_SMALLFONT,
-				 focused && VRBindings_OnGlyph( &a->generic ) ? color_red : color );
+	if ( focused ) {
+		if ( column == VRBM_COL_CLEAR ) {
+			UI_FillRect( VRB_CLEAR_X - 4, a->generic.top, SMALLCHAR_WIDTH + 8, a->generic.bottom - a->generic.top + 1,
+						 listbar_color );
+		}
+		UI_DrawChar( VRB_CLEAR_X, a->generic.y, 'X', UI_LEFT | UI_SMALLFONT, color_red );
+	}
 }
 
 static void VRBindings_RowEvent( void *ptr, int event ) {
 	menucommon_s *item = (menucommon_s *)ptr;
 	const int index = item->id - ID_ROW;
+	int c;
 
 	if ( event != QM_ACTIVATED || VRBM_Waiting() ) {
 		return;
 	}
-	if ( VRBindings_OnGlyph( item ) ) {
-		VRBM_Clear( &vrbmRows[index], vrbm.altView );
-	} else {
-		VRBM_Start( index );
+	if ( !UI_VR_StickNavActive() ) {
+		c = VRBindings_ColumnAt( item );
+		if ( c >= 0 ) {
+			VRBM_Point( &vrbmRows[index], c );
+			if ( VRBM_Column( &vrbmRows[index] ) != c ) {
+				return;
+			}
+		}
 	}
+	VRBM_Activate( index );
 }
 
 static void VRBindings_ResetAction( qboolean result ) {
 	if ( result ) {
-		trap_Cmd_ExecuteText( EXEC_APPEND, "vr_bindreset\n" );
+		// now, not appended, and the cached cells dropped, so the rows show the defaults at once
+		trap_Cmd_ExecuteText( EXEC_NOW, "vr_bindreset\n" );
+		VRBM_Forget();
 	}
 }
 
@@ -163,9 +213,6 @@ static void VRBindings_Event( void *ptr, int event ) {
 	}
 	if ( id >= ID_TAB && id < ID_TAB + VRBM_TABS ) {
 		s_vrb.tab = id - ID_TAB;
-		VRBindings_Update();
-	} else if ( id == ID_ALT ) {
-		vrbm.altView = s_vrb.alt.curvalue;
 		VRBindings_Update();
 	} else if ( id == ID_RESET ) {
 		UI_ConfirmMenu( "RESET BINDINGS?", VRBindings_ResetDraw, VRBindings_ResetAction );
@@ -191,20 +238,31 @@ static sfxHandle_t VRBindings_Key( int key ) {
 	if ( key == K_ESCAPE || key == K_MOUSE2 ) {
 		VRBM_Cancel();
 	}
+	if ( key == K_LEFTARROW || key == K_KP_LEFTARROW || key == K_RIGHTARROW || key == K_KP_RIGHTARROW ) {
+		menucommon_s *item = (menucommon_s *)Menu_ItemAtCursor( &s_vrb.menu );
+		if ( item && item->id >= ID_ROW ) {
+			VRBM_Step( &vrbmRows[item->id - ID_ROW], key == K_LEFTARROW || key == K_KP_LEFTARROW ? -1 : 1 );
+			return menu_move_sound;
+		}
+	}
 	return Menu_DefaultKey( &s_vrb.menu, key );
 }
 
 static void VRBindings_Draw( void ) {
 	char status[256];
+	menucommon_s *item;
 	int style;
 
 	Menu_Draw( &s_vrb.menu );
-	VRBM_Status( status, sizeof( status ) );
+	UI_DrawString( VRB_PLAIN_X, s_vrb.headerY, "Button", UI_LEFT | UI_SMALLFONT, color_yellow );
+	UI_DrawString( VRB_ALT_X, s_vrb.headerY, "Alt + Button", UI_LEFT | UI_SMALLFONT, color_yellow );
+	item = (menucommon_s *)Menu_ItemAtCursor( &s_vrb.menu );
+	VRBM_Status( item && item->id >= ID_ROW ? item->id - ID_ROW : -1, status, sizeof( status ) );
 	style = UI_SMALLFONT | UI_CENTER;
 	if ( VRBM_Waiting() ) {
 		style |= UI_PULSE;
 	}
-	UI_DrawString( SCREEN_WIDTH / 2, SCREEN_HEIGHT * 0.80, status, style, colorWhite );
+	UI_VR_GlyphString( SCREEN_WIDTH / 2, (int)( SCREEN_HEIGHT * 0.80 ), status, style, colorWhite );
 }
 
 static void VRBindings_Cache( void ) {
@@ -220,7 +278,7 @@ static void VRBindings_MenuInit( void ) {
 	int i;
 
 	memset( &s_vrb, 0, sizeof( s_vrb ) );
-	VRBM_Cancel();
+	VRBM_Open();
 	VRBindings_Cache();
 
 	s_vrb.menu.key = VRBindings_Key;
@@ -264,15 +322,6 @@ static void VRBindings_MenuInit( void ) {
 		s_vrb.tabs[i].color = color_red;
 	}
 
-	s_vrb.alt.generic.type = MTYPE_SPINCONTROL;
-	s_vrb.alt.generic.flags = QMF_PULSEIFFOCUS | QMF_SMALLFONT;
-	s_vrb.alt.generic.id = ID_ALT;
-	s_vrb.alt.generic.callback = VRBindings_Event;
-	s_vrb.alt.generic.name = "Alt held:";
-	s_vrb.alt.generic.x = VRB_X;
-	s_vrb.alt.itemnames = vrbAltNames;
-	s_vrb.alt.curvalue = vrbm.altView;
-
 	for ( i = 0; i < VRB_ITEMS; i++ ) {
 		s_vrb.rows[i].generic.type = MTYPE_ACTION;
 		s_vrb.rows[i].generic.flags = QMF_LEFT_JUSTIFY | QMF_PULSEIFFOCUS | QMF_HIDDEN | QMF_INACTIVE;
@@ -309,7 +358,6 @@ static void VRBindings_MenuInit( void ) {
 	for ( i = 0; i < VRBM_TABS; i++ ) {
 		Menu_AddItem( &s_vrb.menu, &s_vrb.tabs[i] );
 	}
-	Menu_AddItem( &s_vrb.menu, &s_vrb.alt );
 	for ( i = 0; i < VRB_ITEMS; i++ ) {
 		Menu_AddItem( &s_vrb.menu, &s_vrb.rows[i] );
 	}

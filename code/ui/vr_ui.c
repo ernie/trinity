@@ -3,6 +3,7 @@
 #include "../game/vr_shared.h"
 #include "../game/vr_trap.h"
 #include "../game/vr_bindmenu.h"
+#include "../game/vr_glyph.h"
 #include "../game/vr_supersample.h"
 
 const char vr_api_sentinel[] = VR_API_SENTINEL;
@@ -56,14 +57,8 @@ static void UI_VRBind_Unbind( const char *context, int key ) {
 	trap_Cmd_ExecuteText( EXEC_NOW, va( "vrunbind %s %s\n", context, name ) );
 }
 
-static void UI_VRBind_KeyName( int key, char *buf, int size ) {
-	if ( !trap_GetValue( buf, size, va( "vr_keyname %i", vrKeyFirst + key ) ) )
-		Q_strncpyz( buf, "???", size );
-}
-
-static void UI_VRBind_CancelName( char *buf, int size ) {
-	if ( !trap_GetValue( buf, size, "vr_menu_cancel_button" ) )
-		Q_strncpyz( buf, "Menu", size );
+static void UI_VRBind_CancelKeys( char *buf, int size ) {
+	VRG_KeysFor( "global", "+key ESCAPE", buf, size );
 }
 
 static void UI_VRBind_Capture( void ) {
@@ -83,7 +78,66 @@ static int UI_VRBind_Defaults( const char *context, const char *command, int key
 }
 
 static const vrbmIO_t uiVRBindIO = {UI_VRBind_Read, UI_VRBind_Bind, UI_VRBind_Unbind,
-									UI_VRBind_KeyName, UI_VRBind_CancelName, UI_VRBind_Capture, UI_VRBind_Defaults};
+									UI_VRBind_CancelKeys, UI_VRBind_Capture, UI_VRBind_Defaults};
+
+static qhandle_t vrGlyphShader;
+
+static int UI_VRGlyph_Query( const char *key, char *buf, int size ) {
+	return vrActive && trap_GetValue( buf, size, key );
+}
+
+static void UI_VRGlyph_Cell( float x, float y, float size, int cell, const float *color ) {
+	const float s = ( cell % VRG_GRID ) / (float)VRG_GRID, t = ( cell / VRG_GRID ) / (float)VRG_GRID;
+	float w = size, h = size;
+	if ( !vrGlyphShader ) {
+		vrGlyphShader = trap_R_RegisterShaderNoMip( "gfx/vr/glyphs" );
+	}
+	UI_AdjustFrom640( &x, &y, &w, &h );
+	trap_R_SetColor( color );
+	trap_R_DrawStretchPic( x, y, w, h, s, t, s + 1.0f / VRG_GRID, t + 1.0f / VRG_GRID, vrGlyphShader );
+	trap_R_SetColor( NULL );
+}
+
+static const vrgIO_t uiVRGlyphIO = {UI_VRGlyph_Query, UI_VRGlyph_Cell};
+
+typedef struct {
+	float scale;
+	int style;
+} uiVRGlyphText_t;
+
+static float UI_VRGlyph_Width( const char *run, void *user ) {
+	return uiInfo.uiDC.textWidth( run, ( (uiVRGlyphText_t *)user )->scale, 0 );
+}
+
+static void UI_VRGlyph_Text( float x, float y, const char *run, const float *color, void *user ) {
+	const uiVRGlyphText_t *text = (const uiVRGlyphText_t *)user;
+	uiInfo.uiDC.drawText( x, y, text->scale, (float *)color, run, 0, 0, text->style );
+}
+
+// Glyphs stand 1.4 cap heights tall above the baseline.
+static void UI_VRGlyph_Font( vrgFont_t *font, uiVRGlyphText_t *text, float scale, int style ) {
+	text->scale = scale;
+	text->style = style;
+	font->glyph = uiInfo.uiDC.textHeight( "A", scale, 0 ) * 1.4f;
+	font->glyphY = -font->glyph * 0.85f;
+	font->width = UI_VRGlyph_Width;
+	font->text = UI_VRGlyph_Text;
+	font->user = text;
+}
+
+float UI_VR_GlyphWidth( const char *text, float scale ) {
+	vrgFont_t font;
+	uiVRGlyphText_t run;
+	UI_VRGlyph_Font( &font, &run, scale, 0 );
+	return VRG_Width( &font, text );
+}
+
+void UI_VR_GlyphPaint( float x, float y, float scale, vec4_t color, const char *text, int style ) {
+	vrgFont_t font;
+	uiVRGlyphText_t run;
+	UI_VRGlyph_Font( &font, &run, scale, style );
+	VRG_Paint( &font, x, y, color, text );
+}
 
 qboolean UI_VR_BindingsAvailable( void ) {
 	return vrActive && bindCaptureAvailable;
@@ -140,7 +194,6 @@ static void UI_VR_Attach( void ) {
 		vrKeyFirst = atoi( ext );
 		bindCaptureAvailable = qtrue;
 		VRBM_SetIO( &uiVRBindIO );
-		trap_Cvar_Set( "ui_vrBindAlt", "0" );
 	}
 	vr->menuYawLocked = qfalse;
 	vr->menuCursorActive = vrActive;
@@ -149,6 +202,7 @@ static void UI_VR_Attach( void ) {
 // Menus gate their VR rows on these with cvarTest; a flatscreen engine reads 0.
 void UI_VR_Init( void ) {
 	trap_Cvar_Set( "ui_vrModeSwitchAvailable", UI_VR_CanSwitchMode() ? "1" : "0" );
+	VRG_SetIO( &uiVRGlyphIO );
 	UI_VR_Attach();
 	trap_Cvar_Register( NULL, "ui_vrActive", "0", CVAR_ROM );
 	trap_Cvar_Set( "ui_vrActive", vrActive ? "1" : "0" );
@@ -375,6 +429,14 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 		return qtrue;
 	} else if ( Q_stricmp( name, "vrBindCancel" ) == 0 ) {
 		VRBM_Cancel();
+		return qtrue;
+	} else if ( Q_stricmp( name, "vrBindOpen" ) == 0 ) {
+		VRBM_Open();
+		return qtrue;
+	} else if ( Q_stricmp( name, "vrBindReset" ) == 0 ) {
+		// run now and drop the cached cells, so the rows show the defaults at once
+		trap_Cmd_ExecuteText( EXEC_NOW, "vr_bindreset\n" );
+		VRBM_Forget();
 		return qtrue;
 	} else if ( Q_stricmp( name, "vrHudDrawStatusChanged" ) == 0 ) {
 		// the HUD mode without a status bar draws no 3D icons
@@ -770,11 +832,15 @@ static qboolean UI_SuperSampling_HandleKey(int flags, float *special, int key) {
 	return qtrue;
 }
 
-// Where each row's clear glyph starts, from its last paint; a click right of it clears instead of binding.
-static float vrBindGlyphX[VRBM_ROW_COUNT];
-// Each row's and the Alt switch's window, from their last paint: focus outlives hover, so clicks must land inside.
+// Each row's cell edges from its last paint (Plain, Alt, the clear glyph) and its window: focus outlives hover, so a
+// click must land inside its row and on a cell.
+#define VRB_LABEL_W 150
+#define VRB_CELL_W 110
+static float vrBindCellX[VRBM_ROW_COUNT][3];
 static rectDef_t vrBindHit[VRBM_ROW_COUNT];
-static rectDef_t vrBindAltHit;
+static const vec4_t vrBindWhite = {1, 1, 1, 1};
+static const vec4_t vrBindRed = {1, .31f, .31f, 1};
+static const vec4_t vrBindDivider = {.5f, .5f, .5f, .6f};
 
 static void UI_VRBind_SetHit( rectDef_t *hit, float x, float y, float w, float h ) {
 	hit->x = x;
@@ -788,53 +854,33 @@ static qboolean UI_VRBind_Inside( const rectDef_t *hit ) {
 	return x >= hit->x && x < hit->x + hit->w && y >= hit->y && y < hit->y + hit->h;
 }
 
-static qboolean UI_VRBind_IsArrow( int c ) {
-	return c == 134 || c == 135 || c == 136 || c == 141;
+// The cell under the pointer in row index; the label counts as Plain.
+static int UI_VRBind_ColumnAt( int index ) {
+	const float x = uiInfo.uiDC.cursorx;
+	if ( x >= vrBindCellX[index][VRBM_COL_CLEAR] - 6 ) {
+		return VRBM_COL_CLEAR;
+	}
+	if ( x >= vrBindCellX[index][VRBM_COL_ALT] - 4 ) {
+		return VRBM_COL_ALT;
+	}
+	return VRBM_COL_PLAIN;
 }
 
-// drawText, with the arrow bytes drawn from the character sheet as the on-screen keyboard draws them: the font pages
-// have no glyphs there.
-static void UI_VRBind_Paint( float x, float y, float scale, vec4_t color, const char *text, int style ) {
-	static qhandle_t charset;
-	char run[256];
-	const float size = uiInfo.uiDC.textHeight( "A", scale, 0 ) * 1.4f;
-	int n = 0;
-
-	if ( !charset ) {
-		charset = trap_R_RegisterShaderNoMip( "gfx/2d/bigchars" );
-	}
-	for ( ;; text++ ) {
-		const int c = *text & 255;
-		if ( c && !UI_VRBind_IsArrow( c ) && n < (int)sizeof( run ) - 1 ) {
-			run[n++] = (char)c;
-			continue;
-		}
-		run[n] = '\0';
-		if ( n ) {
-			uiInfo.uiDC.drawText( x, y, scale, color, run, 0, 0, style );
-			x += uiInfo.uiDC.textWidth( run, scale, 0 );
-			n = 0;
-		}
-		if ( !c ) {
-			break;
-		}
-		if ( UI_VRBind_IsArrow( c ) ) {
-			float ax = x, ay = y - size * 0.85f, aw = size, ah = size;
-			const float s = ( c & 15 ) * 0.0625f, t = ( c >> 4 ) * 0.0625f;
-			UI_AdjustFrom640( &ax, &ay, &aw, &ah );
-			trap_R_SetColor( color );
-			trap_R_DrawStretchPic( ax, ay, aw, ah, s, t, s + 0.0625f, t + 0.0625f, charset );
-			trap_R_SetColor( NULL );
-			x += size;
-		}
-	}
+static int UI_VRBind_FocusedRow( void ) {
+	itemDef_t *item = UI_VR_FocusedItem();
+	return item && item->window.ownerDraw == UI_VRBIND ? (int)item->special : -1;
 }
 
-static void UI_DrawVRBind( rectDef_t *rect, int index, float scale, vec4_t color, int textStyle ) {
+static void UI_DrawVRBind( float top, rectDef_t *rect, int index, float scale, vec4_t color, int textStyle ) {
 	const vrbmRow_t *row;
-	char names[128];
+	char cell[VRBM_CELL];
+	vec4_t fill;
+	qboolean focused;
+	int c, column;
+	float x;
 
 	VRBM_Tick( uiInfo.uiDC.realTime );
+	VRG_Tick( uiInfo.uiDC.realTime );
 	if ( index < 0 || index >= VRBM_ROW_COUNT ) {
 		return;
 	}
@@ -843,43 +889,96 @@ static void UI_DrawVRBind( rectDef_t *rect, int index, float scale, vec4_t color
 		uiInfo.uiDC.drawText( rect->x, rect->y, scale, color, row->label, 0, 0, textStyle );
 		return;
 	}
-	if ( !VRBM_Editable( row, vrbm.altView ) ) {
-		VRBM_Names( row, 0, names, sizeof( names ) );
-		uiInfo.uiDC.drawText( rect->x, rect->y, scale, color, row->label, 0, 0, textStyle );
-		UI_VRBind_Paint( rect->x + 170, rect->y, scale, color, names, textStyle );
-		return;
+	vrBindCellX[index][VRBM_COL_PLAIN] = rect->x + VRB_LABEL_W;
+	vrBindCellX[index][VRBM_COL_ALT] = rect->x + VRB_LABEL_W + VRB_CELL_W;
+	vrBindCellX[index][VRBM_COL_CLEAR] = rect->x + rect->w - 20;
+	focused = UI_VRBind_FocusedRow() == index;
+	if ( focused && !UI_VR_StickNavActive() && !VRBM_Waiting() && UI_VRBind_Inside( &vrBindHit[index] ) ) {
+		c = UI_VRBind_ColumnAt( index );
+		if ( c >= 0 ) {
+			VRBM_Point( row, c );
+		}
 	}
-	VRBM_Names( row, vrbm.altView, names, sizeof( names ) );
-	uiInfo.uiDC.drawText( rect->x, rect->y, scale, color, row->label, 0, 0, textStyle );
-	UI_VRBind_Paint( rect->x + 170, rect->y, scale, color, vrbm.waiting == index ? "..." : names, textStyle );
-	vrBindGlyphX[index] = rect->x + rect->w - 20;
-	uiInfo.uiDC.drawText( vrBindGlyphX[index], rect->y, scale, color, "X", 0, 0, textStyle );
+	column = vrbm.waiting == index ? ( vrbm.waitingAlt ? VRBM_COL_ALT : VRBM_COL_PLAIN ) : focused ? VRBM_Column( row ) : -1;
+	uiInfo.uiDC.drawText( rect->x, rect->y, scale, column >= 0 ? color : (float *)vrBindWhite, row->label, 0, 0, textStyle );
+	// one row pitch tall (20 + the 2px gap), so the rows' dividers butt into one line without overlapping
+	uiInfo.uiDC.fillRect( vrBindCellX[index][VRBM_COL_ALT] - 6, top - 1, 1, rect->h + 2, vrBindDivider );
+	fill[0] = color[0];
+	fill[1] = color[1];
+	fill[2] = color[2];
+	fill[3] = .18f;
+	for ( c = VRBM_COL_PLAIN; c <= VRBM_COL_ALT; c++ ) {
+		x = vrBindCellX[index][c];
+		if ( c == VRBM_COL_ALT && !VRBM_Editable( row, 1 ) ) {
+			// centered in the cell's highlight span, and as thin as the divider
+			uiInfo.uiDC.fillRect( x - 4 + ( VRB_CELL_W - 8 ) / 2 - 12, top + rect->h / 2, 24, 1, vrBindDivider );
+			continue;
+		}
+		if ( c == column ) {
+			uiInfo.uiDC.fillRect( x - 4, top + 1, VRB_CELL_W - 8, rect->h - 2, fill );
+		}
+		if ( vrbm.waiting == index && c == column ) {
+			uiInfo.uiDC.drawText( x, rect->y, scale, color, "...", 0, 0, textStyle );
+			continue;
+		}
+		VRBM_Cell( row, c == VRBM_COL_ALT, cell, sizeof( cell ) );
+		UI_VR_GlyphPaint( x, rect->y, scale, c == column ? color : (float *)vrBindWhite, cell, textStyle );
+	}
+	if ( focused ) {
+		if ( column == VRBM_COL_CLEAR ) {
+			uiInfo.uiDC.fillRect( vrBindCellX[index][VRBM_COL_CLEAR] - 4, top + 1, 16, rect->h - 2, fill );
+		}
+		uiInfo.uiDC.drawText( vrBindCellX[index][VRBM_COL_CLEAR], rect->y, scale, (float *)vrBindRed, "X", 0, 0, textStyle );
+	}
 }
 
 static qboolean UI_VRBind_HandleKey( float *special, int key ) {
 	const int index = (int)*special;
+	const vrbmRow_t *row;
+	int c;
 
-	if ( key != K_MOUSE1 && key != K_ENTER && key != K_KP_ENTER ) {
+	if ( index < 0 || index >= VRBM_ROW_COUNT || VRBM_Waiting() ) {
+		return key == K_MOUSE1 || key == K_ENTER || key == K_KP_ENTER;
+	}
+	row = &vrbmRows[index];
+	switch ( key ) {
+	case K_LEFTARROW:
+	case K_KP_LEFTARROW:
+		VRBM_Step( row, -1 );
+		return qtrue;
+	case K_RIGHTARROW:
+	case K_KP_RIGHTARROW:
+		VRBM_Step( row, 1 );
+		return qtrue;
+	case K_MOUSE1:
+		if ( !UI_VRBind_Inside( &vrBindHit[index] ) ) {
+			return qtrue;
+		}
+		if ( !UI_VR_StickNavActive() ) {
+			c = UI_VRBind_ColumnAt( index );
+			if ( c < 0 ) {
+				return qtrue;
+			}
+			VRBM_Point( row, c );
+			if ( VRBM_Column( row ) != c ) {
+				return qtrue;
+			}
+		}
+		VRBM_Activate( index );
+		return qtrue;
+	case K_ENTER:
+	case K_KP_ENTER:
+		VRBM_Activate( index );
+		return qtrue;
+	default:
 		return qfalse;
 	}
-	if ( index < 0 || index >= VRBM_ROW_COUNT || VRBM_Waiting() || !VRBM_Editable( &vrbmRows[index], vrbm.altView ) ) {
-		return qtrue;
-	}
-	if ( key == K_MOUSE1 && !UI_VRBind_Inside( &vrBindHit[index] ) ) {
-		return qtrue;
-	}
-	if ( key == K_MOUSE1 && !UI_VR_StickNavActive() && uiInfo.uiDC.cursorx >= vrBindGlyphX[index] ) {
-		VRBM_Clear( &vrbmRows[index], vrbm.altView );
-	} else {
-		VRBM_Start( index );
-	}
-	return qtrue;
 }
 
 static void UI_DrawVRBindStatus( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
 	char status[256];
-	VRBM_Status( status, sizeof( status ) );
-	UI_VRBind_Paint( rect->x, rect->y, scale, color, status, textStyle );
+	VRBM_Status( UI_VRBind_FocusedRow(), status, sizeof( status ) );
+	UI_VR_GlyphPaint( rect->x, rect->y, scale, color, status, textStyle );
 }
 
 void UI_VR_OwnerDraw( float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle ) {
@@ -910,11 +1009,7 @@ void UI_VR_OwnerDraw( float x, float y, float w, float h, float text_x, float te
 		if ( (int)special >= 0 && (int)special < VRBM_ROW_COUNT ) {
 			UI_VRBind_SetHit( &vrBindHit[(int)special], x, y, w, h );
 		}
-		UI_DrawVRBind( &rect, (int)special, scale, color, textStyle );
-		break;
-	case UI_VRBIND_ALT:
-		UI_VRBind_SetHit( &vrBindAltHit, x, y, w, h );
-		uiInfo.uiDC.drawText( rect.x, rect.y, scale, color, vrbm.altView ? "Alt held: Yes" : "Alt held: No", 0, 0, textStyle );
+		UI_DrawVRBind( y, &rect, (int)special, scale, color, textStyle );
 		break;
 	case UI_VRBIND_STATUS:
 		UI_DrawVRBindStatus( &rect, scale, color, textStyle );
@@ -936,13 +1031,6 @@ qboolean UI_VR_OwnerDrawHandleKey( int ownerDraw, int flags, float *special, int
 		return UI_SuperSampling_HandleKey( flags, special, key );
 	case UI_VRBIND:
 		return UI_VRBind_HandleKey( special, key );
-	case UI_VRBIND_ALT:
-		if ( ( key == K_MOUSE1 && UI_VRBind_Inside( &vrBindAltHit ) ) || key == K_ENTER || key == K_KP_ENTER ) {
-			vrbm.altView = !vrbm.altView;
-			trap_Cvar_Set( "ui_vrBindAlt", vrbm.altView ? "1" : "0" );
-			return qtrue;
-		}
-		break;
 	default:
 		break;
 	}

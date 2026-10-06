@@ -3,6 +3,7 @@
 #include "../game/vr_shared.h"
 #include "../game/vr_trap.h"
 #include "../game/vr_bindmenu.h"
+#include "../game/vr_glyph.h"
 
 const char vr_api_sentinel[] = VR_API_SENTINEL;
 
@@ -59,14 +60,8 @@ static void UI_VRBind_Unbind( const char *context, int key ) {
 	trap_Cmd_ExecuteText( EXEC_NOW, va( "vrunbind %s %s\n", context, name ) );
 }
 
-static void UI_VRBind_KeyName( int key, char *buf, int size ) {
-	if ( !trap_GetValue( buf, size, va( "vr_keyname %i", vrKeyFirst + key ) ) )
-		Q_strncpyz( buf, "???", size );
-}
-
-static void UI_VRBind_CancelName( char *buf, int size ) {
-	if ( !trap_GetValue( buf, size, "vr_menu_cancel_button" ) )
-		Q_strncpyz( buf, "Menu", size );
+static void UI_VRBind_CancelKeys( char *buf, int size ) {
+	VRG_KeysFor( "global", "+key ESCAPE", buf, size );
 }
 
 static void UI_VRBind_Capture( void ) {
@@ -86,7 +81,66 @@ static int UI_VRBind_Defaults( const char *context, const char *command, int key
 }
 
 static const vrbmIO_t uiVRBindIO = {UI_VRBind_Read, UI_VRBind_Bind, UI_VRBind_Unbind,
-									UI_VRBind_KeyName, UI_VRBind_CancelName, UI_VRBind_Capture, UI_VRBind_Defaults};
+									UI_VRBind_CancelKeys, UI_VRBind_Capture, UI_VRBind_Defaults};
+
+static qhandle_t vrGlyphShader;
+
+static int UI_VRGlyph_Query( const char *key, char *buf, int size ) {
+	return vrActive && trap_GetValue( buf, size, key );
+}
+
+static void UI_VRGlyph_Cell( float x, float y, float size, int cell, const float *color ) {
+	const float s = ( cell % VRG_GRID ) / (float)VRG_GRID, t = ( cell / VRG_GRID ) / (float)VRG_GRID;
+	float w = size, h = size;
+	if ( !vrGlyphShader ) {
+		vrGlyphShader = trap_R_RegisterShaderNoMip( "gfx/vr/glyphs" );
+	}
+	UI_AdjustFrom640( &x, &y, &w, &h );
+	trap_R_SetColor( color );
+	trap_R_DrawStretchPic( x, y, w, h, s, t, s + 1.0f / VRG_GRID, t + 1.0f / VRG_GRID, vrGlyphShader );
+	trap_R_SetColor( NULL );
+}
+
+static const vrgIO_t uiVRGlyphIO = {UI_VRGlyph_Query, UI_VRGlyph_Cell};
+
+static float UI_VRGlyph_Width( const char *run, void *user ) {
+	(void)user;
+	return Q_PrintStrlen( run ) * SMALLCHAR_WIDTH;
+}
+
+static void UI_VRGlyph_Text( float x, float y, const char *run, const float *color, void *user ) {
+	UI_DrawString( (int)x, (int)y, run, *(int *)user, (float *)color );
+}
+
+// Small-font glyphs fill the character cell, a pixel short top and bottom.
+static void UI_VRGlyph_Font( vrgFont_t *font, int *style ) {
+	font->glyph = SMALLCHAR_HEIGHT - 2;
+	font->glyphY = 1;
+	font->width = UI_VRGlyph_Width;
+	font->text = UI_VRGlyph_Text;
+	font->user = style;
+}
+
+float UI_VR_GlyphWidth( const char *text ) {
+	vrgFont_t font;
+	int style = UI_LEFT | UI_SMALLFONT;
+	UI_VRGlyph_Font( &font, &style );
+	return VRG_Width( &font, text );
+}
+
+void UI_VR_GlyphString( int x, int y, const char *text, int style, vec4_t color ) {
+	vrgFont_t font;
+	int runStyle = ( style & ~UI_FORMATMASK ) | UI_LEFT | UI_SMALLFONT;
+	float w;
+	UI_VRGlyph_Font( &font, &runStyle );
+	w = VRG_Width( &font, text );
+	if ( ( style & UI_FORMATMASK ) == UI_CENTER ) {
+		x -= (int)( w / 2 );
+	} else if ( ( style & UI_FORMATMASK ) == UI_RIGHT ) {
+		x -= (int)w;
+	}
+	VRG_Paint( &font, x, y, color, text );
+}
 
 qboolean UI_VR_BindingsAvailable( void ) {
 	return vrActive && bindCaptureAvailable;
@@ -114,6 +168,7 @@ void UI_VR_Init( void ) {
 	trap_Cvar_Set("ui_vrModeSwitchAvailable", UI_VR_CanSwitchMode() ? "1" : "0");
 
 	vrActive = qfalse;
+	VRG_SetIO( &uiVRGlyphIO );
 	bindCaptureAvailable = qfalse;
 	hostScaleSaved = qfalse;
 	memset( &vr_state, 0, sizeof( vr_state ) );

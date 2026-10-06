@@ -1,5 +1,6 @@
 #include "cg_local.h"
 #include "../game/vr_bg.h"
+#include "../game/vr_glyph.h"
 #include "../game/vr_shared.h"
 #include "../game/vr_trap.h"
 #ifdef MISSIONPACK
@@ -117,10 +118,84 @@ int dll_trap_R_HUDBufferEnd;
 int dll_trap_HapticEvent;
 #endif
 
+static qhandle_t cgVRGlyphShader;
+
+static int CG_VRGlyph_Query( const char *key, char *buf, int size ) {
+	return vrActive && trap_GetValue( buf, size, key );
+}
+
+static void CG_VRGlyph_Cell( float x, float y, float size, int cell, const float *color ) {
+	const float s = ( cell % VRG_GRID ) / (float)VRG_GRID, t = ( cell / VRG_GRID ) / (float)VRG_GRID;
+	float w = size, h = size;
+	if ( !cgVRGlyphShader ) {
+		cgVRGlyphShader = trap_R_RegisterShaderNoMip( "gfx/vr/glyphs" );
+	}
+	CG_AdjustFrom640( &x, &y, &w, &h );
+	trap_R_SetColor( color );
+	trap_R_DrawStretchPic( x, y, w, h, s, t, s + 1.0f / VRG_GRID, t + 1.0f / VRG_GRID, cgVRGlyphShader );
+	trap_R_SetColor( NULL );
+}
+
+static const vrgIO_t cgVRGlyphIO = {CG_VRGlyph_Query, CG_VRGlyph_Cell};
+
+typedef struct {
+	float charW, charH;
+	cgVRTextPaint_t paint;
+} cgVRGlyphText_t;
+
+static float CG_VRGlyph_Width( const char *run, void *user ) {
+	return CG_DrawStrlen( run ) * ( (cgVRGlyphText_t *)user )->charW;
+}
+
+static void CG_VRGlyph_Text( float x, float y, const char *run, const float *color, void *user ) {
+	const cgVRGlyphText_t *text = (const cgVRGlyphText_t *)user;
+	if ( text->paint ) {
+		text->paint( x, y, run, color, text->charW, text->charH );
+	} else {
+		CG_DrawStringExt( (int)x, (int)y, run, color, qtrue, qfalse, (int)text->charW, (int)text->charH, 0 );
+	}
+}
+
+// Glyphs stand a quarter taller than the character cell, centered on it.
+static void CG_VRGlyph_Font( vrgFont_t *font, cgVRGlyphText_t *text, float charW, float charH, cgVRTextPaint_t paint ) {
+	text->charW = charW;
+	text->charH = charH;
+	text->paint = paint;
+	font->glyph = charH * 1.25f;
+	font->glyphY = -charH * 0.125f;
+	font->width = CG_VRGlyph_Width;
+	font->text = CG_VRGlyph_Text;
+	font->user = text;
+}
+
+float CG_VR_GlyphWidth( const char *text, float charW, float charH ) {
+	vrgFont_t font;
+	cgVRGlyphText_t run;
+	CG_VRGlyph_Font( &font, &run, charW, charH, NULL );
+	return VRG_Width( &font, text );
+}
+
+void CG_VR_GlyphString( float x, float y, const char *text, const float *color, float charW, float charH, cgVRTextPaint_t paint ) {
+	vrgFont_t font;
+	cgVRGlyphText_t run;
+	CG_VRGlyph_Font( &font, &run, charW, charH, paint );
+	VRG_Paint( &font, x, y, color, text );
+}
+
+qboolean CG_VR_VoteKeys( cgVoteKeys_t *keys, int stamp ) {
+	if ( keys->stamp != stamp ) {
+		keys->stamp = stamp;
+		keys->vr = vrActive && VRG_KeysFor( "vote", "+vote_yes", keys->yes, sizeof( keys->yes ) ) &&
+				   VRG_KeysFor( "vote", "+vote_no", keys->no, sizeof( keys->no ) );
+	}
+	return keys->vr;
+}
+
 void CG_VR_Init( void ) {
 	char ext[64], buf[16];
 
 	vrActive = qfalse;
+	VRG_SetIO( &cgVRGlyphIO );
 	memset( &vr_state, 0, sizeof( vr_state ) );
 	CG_VR_ResetState();
 
@@ -2750,7 +2825,7 @@ static qboolean weaponAdjustParamCycled = qfalse; // debounce for thumbstick par
 static int weaponAdjustResetHoldStart = 0; // when the reset button went down; a WEAPADJUST_RESET_ALL_MS hold resets every parameter
 static qboolean weaponAdjustResetAllFired = qfalse;
 static int weaponAdjustPendingUntil = 0; // set while closing the console or menu that weapon_adjust was run from
-static char weaponAdjustAcceptName[32], weaponAdjustResetName[32];
+static char weaponAdjustAcceptKeys[32], weaponAdjustResetKeys[32];
 
 static void CG_WeaponAdjust_ParseValues( const char *str, float *out ) {
 	// out[0] is scale: default 1, not 0, since a zero scale renders nothing
@@ -2804,12 +2879,10 @@ void CG_WeaponAdjust_Enter( void ) {
 	weaponAdjustParam = 0;
 	weaponAdjustParamCycled = qfalse;
 	weaponAdjustResetHoldStart = 0;
-	if ( !trap_GetValue( weaponAdjustAcceptName, sizeof( weaponAdjustAcceptName ), "vr_bindname adjust weapon_adjust" ) ||
-		 !weaponAdjustAcceptName[0] )
-		Q_strncpyz( weaponAdjustAcceptName, "A", sizeof( weaponAdjustAcceptName ) );
-	if ( !trap_GetValue( weaponAdjustResetName, sizeof( weaponAdjustResetName ), "vr_bindname adjust +adjust_reset" ) ||
-		 !weaponAdjustResetName[0] )
-		Q_strncpyz( weaponAdjustResetName, "B", sizeof( weaponAdjustResetName ) );
+	if ( !VRG_KeysFor( "adjust", "weapon_adjust", weaponAdjustAcceptKeys, sizeof( weaponAdjustAcceptKeys ) ) )
+		Q_strncpyz( weaponAdjustAcceptKeys, "A", sizeof( weaponAdjustAcceptKeys ) );
+	if ( !VRG_KeysFor( "adjust", "+adjust_reset", weaponAdjustResetKeys, sizeof( weaponAdjustResetKeys ) ) )
+		Q_strncpyz( weaponAdjustResetKeys, "B", sizeof( weaponAdjustResetKeys ) );
 
 	CG_WeaponAdjust_LoadWeapon( ps->weapon );
 	CG_Printf( "Weapon adjustment mode: ON\n" );
@@ -3053,12 +3126,11 @@ static void CG_WeaponAdjustDraw( void ) {
 	if ( holding ) {
 		help = va( "Let go: reset %s  Hold: reset all", weaponAdjustParamNames[weaponAdjustParam] );
 	} else {
-		help = va( "%s:Accept  %s:Reset (hold: all)", weaponAdjustAcceptName, weaponAdjustResetName );
+		help = va( "%s Accept  %s Reset (hold: all)", weaponAdjustAcceptKeys, weaponAdjustResetKeys );
 	}
-	helpW = (int)strlen( help ) * charW;
+	helpW = (int)CG_VR_GlyphWidth( help, charW, charH );
 	helpX = boxX + ( boxW - helpW ) / 2;
-	CG_DrawStringExt( (int)helpX, (int)footerY, help, holding ? activeColor : helpColor,
-		qtrue, qfalse, charW, charH, 0 );
+	CG_VR_GlyphString( helpX, footerY, help, holding ? activeColor : helpColor, charW, charH, NULL );
 	if ( holding ) {
 		float frac = (float)( trap_Milliseconds() - weaponAdjustResetHoldStart ) / WEAPADJUST_RESET_ALL_MS;
 		if ( frac > 1.0f ) frac = 1.0f;

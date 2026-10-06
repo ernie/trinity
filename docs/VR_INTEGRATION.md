@@ -746,8 +746,8 @@ The other call-outs live in `ui_main.c`: `UI_VR_Init()` at the top of
 per frame in `_UI_Refresh`, which also fires the menu-hover haptic when
 the focus moves and, under stick navigation, rests the cursor on the
 focused item (a slider's thumb) so stock key paths that test the cursor
-act on that item, with the cursor draw gated behind
-`!UI_VKeyboardIsActive()` and `!UI_VR_HideCursor()`; in `_UI_MouseEvent`,
+act on that item, with the cursor draw gated behind `!UI_VR_HideCursor()`
+(it covers the open keyboard too); in `_UI_MouseEvent`,
 the `UI_VR_StickNavActive()` early-out and the same cursor override; the
 keyboard opener wired into the display context
 (`uiInfo.uiDC.vrEditField = &UI_VR_OnEditField`), with `Menu_HandleKey`
@@ -945,8 +945,10 @@ entries, and no media-struct entries are required of the host. What remains:
 **Seven host functions.** Declared with their contracts in `vr_host.h`:
 `CG_DrawScreen2D`, `CG_Draw2DMinimal`, `CG_PushHUDAnchors` /
 `CG_PopHUDAnchors`, `CG_GetViewable4x3Dimensions`, `CG_GetProjectionCenter`,
-and `CG_LaserSight`. A plain-4:3, no-frills host can implement the geometry
-pair as `640/480` and `320/240` and draw nothing in `CG_DrawScreen2D`; the
+and `CG_LaserSight`. A plain-4:3, no-frills host can return the
+framebuffer's size from `CG_GetViewable4x3Dimensions` (it answers in
+framebuffer pixels) and `320/240` from `CG_GetProjectionCenter`, and draw
+nothing in `CG_DrawScreen2D`; the
 anchor pair may be empty on a host with no widescreen anchoring. Take this
 tree's implementations if you want the full behavior.
 
@@ -1011,9 +1013,9 @@ and native builds pass garbage.
 `vr_host_config.h`); the two stat enum entries (Step 4); the tunables
 `PLAYER_HEIGHT` / `SPECTATOR_WORLDSCALE_MULTIPLIER` /
 `SPECTATOR2_WORLDSCALE_MULTIPLIER`, which default in `vr_host.h` and may be
-predefined by the host; `cgs.cursorX` / `cgs.cursorY` become `float`
-(stock: `int`) — `CG_VR_ScoreboardCursor` writes the cursor through
-`float *`, the cgame twin of the UI-substrate cursor fields below; and
+predefined by the host; if you wire the scoreboard-cursor pair (Step 5),
+`cgs.cursorX` / `cgs.cursorY` become `float` (stock: `int`), because
+`CG_VR_ScoreboardCursor` writes the cursor through `float *`; and
 `cgs.media.friendShader` (`sprites/foe`) must be registered in every
 gametype, not just `GT_TEAM` — the weapon wheel's selection marker draws
 through it.
@@ -1024,14 +1026,13 @@ through it.
 text painters (`UI_DrawBannerString2`, `UI_DrawProportionalString2`,
 `UI_DrawString2`: `ay = y * uis.yscale + uis.biasY;`). Flatscreen leaves
 it 0 and the stock values stand; in VR, `UI_VR_UpdateScale` writes all
-four each frame. `UI_DrawPlayer` (ui_players.c) recomputes its fov from
-the transformed rect, keeping the origin math on the desired fov. And
+four each frame. And
 `uis.cursorx` / `uis.cursory` become `float` (stock: `int`), because
 `UI_VR_CursorOverride` writes the cursor through `float *`. Team Arena: the
 `vrEditField` member on `displayContextDef_t`, wired to the drop's keyboard
 opener (Step 6), and that struct's `cursorx` / `cursory` become `float` for the
 same cursor-override reason. `ui/menudef.h` defines the VR owner-draw IDs
-(265 to 272, listed in Step 7), which the drop's `vr_ui.c` switches on.
+(265 to 271, listed in Step 7), which the drop's `vr_ui.c` switches on.
 
 If a symbol is still unresolved after `vr_host.h` is satisfied, it is a bug
 in the contract — report it; Step 2's failing build output is otherwise your

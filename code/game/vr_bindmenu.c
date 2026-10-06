@@ -1,4 +1,5 @@
 #include "vr_bindmenu.h"
+#include "vr_glyph.h"
 
 #define M VRBM_TAB_MOVE
 #define A VRBM_TAB_ACTIONS
@@ -45,14 +46,15 @@ const vrbmRow_t vrbmRows[VRBM_ROW_COUNT] = {
 #undef F
 #undef S
 
-vrbmState_t vrbm = {-1, 0, -1};
+vrbmState_t vrbm = {-1, 0, -1, VRBM_COL_PLAIN};
 
-#define VRBM_NAMES_MS 500
+#define VRBM_CELLS_MS 500
 static struct {
-	char text[128];
+	char text[VRBM_CELL];
 	int valid;
-} names[VRBM_ROW_COUNT][2];
-static int namesTime;
+} cells[VRBM_ROW_COUNT][2];
+static int cellsTime;
+static char cancelKeys[VRBM_CELL];	// the Menu button, read when a wait starts
 
 // Every layer, global first; the Alt names sit at the same index.
 static const char *const layerNames[] = {"global", "menu", "adjust", "scrub", "scoreboard", "vote", "wheel",
@@ -96,19 +98,6 @@ void VRBM_SetIO( const vrbmIO_t *table ) {
 	io = *table;
 }
 
-void VRBM_Forget( void ) {
-	int i;
-	for ( i = 0; i < VRBM_ROW_COUNT; i++ )
-		names[i][0].valid = names[i][1].valid = 0;
-}
-
-void VRBM_Tick( int timeMs ) {
-	if ( timeMs - namesTime >= VRBM_NAMES_MS || timeMs < namesTime ) {
-		namesTime = timeMs;
-		VRBM_Forget();
-	}
-}
-
 static const char *VRBM_Set( const char *context, int alt ) {
 	int i;
 	for ( i = 0; i < VRBM_LAYERS; i++ )
@@ -117,21 +106,21 @@ static const char *VRBM_Set( const char *context, int alt ) {
 	return context;
 }
 
-const char *VRBM_Context( const vrbmRow_t *row, int altView ) {
-	return VRBM_Set( row->context, altView );
+static const char *VRBM_Context( const vrbmRow_t *row, int alt ) {
+	return VRBM_Set( row->context, alt );
 }
 
-int VRBM_Editable( const vrbmRow_t *row, int altView ) {
-	return !(altView && (row->flags & VRBM_NOALT));
+int VRBM_Editable( const vrbmRow_t *row, int alt ) {
+	return !(alt && (row->flags & VRBM_NOALT));
 }
 
-int VRBM_Keys( const vrbmRow_t *row, int altView, int keys[2] ) {
+int VRBM_Keys( const vrbmRow_t *row, int alt, int keys[2] ) {
 	char binding[VRBM_BINDING];
 	int k, count = 0;
 	if ( row->flags & VRBM_HEADER )
 		return 0;
 	for ( k = 0; k < VRBM_KEYS && count < 2; k++ ) {
-		io.read( VRBM_Context( row, altView ), k, binding, sizeof( binding ) );
+		io.read( VRBM_Context( row, alt ), k, binding, sizeof( binding ) );
 		if ( binding[0] && VRBM_Same( binding, row->command ) )
 			keys[count++] = k;
 	}
@@ -178,19 +167,19 @@ static void VRBM_Place( const char *context, int alt, int key, const char *comma
 	VRBM_Forget();
 }
 
-vrbmResult_t VRBM_Bind( const vrbmRow_t *row, int altView, int key ) {
+static vrbmResult_t VRBM_Bind( const vrbmRow_t *row, int alt, int key ) {
 	const char *contexts[2], *commands[2];
 	char binding[VRBM_BINDING];
 	int keys[2], count, pairs, i, j;
 	if ( (row->flags & VRBM_HEADER) || key < 0 || key >= VRBM_KEYS )
 		return VRBM_UNCHANGED;
-	count = VRBM_Keys( row, altView, keys );
+	count = VRBM_Keys( row, alt, keys );
 	for ( i = 0; i < count; i++ )
 		if ( keys[i] == key )
 			return VRBM_UNCHANGED;
 	pairs = VRBM_Pairs( row, contexts, commands );
 	// An Alt binding leaves the plain one working, so only plain bindings are refused.
-	if ( !altView ) {
+	if ( !alt ) {
 		// Global and menu bindings would take the menu's own clicks and navigation.
 		for ( j = 0; j < pairs; j++ ) {
 			if ( VRBM_Equals( contexts[j], "global" ) || VRBM_Equals( contexts[j], "menu" ) ) {
@@ -205,11 +194,11 @@ vrbmResult_t VRBM_Bind( const vrbmRow_t *row, int altView, int key ) {
 	}
 	// the new key goes on before the old ones come off, so a required row always has one
 	for ( j = 0; j < pairs; j++ )
-		VRBM_Place( contexts[j], altView, key, commands[j] );
+		VRBM_Place( contexts[j], alt, key, commands[j] );
 	if ( count == 2 )
 		for ( j = 0; j < pairs; j++ )
 			for ( i = 0; i < 2; i++ )
-				VRBM_Drop( VRBM_Set( contexts[j], altView ), keys[i], commands[j] );
+				VRBM_Drop( VRBM_Set( contexts[j], alt ), keys[i], commands[j] );
 	return VRBM_BOUND;
 }
 
@@ -226,62 +215,112 @@ static void VRBM_Restore( const vrbmRow_t *row ) {
 			VRBM_Drop( row->context, k, row->command );
 }
 
-void VRBM_Clear( const vrbmRow_t *row, int altView ) {
+static void VRBM_DropAll( const vrbmRow_t *row, int alt ) {
 	const char *contexts[2], *commands[2];
-	int pairs, j, k;
-	if ( row->flags & VRBM_HEADER )
-		return;
-	if ( (row->flags & VRBM_REQUIRED) && !altView ) {
-		VRBM_Restore( row );
-		return;
-	}
-	pairs = VRBM_Pairs( row, contexts, commands );
+	const int pairs = VRBM_Pairs( row, contexts, commands );
+	int j, k;
 	for ( j = 0; j < pairs; j++ )
 		for ( k = 0; k < VRBM_KEYS; k++ )
-			VRBM_Drop( VRBM_Set( contexts[j], altView ), k, commands[j] );
+			VRBM_Drop( VRBM_Set( contexts[j], alt ), k, commands[j] );
 }
 
-static void VRBM_BuildNames( const vrbmRow_t *row, int altView, char *buf, int size ) {
-	char name[64];
+// Clears both columns; a required row gets its default plain keys back.
+static void VRBM_Clear( const vrbmRow_t *row ) {
+	if ( row->flags & VRBM_HEADER )
+		return;
+	if ( row->flags & VRBM_REQUIRED )
+		VRBM_Restore( row );
+	else
+		VRBM_DropAll( row, 0 );
+	if ( VRBM_Editable( row, 1 ) )
+		VRBM_DropAll( row, 1 );
+}
+
+void VRBM_Forget( void ) {
+	int i;
+	for ( i = 0; i < VRBM_ROW_COUNT; i++ )
+		cells[i][0].valid = cells[i][1].valid = 0;
+}
+
+void VRBM_Tick( int timeMs ) {
+	if ( timeMs - cellsTime >= VRBM_CELLS_MS || timeMs < cellsTime ) {
+		cellsTime = timeMs;
+		VRBM_Forget();
+	}
+}
+
+static void VRBM_BuildCell( const vrbmRow_t *row, int alt, char *buf, int size ) {
 	int keys[2], count, i;
 	buf[0] = '\0';
-	count = VRBM_Keys( row, altView, keys );
-	if ( !count ) {
-		VRBM_Append( buf, size, "???" );
-		return;
-	}
+	count = VRBM_Keys( row, alt, keys );
 	for ( i = 0; i < count; i++ ) {
 		if ( i )
-			VRBM_Append( buf, size, ", " );
-		io.keyName( keys[i], name, sizeof( name ) );
-		VRBM_Append( buf, size, name );
+			VRBM_Append( buf, size, " / " );	// reads as "or"
+		VRG_AppendKey( buf, size, keys[i] );
 	}
 }
 
-void VRBM_Names( const vrbmRow_t *row, int altView, char *buf, int size ) {
-	const int index = (int)( row - vrbmRows );
+void VRBM_Cell( const vrbmRow_t *row, int alt, char *buf, int size ) {
+	const int index = (int)( row - vrbmRows ), a = alt ? 1 : 0;
 	if ( index < 0 || index >= VRBM_ROW_COUNT ) {
-		VRBM_BuildNames( row, altView, buf, size );
+		VRBM_BuildCell( row, alt, buf, size );
 		return;
 	}
-	if ( !names[index][altView ? 1 : 0].valid ) {
-		VRBM_BuildNames( row, altView, names[index][altView ? 1 : 0].text, sizeof( names[index][altView ? 1 : 0].text ) );
-		names[index][altView ? 1 : 0].valid = 1;
+	if ( !cells[index][a].valid ) {
+		VRBM_BuildCell( row, alt, cells[index][a].text, sizeof( cells[index][a].text ) );
+		cells[index][a].valid = 1;
 	}
 	buf[0] = '\0';
-	VRBM_Append( buf, size, names[index][altView ? 1 : 0].text );
+	VRBM_Append( buf, size, cells[index][a].text );
+}
+
+void VRBM_Open( void ) {
+	VRBM_Cancel();
+	vrbm.column = VRBM_COL_PLAIN;
+}
+
+int VRBM_Column( const vrbmRow_t *row ) {
+	return vrbm.column == VRBM_COL_ALT && !VRBM_Editable( row, 1 ) ? VRBM_COL_PLAIN : vrbm.column;
+}
+
+void VRBM_Step( const vrbmRow_t *row, int dir ) {
+	int column = VRBM_Column( row ) + dir;
+	if ( column == VRBM_COL_ALT && !VRBM_Editable( row, 1 ) )
+		column += dir;
+	if ( column >= VRBM_COL_PLAIN && column <= VRBM_COL_CLEAR )
+		vrbm.column = column;
+}
+
+void VRBM_Point( const vrbmRow_t *row, int column ) {
+	if ( column == VRBM_COL_ALT && !VRBM_Editable( row, 1 ) )
+		return;
+	if ( column >= VRBM_COL_PLAIN && column <= VRBM_COL_CLEAR )
+		vrbm.column = column;
+}
+
+static void VRBM_Start( int row, int alt ) {
+	if ( row < 0 || row >= VRBM_ROW_COUNT || (vrbmRows[row].flags & VRBM_HEADER) || !VRBM_Editable( &vrbmRows[row], alt ) )
+		return;
+	vrbm.waiting = row;
+	vrbm.waitingAlt = alt ? 1 : 0;
+	vrbm.refused = -1;
+	cancelKeys[0] = '\0';
+	if ( io.cancelKeys )
+		io.cancelKeys( cancelKeys, sizeof( cancelKeys ) );
+	io.capture();
+}
+
+void VRBM_Activate( int row ) {
+	if ( row < 0 || row >= VRBM_ROW_COUNT || VRBM_Waiting() || (vrbmRows[row].flags & VRBM_HEADER) )
+		return;
+	if ( VRBM_Column( &vrbmRows[row] ) == VRBM_COL_CLEAR )
+		VRBM_Clear( &vrbmRows[row] );
+	else
+		VRBM_Start( row, VRBM_Column( &vrbmRows[row] ) == VRBM_COL_ALT );
 }
 
 int VRBM_Waiting( void ) {
 	return vrbm.waiting >= 0;
-}
-
-void VRBM_Start( int row ) {
-	if ( row < 0 || row >= VRBM_ROW_COUNT || (vrbmRows[row].flags & VRBM_HEADER) )
-		return;
-	vrbm.waiting = row;
-	vrbm.refused = -1;
-	io.capture();
 }
 
 void VRBM_Cancel( void ) {
@@ -293,7 +332,7 @@ vrbmResult_t VRBM_Capture( int key ) {
 	vrbmResult_t result;
 	if ( vrbm.waiting < 0 )
 		return VRBM_UNCHANGED;
-	result = VRBM_Bind( &vrbmRows[vrbm.waiting], vrbm.altView, key );
+	result = VRBM_Bind( &vrbmRows[vrbm.waiting], vrbm.waitingAlt, key );
 	if ( result == VRBM_REFUSED ) {
 		vrbm.refused = key;
 		io.capture();
@@ -308,21 +347,31 @@ void VRBM_OtherKey( void ) {
 		io.capture();
 }
 
-void VRBM_Status( char *buf, int size ) {
-	char name[64];
+void VRBM_Status( int focusedRow, char *buf, int size ) {
+	const vrbmRow_t *row = focusedRow >= 0 && focusedRow < VRBM_ROW_COUNT ? &vrbmRows[focusedRow] : 0;
 	buf[0] = '\0';
-	if ( vrbm.waiting < 0 ) {
-		VRBM_Append( buf, size, "Select an action to bind it. X clears it." );
+	if ( vrbm.waiting >= 0 ) {
+		if ( vrbm.refused >= 0 ) {
+			VRG_AppendKey( buf, size, vrbm.refused );
+			VRBM_Append( buf, size, " is reserved for menu navigation" );
+			return;
+		}
+		VRBM_Append( buf, size, "Press and release an input. " );
+		VRBM_Append( buf, size, cancelKeys[0] ? cancelKeys : "Menu" );
+		VRBM_Append( buf, size, " cancels." );
 		return;
 	}
-	if ( vrbm.refused >= 0 ) {
-		io.keyName( vrbm.refused, name, sizeof( name ) );
-		VRBM_Append( buf, size, name );
-		VRBM_Append( buf, size, " is reserved for menu navigation" );
+	if ( row && !(row->flags & VRBM_HEADER) && VRBM_Column( row ) == VRBM_COL_CLEAR ) {
+		if ( row->flags & VRBM_REQUIRED ) {
+			VRBM_Append( buf, size, "Puts back the default " );
+			VRBM_Append( buf, size, row->label );
+			VRBM_Append( buf, size, " button and clears its Alt bindings." );
+			return;
+		}
+		VRBM_Append( buf, size, "Clears all " );
+		VRBM_Append( buf, size, row->label );
+		VRBM_Append( buf, size, " bindings." );
 		return;
 	}
-	VRBM_Append( buf, size, "Press and release an input. " );
-	io.cancelName( name, sizeof( name ) );
-	VRBM_Append( buf, size, name );
-	VRBM_Append( buf, size, " cancels." );
+	VRBM_Append( buf, size, "Select a cell to bind it." );
 }

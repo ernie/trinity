@@ -13,6 +13,7 @@ MULTIPLAYER MENU (SERVER BROWSER)
 #include "../game/q_shared.h"
 #include "../game/bg_mode.h"
 #include "../game/bg_hostlabels.h"
+#include "../game/vr_glyph.h"
 
 
 #define REFRESH_DELAY			10	  // in ms
@@ -773,31 +774,30 @@ static void ArenaServers_UpdateList( void )
 }
 
 
+static char s_stopPrompt[MAX_STATUSLENGTH];
+
 /*
 =================
-ArenaServers_StopPrompt
+ArenaServers_ResolveStopPrompt
 
-Statusbar prompt shown while a refresh is in flight. Under a VR engine
-the stop key is synthesized from a controller button, so the engine is
-asked once for its real name; on flatscreen, or when the engine doesn't
-answer, the stock SPACE text is used unchanged.
+Statusbar prompt shown while a refresh is in flight. Under a VR engine the stop
+key is a controller button, asked for when the refresh starts so a rebind since
+the last one shows; on flatscreen, or when nothing is bound, the stock SPACE text.
 =================
 */
-static char *ArenaServers_StopPrompt( void ) {
-	static char	prompt[MAX_STATUSLENGTH];
+static void ArenaServers_ResolveStopPrompt( void ) {
+	char keys[16];
 
-	if ( !prompt[0] ) {
-		char	button[32];
-
-		if ( UI_VR_Platform() != VRP_NONE
-				&& trap_GetValue( button, sizeof( button ), "vr_menu_skip_button" )
-				&& button[0] ) {
-			Com_sprintf( prompt, sizeof( prompt ), "Press %s to stop", button );
-		} else {
-			Q_strncpyz( prompt, "Press SPACE to stop", sizeof( prompt ) );
-		}
+	if ( UI_VR_Platform() != VRP_NONE && VRG_KeysFor( "menu", "+key SPACE", keys, sizeof( keys ) ) ) {
+		Com_sprintf( s_stopPrompt, sizeof( s_stopPrompt ), "Press %s to stop", keys );
+	} else {
+		Q_strncpyz( s_stopPrompt, "Press SPACE to stop", sizeof( s_stopPrompt ) );
 	}
-	return prompt;
+}
+
+static void ArenaServers_DrawStatusbar( void *self ) {
+	menutext_s *t = (menutext_s *)self;
+	UI_VR_GlyphString( t->generic.x, t->generic.y, t->string, t->style, t->color );
 }
 
 
@@ -815,7 +815,7 @@ static void ArenaServers_UpdateMenu( void ) {
 		{
 			// show progress
 			Com_sprintf( g_arenaservers.status.string, MAX_STATUSLENGTH, "%d of %d Arena Servers.", g_arenaservers.currentping, g_arenaservers.numqueriedservers);
-			g_arenaservers.statusbar.string  = ArenaServers_StopPrompt();
+			g_arenaservers.statusbar.string = s_stopPrompt;
 			qsort( g_arenaservers.serverlist, *g_arenaservers.numservers, sizeof( servernode_t ), ArenaServers_Compare);
 		}
 		else 
@@ -841,7 +841,7 @@ static void ArenaServers_UpdateMenu( void ) {
 		// no servers found
 		if( g_arenaservers.refreshservers ) {
 			strcpy( g_arenaservers.status.string,"Scanning For Servers." );
-			g_arenaservers.statusbar.string = ArenaServers_StopPrompt();
+			g_arenaservers.statusbar.string = s_stopPrompt;
 
 			// disable controls during refresh
 			//g_arenaservers.gametype.generic.flags	|= QMF_GRAYED;
@@ -1494,6 +1494,8 @@ static void ArenaServers_StartRefresh( void )
 	int		i;
 	char	myargs[32], protocol[24];
 
+	ArenaServers_ResolveStopPrompt();
+
 	memset( g_arenaservers.serverlist, 0, g_arenaservers.maxservers*sizeof(servernode_t) );
 
 	for ( i = 0; i < MAX_PINGLISTSIZE; i++ )
@@ -1998,6 +2000,7 @@ static void ArenaServers_MenuInit( void ) {
 	g_arenaservers.statusbar.string	        = "";
 	g_arenaservers.statusbar.style	        = UI_CENTER|UI_SMALLFONT;
 	g_arenaservers.statusbar.color	        = text_color_normal;
+	g_arenaservers.statusbar.generic.ownerdraw = ArenaServers_DrawStatusbar;
 
 	g_arenaservers.save.generic.type		= MTYPE_BITMAP;
 	g_arenaservers.save.generic.name		= ART_SAVE0;

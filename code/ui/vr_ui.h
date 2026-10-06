@@ -40,4 +40,7 @@ qboolean UI_VR_ModeChoice(void);
 void UI_VR_ChooseMode(qboolean vr);
 qboolean UI_VR_ModePending(void);
 
+float UI_VR_GlyphWidth( const char *text, float scale );
+void UI_VR_GlyphPaint( float x, float y, float scale, vec4_t color, const char *text, int style );
+
 #endif

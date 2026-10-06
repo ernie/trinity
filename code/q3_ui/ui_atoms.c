@@ -622,7 +622,7 @@ UI_DrawString2
 void UI_DrawString2( int x, int y, const char* str, vec4_t color, int charw, int charh )
 {
 	const char* s;
-	int		ch;	// the sheet's upper half (the arrows) would turn negative in a signed char
+	int		ch;	// bytes 128-255 of the sheet would turn negative in a signed char
 	int forceColor = qfalse; //APSFIXME;
 	vec4_t	tempcolor;
 	float	ax;

@@ -2763,7 +2763,24 @@ static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
 						   float barFrac, vec4_t barColor, float alpha,
 						   qboolean highlighted );
 
-static void CG_DrawVoteHoldBar( float boxY, qboolean hasLine3 );
+static void CG_DrawVoteHoldBar( float boxY, qboolean hasLine3, const cgVoteKeys_t *keys );
+
+// Each dialog's vote buttons, asked when it opens.
+static cgVoteKeys_t cg_voteKeys, cg_teamVoteKeys[2], cg_tvdKeys;
+
+// VR keys in VR, else the engine's cl_voteYesKey/cl_voteNoKey names; false when either is unbound.
+static qboolean CG_VoteKeys( cgVoteKeys_t *keys, int stamp ) {
+	if ( !CG_VR_VoteKeys( keys, stamp ) ) {
+		Q_strncpyz( keys->yes, cg_voteYesKey.string, sizeof( keys->yes ) );
+		Q_strncpyz( keys->no, cg_voteNoKey.string, sizeof( keys->no ) );
+	}
+	return keys->yes[0] && keys->no[0];
+}
+
+// Dialog text runs draw shadowed between the button glyphs.
+static void CG_DialogText( float x, float y, const char *run, const float *color, float charW, float charH ) {
+	CG_DrawString( x, y, run, color, charW, charH, 0, DS_SHADOW );
+}
 
 /*
 =================
@@ -2771,9 +2788,9 @@ CG_DrawVote
 =================
 */
 static float CG_DrawVote( float y, qboolean highlighted ) {
-	const char	*keyYes, *keyNo;
 	char		caller[64], desc[MAX_STRING_TOKENS + 32], tally[64], keys[128];
 	float		frac;
+	qboolean	hint;
 	int			elapsed;
 	vec4_t		barFg;
 
@@ -2826,22 +2843,21 @@ static float CG_DrawVote( float y, qboolean highlighted ) {
 		Com_sprintf( tally, sizeof( tally ), "yes:%i    no:%i",
 			cgs.voteYes, cgs.voteNo );
 
-	// line 4: key hints (only on active dialog, before voting)
-	keyYes = cg_voteYesKey.string;
-	keyNo = cg_voteNoKey.string;
-	if ( highlighted && keyYes[0] && keyNo[0] && !cg.myVote ) {
-		Com_sprintf( keys, sizeof( keys ), "%s: yes    %s: no",
-			keyYes, keyNo );
+	// line 4: key hints (only on active dialog, before voting); glyphs take no colon after them
+	hint = highlighted && !cg.myVote && CG_VoteKeys( &cg_voteKeys, cgs.voteTime );
+	if ( hint ) {
+		Com_sprintf( keys, sizeof( keys ), cg_voteKeys.vr ? "%s yes    %s no" : "%s: yes    %s: no",
+			cg_voteKeys.yes, cg_voteKeys.no );
 	}
 
 	barFg[0] = 0.2f; barFg[1] = 0.6f; barFg[2] = 0.8f; barFg[3] = 0.7f;
 	{
 		float retY = CG_DrawDialogBox( y, caller, desc, tally,
-			( highlighted && keyYes[0] && keyNo[0] && !cg.myVote ) ? keys : NULL,
+			hint ? keys : NULL,
 			frac, barFg, 1.0f, highlighted );
 
 		if ( highlighted && !cg.myVote )
-			CG_DrawVoteHoldBar( y, qtrue );  // has tally (line3)
+			CG_DrawVoteHoldBar( y, qtrue, &cg_voteKeys );  // has tally (line3)
 
 		return retY;
 	}
@@ -2854,9 +2870,9 @@ CG_DrawTeamVote
 =================
 */
 static float CG_DrawTeamVote( float y, qboolean highlighted ) {
-	const char	*keyYes, *keyNo;
 	char		caller[64], desc[MAX_STRING_TOKENS + 32], tally[64], keys[128];
 	float		frac;
+	qboolean	hint;
 	int			elapsed, cs_offset;
 	vec4_t		barFg;
 
@@ -2918,22 +2934,21 @@ static float CG_DrawTeamVote( float y, qboolean highlighted ) {
 		Com_sprintf( tally, sizeof( tally ), "yes:%i    no:%i",
 			cgs.teamVoteYes[cs_offset], cgs.teamVoteNo[cs_offset] );
 
-	// line 4: key hints (only on active dialog, before voting)
-	keyYes = cg_voteYesKey.string;
-	keyNo = cg_voteNoKey.string;
-	if ( highlighted && keyYes[0] && keyNo[0] && !cg.myTeamVote ) {
-		Com_sprintf( keys, sizeof( keys ), "%s: yes    %s: no",
-			keyYes, keyNo );
+	// line 4: key hints (only on active dialog, before voting); glyphs take no colon after them
+	hint = highlighted && !cg.myTeamVote && CG_VoteKeys( &cg_teamVoteKeys[cs_offset], cgs.teamVoteTime[cs_offset] );
+	if ( hint ) {
+		Com_sprintf( keys, sizeof( keys ), cg_teamVoteKeys[cs_offset].vr ? "%s yes    %s no" : "%s: yes    %s: no",
+			cg_teamVoteKeys[cs_offset].yes, cg_teamVoteKeys[cs_offset].no );
 	}
 
 	barFg[0] = 0.2f; barFg[1] = 0.6f; barFg[2] = 0.8f; barFg[3] = 0.7f;
 	{
 		float retY = CG_DrawDialogBox( y, caller, desc, tally,
-			( highlighted && keyYes[0] && keyNo[0] && !cg.myTeamVote ) ? keys : NULL,
+			hint ? keys : NULL,
 			frac, barFg, 1.0f, highlighted );
 
 		if ( highlighted && !cg.myTeamVote )
-			CG_DrawVoteHoldBar( y, qtrue );  // has tally (line3)
+			CG_DrawVoteHoldBar( y, qtrue, &cg_teamVoteKeys[cs_offset] );  // has tally (line3)
 
 		return retY;
 	}
@@ -3585,11 +3600,9 @@ boxY is the top of the dialog, hasLine3 indicates whether the
 dialog has a third text line (tally).
 =================
 */
-static void CG_DrawVoteHoldBar( float boxY, qboolean hasLine3 ) {
+static void CG_DrawVoteHoldBar( float boxY, qboolean hasLine3, const cgVoteKeys_t *keys ) {
 	float	textX, lineY, barX, barW, barH, frac;
-	float	yesW, gapW;
-	int		yesLen, noLen;
-	const char *keyYes, *keyNo;
+	float	yesW, noW, gapW;
 	vec4_t	bgColor, fillColor;
 
 	if ( cg.voteHoldButton == 0 || cg.voteHoldStartTime == 0 )
@@ -3599,9 +3612,7 @@ static void CG_DrawVoteHoldBar( float boxY, qboolean hasLine3 ) {
 	if ( frac < 0.0f ) frac = 0.0f;
 	if ( frac > 1.0f ) frac = 1.0f;
 
-	keyYes = cg_voteYesKey.string;
-	keyNo = cg_voteNoKey.string;
-	if ( !keyYes[0] || !keyNo[0] )
+	if ( !keys->yes[0] || !keys->no[0] )
 		return;
 
 	textX = cgs.screenXmin + DIALOG_PAD_X + DIALOG_PAD_X;
@@ -3613,17 +3624,13 @@ static void CG_DrawVoteHoldBar( float boxY, qboolean hasLine3 ) {
 		lineY = boxY + boxH - DIALOG_BAR_H - barH;
 	}
 
-	// calculate text widths: "A: yes" and "B: no"
-	// format is "%s: yes    %s: no"
-	yesLen = CG_DrawStrlen( keyYes ) + 5;  // "%s: yes" = keyLen + ": yes"
-	noLen = CG_DrawStrlen( keyNo ) + 4;    // "%s: no" = keyLen + ": no"
-	yesW = yesLen * DIALOG_CHARW;
-	gapW = 4 * DIALOG_CHARW;  // "    " gap
+	// the two hints' widths, "<yes> yes" and "<no> no", with the four-space gap between them
+	yesW = CG_VR_GlyphWidth( va( keys->vr ? "%s yes" : "%s: yes", keys->yes ), DIALOG_CHARW, DIALOG_CHARH );
+	noW = CG_VR_GlyphWidth( va( keys->vr ? "%s no" : "%s: no", keys->no ), DIALOG_CHARW, DIALOG_CHARH );
+	gapW = 4 * DIALOG_CHARW;
 
 	// use the longer of the two label widths so both bars match
-	barW = yesW;
-	if ( noLen * DIALOG_CHARW > barW )
-		barW = noLen * DIALOG_CHARW;
+	barW = yesW > noW ? yesW : noW;
 
 	bgColor[0] = 0.5f; bgColor[1] = 0.5f; bgColor[2] = 0.5f; bgColor[3] = 0.6f;
 
@@ -3656,25 +3663,25 @@ static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
 						   const char *line3, const char *line4,
 						   float barFrac, vec4_t barColor, float alpha,
 						   qboolean highlighted ) {
-	int		len1, len2, len3, len4, maxLen;
-	float	boxW, boxH, boxX, textX;
+	float	w, maxW, boxW, boxH, boxX, textX;
 	float	lineY, barY;
 	vec4_t	bgColor, barBg, textColor;
 
-	len1 = CG_DrawStrlen( line1 );
-	len2 = CG_DrawStrlen( line2 );
-	maxLen = ( len1 > len2 ) ? len1 : len2;
+	maxW = CG_VR_GlyphWidth( line1, DIALOG_CHARW, DIALOG_CHARH );
+	w = CG_VR_GlyphWidth( line2, DIALOG_CHARW, DIALOG_CHARH );
+	if ( w > maxW )
+		maxW = w;
 	if ( line3 ) {
-		len3 = CG_DrawStrlen( line3 );
-		if ( len3 > maxLen )
-			maxLen = len3;
+		w = CG_VR_GlyphWidth( line3, DIALOG_CHARW, DIALOG_CHARH );
+		if ( w > maxW )
+			maxW = w;
 	}
 	if ( line4 ) {
-		len4 = CG_DrawStrlen( line4 );
-		if ( len4 > maxLen )
-			maxLen = len4;
+		w = CG_VR_GlyphWidth( line4, DIALOG_CHARW, DIALOG_CHARH );
+		if ( w > maxW )
+			maxW = w;
 	}
-	boxW = maxLen * DIALOG_CHARW + 2 * DIALOG_PAD_X;
+	boxW = maxW + 2 * DIALOG_PAD_X;
 	if ( boxW < DIALOG_MIN_W )
 		boxW = DIALOG_MIN_W;
 	if ( line3 && line4 )
@@ -3708,15 +3715,15 @@ static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
 	CG_FillRect( boxX, boxY, boxW, boxH, bgColor );
 
 	lineY = boxY + DIALOG_PAD_TOP;
-	CG_DrawString( textX, lineY, line1, textColor,
-		DIALOG_CHARW, DIALOG_CHARH, 0, DS_SHADOW );
+	CG_VR_GlyphString( textX, lineY, line1, textColor,
+		DIALOG_CHARW, DIALOG_CHARH, CG_DialogText );
 	lineY += DIALOG_CHARH + DIALOG_LINE_GAP;
-	CG_DrawString( textX, lineY, line2, textColor,
-		DIALOG_CHARW, DIALOG_CHARH, 0, DS_SHADOW );
+	CG_VR_GlyphString( textX, lineY, line2, textColor,
+		DIALOG_CHARW, DIALOG_CHARH, CG_DialogText );
 	if ( line3 ) {
 		lineY += DIALOG_CHARH + DIALOG_LINE_GAP;
-		CG_DrawString( textX, lineY, line3, textColor,
-			DIALOG_CHARW, DIALOG_CHARH, 0, DS_SHADOW );
+		CG_VR_GlyphString( textX, lineY, line3, textColor,
+			DIALOG_CHARW, DIALOG_CHARH, CG_DialogText );
 	}
 	if ( line4 ) {
 		vec4_t pulseColor;
@@ -3727,8 +3734,8 @@ static float CG_DrawDialogBox( float boxY, const char *line1, const char *line2,
 		pulseColor[2] = t;	// 0 = yellow, 1 = white
 		pulseColor[3] = alpha;
 		lineY += DIALOG_CHARH + DIALOG_LINE_GAP;
-		CG_DrawString( textX, lineY, line4, pulseColor,
-			DIALOG_CHARW, DIALOG_CHARH, 0, DS_SHADOW );
+		CG_VR_GlyphString( textX, lineY, line4, pulseColor,
+			DIALOG_CHARW, DIALOG_CHARH, CG_DialogText );
 	}
 
 	barY = boxY + boxH - DIALOG_BAR_H;
@@ -3841,7 +3848,6 @@ Polls cl_tvdOffer cvar each frame; countdown shown as a progress bar.
 */
 static float CG_DrawTVOffer( float y ) {
 	const char	*offer;
-	const char	*keyYes, *keyNo;
 	char		keys[128];
 	float		frac;
 	int			mode;
@@ -3888,14 +3894,12 @@ static float CG_DrawTVOffer( float y ) {
 		if ( frac < 0.0f ) frac = 0.0f;
 	}
 
-	// use resolved key names if the engine provided them, else command names
-	keyYes = cg_voteYesKey.string;
-	keyNo = cg_voteNoKey.string;
-	if ( keyYes[0] && keyNo[0] ) {
+	// use the resolved buttons if there are any, else the command names; glyphs take no colon after them
+	if ( CG_VoteKeys( &cg_tvdKeys, cg.tvdOfferTime ) ) {
 		Com_sprintf( keys, sizeof( keys ),
-			mode <= 1 ? "^7%s: yes    ^3%s: no"
-			          : "^3%s: yes    ^7%s: no",
-			keyYes, keyNo );
+			cg_tvdKeys.vr ? ( mode <= 1 ? "^7%s yes    ^3%s no" : "^3%s yes    ^7%s no" )
+			              : ( mode <= 1 ? "^7%s: yes    ^3%s: no" : "^3%s: yes    ^7%s: no" ),
+			cg_tvdKeys.yes, cg_tvdKeys.no );
 	} else {
 		Com_sprintf( keys, sizeof( keys ),
 			mode <= 1 ? "^7vote yes    ^3vote no"
@@ -3907,7 +3911,7 @@ static float CG_DrawTVOffer( float y ) {
 		float retY = CG_DrawDialogBox( y, "Download last match?", cg.tvdOfferName,
 			NULL, keys, frac, barFg, 1.0f, qfalse );
 
-		CG_DrawVoteHoldBar( y, qfalse );  // TVD offer has no tally line (no line3)
+		CG_DrawVoteHoldBar( y, qfalse, &cg_tvdKeys );  // TVD offer has no tally line (no line3)
 
 		return retY;
 	}

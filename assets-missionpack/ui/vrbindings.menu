@@ -13,8 +13,8 @@ menuDef {
 	disableColor .5 .5 .5 1
 	style 1
 	border 1
-	// Resets only the back arrow's hover state; the tabs keep what the player left showing.
-	onOpen { hide back_alt ; show back ; hide grpmessage }
+	// vrBindOpen clears any wait and focuses the Button column; the tabs keep what the player left showing.
+	onOpen { uiScript vrBindOpen ; hide back_alt ; show back ; hide grpmessage }
 	onEsc { close vrbindings_menu ; open vroptions_menu }
 	onClose { uiScript vrBindCancel }
 
@@ -45,7 +45,7 @@ itemDef {
 	textaligny 28
 	forecolor 1 1 1 1
 	visible 1
-	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_move ; show vb_alt }
+	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_move }
 	mouseEnter { setitemcolor sb_move forecolor 1 .75 0 1 }
 	mouseExit { setitemcolor sb_move forecolor 1 1 1 1 }
 	}
@@ -63,7 +63,7 @@ itemDef {
 	textaligny 28
 	forecolor 1 1 1 1
 	visible 1
-	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_actions ; show vb_alt }
+	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_actions }
 	mouseEnter { setitemcolor sb_actions forecolor 1 .75 0 1 }
 	mouseExit { setitemcolor sb_actions forecolor 1 1 1 1 }
 	}
@@ -81,7 +81,7 @@ itemDef {
 	textaligny 28
 	forecolor 1 1 1 1
 	visible 1
-	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_follow ; show vb_alt }
+	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_follow }
 	mouseEnter { setitemcolor sb_follow forecolor 1 .75 0 1 }
 	mouseExit { setitemcolor sb_follow forecolor 1 1 1 1 }
 	}
@@ -99,7 +99,7 @@ itemDef {
 	textaligny 28
 	forecolor 1 1 1 1
 	visible 1
-	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_system ; show vb_alt }
+	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_system }
 	mouseEnter { setitemcolor sb_system forecolor 1 .75 0 1 }
 	mouseExit { setitemcolor sb_system forecolor 1 1 1 1 }
 	}
@@ -136,14 +136,27 @@ itemDef {
 	}
 
 itemDef {
-	name vb_alt
-	group grpVB
-	ownerdraw UI_VRBIND_ALT
-	rect 196 30 200 20
+	name vb_hdr_plain
+	text "Button"
+	style 0
+	textscale .25
+	rect 346 30 110 20
 	textaligny 16
-	textscale .3
 	forecolor 1 .75 0 1
 	visible 1
+	decoration
+	}
+
+itemDef {
+	name vb_hdr_alt
+	text "Alt + Button"
+	style 0
+	textscale .25
+	rect 456 30 110 20
+	textaligny 16
+	forecolor 1 .75 0 1
+	visible 1
+	decoration
 	}
 
 itemDef {
@@ -420,8 +433,6 @@ itemDef {
 	textscale .3
 	forecolor 1 1 1 1
 	visible 0
-	cvarTest "ui_vrBindAlt"
-	disableCvar { 1 }
 	}
 itemDef {
 	name vb_system
@@ -461,7 +472,7 @@ itemDef {
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 26
-	rect 196 170 436 20
+	rect 196 178 436 20
 	textaligny 16
 	textscale .3
 	forecolor 1 .75 0 1
@@ -473,7 +484,7 @@ itemDef {
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 27
-	rect 196 192 436 20
+	rect 196 200 436 20
 	textaligny 16
 	textscale .3
 	forecolor 1 1 1 1
@@ -484,7 +495,7 @@ itemDef {
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 28
-	rect 196 214 436 20
+	rect 196 222 436 20
 	textaligny 16
 	textscale .3
 	forecolor 1 1 1 1
@@ -495,7 +506,7 @@ itemDef {
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 29
-	rect 196 236 436 20
+	rect 196 252 436 20
 	textaligny 16
 	textscale .3
 	forecolor 1 .75 0 1
@@ -507,7 +518,7 @@ itemDef {
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 30
-	rect 196 258 436 20
+	rect 196 274 436 20
 	textaligny 16
 	textscale .3
 	forecolor 1 1 1 1
@@ -518,7 +529,7 @@ itemDef {
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 31
-	rect 196 280 436 20
+	rect 196 296 436 20
 	textaligny 16
 	textscale .3
 	forecolor 1 1 1 1
@@ -632,7 +643,7 @@ itemDef {
 	textscale .35
 	forecolor 1 1 1 1
 	visible 1
-	action { play "sound/misc/kcaction.wav" ; exec "vr_bindreset" ; close vrbindings_confirm ; open vrbindings_menu }
+	action { play "sound/misc/kcaction.wav" ; uiScript vrBindReset ; close vrbindings_confirm ; open vrbindings_menu }
 	}
 
 itemDef {

@@ -59,8 +59,8 @@ void CG_Draw2DMinimal( stereoFrame_t stereoFrame );
 void CG_PushHUDAnchors( void );
 void CG_PopHUDAnchors( void );
 
-// The largest centered 4:3 box that fits the current framebuffer, in 640x480
-// virtual units. On a plain 4:3 host this is simply 640x480.
+// The largest centered 4:3 box that fits the current framebuffer, in
+// framebuffer pixels. On a 4:3 framebuffer this is the framebuffer's size.
 void CG_GetViewable4x3Dimensions( float *outW, float *outH );
 
 // The projection's optical center in 640x480 virtual coordinates - (320,240)
@@ -112,8 +112,8 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //   state the drop uses lives as module state inside vr_cgame.c; the host
 //   reads what it needs through accessors (CG_VR_DrawingZoomedHUD,
 //   CG_VR_ReticleShader) and resets drop state through call-outs
-//   (CG_VR_DeathCamReset, CG_VR_PortraitReset). One field-shape change:
-//   cgs.cursorX/cursorY become float (stock: int) -
+//   (CG_VR_DeathCamReset, CG_VR_PortraitReset). A host that wires the
+//   scoreboard-cursor pair makes cgs.cursorX/cursorY float (stock: int) -
 //   CG_VR_ScoreboardCursor writes the cursor through float *. One existing
 //   media entry changes scope: register cgs.media.friendShader
 //   ("sprites/foe") in every gametype, not just GT_TEAM - the weapon
@@ -127,7 +127,7 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //   which Menu_HandleKey calls where an edit field starts editing; the ui
 //   link wires it to UI_VR_OnEditField. Its cursorx/cursory also become
 //   float (stock: int) - UI_VR_CursorOverride writes the cursor through
-//   float *. ui/menudef.h defines the VR owner-draw IDs 265 to 272, which
+//   float *. ui/menudef.h defines the VR owner-draw IDs 265 to 271, which
 //   vr_ui.c switches on.
 
 #endif // VR_HOST_H

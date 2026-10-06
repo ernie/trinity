@@ -180,4 +180,18 @@ void CG_WeaponAdjustResetDown_f( void );
 void CG_WeaponAdjustResetUp_f( void );
 void CG_WeaponAdjustFrame( void );
 
+// Button glyphs in text. paint draws each text run between glyphs; NULL draws with CG_DrawStringExt.
+typedef void (*cgVRTextPaint_t)( float x, float y, const char *run, const float *color, float charW, float charH );
+float CG_VR_GlyphWidth( const char *text, float charW, float charH );
+void CG_VR_GlyphString( float x, float y, const char *text, const float *color, float charW, float charH, cgVRTextPaint_t paint );
+
+typedef struct {
+	int stamp;		// the dialog these keys were asked for: its start time
+	qboolean vr;	// VR key markers, which take no colon after them
+	char yes[16], no[16];
+} cgVoteKeys_t;
+// The VR vote buttons for the dialog stamped stamp, asked once per dialog as key markers. False outside VR or when
+// either is unbound; the host then names its own keys.
+qboolean CG_VR_VoteKeys( cgVoteKeys_t *keys, int stamp );
+
 #endif

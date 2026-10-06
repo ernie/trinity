@@ -15,6 +15,7 @@ USER INTERFACE MAIN
 #include "../game/ui_swatches.h"
 #include "../game/bg_mode.h"
 #include "../game/bg_hostlabels.h"
+#include "../game/vr_glyph.h"
 
 extern displayContextDef_t *DC;
 
@@ -2202,28 +2203,36 @@ static void UI_DrawOpponentName(rectDef_t *rect, float scale, vec4_t color, int 
   Text_Paint(rect->x, rect->y, scale, color, UI_Cvar_VariableString("ui_opponentName"), 0, 0, textStyle);
 }
 
-/*
-=================
-UI_VR_CancelButtonName
+// The K_ESCAPE VR button as key markers, re-asked when fresh; NULL keeps the stock ESC text.
+static const char *UI_VR_CancelKeys( qboolean fresh ) {
+	static char keys[16];
 
-Name of the control that synthesizes K_ESCAPE under a VR engine, asked
-once, for prompts that tell the player how to cancel. NULL on flatscreen
-or when the engine doesn't answer, so callers keep the stock ESC text.
-=================
-*/
-static const char *UI_VR_CancelButtonName( void ) {
-	static char name[32];
-	static qboolean resolved = qfalse;
-
-	if ( !resolved ) {
-		resolved = qtrue;
+	if ( fresh ) {
+		keys[0] = '\0';
 		if ( UI_VR_Platform() != VRP_NONE ) {
-			if ( !trap_GetValue( name, sizeof( name ), "vr_menu_cancel_button" ) ) {
-				name[0] = '\0';
-			}
+			VRG_KeysFor( "global", "+key ESCAPE", keys, sizeof( keys ) );
 		}
 	}
-	return name[0] ? name : NULL;
+	return keys[0] ? keys : NULL;
+}
+
+// The keyboard-bind prompt's cancel keys, asked when the wait for a key starts.
+static const char *UI_VR_BindCancelKeys( void ) {
+	static qboolean shown;
+	const qboolean pending = Display_KeyBindPending();
+	const char *keys = UI_VR_CancelKeys( pending && !shown );
+
+	shown = pending;
+	return keys;
+}
+
+// The server refresh prompt's cancel keys, asked when the refresh starts.
+static const char *UI_VR_RefreshCancelKeys( void ) {
+	static qboolean shown;
+	const char *keys = UI_VR_CancelKeys( uiInfo.serverStatus.refreshActive && !shown );
+
+	shown = uiInfo.serverStatus.refreshActive;
+	return keys;
 }
 
 
@@ -2322,12 +2331,11 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 			break;
 		case UI_KEYBINDSTATUS:
 			if (Display_KeyBindPending()) {
-				const char *cancelName = UI_VR_CancelButtonName();
-				if (cancelName) {
-					s = va("Waiting for new key... Press %s to cancel", cancelName);
-				} else {
-					s = "Waiting for new key... Press ESCAPE to cancel";
+				const char *cancelKeys = UI_VR_BindCancelKeys();
+				if (cancelKeys) {
+					return (int)UI_VR_GlyphWidth(va("Waiting for new key... Press %s to cancel", cancelKeys), scale);
 				}
+				s = "Waiting for new key... Press ESCAPE to cancel";
 			} else {
 				s = "Press ENTER or CLICK to change, Press BACKSPACE to clear";
 			}
@@ -2497,6 +2505,8 @@ static void UI_DrawSelectedPlayer(rectDef_t *rect, float scale, vec4_t color, in
 }
 
 static void UI_DrawServerRefreshDate(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	const char *refreshCancel = UI_VR_RefreshCancelKeys();
+
 	if (uiInfo.serverStatus.refreshActive) {
 		vec4_t lowLight, newColor;
 		char status[64];
@@ -2513,8 +2523,8 @@ static void UI_DrawServerRefreshDate(rectDef_t *rect, float scale, vec4_t color,
 		} else {
 			Com_sprintf(status, sizeof(status), "Getting info for %d servers", count);
 		}
-		if (UI_VR_CancelButtonName()) {
-			Text_Paint(rect->x, rect->y, scale, newColor, va("%s (%s to cancel)", status, UI_VR_CancelButtonName()), 0, 0, textStyle);
+		if (refreshCancel) {
+			UI_VR_GlyphPaint(rect->x, rect->y, scale, newColor, va("%s (%s to cancel)", status, refreshCancel), textStyle);
 		} else {
 			Text_Paint(rect->x, rect->y, scale, newColor, va("%s (ESC to cancel)", status), 0, 0, textStyle);
 		}
@@ -2586,10 +2596,12 @@ static void UI_DrawServerMOTD(rectDef_t *rect, float scale, vec4_t color) {
 
 static void UI_DrawKeyBindStatus(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 //	int ofs = 0; TTimo: unused
+	// Asked every frame so the latch sees each wait end, not only the first.
+	const char *cancelKeys = UI_VR_BindCancelKeys();
+
 	if (Display_KeyBindPending()) {
-		const char *cancelName = UI_VR_CancelButtonName();
-		if (cancelName) {
-			Text_Paint(rect->x, rect->y, scale, color, va("Waiting for new key... Press %s to cancel", cancelName), 0, 0, textStyle);
+		if (cancelKeys) {
+			UI_VR_GlyphPaint(rect->x, rect->y, scale, color, va("Waiting for new key... Press %s to cancel", cancelKeys), textStyle);
 		} else {
 			Text_Paint(rect->x, rect->y, scale, color, "Waiting for new key... Press ESCAPE to cancel", 0, 0, textStyle);
 		}
