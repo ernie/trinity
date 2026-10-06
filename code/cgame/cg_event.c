@@ -605,12 +605,15 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 	}
 	ci = &cgs.clientinfo[ clientNum ];
 
-	if (event >= EV_USE_ITEM0 && event <= EV_USE_ITEM15)
-	{
-		if (clientNum == cg.predictedPlayerState.clientNum) {
-			CG_VR_OnUseItem();
+	// a pickup this client predicted has already played
+	if ( event == EV_ITEM_PICKUP ) {
+		ce = CG_PredictedPickupEntity( entityNum, es->eventParm );
+		if ( ce && ce->delaySpawn > cg.time && ce->delaySpawnPlayed ) {
+			return;
 		}
 	}
+
+	CG_VR_EntityEvent( cent, event, clientNum );
 
 	switch ( event ) {
 	//
@@ -657,7 +660,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			// smooth landing z changes
 			cg.landChange = -8;
 			cg.landTime = cg.time;
-			CG_VR_OnFall( 40 );
 		}
 		break;
 
@@ -670,7 +672,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			// smooth landing z changes
 			cg.landChange = -16;
 			cg.landTime = cg.time;
-			CG_VR_OnFall( 60 );
 		}
 		break;
 
@@ -682,7 +683,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			// smooth landing z changes
 			cg.landChange = -24;
 			cg.landTime = cg.time;
-			CG_VR_OnFall( 100 );
 		}
 		break;
 
@@ -739,18 +739,12 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		// boing sound at origin, jump sound on player
 		trap_S_StartSound ( cent->lerpOrigin, -1, CHAN_VOICE, cgs.media.jumpPadSound );
 		trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*jump1.wav" ) );
-		if ( clientNum == cg.predictedPlayerState.clientNum ) {
-			CG_VR_OnJump( qtrue );
-		}
 		break;
 
 	case EV_JUMP:
 		// pain event with fast sequential jump just creates sound distortion
 		if ( cg.time - cent->pe.painTime > 50 )
 			trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*jump1.wav" ) );
-		if ( clientNum == cg.predictedPlayerState.clientNum ) {
-			CG_VR_OnJump( qfalse );
-		}
 		break;
 
 	case EV_TAUNT:
@@ -810,10 +804,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			}
 
 			ce = CG_PredictedPickupEntity( entityNum, index );
-			if ( ce && ce->delaySpawn > cg.time && ce->delaySpawnPlayed ) {
-				break;	// already sounded when we predicted it
-			}
-
 			item = &bg_itemlist[ index ];
 
 			// powerups and team items will have a separate global sound, this one
@@ -840,10 +830,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			} else {
 				trap_S_StartSound (NULL, es->number, CHAN_AUTO,	trap_S_RegisterSound( item->pickup_sound, qfalse ) );
 			}
-			if ( clientNum == cg.predictedPlayerState.clientNum ) {
-				CG_VR_OnItemPickup( item );
-			}
-
 			// show icon and name on status bar
 			if ( es->number == cg.snap->ps.clientNum ) {
 				CG_ItemPickup( index );
@@ -900,9 +886,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 
 	case EV_CHANGE_WEAPON:
 		trap_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.selectSound );
-		if ( clientNum == cg.predictedPlayerState.clientNum ) {
-			CG_VR_OnWeaponSwitch();
-		}
 		break;
 
 	case EV_FIRE_WEAPON:
@@ -936,7 +919,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 	case EV_PLAYER_TELEPORT_IN:
 		trap_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.teleInSound );
 		CG_SpawnEffect( position);
-		CG_VR_OnTeleport( clientNum );
 		break;
 
 	case EV_PLAYER_TELEPORT_OUT:
@@ -1274,11 +1256,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		} else {
 			trap_S_StartSound( NULL, es->number, CHAN_VOICE, CG_CustomSound(es->number, va("*death%i.wav", event - EV_DEATH1 + 1)) );
 		}
-
-		if(es->clientNum == cg.snap->ps.clientNum)
-		{
-			CG_VR_OnDeath();
-		}
 		break;
 
 	case EV_OBITUARY:
@@ -1294,9 +1271,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.quadSound );
-		if ( clientNum == cg.predictedPlayerState.clientNum ) {
-			CG_VR_OnPowerup();
-		}
 		break;
 
 	case EV_POWERUP_BATTLESUIT:
@@ -1305,9 +1279,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.protectSound );
-		if ( clientNum == cg.snap->ps.clientNum ) {
-			CG_VR_OnPowerup();
-		}
 		break;
 
 	case EV_POWERUP_REGEN:
@@ -1316,9 +1287,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 			cg.powerupTime = cg.time;
 		}
 		trap_S_StartSound (NULL, es->number, CHAN_ITEM, cgs.media.regenSound );
-		if ( clientNum == cg.predictedPlayerState.clientNum ) {
-			CG_VR_OnPowerup();
-		}
 		break;
 
 	case EV_GIB_PLAYER:
@@ -1333,9 +1301,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		trap_S_StartSound( NULL, es->number, CHAN_BODY, cgs.media.gibSound );
 #endif
 		CG_GibPlayer( cent->lerpOrigin, cent->currentState.pos.trDelta );
-		if ( clientNum == cg.snap->ps.clientNum ) {
-			CG_VR_OnGibbed();
-		}
 		break;
 
 	case EV_STOPLOOPINGSOUND:

@@ -606,9 +606,11 @@ five shapes:
   `CG_OwnerDraw` and `CG_Draw2DMinimal` early-return when it is qfalse, and
   `CG_Draw2D` composes it into the `Menu_PaintAll` condition,
   `CG_VR_HudVisible() && ( CG_VR_OwnsHudVisibility() || cg_drawStatus.integer )`.
-- **Event hooks.** `CG_VR_OnFall`, `CG_VR_OnJump`, `CG_VR_OnTeleport`,
-  `CG_VR_OnHitByMissile`, `CG_VR_OnWeaponFired`, and the rest wrap the
-  haptic dispatch at each game event. Dormant they no-op.
+- **Event hooks.** `CG_VR_EntityEvent( cent, event, clientNum )` goes at
+  the top of `CG_EntityEvent`, right before the `switch`, and handles the
+  game events' haptics itself (note 2). `CG_VR_OnHitByMissile`,
+  `CG_VR_OnDamageTaken`, `CG_VR_OnWeaponFired` and
+  `CG_VR_OnWeaponFiring` sit at their own sites. Dormant they no-op.
 - **Server-interaction accessors.** Wire the families your tree has
   features for. Voting (stock): `CG_VR_SetVoteActive(active)` and
   `CG_VR_VoteHolding()` in the vote-draw path (controller hold-to-confirm).
@@ -667,11 +669,12 @@ Two placement details:
    `CG_AddViewWeapon`, so it reads a fresh snapshot; folding it into
    `CG_VR_Frame` would feed it a stale one. The overlay draws from the
    drop's HUD pass, so there is no draw half to place.
-2. **Most event hooks keep their call-site identity gate.** A `void` hook
-   like `CG_VR_OnFall(severity)` cannot re-derive which client the event
-   belongs to, so it keeps the local-player gate already at the call site.
-   Only `CG_VR_OnTeleport(clientNum)` and `CG_VR_OnHitByMissile(entityNum)`
-   receive an identity argument and check inside.
+2. **Call `CG_VR_EntityEvent` after `clientNum` is clamped.** It maps the
+   events by their `bg_public.h` names and tests the local player the way
+   each stock site does, against `cg.predictedPlayerState` or `cg.snap->ps`,
+   so it needs the clamped `clientNum`. If your tree drops a duplicate
+   event, do that first: this tree returns early for a pickup it already
+   predicted, so the haptic fires once.
 
 ---
 
@@ -922,9 +925,8 @@ Deliberate differences, noted so the two `vr_ui.c` files don't surprise you:
   stock's `xscale`/`yscale`/`bias` to the uniform-scale fields; see
   Appendix E). Team Arena hooks the transform directly, at two sites
   unified through `vr_uishared`.
-- **Event-hook identity.** Only `CG_VR_OnTeleport` and
-  `CG_VR_OnHitByMissile` carry a client/entity number; the others rely on
-  the local-player gate at their call site (Step 5, note 2).
+- **Event-hook identity.** `CG_VR_EntityEvent` and `CG_VR_OnHitByMissile`
+  test the local player themselves (Step 5, note 2).
 
 ## Appendix E: The host contract (`vr_host.h`)
 

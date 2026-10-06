@@ -43,20 +43,10 @@ void CG_VR_InterpolateHeadStats( playerState_t *out, const playerState_t *prev, 
 void CG_VR_FollowHeadView( const playerState_t *ps );
 void CG_VR_FollowHeadViewReset( void );
 
-// Game-event hooks: each wraps the haptic dispatch (and, for OnTeleport, the
-// fake-6DoF realign) that used to live inline at the event's call site. Call
-// sites keep whatever local-player gate they already had; hooks that were
-// passed enough context to re-derive that gate themselves (OnTeleport,
-// OnHitByMissile, OnDamageTaken) keep it inside instead.
-void CG_VR_OnUseItem( void );
-void CG_VR_OnFall( int severity );
-void CG_VR_OnJump( qboolean pad );
-void CG_VR_OnItemPickup( const gitem_t *item );
-void CG_VR_OnWeaponSwitch( void );
-void CG_VR_OnTeleport( int clientNum );
-void CG_VR_OnDeath( void );
-void CG_VR_OnPowerup( void );
-void CG_VR_OnGibbed( void );
+// Game-event hooks. CG_VR_EntityEvent runs first in CG_EntityEvent and maps the
+// events itself; the others sit at their own sites and test the local player
+// themselves.
+void CG_VR_EntityEvent( centity_t *cent, int event, int clientNum );
 void CG_VR_OnHitByMissile( int entityNum );
 void CG_VR_OnDamageTaken( int damage, float yaw );
 void CG_VR_OnWeaponFired( int weapon );

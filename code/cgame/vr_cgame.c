@@ -1144,77 +1144,105 @@ void CG_VR_FollowHeadViewReset( void ) {
 	vr_followViewInitialized = qfalse;
 }
 
-// cg_event.c EV_USE_ITEM0..15 pre-switch haptic. The local-predicted gate
-// stayed at the call site (it wraps the "which event range" check too);
-// this is just the haptic that used to fire inside it.
-void CG_VR_OnUseItem( void ) {
-	CG_VRHaptic("pickup_shield", 0, 0, 100, 0, 0);
-}
+/*
+===============
+CG_VR_EntityEvent
 
-// cg_event.c EV_FALL_SHORT/MEDIUM/FAR. Each call site also updates
-// cg.landChange/cg.landTime under the same gate, so the gate itself stays
-// at the call site; severity carries the 40/60/100 intensity.
-void CG_VR_OnFall( int severity ) {
-	CG_VRHaptic("jump_landing", 0, 0, severity, 0, 0);
-}
+The local player's event haptics, and the fake-6DoF realign on a teleport.
+Called first in CG_EntityEvent; each event keeps the local-player test its
+stock site had, against the predicted playerstate or the snapshot's.
+===============
+*/
+void CG_VR_EntityEvent( centity_t *cent, int event, int clientNum ) {
+	const entityState_t *es = &cent->currentState;
+	const qboolean predicted = clientNum == cg.predictedPlayerState.clientNum;
+	const gitem_t *item;
 
-// cg_event.c EV_JUMP_PAD (pad=qtrue, intensity 100) / EV_JUMP (pad=qfalse,
-// intensity 50).
-void CG_VR_OnJump( qboolean pad ) {
-	if ( pad ) {
-		CG_VRHaptic("jump_start", 0, 0, 100, 0, 0);
-	} else {
-		CG_VRHaptic("jump_start", 0, 0, 50, 0, 0);
+	if ( !vrActive ) {
+		return;
 	}
-}
-
-// cg_event.c EV_ITEM_PICKUP. The three item-kind branches all shared the
-// same local-predicted gate, so that gate stays (once) at the call site;
-// the giType branching that picks which haptic fires moves here verbatim.
-void CG_VR_OnItemPickup( const gitem_t *item ) {
-	if ( item->giType == IT_POWERUP || item->giType == IT_TEAM) {
-		CG_VRHaptic("pickup_weapon", 0, 0, 80, 0, 0);
-	} else if (item->giType == IT_PERSISTANT_POWERUP) {
-		CG_VRHaptic("pickup_weapon", 0, 0, 50, 0, 0);
-	} else {
-		CG_VRHaptic("RTCWQuest:pickup_item", 0, 0, 100, 0, 0);
+	if ( event >= EV_USE_ITEM0 && event <= EV_USE_ITEM15 ) {
+		if ( predicted ) {
+			CG_VRHaptic( "pickup_shield", 0, 0, 100, 0, 0 );
+		}
+		return;
 	}
-}
-
-// cg_event.c EV_CHANGE_WEAPON. The gate wrapped only the haptic, so it
-// stays at the call site verbatim.
-void CG_VR_OnWeaponSwitch( void ) {
-	CG_VRHaptic("weapon_switch", 0, 0, 100, 0, 0);
-}
-
-// cg_event.c EV_PLAYER_TELEPORT_IN. The whole gated block (vrActive +
-// local-predicted compare, the fake-6DoF realign, and the haptic) moves
-// here verbatim; the call site is unconditional and just forwards
-// clientNum.
-void CG_VR_OnTeleport( int clientNum ) {
-	if (vrActive && clientNum == cg.predictedPlayerState.clientNum) {
-		vr->realign = 3; // Initiate position reset for fake 6DoF
-		CG_VRHaptic("spark", 0, 0, 80, 0, 0);
+	switch ( event ) {
+	case EV_FALL_SHORT:
+		if ( predicted ) {
+			CG_VRHaptic( "jump_landing", 0, 0, 40, 0, 0 );
+		}
+		break;
+	case EV_FALL_MEDIUM:
+		if ( predicted ) {
+			CG_VRHaptic( "jump_landing", 0, 0, 60, 0, 0 );
+		}
+		break;
+	case EV_FALL_FAR:
+		if ( predicted ) {
+			CG_VRHaptic( "jump_landing", 0, 0, 100, 0, 0 );
+		}
+		break;
+	case EV_JUMP_PAD:
+		if ( predicted ) {
+			CG_VRHaptic( "jump_start", 0, 0, 100, 0, 0 );
+		}
+		break;
+	case EV_JUMP:
+		if ( predicted ) {
+			CG_VRHaptic( "jump_start", 0, 0, 50, 0, 0 );
+		}
+		break;
+	case EV_ITEM_PICKUP:
+		if ( !predicted || es->eventParm < 1 || es->eventParm >= bg_numItems ) {
+			break;
+		}
+		item = &bg_itemlist[es->eventParm];
+		if ( item->giType == IT_POWERUP || item->giType == IT_TEAM ) {
+			CG_VRHaptic( "pickup_weapon", 0, 0, 80, 0, 0 );
+		} else if ( item->giType == IT_PERSISTANT_POWERUP ) {
+			CG_VRHaptic( "pickup_weapon", 0, 0, 50, 0, 0 );
+		} else {
+			CG_VRHaptic( "RTCWQuest:pickup_item", 0, 0, 100, 0, 0 );
+		}
+		break;
+	case EV_CHANGE_WEAPON:
+		if ( predicted ) {
+			CG_VRHaptic( "weapon_switch", 0, 0, 100, 0, 0 );
+		}
+		break;
+	case EV_PLAYER_TELEPORT_IN:
+		if ( predicted ) {
+			vr->realign = 3;
+			CG_VRHaptic( "spark", 0, 0, 80, 0, 0 );
+		}
+		break;
+	case EV_DEATH1:
+	case EV_DEATH2:
+	case EV_DEATH3:
+		if ( es->clientNum == cg.snap->ps.clientNum ) {
+			CG_VRHaptic( "fireball", 0, 0, 100, 0, 0 );
+		}
+		break;
+	case EV_POWERUP_QUAD:
+	case EV_POWERUP_REGEN:
+		if ( predicted ) {
+			CG_VRHaptic( "decontaminate", 0, 0, 100, 0, 0 );
+		}
+		break;
+	case EV_POWERUP_BATTLESUIT:
+		if ( clientNum == cg.snap->ps.clientNum ) {
+			CG_VRHaptic( "decontaminate", 0, 0, 100, 0, 0 );
+		}
+		break;
+	case EV_GIB_PLAYER:
+		if ( clientNum == cg.snap->ps.clientNum ) {
+			CG_VRHaptic( "shield_break", 0, 0, 100, 0, 0 );
+		}
+		break;
+	default:
+		break;
 	}
-}
-
-// cg_event.c EV_DEATH1/2/3. The gate wrapped only the haptic, so it stays
-// at the call site verbatim.
-void CG_VR_OnDeath( void ) {
-	CG_VRHaptic("fireball", 0, 0, 100, 0, 0);
-}
-
-// cg_event.c EV_POWERUP_QUAD/BATTLESUIT/REGEN. Each of the three call
-// sites keeps its own (pre-existing, not-quite-identical) local-predicted
-// gate; this is just the shared haptic.
-void CG_VR_OnPowerup( void ) {
-	CG_VRHaptic("decontaminate", 0, 0, 100, 0, 0);
-}
-
-// cg_event.c EV_GIB_PLAYER. The gate wrapped only the haptic, so it stays
-// at the call site verbatim.
-void CG_VR_OnGibbed( void ) {
-	CG_VRHaptic("shield_break", 0, 0, 100, 0, 0);
 }
 
 // cg_weapons.c CG_MissileHitPlayer. entityNum is passed straight through,
