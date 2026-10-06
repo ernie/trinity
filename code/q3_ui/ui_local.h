@@ -537,9 +537,10 @@ typedef struct {
 	qhandle_t			rb_on;
 	qhandle_t			rb_off;
 
-	float				scale;
-	float				biasX;
-	float				biasY;
+	float				xscale;
+	float				yscale;
+	float				bias;
+	float				biasY;		// letterboxes screens taller than 4:3; VR also offsets the menus
 
 	float				cursorScaleR;		// clamped 1/scale for mouse
 

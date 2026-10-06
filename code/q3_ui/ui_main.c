@@ -151,6 +151,7 @@ void UI_VideoCheck( int time )
 	if ( abs( time - uis.lastVideoCheck ) > 1000 ) {
 		
 		int oldWidth, oldHeight;
+		float scale;
 		oldWidth = uis.glconfig.vidWidth;
 		oldHeight = uis.glconfig.vidHeight;
 
@@ -158,25 +159,27 @@ void UI_VideoCheck( int time )
 
 		if ( uis.glconfig.vidWidth != oldWidth || uis.glconfig.vidHeight != oldHeight ) {
 			uis.biasY = 0.0;
-			uis.biasX = 0.0;
-			// for 640x480 virtualized screen
+			uis.bias = 0.0;
+			// for 640x480 virtualized screen, scaled uniformly
 			if ( uis.glconfig.vidWidth * 480 > uis.glconfig.vidHeight * 640 ) {
 				// wide screen, scale by height
-				uis.scale = uis.glconfig.vidHeight * (1.0/480.0);
-				uis.biasX = 0.5 * ( uis.glconfig.vidWidth - ( uis.glconfig.vidHeight * (640.0/480.0) ) );
+				scale = uis.glconfig.vidHeight * (1.0/480.0);
+				uis.bias = 0.5 * ( uis.glconfig.vidWidth - ( uis.glconfig.vidHeight * (640.0/480.0) ) );
 			} else {
 				// no wide screen, scale by width
-				uis.scale = uis.glconfig.vidWidth * (1.0/640.0);
+				scale = uis.glconfig.vidWidth * (1.0/640.0);
 				uis.biasY = 0.5 * ( uis.glconfig.vidHeight - ( uis.glconfig.vidWidth * (480.0/640) ) );
 			}
+			uis.xscale = scale;
+			uis.yscale = scale;
 
-			uis.screenXmin = 0.0 - (uis.biasX / uis.scale);
-			uis.screenXmax = 640.0 + (uis.biasX / uis.scale);
+			uis.screenXmin = 0.0 - (uis.bias / scale);
+			uis.screenXmax = 640.0 + (uis.bias / scale);
 
-			uis.screenYmin = 0.0 - (uis.biasY / uis.scale);
-			uis.screenYmax = 480.0 + (uis.biasY / uis.scale);
+			uis.screenYmin = 0.0 - (uis.biasY / scale);
+			uis.screenYmax = 480.0 + (uis.biasY / scale);
 
-			uis.cursorScaleR = 1.0 / uis.scale;
+			uis.cursorScaleR = 1.0 / scale;
 			if ( uis.cursorScaleR < 0.5 ) {
 				uis.cursorScaleR = 0.5;
 			}

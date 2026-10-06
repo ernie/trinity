@@ -34,6 +34,10 @@ static qboolean bindCaptureAvailable;
 // The engine's first VR key code; engines number their keys differently.
 static int vrKeyFirst;
 
+// The host's own transform, kept for the frames VR draws without the virtual screen or the HUD buffer.
+static float hostXscale, hostYscale, hostBias, hostBiasY;
+static qboolean hostScaleSaved;
+
 int UI_VR_KeyIndex( int key ) {
 	return bindCaptureAvailable && key >= vrKeyFirst && key < vrKeyFirst + VRBM_KEYS ? key - vrKeyFirst : -1;
 }
@@ -111,6 +115,7 @@ void UI_VR_Init( void ) {
 
 	vrActive = qfalse;
 	bindCaptureAvailable = qfalse;
+	hostScaleSaved = qfalse;
 	memset( &vr_state, 0, sizeof( vr_state ) );
 
 	// keep the sentinel referenced so the toolchain retains it in the image
@@ -299,69 +304,56 @@ static void UI_GetViewable4x3Dimensions( float *outWidth, float *outHeight )
 ================
 UI_VR_UpdateScale
 
-Recompute uis.scale/biasX/biasY (and the derived cursor/screen bounds) each
-frame so that ALL draw paths share one transform: both the UI_AdjustFrom640-
-routed widgets/cursor AND the direct-scale text draws (UI_DrawBannerString2 /
-UI_DrawProportionalString2 / UI_DrawString2, which apply uis.scale/biasX/biasY
-themselves and bypass UI_AdjustFrom640).
-
-In VR the centered viewable 4:3 box and optical-center Y offset are baked into
-uis.* here. On flatscreen the stock aspect-preserving values are restored so a
-VR -> non-VR transition can't leave VR values stuck.
+Sets uis.xscale/yscale/bias/biasY each frame in VR, so the UI_AdjustFrom640
+draws and the text painters that apply those fields themselves share one
+transform: the centered 4:3 viewable box with the optical-center Y offset.
+A flatscreen engine keeps the host's values untouched.
 ================
 */
 void UI_VR_UpdateScale( void )
 {
 	float vw;
 	float vh;
+	float scale;
 	float safeHeight;
 
-	if ( vrActive && vr->virtual_screen ) {
-		// VR menus render into the centered 4:3 viewable box; scale is uniform
-		// there (vw/640 == vh/480), so biasX/biasY do the centering.
-		UI_GetViewable4x3Dimensions( &vw, &vh );
-		uis.scale = vw / 640.0f;
-		uis.biasX = ( uis.glconfig.vidWidth - vw ) / 2.0f;
-		uis.biasY = ( uis.glconfig.vidHeight - vh ) / 2.0f + UI_GetProjectionCenterYOffset() * uis.scale;
-
-		// For VRFM_FIRSTPERSON we render to the full framebuffer but only display
-		// the centered 4:3 portion, so scale/bias off the visible safe area.
-		if ( vr->first_person_following ) {
-			safeHeight = ( uis.glconfig.vidWidth * 3.0f ) / 4.0f;
-			uis.scale = safeHeight / 480.0f;
-			uis.biasY = ( uis.glconfig.vidHeight - safeHeight ) / 2.0f + UI_GetProjectionCenterYOffset() * uis.scale;
-			// biasX unchanged: xscale still vw/640 == uis.scale when width-limited
-		}
-	} else if ( vrActive && vr->sp_intermission_active ) {
-		// SP intermission: drawing to the HUD buffer (1280x960), 2x scale, no offset
-		uis.scale = 2.0f;
-		uis.biasX = 0.0f;
-		uis.biasY = 0.0f;
-	} else {
-		// stock flatscreen aspect-preserving values (mirrors ui_main.c:147-166)
-		uis.biasX = 0.0f;
-		uis.biasY = 0.0f;
-		// for 640x480 virtualized screen
-		if ( uis.glconfig.vidWidth * 480 > uis.glconfig.vidHeight * 640 ) {
-			// wide screen, scale by height
-			uis.scale = uis.glconfig.vidHeight * ( 1.0f / 480.0f );
-			uis.biasX = 0.5f * ( uis.glconfig.vidWidth - ( uis.glconfig.vidHeight * ( 640.0f / 480.0f ) ) );
-		} else {
-			// no wide screen, scale by width
-			uis.scale = uis.glconfig.vidWidth * ( 1.0f / 640.0f );
-			uis.biasY = 0.5f * ( uis.glconfig.vidHeight - ( uis.glconfig.vidWidth * ( 480.0f / 640 ) ) );
-		}
+	if ( !vrActive ) {
+		return;
+	}
+	if ( !hostScaleSaved ) {
+		hostXscale = uis.xscale;
+		hostYscale = uis.yscale;
+		hostBias = uis.bias;
+		hostBiasY = uis.biasY;
+		hostScaleSaved = qtrue;
 	}
 
-	// derived fields kept consistent with the chosen scale/bias in every branch
-	uis.screenXmin = 0.0f - ( uis.biasX / uis.scale );
-	uis.screenXmax = 640.0f + ( uis.biasX / uis.scale );
-	uis.screenYmin = 0.0f - ( uis.biasY / uis.scale );
-	uis.screenYmax = 480.0f + ( uis.biasY / uis.scale );
+	if ( vr->virtual_screen ) {
+		// the 4:3 box scales uniformly (vw/640 == vh/480); bias and biasY center it
+		UI_GetViewable4x3Dimensions( &vw, &vh );
+		scale = vw / 640.0f;
+		uis.bias = ( uis.glconfig.vidWidth - vw ) / 2.0f;
+		uis.biasY = ( uis.glconfig.vidHeight - vh ) / 2.0f + UI_GetProjectionCenterYOffset() * scale;
 
-	uis.cursorScaleR = 1.0f / uis.scale;
-	if ( uis.cursorScaleR < 0.5f ) {
-		uis.cursorScaleR = 0.5f;
+		// VRFM_FIRSTPERSON renders the full framebuffer but shows its centered 4:3 part
+		if ( vr->first_person_following ) {
+			safeHeight = ( uis.glconfig.vidWidth * 3.0f ) / 4.0f;
+			scale = safeHeight / 480.0f;
+			uis.biasY = ( uis.glconfig.vidHeight - safeHeight ) / 2.0f + UI_GetProjectionCenterYOffset() * scale;
+		}
+		uis.xscale = scale;
+		uis.yscale = scale;
+	} else if ( vr->sp_intermission_active ) {
+		// SP intermission draws to the 1280x960 HUD buffer
+		uis.xscale = 2.0f;
+		uis.yscale = 2.0f;
+		uis.bias = 0.0f;
+		uis.biasY = 0.0f;
+	} else {
+		uis.xscale = hostXscale;
+		uis.yscale = hostYscale;
+		uis.bias = hostBias;
+		uis.biasY = hostBiasY;
 	}
 }
 

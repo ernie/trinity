@@ -697,7 +697,8 @@ The rest are one-liners at their sites: `UI_VR_Shutdown()` beside
 first in `UI_KeyEvent`, which also opens the VR keyboard when a click
 lands on a text field; in `UI_MouseEvent`, the
 `UI_VR_StickNavActive()` early-out,
-`UI_VR_CursorOverride( &uis.cursorx, &uis.cursory )`, the
+`UI_VR_CursorOverride( &uis.cursorx, &uis.cursory )` after the stock
+clamps (the VR pointer can rest past the screen's edges), the
 `UI_VKeyboardIsActive()` guard before the region test, and the
 `UI_VR_OnMenuMove()` hover haptic on focus change; `UI_VR_UpdateScale()`
 and the same cursor override once per frame in `UI_Refresh`; the cursor
@@ -717,9 +718,10 @@ is a sanctioned `vrActive` gate in both UIs; baseq3's form:
 VR covers the physical framebuffer edge-to-edge so the letterbox outside
 the centered 4:3 box shows no stale eye-buffer content; flatscreen keeps
 the stock aspect-preserving draw, because the fill would visibly paint the
-pillarbox bars. baseq3 keeps `UI_AdjustFrom640` free of any VR branch — it
-bakes the VR transform into the `uis.scale`/`biasX`/`biasY` fields the
-function already applies (Appendix E).
+pillarbox bars. baseq3 keeps `UI_AdjustFrom640` free of any VR branch:
+in VR, `UI_VR_UpdateScale` writes the VR transform into the
+`uis.xscale`/`yscale`/`bias`/`biasY` fields it already applies
+(Appendix E).
 
 **Team Arena (`ui`).** Team Arena hooks the 640-space transform directly,
 at *two* sites, both routed through `vr_uishared` so text and models
@@ -925,12 +927,11 @@ Deliberate differences, noted so the two `vr_ui.c` files don't surprise you:
   `UI_VR_KeyEvent` opens it on a click over a text field. Team Arena's
   editing state is private to `ui_shared.c`, so `Menu_HandleKey` reports
   the start through `DC->vrEditField`.
-- **On-screen model transform.** baseq3 bakes the VR scale into
-  `uis.scale/biasX/biasY` once per frame and keeps `UI_AdjustFrom640` free
-  of any VR branch — its body simply applies those fields (rewritten from
-  stock's `xscale`/`yscale`/`bias` to the uniform-scale fields; see
-  Appendix E). Team Arena hooks the transform directly, at two sites
-  unified through `vr_uishared`.
+- **On-screen model transform.** baseq3 writes the VR scale into
+  `uis.xscale/yscale/bias/biasY` once per frame and keeps
+  `UI_AdjustFrom640` free of any VR branch, so its body simply applies
+  those fields (Appendix E). Team Arena hooks the transform directly, at
+  two sites unified through `vr_uishared`.
 - **Event-hook identity.** `CG_VR_EntityEvent` and `CG_VR_OnHitByMissile`
   test the local player themselves (Step 5, note 2).
 
@@ -1017,16 +1018,13 @@ predefined by the host; `cgs.cursorX` / `cgs.cursorY` become `float`
 gametype, not just `GT_TEAM` — the weapon wheel's selection marker draws
 through it.
 
-**UI substrate.** baseq3: the `uis.scale` / `uis.biasX` / `uis.biasY` /
-`uis.cursorScaleR` / `uis.screenXmin…Ymax` uniform-scale fields on
-`uiStatic_t` **replace** stock's `xscale` / `yscale` / `bias`, and every
-consumer converts to them: `UI_AdjustFrom640`, `UI_MouseEvent`'s cursor
-scaling and clamps, and the three text painters (`UI_DrawBannerString2`,
-`UI_DrawProportionalString2`, `UI_DrawString2`). `UI_VideoCheck`
-recomputes the fields on resolution change — take this tree's function
-(`ui_main.c`) and its call sites in `UI_Init`, `UI_KeyEvent`, `UI_Refresh`,
-and the connect screen; under VR, `UI_VR_UpdateScale` overwrites the same
-fields each frame. `UI_DrawPlayer` (ui_players.c) recomputes its fov from
+**UI substrate.** baseq3: `uiStatic_t` gains `float biasY` beside stock's
+`xscale` / `yscale` / `bias`, and the vertical transform adds it in
+`UI_AdjustFrom640` (`*y = *y * uis.yscale + uis.biasY;`) and the three
+text painters (`UI_DrawBannerString2`, `UI_DrawProportionalString2`,
+`UI_DrawString2`: `ay = y * uis.yscale + uis.biasY;`). Flatscreen leaves
+it 0 and the stock values stand; in VR, `UI_VR_UpdateScale` writes all
+four each frame. `UI_DrawPlayer` (ui_players.c) recomputes its fov from
 the transformed rect, keeping the origin math on the desired fov. And
 `uis.cursorx` / `uis.cursory` become `float` (stock: `int`), because
 `UI_VR_CursorOverride` writes the cursor through `float *`. Team Arena: the

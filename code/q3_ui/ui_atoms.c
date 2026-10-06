@@ -338,15 +338,15 @@ static void UI_DrawBannerString2( int x, int y, const char* str, vec4_t color )
 	// draw the colored text
 	trap_R_SetColor( color );
 	
-	ax = x * uis.scale + uis.biasX;
-	ay = y * uis.scale + uis.biasY;
+	ax = x * uis.xscale + uis.bias;
+	ay = y * uis.yscale + uis.biasY;
 
 	s = str;
 	while ( *s )
 	{
 		ch = *s & 127;
 		if ( ch == ' ' ) {
-			ax += ((float)PROPB_SPACE_WIDTH + (float)PROPB_GAP_WIDTH)* uis.scale;
+			ax += ((float)PROPB_SPACE_WIDTH + (float)PROPB_GAP_WIDTH)* uis.xscale;
 		}
 		else if ( ch >= 'A' && ch <= 'Z' ) {
 			ch -= 'A';
@@ -354,10 +354,10 @@ static void UI_DrawBannerString2( int x, int y, const char* str, vec4_t color )
 			frow = (float)propMapB[ch][1] / 256.0f;
 			fwidth = (float)propMapB[ch][2] / 256.0f;
 			fheight = (float)PROPB_HEIGHT / 256.0f;
-			aw = (float)propMapB[ch][2] * uis.scale;
-			ah = (float)PROPB_HEIGHT * uis.scale;
+			aw = (float)propMapB[ch][2] * uis.xscale;
+			ah = (float)PROPB_HEIGHT * uis.yscale;
 			trap_R_DrawStretchPic( ax, ay, aw, ah, fcol, frow, fcol+fwidth, frow+fheight, uis.charsetPropB );
-			ax += (aw + (float)PROPB_GAP_WIDTH * uis.scale);
+			ax += (aw + (float)PROPB_GAP_WIDTH * uis.xscale);
 		}
 		s++;
 	}
@@ -448,27 +448,27 @@ static void UI_DrawProportionalString2( int x, int y, const char* str, vec4_t co
 	// draw the colored text
 	trap_R_SetColor( color );
 	
-	ax = x * uis.scale + uis.biasX;
-	ay = y * uis.scale + uis.biasY;
+	ax = x * uis.xscale + uis.bias;
+	ay = y * uis.yscale + uis.biasY;
 
 	s = str;
 	while ( *s )
 	{
 		ch = *s & 127;
 		if ( ch == ' ' ) {
-			aw = (float)PROP_SPACE_WIDTH * uis.scale * sizeScale;
+			aw = (float)PROP_SPACE_WIDTH * uis.xscale * sizeScale;
 		}
 		else if ( propMap[ch][2] != -1 ) {
 			fcol = (float)propMap[ch][0] / 256.0f;
 			frow = (float)propMap[ch][1] / 256.0f;
 			fwidth = (float)propMap[ch][2] / 256.0f;
 			fheight = (float)PROP_HEIGHT / 256.0f;
-			aw = (float)propMap[ch][2] * uis.scale * sizeScale;
-			ah = (float)PROP_HEIGHT * uis.scale * sizeScale;
+			aw = (float)propMap[ch][2] * uis.xscale * sizeScale;
+			ah = (float)PROP_HEIGHT * uis.yscale * sizeScale;
 			trap_R_DrawStretchPic( ax, ay, aw, ah, fcol, frow, fcol+fwidth, frow+fheight, charset );
 		}
 
-		ax += (aw + (float)PROP_GAP_WIDTH * uis.scale * sizeScale);
+		ax += (aw + (float)PROP_GAP_WIDTH * uis.xscale * sizeScale);
 		s++;
 	}
 
@@ -639,10 +639,10 @@ void UI_DrawString2( int x, int y, const char* str, vec4_t color, int charw, int
 	// draw the colored text
 	trap_R_SetColor( color );
 	
-	ax = x * uis.scale + uis.biasX;
-	ay = y * uis.scale + uis.biasY;
-	aw = charw * uis.scale;
-	ah = charh * uis.scale;
+	ax = x * uis.xscale + uis.bias;
+	ay = y * uis.yscale + uis.biasY;
+	aw = charw * uis.xscale;
+	ah = charh * uis.yscale;
 
 	s = str;
 	while ( *s )
@@ -878,8 +878,6 @@ void UI_MouseEvent( int dx, int dy )
 		return;   // thumbstick nav owns selection; ignore ray hover
 	}
 
-	UI_VR_CursorOverride( &uis.cursorx, &uis.cursory );
-
 	if ( !uis.activemenu )
 		return;
 
@@ -897,6 +895,9 @@ void UI_MouseEvent( int dx, int dy )
 		uis.cursory = uis.screenYmin;
 	else if ( uis.cursory > uis.screenYmax )
 		uis.cursory = uis.screenYmax;
+
+	// the VR pointer can rest past the screen's edges, so it lands after the clamp
+	UI_VR_CursorOverride( &uis.cursorx, &uis.cursory );
 
 	// Don't change menu cursor while keyboard is active - keep focus on the field
 	if (VirtualKeyboard_IsActive()) {
@@ -1097,17 +1098,15 @@ void UI_Init( void ) {
 ================
 UI_AdjustFrom640
 
-Adjusted for resolution and screen aspect ratio. The VR transform (viewable
-4:3 box, optical-center offset, follow-mode, intermission) is baked into
-uis.scale/biasX/biasY by UI_VR_UpdateScale, so this stays the stock uniform
-form - guaranteeing widgets/cursor match the direct-scale text draw paths.
+Adjusted for resolution and screen aspect ratio. In VR, UI_VR_UpdateScale
+sets these fields each frame.
 ================
 */
 void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
-	*x = *x * uis.scale + uis.biasX;
-	*y = *y * uis.scale + uis.biasY;
-	*w *= uis.scale;
-	*h *= uis.scale;
+	*x = *x * uis.xscale + uis.bias;
+	*y = *y * uis.yscale + uis.biasY;
+	*w *= uis.xscale;
+	*h *= uis.yscale;
 }
 
 

@@ -118,11 +118,11 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //   media entry changes scope: register cgs.media.friendShader
 //   ("sprites/foe") in every gametype, not just GT_TEAM - the weapon
 //   wheel's selection marker draws through it.
-// * baseq3 UI (q3_ui): the uniform-scale uiStatic_t fields
-//   scale/biasX/biasY/cursorScaleR/screenXmin..Ymax replace stock
-//   xscale/yscale/bias, and uis.cursorx/uis.cursory become float (stock:
-//   int) - UI_VR_CursorOverride writes the cursor through float * (see
-//   Appendix E).
+// * baseq3 UI (q3_ui): uiStatic_t gains float biasY beside stock
+//   xscale/yscale/bias, added to the vertical transform in UI_AdjustFrom640
+//   and the three text painters; UI_VR_UpdateScale writes all four in VR.
+//   uis.cursorx/uis.cursory become float (stock: int) -
+//   UI_VR_CursorOverride writes the cursor through float * (see Appendix E).
 // * Team Arena UI: displayContextDef_t gains void (*vrEditField)(void),
 //   which Menu_HandleKey calls where an edit field starts editing; the ui
 //   link wires it to UI_VR_OnEditField. Its cursorx/cursory also become
