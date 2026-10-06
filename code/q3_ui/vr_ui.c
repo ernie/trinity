@@ -328,7 +328,13 @@ void UI_VR_UpdateScale( void )
 		hostScaleSaved = qtrue;
 	}
 
-	if ( vr->virtual_screen ) {
+	if ( vr->sp_intermission_active ) {
+		// SP intermission draws to the 1280x960 HUD buffer, even while the console has the virtual screen
+		uis.xscale = 2.0f;
+		uis.yscale = 2.0f;
+		uis.bias = 0.0f;
+		uis.biasY = 0.0f;
+	} else if ( vr->virtual_screen ) {
 		// the 4:3 box scales uniformly (vw/640 == vh/480); bias and biasY center it
 		UI_GetViewable4x3Dimensions( &vw, &vh );
 		scale = vw / 640.0f;
@@ -343,12 +349,6 @@ void UI_VR_UpdateScale( void )
 		}
 		uis.xscale = scale;
 		uis.yscale = scale;
-	} else if ( vr->sp_intermission_active ) {
-		// SP intermission draws to the 1280x960 HUD buffer
-		uis.xscale = 2.0f;
-		uis.yscale = 2.0f;
-		uis.bias = 0.0f;
-		uis.biasY = 0.0f;
 	} else {
 		uis.xscale = hostXscale;
 		uis.yscale = hostYscale;

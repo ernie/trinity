@@ -128,7 +128,8 @@ qboolean UI_VR_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 	if ( !vrActive ) {
 		return qfalse;
 	}
-	if ( !vr->virtual_screen ) {
+	// the SP postgame UI draws into the podium HUD buffer even while the console has the virtual screen
+	if ( !vr->virtual_screen || vr->sp_intermission_active ) {
 #ifdef CGAME
 		xscale = DC->xscale / 2.75f;
 		yscale = DC->yscale / 2.75f;
