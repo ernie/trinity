@@ -2,6 +2,9 @@
 #include "../game/vr_bg.h"
 #include "../game/vr_shared.h"
 #include "../game/vr_trap.h"
+#ifdef MISSIONPACK
+#include "../ui/ui_shared.h"
+#endif
 
 const char vr_api_sentinel[] = VR_API_SENTINEL;
 
@@ -182,6 +185,11 @@ void CG_VR_Frame( void ) {
 		cgs.cursorX = vr->scoreboardCursorX;
 		cgs.cursorY = vr->scoreboardCursorY;
 	}
+#ifdef MISSIONPACK
+	if ( UI_VR_MenuFocusMoved() ) {
+		CG_VR_OnMenuMove();
+	}
+#endif
 
 	if ( vrActive ) {
 		char buf[32];

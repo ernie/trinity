@@ -612,7 +612,7 @@ itemDef {
 	textscale .25
 	forecolor 1 1 1 1
 	visible 0
-	action { uiScript update "vr_hudDrawStatus" }
+	action { uiScript vrHudDrawStatusChanged }
 	}
 itemDef {
 	name hud

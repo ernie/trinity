@@ -38,8 +38,7 @@ flatscreen engine; with no VR player in view they too do nothing.
 A short list of placements is the sanctioned exception: they read the
 `vrActive` dormancy signal directly, because an unconditional call there
 would double-draw in VR or visibly change flatscreen rendering. They are
-the lightning-gun bolt origin and the flatscreen follow crosshair (Step 5);
-Team Arena's `ui_shared.c` transform fork
+the lightning-gun bolt origin and the flatscreen follow crosshair (Step 5)
 and the connect-screen background fill in both UIs (Step 6). Each is
 flagged at its site; every other call-out stays unconditional.
 
@@ -721,7 +720,7 @@ function already applies (Appendix E).
 **Team Arena (`ui`).** Team Arena hooks the 640-space transform directly,
 at *two* sites, both routed through `vr_uishared` so text and models
 transform identically in both links. `ui_atoms.c`'s `UI_AdjustFrom640`
-takes the simple early-out:
+and `ui_shared.c`'s `AdjustFrom640` take the same early-out:
 
 ```diff
  void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
@@ -730,32 +729,29 @@ takes the simple early-out:
 +	}
 ```
 
-`ui_shared.c`'s `AdjustFrom640` is more involved — one of the sanctioned
-`vrActive` forks: declare `extern qboolean vrActive;` at the top of the
-file, keep your stock body for `!vrActive`, try `UI_VR_AdjustFrom640`
-first, and keep a live in-world transform tail (`xscale`/`yscale` ÷ 2.75,
-centered) for the non-virtual-screen case — the missionpack cgame paints
-the VR HUD's `.menu` widgets through it during gameplay. Take this tree's
-`AdjustFrom640` fork; the `!vrActive` branch stays your stock body.
+Off the virtual screen, the cgame link's `UI_VR_AdjustFrom640` scales
+`ui_shared.c`'s menu items to a fixed in-world size around the screen
+center; the ui link's returns `qfalse` there, so your stock body runs.
 
 The other call-outs live in `ui_main.c`: `UI_VR_Init()` at the top of
 `_UI_Init`; `UI_VR_Shutdown()` beside `_UI_Shutdown` in vmMain's
 `UI_SHUTDOWN` case;
 `UI_VR_CursorOverride( &uiInfo.uiDC.cursorx, &uiInfo.uiDC.cursory )` once
-per frame in `_UI_Refresh`, with the cursor draw gated behind
+per frame in `_UI_Refresh`, which also fires the menu-hover haptic when
+the focus moves and, under stick navigation, rests the cursor on the
+focused item (a slider's thumb) so stock key paths that test the cursor
+act on that item, with the cursor draw gated behind
 `!UI_VKeyboardIsActive()` and `!UI_VR_HideCursor()`; in `_UI_MouseEvent`,
 the `UI_VR_StickNavActive()` early-out and the same cursor override; the
-hover haptic wired into the display context
-(`uiInfo.uiDC.vrMenuMove = &UI_VR_OnMenuMove`) alongside the four
-`vkeyboard*` members and `Menu_HandleKey`'s edit-field interception — a
-deeper insertion this tree carries for in-headset text entry (Appendix D);
+four `vkeyboard*` members wired into the display context and
+`Menu_HandleKey`'s edit-field interception — a deeper insertion this tree
+carries for in-headset text entry (Appendix D);
 `UI_VR_LoadMenus()` after every `UI_LoadMenus` wave — both `_UI_Init` and
 `UI_Load`; the connect-screen background gated the same way as baseq3's
 (`if ( vrActive && menu->window.background )
 UI_VR_FillScreen( menu->window.background );` before the stock
-`Menu_Paint`); and the two settings dispatchers
-`UI_VR_UpdateSettingsCvar(name, val)` and `UI_VR_RunMenuScript(name)` in
-`UI_Update`'s else-if chain and `UI_RunMenuScript`'s command chain.
+`Menu_Paint`); and the settings dispatcher `UI_VR_RunMenuScript(name)` in
+`UI_RunMenuScript`'s command chain, which runs the drop's menu scripts.
 `UI_VR_CompensateModelFov` is called from `Item_Model_Paint` in both links
 and from `UI_DrawPlayer`.
 
@@ -774,7 +770,9 @@ the couplings behind the screens:
 
 - **`vr_hudDrawStatus` → `cg_draw3dIcons`.** The value `2` (no status bar)
   also sets `cg_draw3dIcons 0`; **every other value** sets
-  `cg_draw3dIcons 1`.
+  `cg_draw3dIcons 1`. Team Arena's HUD Mode rows run
+  `uiScript vrHudDrawStatusChanged` in their `action`, handled by
+  `UI_VR_RunMenuScript`.
 - **`vr_switchThumbsticks`.** A swap-in-place edit of the affected button
   mappings.
 - **The display mode.** `vr_enabled` is latched: a module's own cvar
@@ -1024,10 +1022,11 @@ fields each frame. `UI_DrawPlayer` (ui_players.c) recomputes its fov from
 the transformed rect, keeping the origin math on the desired fov. And
 `uis.cursorx` / `uis.cursory` become `float` (stock: `int`), because
 `UI_VR_CursorOverride` writes the cursor through `float *`. Team Arena: the
-`vrMenuMove` member on `displayContextDef_t`, wired to the drop's menu-hover
-hook (the virtual-keyboard wiring adds the four `vkeyboard*` members —
-Step 6) — and that struct's `cursorx` / `cursory` become `float` for the
-same cursor-override reason.
+virtual-keyboard wiring adds the four `vkeyboard*` members to
+`displayContextDef_t` (Step 6), and that struct's `cursorx` / `cursory`
+become `float` for the
+same cursor-override reason. `ui/menudef.h` defines the VR owner-draw IDs
+(265 to 272, listed in Step 7), which the drop's `vr_ui.c` switches on.
 
 If a symbol is still unresolved after `vr_host.h` is satisfied, it is a bug
 in the contract — report it; Step 2's failing build output is otherwise your

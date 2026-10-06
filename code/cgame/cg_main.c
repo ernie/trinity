@@ -1945,7 +1945,6 @@ void CG_LoadHudMenu( void ) {
 	cgDC.stopCinematic = &CG_StopCinematic;
 	cgDC.drawCinematic = &CG_DrawCinematic;
 	cgDC.runCinematicFrame = &CG_RunCinematicFrame;
-	cgDC.vrMenuMove = &CG_VR_OnMenuMove;
 
 	Init_Display(&cgDC);
 

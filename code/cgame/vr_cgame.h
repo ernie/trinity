@@ -62,8 +62,8 @@ void CG_VR_OnDamageTaken( int damage, float yaw );
 void CG_VR_OnWeaponFired( int weapon );
 void CG_VR_OnWeaponFiring( int weapon );
 
-// ui_shared.c Item_SetFocus menu-hover haptic (wired via DC->vrMenuMove;
-// the ui link's counterpart is UI_VR_OnMenuMove in code/ui/vr_ui.c).
+// Menu-hover haptic, fired from CG_VR_Frame when UI_VR_MenuFocusMoved
+// reports a move (the ui link's counterpart is UI_VR_OnMenuMove).
 void CG_VR_OnMenuMove( void );
 
 // cg_weapons.c CG_AddViewWeapon hand-pose hooks (fork's former CG_AddViewWeaponVR)

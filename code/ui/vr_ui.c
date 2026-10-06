@@ -3,6 +3,7 @@
 #include "../game/vr_shared.h"
 #include "../game/vr_trap.h"
 #include "../game/vr_bindmenu.h"
+#include "../game/vr_supersample.h"
 
 const char vr_api_sentinel[] = VR_API_SENTINEL;
 
@@ -100,15 +101,13 @@ vrPlatform_t UI_VR_Platform( void ) {
 	return VR_Platform( vrActive );
 }
 
-void UI_VR_Init( void ) {
+static void UI_VR_Attach( void ) {
 	char ext[64];
 #ifdef Q3_VM
 	trap_GetValue = NULL;
 #else
 	dll_com_trapGetValue = 0;
 #endif
-	trap_Cvar_Set("ui_vrModeSwitchAvailable", UI_VR_CanSwitchMode() ? "1" : "0");
-
 	vrActive = qfalse;
 	bindCaptureAvailable = qfalse;
 	memset( &vr_state, 0, sizeof( vr_state ) );
@@ -146,6 +145,16 @@ void UI_VR_Init( void ) {
 	vr->menuYawLocked = qfalse;
 	vr->menuCursorActive = vrActive;
 }
+
+// Menus gate their VR rows on these with cvarTest; a flatscreen engine reads 0.
+void UI_VR_Init( void ) {
+	trap_Cvar_Set( "ui_vrModeSwitchAvailable", UI_VR_CanSwitchMode() ? "1" : "0" );
+	UI_VR_Attach();
+	trap_Cvar_Register( NULL, "ui_vrActive", "0", CVAR_ROM );
+	trap_Cvar_Set( "ui_vrActive", vrActive ? "1" : "0" );
+	trap_Cvar_Set( "ui_vrBindingsAvailable", UI_VR_BindingsAvailable() ? "1" : "0" );
+}
+
 void UI_VR_Shutdown( void ) {
 	vrActive = qfalse;
 	vr->menuCursorActive = qfalse;
@@ -187,24 +196,95 @@ qboolean UI_VR_StickNavActive( void ) {
 	return vrActive && vr->pointerMode == VR_POINTER_STICK;
 }
 
+static itemDef_t *UI_VR_FocusedItem( void ) {
+	menuDef_t *menu = Menu_GetFocused();
+	return menu ? Menu_GetFocusedItem( menu ) : NULL;
+}
+
+// Stick navigation steps the focused slider by a fortieth of its range, as stock has no key for it.
+static qboolean UI_VR_StepSlider( int key ) {
+	itemDef_t *item = UI_VR_FocusedItem();
+	editFieldDef_t *editDef;
+	float value;
+
+	if ( key != K_LEFTARROW && key != K_KP_LEFTARROW && key != K_RIGHTARROW && key != K_KP_RIGHTARROW ) {
+		return qfalse;
+	}
+	if ( !item || item->type != ITEM_TYPE_SLIDER || !item->cvar || !item->typeData ) {
+		return qfalse;
+	}
+	editDef = (editFieldDef_t *)item->typeData;
+	value = trap_Cvar_VariableValue( item->cvar );
+	value += ( key == K_RIGHTARROW || key == K_KP_RIGHTARROW ? 1 : -1 ) * ( editDef->maxVal - editDef->minVal ) / 40.0f;
+	if ( value < editDef->minVal ) {
+		value = editDef->minVal;
+	} else if ( value > editDef->maxVal ) {
+		value = editDef->maxVal;
+	}
+	trap_Cvar_Set( item->cvar, va( "%f", value ) );
+	return qtrue;
+}
+
 /*
 ================
 UI_VR_KeyEvent
 
-First-chance key routing: an active virtual keyboard consumes its keys.
-qfalse lets the stock menu key path run (including for unconsumed keys
-while the keyboard is up - stock behavior preserved).
+First-chance key routing: while a bindings row waits for a button, every key
+belongs to the bindings model; closing the menu ends the wait. Stick
+navigation steps the focused slider.
 ================
 */
-qboolean UI_VR_KeyEvent( int key ) {
-	if ( UI_VKeyboardIsActive() && UI_VKeyboardHandleKey( key ) ) {
+qboolean UI_VR_KeyEvent( int key, qboolean down ) {
+	if ( VRBM_Waiting() ) {
+		if ( down ) {
+			if ( key == K_ESCAPE ) {
+				VRBM_Cancel();
+			} else if ( UI_VR_KeyIndex( key ) >= 0 ) {
+				VRBM_Capture( UI_VR_KeyIndex( key ) );
+			} else {
+				VRBM_OtherKey();
+			}
+		}
 		return qtrue;
+	}
+	if ( !down ) {
+		return qfalse;
+	}
+	if ( UI_VR_StickNavActive() ) {
+		return UI_VR_StepSlider( key );
 	}
 	return qfalse;
 }
 
+/*
+================
+UI_VR_CursorOverride
+
+Called every frame from _UI_Refresh and from _UI_MouseEvent. The laser
+pointer sets the cursor; under stick navigation the cursor rests on the
+focused item (a slider's thumb), so the stock key paths that test the
+cursor against that item act on it. Also drives the menu-hover haptic.
+================
+*/
 qboolean UI_VR_CursorOverride( float *x, float *y ) {
-	if ( vrActive && vr->menuCursorActive && vr->pointerMode != VR_POINTER_STICK ) {
+	itemDef_t *item;
+
+	if ( UI_VR_MenuFocusMoved() ) {
+		UI_VR_OnMenuMove();
+	}
+	if ( !vrActive ) {
+		return qfalse;
+	}
+	if ( vr->pointerMode == VR_POINTER_STICK ) {
+		item = UI_VR_FocusedItem();
+		if ( !item ) {
+			return qfalse;
+		}
+		*x = item->type == ITEM_TYPE_SLIDER ? Item_Slider_ThumbPosition( item ) : item->window.rect.x + item->window.rect.w / 2;
+		*y = item->window.rect.y + item->window.rect.h / 2;
+		return qtrue;
+	}
+	if ( vr->menuCursorActive ) {
 		*x = vr->menuCursorX;
 		*y = vr->menuCursorY;
 		return qtrue;
@@ -269,33 +349,6 @@ void UI_VR_LoadMenus( void ) {
 
 /*
 ===============
-UI_VR_UpdateSettingsCvar
-
-VR settings-menu cvar handlers, dispatched from UI_Update's else-if chain.
-Returns qtrue when name matched one of the VR settings cvars (regardless of
-whether the platform gate let the body run), so the caller's chain continues
-exactly as before for unmatched names.
-===============
-*/
-qboolean UI_VR_UpdateSettingsCvar( const char *name, int val ) {
-	if ( Q_stricmp( name, "vr_hudDrawStatus" ) == 0 ) {
-		if ( UI_VR_Platform() != VRP_NONE ) {
-			switch (val) {
-				case 2:
-					trap_Cvar_SetValue( "cg_draw3dIcons", 0 );
-					break;
-				default:
-					trap_Cvar_SetValue( "cg_draw3dIcons", 1 );
-					break;
-			}
-		}
-		return qtrue;
-	}
-	return qfalse;
-}
-
-/*
-===============
 UI_VR_RunMenuScript
 ===============
 */
@@ -309,6 +362,12 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 		return qtrue;
 	} else if ( Q_stricmp( name, "vrBindCancel" ) == 0 ) {
 		VRBM_Cancel();
+		return qtrue;
+	} else if ( Q_stricmp( name, "vrHudDrawStatusChanged" ) == 0 ) {
+		// the HUD mode without a status bar draws no 3D icons
+		if ( UI_VR_Platform() != VRP_NONE ) {
+			trap_Cvar_SetValue( "cg_draw3dIcons", (int)trap_Cvar_VariableValue( "vr_hudDrawStatus" ) == 2 ? 0 : 1 );
+		}
 		return qtrue;
 	} else if ( Q_stricmp( name, "vrMirrorSetup" ) == 0 ) {
 		// Stage the restart-class desktop-mirror values into ui_ cvars.
@@ -415,6 +474,473 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 		return qtrue;
 	}
 	return qfalse;
+}
+
+/*
+===============
+VR settings and bindings owner-draws
+
+The host's UI_OwnerDraw, UI_OwnerDrawHandleKey and UI_OwnerDrawWidth call the
+entry points below from their default cases; the IDs are in ui/menudef.h.
+===============
+*/
+#define MAX_REFRESH_RATES 16
+static int uiRefreshRates[MAX_REFRESH_RATES];
+static int uiNumRefreshRates;
+
+static void UI_ReadRefreshRates(void) {
+	static const int fallback[] = { 60, 72, 80, 90, 120 };
+	char list[256];
+	char *p;
+	int i;
+
+	uiNumRefreshRates = 0;
+	trap_Cvar_VariableStringBuffer("vr_refreshrates", list, sizeof(list));
+	p = list;
+	while (uiNumRefreshRates < MAX_REFRESH_RATES) {
+		const char *token = COM_Parse(&p);
+		if (!token[0]) {
+			break;
+		}
+		uiRefreshRates[uiNumRefreshRates++] = (int)(atof(token) + 0.5f);
+	}
+	if (uiNumRefreshRates == 0) {
+		for (i = 0; i < ARRAY_LEN(fallback); i++) {
+			uiRefreshRates[i] = fallback[i];
+		}
+		uiNumRefreshRates = ARRAY_LEN(fallback);
+	}
+}
+
+// nearest, since an archived vr_refreshrate may not be in this headset's list
+static int UI_RefreshRateIndex(void) {
+	int rate = (int)(trap_Cvar_VariableValue("vr_refreshrate") + 0.5f);
+	int best = 0;
+	int i;
+
+	UI_ReadRefreshRates();
+	for (i = 1; i < uiNumRefreshRates; i++) {
+		if (abs(uiRefreshRates[i] - rate) < abs(uiRefreshRates[best] - rate)) {
+			best = i;
+		}
+	}
+	return best;
+}
+
+static void UI_DrawRefreshRate(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	uiInfo.uiDC.drawText(rect->x, rect->y, scale, color, va("%i Hz", uiRefreshRates[UI_RefreshRateIndex()]), 0, 0, textStyle);
+}
+
+static qboolean UI_RefreshRate_HandleKey(int flags, float *special, int key) {
+	int select = UI_SelectForKey(key);
+	if (select != 0) {
+		int i = UI_RefreshRateIndex() + select;
+
+		if (i >= uiNumRefreshRates) {
+			i = 0;
+		} else if (i < 0) {
+			i = uiNumRefreshRates - 1;
+		}
+
+		// the engine applies this live and writes back the rate it actually got
+		trap_Cvar_SetValue("vr_refreshrate", uiRefreshRates[i]);
+		return qtrue;
+	}
+	return qfalse;
+}
+
+// vr_foveation: 0 off, 1 fixed, 2 eye tracked. vr_foveationStrength: 1 low, 2 medium, 3 high.
+// vr_foveationCaps (none / fixed / eyetracked) caps the mode row at what the headset has.
+static const char *uiFoveationNames[] = { "Off", "Fixed", "Eye-Tracked" };
+static const char *uiFoveationStrengthNames[] = { "Low", "Medium", "High" };
+
+// highest vr_foveation value this headset supports, -1 when it has none
+static int UI_FoveationMax(void) {
+	char caps[32];
+
+	trap_Cvar_VariableStringBuffer("vr_foveationCaps", caps, sizeof(caps));
+	if (!Q_stricmp(caps, "eyetracked")) {
+		return 2;
+	}
+	if (!Q_stricmp(caps, "fixed")) {
+		return 1;
+	}
+	return -1;
+}
+
+static int UI_FoveationLevel(int max) {
+	int level = (int)trap_Cvar_VariableValue("vr_foveation");
+
+	if (level < 0) {
+		level = 0;
+	} else if (level > max) {
+		level = max;
+	}
+	return level;
+}
+
+static const char *UI_FoveationText(void) {
+	int max = UI_FoveationMax();
+
+	if (max < 0) {
+		return "Not Supported";
+	}
+	return uiFoveationNames[UI_FoveationLevel(max)];
+}
+
+static void UI_DrawFoveation(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	uiInfo.uiDC.drawText(rect->x, rect->y, scale, color, UI_FoveationText(), 0, 0, textStyle);
+}
+
+static qboolean UI_Foveation_HandleKey(int flags, float *special, int key) {
+	int select = UI_SelectForKey(key);
+	if (select != 0) {
+		int max = UI_FoveationMax();
+		int level;
+
+		if (max < 0) {
+			return qtrue;
+		}
+		level = UI_FoveationLevel(max) + select;
+		if (level > max) {
+			level = 0;
+		} else if (level < 0) {
+			level = max;
+		}
+
+		// the engine applies this live and falls back if the runtime refuses
+		trap_Cvar_SetValue("vr_foveation", level);
+		return qtrue;
+	}
+	return qfalse;
+}
+
+static int UI_FoveationStrength(void) {
+	int strength = (int)trap_Cvar_VariableValue("vr_foveationStrength");
+
+	if (strength < 1) {
+		strength = 1;
+	} else if (strength > 3) {
+		strength = 3;
+	}
+	return strength;
+}
+
+static const char *UI_FoveationStrengthText(void) {
+	if (UI_FoveationMax() < 0) {
+		return "Not Supported";
+	}
+	return uiFoveationStrengthNames[UI_FoveationStrength() - 1];
+}
+
+static void UI_DrawFoveationStrength(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	uiInfo.uiDC.drawText(rect->x, rect->y, scale, color, UI_FoveationStrengthText(), 0, 0, textStyle);
+}
+
+static qboolean UI_FoveationStrength_HandleKey(int flags, float *special, int key) {
+	int select = UI_SelectForKey(key);
+	if (select != 0) {
+		int strength;
+
+		if (UI_FoveationMax() < 0) {
+			return qtrue;
+		}
+		strength = UI_FoveationStrength() + select;
+		if (strength > 3) {
+			strength = 1;
+		} else if (strength < 1) {
+			strength = 3;
+		}
+
+		trap_Cvar_SetValue("vr_foveationStrength", strength);
+		return qtrue;
+	}
+	return qfalse;
+}
+
+// Only the player's own tilt: the engine applies the grip-to-aim correction itself, so zero reads as none.
+static const char *UI_WeaponPitchText(void) {
+	int offset = (int)trap_Cvar_VariableValue("vr_weaponPitch");
+
+	// Kept terse: this sits in the narrow strip beside the slider bar
+	return va("%s%i", offset > 0 ? "+" : "", offset);
+}
+
+static void UI_DrawWeaponPitch(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
+	uiInfo.uiDC.drawText(rect->x, rect->y, scale, color, UI_WeaponPitchText(), 0, 0, textStyle);
+}
+
+// vr_superSampling as a 1.0..2.0 slider in tenths, with the eye size each step renders at beside it.
+static rectDef_t uiSuperSamplingBar;   // the bar's window from its last paint, so a click can land on it
+static int uiEyeSize[4];               // recommended w h, maximum w h; zeros outside VR
+static int uiEyeSizeTime = -1;
+static qboolean uiSuperSamplingDrag;   // a press on the bar follows the pointer until the button lets go
+
+static void UI_ReadEyeSize(void) {
+	char eyeSize[64];
+	if (uiEyeSizeTime >= 0 && uiInfo.uiDC.realTime - uiEyeSizeTime < 1000) {
+		return;
+	}
+	uiEyeSizeTime = uiInfo.uiDC.realTime;
+	if (!trap_GetValue(eyeSize, sizeof(eyeSize), "vr_eyesize") ||
+		!VRSS_ParseEyeSize(eyeSize, &uiEyeSize[0], &uiEyeSize[1], &uiEyeSize[2], &uiEyeSize[3])) {
+		memset(uiEyeSize, 0, sizeof(uiEyeSize));
+	}
+}
+
+// the step under the pointer, with the pointer held to the bar
+static int UI_SuperSampling_TenthsAt(float cursorx) {
+	float t = (cursorx - uiSuperSamplingBar.x) / uiSuperSamplingBar.w;
+	if (t < 0) {
+		t = 0;
+	} else if (t > 1) {
+		t = 1;
+	}
+	return VRSS_MIN_TENTHS + (int)(t * (VRSS_MAX_TENTHS - VRSS_MIN_TENTHS) + 0.5f);
+}
+
+static void UI_DrawSuperSampling(rectDef_t *rect, float span, float scale, vec4_t color, int textStyle) {
+	int tenths = VRSS_Tenths(trap_Cvar_VariableValue("vr_superSampling"));
+	// rect->y is the row's text baseline; the bar sits on it like the stock slider sits in its row
+	const float top = rect->y - SLIDER_HEIGHT, gap = 4, bar = SLIDER_WIDTH;
+	const int textHeight = uiInfo.uiDC.textHeight("0", scale, 0);
+	float cx, y;
+	char mult[8], res[24];
+
+	if (uiSuperSamplingDrag) {
+		if (!trap_Key_IsDown(K_MOUSE1)) {
+			uiSuperSamplingDrag = qfalse;
+		} else if (uiSuperSamplingBar.w > 0 && UI_SuperSampling_TenthsAt(uiInfo.uiDC.cursorx) != tenths) {
+			tenths = UI_SuperSampling_TenthsAt(uiInfo.uiDC.cursorx);
+			trap_Cvar_SetValue("vr_superSampling", VRSS_Value(tenths));
+		}
+	}
+	UI_ReadEyeSize();
+	VRSS_Multiplier(tenths, mult, sizeof(mult));
+	VRSS_Resolution(tenths, uiEyeSize[0], uiEyeSize[1], uiEyeSize[2], uiEyeSize[3], res, sizeof(res));
+	if (span <= bar + gap) {
+		span = bar + gap + bar;
+	}
+	uiSuperSamplingBar.x = rect->x;
+	uiSuperSamplingBar.y = top;
+	uiSuperSamplingBar.w = bar;
+	uiSuperSamplingBar.h = SLIDER_HEIGHT;
+	trap_R_SetColor(color);
+	UI_DrawHandlePic(rect->x, top, bar, SLIDER_HEIGHT, uiInfo.uiDC.Assets.sliderBar);
+	UI_DrawHandlePic(rect->x + (tenths - VRSS_MIN_TENTHS) * bar / (VRSS_MAX_TENTHS - VRSS_MIN_TENTHS) - SLIDER_THUMB_WIDTH / 2,
+					 top - 2, SLIDER_THUMB_WIDTH, SLIDER_THUMB_HEIGHT, uiInfo.uiDC.Assets.sliderThumb);
+	trap_R_SetColor(NULL);
+	// two lines, each centered in what is left of the span, the pair centered on the bar
+	cx = rect->x + bar + gap + (span - bar - gap) / 2;
+	y = top + SLIDER_HEIGHT / 2 - (textHeight + 3) / 2.0f + textHeight / 2.0f;
+	uiInfo.uiDC.drawText(cx - uiInfo.uiDC.textWidth(mult, scale, 0) / 2, y, scale, color, mult, 0, 0, textStyle);
+	uiInfo.uiDC.drawText(cx - uiInfo.uiDC.textWidth(res, scale, 0) / 2, y + textHeight + 3, scale, color, res, 0, 0, textStyle);
+}
+
+static qboolean UI_SuperSampling_HandleKey(int flags, float *special, int key) {
+	int tenths = VRSS_Tenths(trap_Cvar_VariableValue("vr_superSampling"));
+	const float cx = uiInfo.uiDC.cursorx, cy = uiInfo.uiDC.cursory;
+	int select;
+
+	if (key == K_MOUSE1 && cx >= uiSuperSamplingBar.x && cx < uiSuperSamplingBar.x + uiSuperSamplingBar.w &&
+		cy >= uiSuperSamplingBar.y - 2 && cy < uiSuperSamplingBar.y + uiSuperSamplingBar.h + 2) {
+		tenths = UI_SuperSampling_TenthsAt(cx);
+		uiSuperSamplingDrag = qtrue;
+	} else {
+		select = UI_SelectForKey(key);
+		if (select == 0) {
+			return qfalse;
+		}
+		tenths += select;
+	}
+	trap_Cvar_SetValue("vr_superSampling", VRSS_Value(VRSS_Tenths(tenths / 10.0f)));
+	return qtrue;
+}
+
+// Where each row's clear glyph starts, from its last paint; a click right of it clears instead of binding.
+static float vrBindGlyphX[VRBM_ROW_COUNT];
+// Each row's and the Alt switch's window, from their last paint: focus outlives hover, so clicks must land inside.
+static rectDef_t vrBindHit[VRBM_ROW_COUNT];
+static rectDef_t vrBindAltHit;
+
+static void UI_VRBind_SetHit( rectDef_t *hit, float x, float y, float w, float h ) {
+	hit->x = x;
+	hit->y = y;
+	hit->w = w;
+	hit->h = h;
+}
+
+static qboolean UI_VRBind_Inside( const rectDef_t *hit ) {
+	const float x = uiInfo.uiDC.cursorx, y = uiInfo.uiDC.cursory;
+	return x >= hit->x && x < hit->x + hit->w && y >= hit->y && y < hit->y + hit->h;
+}
+
+static qboolean UI_VRBind_IsArrow( int c ) {
+	return c == 134 || c == 135 || c == 136 || c == 141;
+}
+
+// drawText, with the arrow bytes drawn from the character sheet as the on-screen keyboard draws them: the font pages
+// have no glyphs there.
+static void UI_VRBind_Paint( float x, float y, float scale, vec4_t color, const char *text, int style ) {
+	static qhandle_t charset;
+	char run[256];
+	const float size = uiInfo.uiDC.textHeight( "A", scale, 0 ) * 1.4f;
+	int n = 0;
+
+	if ( !charset ) {
+		charset = trap_R_RegisterShaderNoMip( "gfx/2d/bigchars" );
+	}
+	for ( ;; text++ ) {
+		const int c = *text & 255;
+		if ( c && !UI_VRBind_IsArrow( c ) && n < (int)sizeof( run ) - 1 ) {
+			run[n++] = (char)c;
+			continue;
+		}
+		run[n] = '\0';
+		if ( n ) {
+			uiInfo.uiDC.drawText( x, y, scale, color, run, 0, 0, style );
+			x += uiInfo.uiDC.textWidth( run, scale, 0 );
+			n = 0;
+		}
+		if ( !c ) {
+			break;
+		}
+		if ( UI_VRBind_IsArrow( c ) ) {
+			float ax = x, ay = y - size * 0.85f, aw = size, ah = size;
+			const float s = ( c & 15 ) * 0.0625f, t = ( c >> 4 ) * 0.0625f;
+			UI_AdjustFrom640( &ax, &ay, &aw, &ah );
+			trap_R_SetColor( color );
+			trap_R_DrawStretchPic( ax, ay, aw, ah, s, t, s + 0.0625f, t + 0.0625f, charset );
+			trap_R_SetColor( NULL );
+			x += size;
+		}
+	}
+}
+
+static void UI_DrawVRBind( rectDef_t *rect, int index, float scale, vec4_t color, int textStyle ) {
+	const vrbmRow_t *row;
+	char names[128];
+
+	VRBM_Tick( uiInfo.uiDC.realTime );
+	if ( index < 0 || index >= VRBM_ROW_COUNT ) {
+		return;
+	}
+	row = &vrbmRows[index];
+	if ( row->flags & VRBM_HEADER ) {
+		uiInfo.uiDC.drawText( rect->x, rect->y, scale, color, row->label, 0, 0, textStyle );
+		return;
+	}
+	if ( !VRBM_Editable( row, vrbm.altView ) ) {
+		VRBM_Names( row, 0, names, sizeof( names ) );
+		uiInfo.uiDC.drawText( rect->x, rect->y, scale, color, row->label, 0, 0, textStyle );
+		UI_VRBind_Paint( rect->x + 170, rect->y, scale, color, names, textStyle );
+		return;
+	}
+	VRBM_Names( row, vrbm.altView, names, sizeof( names ) );
+	uiInfo.uiDC.drawText( rect->x, rect->y, scale, color, row->label, 0, 0, textStyle );
+	UI_VRBind_Paint( rect->x + 170, rect->y, scale, color, vrbm.waiting == index ? "..." : names, textStyle );
+	vrBindGlyphX[index] = rect->x + rect->w - 20;
+	uiInfo.uiDC.drawText( vrBindGlyphX[index], rect->y, scale, color, "X", 0, 0, textStyle );
+}
+
+static qboolean UI_VRBind_HandleKey( float *special, int key ) {
+	const int index = (int)*special;
+
+	if ( key != K_MOUSE1 && key != K_ENTER && key != K_KP_ENTER ) {
+		return qfalse;
+	}
+	if ( index < 0 || index >= VRBM_ROW_COUNT || VRBM_Waiting() || !VRBM_Editable( &vrbmRows[index], vrbm.altView ) ) {
+		return qtrue;
+	}
+	if ( key == K_MOUSE1 && !UI_VRBind_Inside( &vrBindHit[index] ) ) {
+		return qtrue;
+	}
+	if ( key == K_MOUSE1 && !UI_VR_StickNavActive() && uiInfo.uiDC.cursorx >= vrBindGlyphX[index] ) {
+		VRBM_Clear( &vrbmRows[index], vrbm.altView );
+	} else {
+		VRBM_Start( index );
+	}
+	return qtrue;
+}
+
+static void UI_DrawVRBindStatus( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
+	char status[256];
+	VRBM_Status( status, sizeof( status ) );
+	UI_VRBind_Paint( rect->x, rect->y, scale, color, status, textStyle );
+}
+
+void UI_VR_OwnerDraw( float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle ) {
+	rectDef_t rect;
+
+	rect.x = x + text_x;
+	rect.y = y + text_y;
+	rect.w = w;
+	rect.h = h;
+
+	switch ( ownerDraw ) {
+	case UI_REFRESHRATE:
+		UI_DrawRefreshRate( &rect, scale, color, textStyle );
+		break;
+	case UI_FOVEATION:
+		UI_DrawFoveation( &rect, scale, color, textStyle );
+		break;
+	case UI_FOVEATION_STRENGTH:
+		UI_DrawFoveationStrength( &rect, scale, color, textStyle );
+		break;
+	case UI_WEAPONPITCH:
+		UI_DrawWeaponPitch( &rect, scale, color, textStyle );
+		break;
+	case UI_VRSUPERSAMPLING:
+		UI_DrawSuperSampling( &rect, special, scale, color, textStyle );
+		break;
+	case UI_VRBIND:
+		if ( (int)special >= 0 && (int)special < VRBM_ROW_COUNT ) {
+			UI_VRBind_SetHit( &vrBindHit[(int)special], x, y, w, h );
+		}
+		UI_DrawVRBind( &rect, (int)special, scale, color, textStyle );
+		break;
+	case UI_VRBIND_ALT:
+		UI_VRBind_SetHit( &vrBindAltHit, x, y, w, h );
+		uiInfo.uiDC.drawText( rect.x, rect.y, scale, color, vrbm.altView ? "Alt held: Yes" : "Alt held: No", 0, 0, textStyle );
+		break;
+	case UI_VRBIND_STATUS:
+		UI_DrawVRBindStatus( &rect, scale, color, textStyle );
+		break;
+	default:
+		break;
+	}
+}
+
+qboolean UI_VR_OwnerDrawHandleKey( int ownerDraw, int flags, float *special, int key ) {
+	switch ( ownerDraw ) {
+	case UI_REFRESHRATE:
+		return UI_RefreshRate_HandleKey( flags, special, key );
+	case UI_FOVEATION:
+		return UI_Foveation_HandleKey( flags, special, key );
+	case UI_FOVEATION_STRENGTH:
+		return UI_FoveationStrength_HandleKey( flags, special, key );
+	case UI_VRSUPERSAMPLING:
+		return UI_SuperSampling_HandleKey( flags, special, key );
+	case UI_VRBIND:
+		return UI_VRBind_HandleKey( special, key );
+	case UI_VRBIND_ALT:
+		if ( ( key == K_MOUSE1 && UI_VRBind_Inside( &vrBindAltHit ) ) || key == K_ENTER || key == K_KP_ENTER ) {
+			vrbm.altView = !vrbm.altView;
+			trap_Cvar_Set( "ui_vrBindAlt", vrbm.altView ? "1" : "0" );
+			return qtrue;
+		}
+		break;
+	default:
+		break;
+	}
+	return qfalse;
+}
+
+int UI_VR_OwnerDrawWidth( int ownerDraw, float scale ) {
+	if ( ownerDraw == UI_WEAPONPITCH ) {
+		return uiInfo.uiDC.textWidth( UI_WeaponPitchText(), scale, 0 );
+	}
+	return 0;
 }
 
 #ifndef Q3_VM

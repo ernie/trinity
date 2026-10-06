@@ -386,10 +386,6 @@ typedef struct {
 	float				screenYmax;
 	int					lastVideoCheck;
 
-	// VR menu-move haptic: fired on item focus change; each module wires its
-	// own handler (UI_VR_OnMenuMove in the ui link, CG_VR_OnMenuMove in the
-	// cgame link).
-	void (*vrMenuMove)( void );
 
 } displayContextDef_t;
 

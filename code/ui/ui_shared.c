@@ -2,12 +2,6 @@
 // string allocation/managment
 
 #include "ui_shared.h"
-#include "../game/vr_shared.h"
-
-// VR API bootstrap mirror (defined in vr_ui.c for the TA UI module,
-// vr_cgame.c for the missionpack cgame that also compiles this TU)
-extern vr_shared_t	*vr;
-extern qboolean		vrActive;
 
 extern int Q_vsprintf( char *buffer, const char *fmt, va_list argptr );
 
@@ -1444,9 +1438,6 @@ qboolean Item_SetFocus(itemDef_t *item, float x, float y) {
 
 	if (playSound && sfx) {
 		DC->startLocalSound( *sfx, CHAN_LOCAL_SOUND );
-		if ( DC->vrMenuMove ) {
-			DC->vrMenuMove();
-		}
 	}
 
 	for (i = 0; i < parent->itemCount; i++) {
@@ -2471,10 +2462,7 @@ qboolean Item_Slider_HandleKey(itemDef_t *item, int key, qboolean down) {
 	}
 
 	if (item->cvar) {
-		// under VR stick-nav the cursor is parked away from the slider, so
-		// ENTER must not click-warp the thumb to a stale cursor position;
-		// it falls through to the select-key step below instead
-		if (key == K_MOUSE1 || (!vrActive && key == K_ENTER) || key == K_MOUSE2 || key == K_MOUSE3) {
+		if (key == K_MOUSE1 || key == K_ENTER || key == K_MOUSE2 || key == K_MOUSE3) {
 			editFieldDef_t *editDef = item->typeData;
 			if (editDef && Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && item->window.flags & WINDOW_HASFOCUS) {
 				rectDef_t testRect;
@@ -3690,21 +3678,7 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 	int			id;
 	int			i;
 
-	if (vrActive) {
-		// stick-nav binding: the focused bind item arms on the activate keys
-		// with the cursor parked anywhere; only a mouse click still requires
-		// the cursor inside the rect
-		if (!g_waitingForKey)
-		{
-			if (down && ((key == K_MOUSE1 && Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory))
-					|| key == K_ENTER || key == K_KP_ENTER || key == K_JOY1 || key == K_JOY2 || key == K_JOY3 || key == K_JOY4)) {
-				g_waitingForKey = qtrue;
-				g_bindItem = item;
-			}
-			return qtrue;
-		}
-	}
-	else if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && !g_waitingForKey)
+	if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory) && !g_waitingForKey)
 	{
 		if (down && (key == K_MOUSE1 || key == K_ENTER)) {
 			g_waitingForKey = qtrue;
@@ -3799,42 +3773,14 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 
 
 void AdjustFrom640(float *x, float *y, float *w, float *h) {
-	if (!vrActive) {
-		*x = *x * DC->scale + DC->biasX;
-		*y = *y * DC->scale + DC->biasY;
-		*w *= DC->scale;
-		*h *= DC->scale;
-		return;
-	}
-
-	// Shared with ui_atoms.c UI_AdjustFrom640 via UI_VR_AdjustFrom640() so text,
-	// cursor, ownerdraws and .menu widgets (bars/backgrounds/model rects) use
-	// ONE VR transform: scale into the centered 4:3 viewable box and apply the
-	// optical-center Y offset for the headset's asymmetric FOV. Menu hit-testing
-	// is done in raw 640 space, so any draw path that used a different mapping
-	// would drift the visible target away from its clickable rect.
 	if ( UI_VR_AdjustFrom640( x, y, w, h ) ) {
 		return;
 	}
 
-	// Non-virtual-screen VR: the in-world transform, and it IS live. Missionpack
-	// paints the VR HUD (hud.menu widgets) through Menu_PaintAll during gameplay
-	// (cg_draw.c, when the VR HUD mode != 0) while vr->virtual_screen is false, so
-	// this branch scales those widgets. It intentionally differs from the
-	// virtual_screen menu transform above (which matches ui_atoms UI_AdjustFrom640);
-	// do not assume it is dead and delete it.
-	{
-		float screenXScale = DC->xscale / 2.75f;
-		float screenYScale = DC->yscale / 2.75f;
-
-		*x *= screenXScale;
-		*y *= screenYScale;
-		*w *= screenXScale;
-		*h *= screenYScale;
-
-		*x += (DC->glconfig.vidWidth - (640 * screenXScale)) / 2.0f;
-		*y += (DC->glconfig.vidHeight - (480 * screenYScale)) / 2.0f;
-	}
+	*x = *x * DC->scale + DC->biasX;
+	*y = *y * DC->scale + DC->biasY;
+	*w *= DC->scale;
+	*h *= DC->scale;
 }
 
 void Item_Model_Paint(itemDef_t *item) {

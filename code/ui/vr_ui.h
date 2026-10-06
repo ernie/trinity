@@ -25,14 +25,16 @@ qboolean UI_VR_StickNavActive( void );
 qboolean UI_VR_BindingsAvailable( void );
 // The VR key index (0-35) of an engine key code, or -1 when it isn't a VR key.
 int UI_VR_KeyIndex( int key );
-qboolean UI_VR_KeyEvent( int key );
+qboolean UI_VR_KeyEvent( int key, qboolean down );
 qboolean UI_VR_CursorOverride( float *x, float *y );
 qboolean UI_VR_HideCursor( void );
 void UI_VR_OnMenuMove( void );
 void UI_VR_FillScreen( qhandle_t shader );
 void UI_VR_LoadMenus( void );
-qboolean UI_VR_UpdateSettingsCvar( const char *name, int val );
 qboolean UI_VR_RunMenuScript( const char *name );
+void UI_VR_OwnerDraw( float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle );
+qboolean UI_VR_OwnerDrawHandleKey( int ownerDraw, int flags, float *special, int key );
+int UI_VR_OwnerDrawWidth( int ownerDraw, float scale );
 
 qboolean UI_VR_CanSwitchMode(void);
 qboolean UI_VR_ModeChoice(void);

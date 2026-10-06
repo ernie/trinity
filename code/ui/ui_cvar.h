@@ -124,6 +124,5 @@ UI_CVAR( ui_hdrAvail, "ui_hdrAvail", "0", CVAR_ROM )
 UI_CVAR( ui_hdrCalibAvail, "ui_hdrCalibAvail", "0", CVAR_ROM )
 UI_CVAR( ui_hdrDisplay, "ui_hdrDisplay", "0", 0 )
 UI_CVAR( ui_hdrWarning, "ui_hdrWarning", "", CVAR_ROM )
-UI_CVAR( ui_vrActive, "ui_vrActive", "0", CVAR_ROM )
 
 #undef UI_CVAR

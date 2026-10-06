@@ -21,6 +21,33 @@ extern displayContextDef_t *DC;
 
 /*
 ================
+UI_VR_MenuFocusMoved
+
+qtrue once per move of the focus to another item within the focused menu,
+for the menu-hover haptic. Called every frame; a menu switch only records
+the new menu, so a reopened menu's remembered focus does not buzz.
+================
+*/
+qboolean UI_VR_MenuFocusMoved( void ) {
+	static menuDef_t *lastMenu;
+	static itemDef_t *lastItem;
+	menuDef_t *menu;
+	itemDef_t *item;
+	qboolean moved;
+
+	if ( !vrActive ) {
+		return qfalse;
+	}
+	menu = Menu_GetFocused();
+	item = menu ? Menu_GetFocusedItem( menu ) : NULL;
+	moved = (qboolean)( menu == lastMenu && item && item != lastItem );
+	lastMenu = menu;
+	lastItem = item;
+	return moved;
+}
+
+/*
+================
 UI_GetProjectionCenterYOffset
 
 Returns the Y offset (in virtual 480 coordinates) of the optical center
@@ -85,9 +112,9 @@ hit-testing is done in raw 640 space, and any draw path using a different
 mapping would drift the visible target away from its clickable rect).
 Scales into the centered 4:3 viewable box and applies the optical-center Y
 offset for the headset's asymmetric FOV; VRFM_FIRSTPERSON overrides the Y
-scale/offset to the full-width safe area. Returns qfalse (x/y/w/h
-untouched) when the virtual screen isn't active, so the caller falls
-through to its own transform.
+scale/offset to the full-width safe area. Off the virtual screen, the cgame
+link scales menu items to a fixed in-world size around the screen center.
+Returns qfalse (x/y/w/h untouched) when the caller's own transform applies.
 ================
 */
 qboolean UI_VR_AdjustFrom640( float *x, float *y, float *w, float *h ) {
@@ -98,8 +125,23 @@ qboolean UI_VR_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 	float xoffset;
 	float yoffset;
 
-	if ( !vrActive || !vr->virtual_screen ) {
+	if ( !vrActive ) {
 		return qfalse;
+	}
+	if ( !vr->virtual_screen ) {
+#ifdef CGAME
+		xscale = DC->xscale / 2.75f;
+		yscale = DC->yscale / 2.75f;
+		*x *= xscale;
+		*y *= yscale;
+		*w *= xscale;
+		*h *= yscale;
+		*x += ( DC->glconfig.vidWidth - ( 640 * xscale ) ) / 2.0f;
+		*y += ( DC->glconfig.vidHeight - ( 480 * yscale ) ) / 2.0f;
+		return qtrue;
+#else
+		return qfalse;
+#endif
 	}
 
 	// VR menus render into the centered 4:3 viewable box; scale is uniform
