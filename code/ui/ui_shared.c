@@ -2879,7 +2879,6 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 						item->cursorPos = 0;
 						g_editingField = qtrue;
 						g_editItem = item;
-						DC->setOverstrikeMode(qtrue);
 						if (DC->vrEditField) {
 							DC->vrEditField();
 						}
@@ -2920,7 +2919,6 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 					item->cursorPos = 0;
 					g_editingField = qtrue;
 					g_editItem = item;
-					DC->setOverstrikeMode(qtrue);
 					if (DC->vrEditField) {
 						DC->vrEditField();
 					}
