@@ -29,6 +29,9 @@ typedef vec_t vr_matrix4x4[4][4];
 // bottom of this file.
 static float    vrc_worldscale;
 static vec3_t   vrc_vieworigin;              // last first-person view origin
+typedef enum { VRC_ANCHOR_NONE, VRC_ANCHOR_THIRDPERSON, VRC_ANCHOR_INTERMISSION } vrcHeadAnchor_t;
+static vrcHeadAnchor_t vrc_headAnchorView;   // camera the head anchor was taken for
+static vec3_t   vrc_headAnchor;              // head position the camera's horizontal offset is measured from
 static int      vrc_deathCamTime = -1;       // cg.time death cam began, -1 inactive
 static int      vrc_followLastClientNum = -1;
 static float    vrc_smoothFollow_distance;
@@ -540,6 +543,25 @@ static float CG_VR_DeltaYaw( void ) {
 
 /*
 ===============
+CG_VR_AnchoredHeadPosition
+
+The head position with its horizontal part measured from where the head was
+when this camera took over, so the camera starts centered wherever the
+player stands in the play space. Height stays floor-relative.
+===============
+*/
+static void CG_VR_AnchoredHeadPosition( vrcHeadAnchor_t view, vec3_t out ) {
+	if ( vrc_headAnchorView != view ) {
+		VectorCopy( vr->hmdposition, vrc_headAnchor );
+		vrc_headAnchorView = view;
+	}
+	out[0] = vr->hmdposition[0] - vrc_headAnchor[0];
+	out[1] = vr->hmdposition[1];
+	out[2] = vr->hmdposition[2] - vrc_headAnchor[2];
+}
+
+/*
+===============
 CG_InitSmoothFollow
 
 Initialize or recenter smooth follow camera behind the player
@@ -553,6 +575,7 @@ static void CG_InitSmoothFollow( void ) {
 	vrc_smoothFollow_hmdYawOffset = vr->hmdorientation[YAW];
 	vrc_smoothFollow_initialized = qtrue;
 	vrc_followLastClientNum = cg.snap->ps.clientNum;
+	vrc_headAnchorView = VRC_ANCHOR_NONE;
 }
 
 /*
@@ -716,6 +739,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 				float snapTurn;
 
 				VectorCopy(cg.refdef.vieworg, vrc_vieworigin);
+				vrc_headAnchorView = VRC_ANCHOR_NONE;
 
 				//Move behind the player
 				VectorCopy(cg.snap->ps.viewangles, angles);
@@ -759,6 +783,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 
 			// Reset camera to followed player's position
 			VectorCopy(cg.refdef.vieworg, vrc_vieworigin);
+			vrc_headAnchorView = VRC_ANCHOR_NONE;
 
 			// Move camera behind and slightly above the player
 			VectorCopy(cg.snap->ps.viewangles, angles);
@@ -800,7 +825,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 		}
 	}
 
-	VectorCopy(vr->hmdposition, position);
+	CG_VR_AnchoredHeadPosition(VRC_ANCHOR_THIRDPERSON, position);
 	CG_ConvertFromVR(position, NULL, position);
 	position[2] -= PLAYER_HEIGHT;
 	VectorScale(position, scale, position);
@@ -910,7 +935,7 @@ qboolean CG_VR_IntermissionView( void ) {
 		// Apply HMD positional tracking so the view moves with head movement
 		// This prevents the world from appearing frozen while HMD moves
 		// Note: Don't apply worldscale - intermission uses 1:1 scale, not spectator god-view
-		VectorCopy(vr->hmdposition, hmdPos);
+		CG_VR_AnchoredHeadPosition(VRC_ANCHOR_INTERMISSION, hmdPos);
 		CG_ConvertFromVR(hmdPos, NULL, hmdPos);
 		hmdPos[2] -= PLAYER_HEIGHT;
 		VectorAdd(cg.refdef.vieworg, hmdPos, cg.refdef.vieworg);
@@ -956,6 +981,7 @@ qboolean CG_VR_OffsetView( void ) {
 
 		//Reset this in case we die or follow
 		VectorCopy(cg.refdef.vieworg, vrc_vieworigin);
+		vrc_headAnchorView = VRC_ANCHOR_NONE;
 	}
 
 	return qtrue;
@@ -2487,7 +2513,7 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 	{
 		// If not using true 6DoF, allow some amount of faked positional tracking
 		if ( cg.snap->ps.stats[STAT_HEALTH] > 0 &&
-		     // Intermission folds absolute HMD position into vieworg itself; this
+		     // Intermission folds its own anchored HMD position into vieworg; this
 		     // hmdorigin-relative path would fight it and snap back on realign.
 		     cg.snap->ps.pm_type != PM_INTERMISSION &&
 		     // Don't use fake positional if following another player - this is
@@ -3859,6 +3885,7 @@ float CG_VR_MenuPointerYaw( void ) {
 
 static void CG_VR_ResetState( void ) {
 	vrc_deathCamTime = -1;
+	vrc_headAnchorView = VRC_ANCHOR_NONE;
 	vrc_followLastClientNum = -1;
 	vrc_smoothFollow_initialized = qfalse;
 	vrc_portraitInitialized = qfalse;
