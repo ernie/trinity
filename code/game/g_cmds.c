@@ -1851,6 +1851,21 @@ static void Cmd_Stats_f( gentity_t *ent ) {
 }
 
 
+static qboolean G_PlatformValid( const char *platform ) {
+	int i;
+
+	if ( !platform[0] ) {
+		return qfalse;
+	}
+	for ( i = 0; platform[i]; i++ ) {
+		if ( i >= 16 || !( ( platform[i] >= 'a' && platform[i] <= 'z' ) ||
+			( platform[i] >= '0' && platform[i] <= '9' ) || platform[i] == '_' ) ) {
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
+
 /*
 ==================
 Cmd_TrinityHandshake_f
@@ -1864,6 +1879,7 @@ static void Cmd_TrinityHandshake_f( gentity_t *ent ) {
 	char		proto[8];
 	char		version[32];
 	char		engine[64];
+	char		platform[32];
 	char		username[20];
 	char		tokenHash[72];
 
@@ -1875,7 +1891,7 @@ static void Cmd_TrinityHandshake_f( gentity_t *ent ) {
 		return;  // already handshook this connection
 	}
 
-	if ( trap_Argc() < 5 ) {
+	if ( trap_Argc() < 6 ) {
 		trap_SendServerCommand( ent - g_entities, "print \"Invalid handshake response\n\"" );
 		return;
 	}
@@ -1884,11 +1900,16 @@ static void Cmd_TrinityHandshake_f( gentity_t *ent ) {
 	trap_Argv( 2, proto, sizeof( proto ) );
 	trap_Argv( 3, version, sizeof( version ) );
 	trap_Argv( 4, engine, sizeof( engine ) );
+	trap_Argv( 5, platform, sizeof( platform ) );
+	// it reaches the log and the tracker verbatim
+	if ( !G_PlatformValid( platform ) ) {
+		Q_strncpyz( platform, "unknown", sizeof( platform ) );
+	}
 
 	// Username and token hash are both present (authenticated) or both absent
-	if ( trap_Argc() >= 7 ) {
-		trap_Argv( 5, username, sizeof( username ) );
-		trap_Argv( 6, tokenHash, sizeof( tokenHash ) );
+	if ( trap_Argc() >= 8 ) {
+		trap_Argv( 6, username, sizeof( username ) );
+		trap_Argv( 7, tokenHash, sizeof( tokenHash ) );
 	} else {
 		username[0] = '\0';
 		tokenHash[0] = '\0';
@@ -1916,18 +1937,18 @@ static void Cmd_TrinityHandshake_f( gentity_t *ent ) {
 
 	// Log handshake for tracker
 	if ( username[0] ) {
-		G_LogPrintf( "TrinityHandshake: %i %s %s %s %s %s\n",
+		G_LogPrintf( "TrinityHandshake: %i %s %s %s %s %s %s\n",
 			(int)( ent - g_entities ),
-			proto, version, engine, username, tokenHash );
+			proto, version, engine, platform, username, tokenHash );
 	} else {
-		G_LogPrintf( "TrinityHandshake: %i %s %s %s\n",
+		G_LogPrintf( "TrinityHandshake: %i %s %s %s %s\n",
 			(int)( ent - g_entities ),
-			proto, version, engine );
+			proto, version, engine, platform );
 	}
 
-	G_Printf( "Client %i Trinity handshake: proto=%s ver=%s engine=%s\n",
+	G_Printf( "Client %i Trinity handshake: proto=%s ver=%s engine=%s platform=%s\n",
 		(int)( ent - g_entities ),
-		proto, version, engine );
+		proto, version, engine, platform );
 }
 
 /*

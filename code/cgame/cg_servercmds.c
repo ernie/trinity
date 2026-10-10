@@ -1256,6 +1256,7 @@ static void CG_ServerCommand( void ) {
 		char hs_nonce[32];
 		char hs_version[64];
 		char hs_engine[64];
+		char hs_platform[32];
 		char hs_token[256];
 		char hs_user[20];
 		char hs_tokenHash[TRINITY_HASH_HEX_LEN];
@@ -1280,6 +1281,13 @@ static void CG_ServerCommand( void ) {
 		for ( k = 0; hs_engine[k]; k++ )
 			if ( hs_engine[k] == ' ' ) hs_engine[k] = '_';
 
+		trap_Cvar_VariableStringBuffer( "cl_platform", hs_platform, sizeof( hs_platform ) );
+		if ( !hs_platform[0] ) {
+			Q_strncpyz( hs_platform, "unknown", sizeof( hs_platform ) );
+		}
+		for ( k = 0; hs_platform[k]; k++ )
+			if ( hs_platform[k] == ' ' ) hs_platform[k] = '_';
+
 		// Hash auth token with nonce if token exists
 		hs_tokenHash[0] = '\0';
 		hs_user[0] = '\0';
@@ -1298,16 +1306,16 @@ static void CG_ServerCommand( void ) {
 		// Build and send handshake response
 		if ( hs_tokenHash[0] && hs_user[0] ) {
 			Com_sprintf( hs_response, sizeof( hs_response ),
-				"trinity_handshake %s %i %s %s %s %s",
+				"trinity_handshake %s %i %s %s %s %s %s",
 				hs_nonce, TRINITY_PROTO_VERSION,
 				hs_version[0] ? hs_version : "unknown",
-				hs_engine, hs_user, hs_tokenHash );
+				hs_engine, hs_platform, hs_user, hs_tokenHash );
 		} else {
 			Com_sprintf( hs_response, sizeof( hs_response ),
-				"trinity_handshake %s %i %s %s",
+				"trinity_handshake %s %i %s %s %s",
 				hs_nonce, TRINITY_PROTO_VERSION,
 				hs_version[0] ? hs_version : "unknown",
-				hs_engine );
+				hs_engine, hs_platform );
 		}
 		trap_SendClientCommand( hs_response );
 		CG_Printf( "^5Trinity handshake sent: ^7%s ^3%s%s\n",
