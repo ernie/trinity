@@ -1335,6 +1335,19 @@ void BG_MoverLocalToWorld( vec3_t matrix[3], const vec3_t in, vec3_t out ) {
 
 /*
 ================
+BG_MoverWorldToLocal
+
+The inverse of BG_MoverLocalToWorld
+================
+*/
+void BG_MoverWorldToLocal( vec3_t matrix[3], const vec3_t in, vec3_t out ) {
+	out[0] = DotProduct( matrix[0], in );
+	out[1] = DotProduct( matrix[1], in );
+	out[2] = DotProduct( matrix[2], in );
+}
+
+/*
+================
 BG_MoverCoMoves
 
 Movers on identical trajectories are one rigid co-mover set

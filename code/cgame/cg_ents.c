@@ -471,10 +471,26 @@ CG_GrappleHookAxis
 Rolled about its own line of travel so it reads as gyroscopically held.
 ===============
 */
+/* The mover a grapple hook is attached to, or NULL. */
+static const centity_t *CG_GrapplePadMover( const entityState_t *s ) {
+	const centity_t	*mover;
+
+	if ( s->eType != ET_GRAPPLE || s->otherEntityNum2 < MAX_CLIENTS ) {
+		return NULL;
+	}
+	mover = &cg_entities[ s->otherEntityNum2 ];
+	return mover->currentValid && mover->currentState.eType == ET_MOVER ? mover : NULL;
+}
+
 void CG_GrappleHookAxis( const centity_t *cent, vec3_t axis[3] ) {
 	vec3_t	dir, angles;
 
 	if ( cent->currentState.eType == ET_GRAPPLE ) {
+		// CG_Grapple already set a mover hook's angles, spin included
+		if ( CG_GrapplePadMover( &cent->currentState ) ) {
+			AnglesToAxis( cent->lerpAngles, axis );
+			return;
+		}
 		CG_GrapplePadAnchorAxis( cent->lerpAngles, cent->currentState.time,
 			cent->currentState.number, axis );
 		return;
@@ -685,19 +701,6 @@ This is called when the grapple is sitting up against the wall
 
 /*
 ===============
-CG_MoverWorldToLocal
-
-No BG equivalent; only this file's mover-axis composition needs world to local.
-===============
-*/
-static void CG_MoverWorldToLocal( vec3_t matrix[3], const vec3_t in, vec3_t out ) {
-	out[0] = DotProduct( matrix[0], in );
-	out[1] = DotProduct( matrix[1], in );
-	out[2] = DotProduct( matrix[2], in );
-}
-
-/*
-===============
 CG_AxisToAngles
 
 Inverse of AnglesToAxis, roll included: yaw/pitch from the forward row,
@@ -720,6 +723,7 @@ void CG_AxisToAngles( vec3_t axis[3], vec3_t angles ) {
 static void CG_Grapple( centity_t *cent ) {
 	refEntity_t			ent;
 	entityState_t		*s1;
+	const centity_t		*mover;
 	const weaponInfo_t		*weapon;
 	const clientInfo_t	*ci;
 	vec3_t				lightOrigin;
@@ -737,32 +741,30 @@ static void CG_Grapple( centity_t *cent ) {
 	weapon = &cg_weapons[s1->weapon];
 
 	// re-derive from the mover's rendered trajectory so the pad paths with it
-	if ( s1->otherEntityNum2 >= MAX_CLIENTS ) {
-		const centity_t *mover = &cg_entities[ s1->otherEntityNum2 ];
+	mover = CG_GrapplePadMover( s1 );
+	if ( mover ) {
+		vec3_t	morg, mang, a0, f, loc;
+		vec3_t	m[3], m0[3], axis0[3], axis[3];
+		int		i;
 
-		if ( mover->currentValid && mover->currentState.eType == ET_MOVER ) {
-			vec3_t	morg, mang, a0, f, loc;
-			vec3_t	m[3], m0[3], axis0[3], axis[3];
-			int		i;
+		BG_EvaluateTrajectory( &mover->currentState.pos, cg.time, morg );
+		BG_EvaluateTrajectory( &mover->currentState.apos, cg.time, mang );
+		BG_CreateRotationMatrix( mang, m );
+		BG_MoverLocalToWorld( m, s1->origin2, cent->lerpOrigin );
+		VectorAdd( morg, cent->lerpOrigin, cent->lerpOrigin );
 
-			BG_EvaluateTrajectory( &mover->currentState.pos, cg.time, morg );
-			BG_EvaluateTrajectory( &mover->currentState.apos, cg.time, mang );
-			BG_CreateRotationMatrix( mang, m );
-			BG_MoverLocalToWorld( m, s1->origin2, cent->lerpOrigin );
-			VectorAdd( morg, cent->lerpOrigin, cent->lerpOrigin );
-
-			// claws ride the mover frame; a lone direction cannot carry spin
-			BG_EvaluateTrajectory( &mover->currentState.apos, s1->time, a0 );
-			BG_CreateRotationMatrix( a0, m0 );
-			BG_MoverLocalToWorld( m0, s1->angles2, f );
-			vectoangles( f, cent->lerpAngles );
-			AnglesToAxis( cent->lerpAngles, axis0 );
-			for ( i = 0 ; i < 3 ; i++ ) {
-				CG_MoverWorldToLocal( m0, axis0[i], loc );
-				BG_MoverLocalToWorld( m, loc, axis[i] );
-			}
-			CG_AxisToAngles( axis, cent->lerpAngles );
+		// apply the spin before the mover's rotation; the spin rebuilds the side axes
+		// from the forward vector and would undo it
+		BG_EvaluateTrajectory( &mover->currentState.apos, s1->time, a0 );
+		BG_CreateRotationMatrix( a0, m0 );
+		BG_MoverLocalToWorld( m0, s1->angles2, f );
+		vectoangles( f, a0 );
+		CG_GrapplePadAnchorAxis( a0, s1->time, s1->number, axis0 );
+		for ( i = 0 ; i < 3 ; i++ ) {
+			BG_MoverWorldToLocal( m0, axis0[i], loc );
+			BG_MoverLocalToWorld( m, loc, axis[i] );
 		}
+		CG_AxisToAngles( axis, cent->lerpAngles );
 	}
 
 	// the far end of the launcher's cell breathes on its envelope, always the

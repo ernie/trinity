@@ -1082,8 +1082,17 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 					trap_S_StartSound( position, ENTITYNUM_WORLD, CHAN_AUTO,
 						cgs.media.sfx_grapplefree );
 				}
-				CG_GrapplePadFall( position, es->angles, es->otherEntityNum,
-					es->time, es->time2 );
+				{
+					// a hook on a mover falls from its drawn angles; the matching time
+					// confirms the slot still holds this hook
+					const centity_t	*hook = es->time2 >= 0 && es->time2 < MAX_GENTITIES
+						? &cg_entities[ es->time2 ] : NULL;
+					const qboolean	posed = hook && es->otherEntityNum2 >= MAX_CLIENTS
+						&& hook->currentState.eType == ET_GRAPPLE && hook->currentState.time == es->time;
+
+					CG_GrapplePadFall( position, posed ? hook->lerpAngles : es->angles,
+						es->otherEntityNum, es->time, es->time2, posed );
+				}
 				// the anchored scar is temporary and dies with the entity;
 				// leave the persistent, fading copy. s.time/time2 carry
 				// the hook's spin stamp and number so a witness who never

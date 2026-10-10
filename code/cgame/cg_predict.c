@@ -13,6 +13,10 @@ static	pmove_t		cg_pmove;
 // the captured anchor's co-mover set (anchor + wired co-movers), absent from
 // predicted collision while latched; -1 slots are empty
 static	int			cg_grappleCoMovers[4] = { -1, -1, -1, -1 };
+// time the hooked mover and its parts are placed at for collision, -1 while removed;
+// they are placed from the snapshot CG_GrappleLatchFill read
+static	int			cg_grapplePoseTime = -1;
+static	qboolean	cg_grapplePoseNext;
 
 // diagnostic: snapshots whose prediction was accepted since the last miss
 static	int			predictionStreak;
@@ -67,6 +71,23 @@ void CG_BuildSolidList( void ) {
 
 /*
 ====================
+CG_GrapplePosed
+
+True for a part of the hooked mover while it is placed for collision
+====================
+*/
+static qboolean CG_GrapplePosed( int number ) {
+	return cg_pmove.grappleLatch && cg_grapplePoseTime >= 0
+		&& ( number == cg_grappleCoMovers[0] || number == cg_grappleCoMovers[1]
+			|| number == cg_grappleCoMovers[2] || number == cg_grappleCoMovers[3] );
+}
+
+static void CG_GrappleAnchor( int serverTime ) {
+	cg_grapplePoseTime = serverTime;
+}
+
+/*
+====================
 CG_ClipMoveToEntities
 
 ====================
@@ -97,8 +118,16 @@ static void CG_ClipMoveToEntities ( const vec3_t start, const vec3_t mins, const
 		if ( ent->solid == SOLID_BMODEL ) {
 			// special value for bmodel
 			cmodel = trap_CM_InlineModel( ent->modelindex );
-			VectorCopy( cent->lerpAngles, angles );
-			BG_EvaluateTrajectory( &cent->currentState.pos, moverTime, origin );
+			if ( CG_GrapplePosed( ent->number ) ) {
+				// where the server places it for this command
+				const entityState_t *ps = cg_grapplePoseNext ? &cent->nextState : &cent->currentState;
+
+				BG_EvaluateTrajectory( &ps->pos, cg_grapplePoseTime, origin );
+				BG_EvaluateTrajectory( &ps->apos, cg_grapplePoseTime, angles );
+			} else {
+				VectorCopy( cent->lerpAngles, angles );
+				BG_EvaluateTrajectory( &cent->currentState.pos, moverTime, origin );
+			}
 		} else {
 			// encoded bbox
 			x = (ent->solid & 255);
@@ -181,7 +210,7 @@ void	CG_TraceRender( trace_t *result, const vec3_t start, const vec3_t mins, con
 CG_TracePredict
 
 CG_Trace for the replayed commands: while captured, the anchor's co-mover
-set is absent: the hold owns that motion on both sides
+set is absent for the ride, and posed at the command's time for the hang
 ================
 */
 static void	CG_TracePredict( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
@@ -195,7 +224,7 @@ static void	CG_TracePredict( trace_t *result, const vec3_t start, const vec3_t m
 		t.entityNum = ENTITYNUM_WORLD;
 
 	CG_ClipMoveToEntities (start, mins, maxs, end, skipNumber, mask, cg.physicsTime,
-		cg_pmove.grappleLatch ? cg_grappleCoMovers : NULL, &t);
+		cg_pmove.grappleLatch && cg_grapplePoseTime < 0 ? cg_grappleCoMovers : NULL, &t);
 
 	*result = t;
 }
@@ -1167,6 +1196,8 @@ static void CG_GrappleLatchFill( pmove_t *pmv, const snapshot_t *snap, qboolean 
 	const centity_t			*mover;
 
 	pmv->grappleLatch = qfalse;
+	pmv->grappleAnchor = NULL;
+	cg_grapplePoseTime = -1;
 	cg_grappleLatchMover = -1;
 	cg_grappleCoMovers[0] = cg_grappleCoMovers[1] =
 		cg_grappleCoMovers[2] = cg_grappleCoMovers[3] = -1;
@@ -1192,9 +1223,12 @@ static void CG_GrappleLatchFill( pmove_t *pmv, const snapshot_t *snap, qboolean 
 		}
 		pmv->grappleLatch = qtrue;
 		cg_grappleLatchMover = es->otherEntityNum2;
-		VectorCopy( es->pos.trDelta, pmv->grappleLatchLocal );
+		VectorCopy( es->origin2, pmv->grappleAnchorLocal );
+		VectorCopy( es->angles2, pmv->grappleEmbedLocal );
 		pmv->grappleMoverPos = ms->pos;
 		pmv->grappleMoverApos = ms->apos;
+		pmv->grappleAnchor = CG_GrappleAnchor;
+		cg_grapplePoseNext = useNext;
 
 		// the co-mover set the server wired at capture
 		cg_grappleCoMovers[0] = es->otherEntityNum2;

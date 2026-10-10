@@ -180,12 +180,15 @@ typedef struct {
 
 	int			pmove_mode;			// gamemode_t; combat & movement both index from it
 
-	// mover-anchored grapple: pmove holds the captured pose through the
-	// anchor's motion, identically on both sides, so prediction is exact
+	// grapple hooked to a mover; see PM_GrappleLatchMove
 	qboolean	grappleLatch;
-	vec3_t		grappleLatchLocal;		// captured pose in the mover frame
+	vec3_t		grappleAnchorLocal;		// hook position, mover-local
+	vec3_t		grappleEmbedLocal;		// hook's embed direction, mover-local
 	trajectory_t	grappleMoverPos;
 	trajectory_t	grappleMoverApos;
+	// places the hooked mover and its parts at serverTime for collision, or removes them at -1
+	void		(*grappleAnchor)( int serverTime );
+	float		grappleStrain;			// out: farthest the world blocked the carry
 
 	// callbacks to test the world
 	// these will be different functions during game and cgame
@@ -199,16 +202,13 @@ void Pmove (pmove_t *pmove);
 
 // capture envelope: must contain the pull's chase stall vs a fast anchor
 #define GRAPPLE_LATCH_REACH		64.0f
-// captured pose clearance off the face: brush contact splits prediction,
-// which clips the snapshot pose while the server clips the live one
+// max push-out from a rotating face that sweeps into the player
 #define GRAPPLE_LATCH_STANDOFF	48.0f
-// same-clock strain is pure signal: the hold is exact unless blocked, so
-// this only needs to clear float noise for stock-parity lethality
+// the carry is exact unless blocked, so this only needs to exceed float error
 #define GRAPPLE_CRUSH_STRAIN	8.0f
-// extra tether set past a tight socket's bare fit, holding the frame-lead off
-#define GRAPPLE_FIT_MARGIN		12.0f
 void BG_CreateRotationMatrix( const vec3_t angles, vec3_t matrix[3] );
 void BG_MoverLocalToWorld( vec3_t matrix[3], const vec3_t in, vec3_t out );
+void BG_MoverWorldToLocal( vec3_t matrix[3], const vec3_t in, vec3_t out );
 qboolean BG_MoverCoMoves( const entityState_t *a, const entityState_t *b );
 
 

@@ -889,78 +889,10 @@ void Weapon_HookThink (gentity_t *ent)
 			return;
 		}
 
-		// within reach the wielder is captured: perpendicular off the face,
-		// body support clear along the normal (rotators keep the full
-		// margin, since their spinning normal sweeps the box)
+		// close enough: from here pmove carries the player with the mover
 		if ( !ent->s.generic1
 				&& ent->parent->client->ps.groundEntityNum == ENTITYNUM_NONE
 				&& Distance( ent->parent->r.currentOrigin, ent->r.currentOrigin ) <= GRAPPLE_LATCH_REACH ) {
-			vec3_t		loc, out;
-			float		standoff;
-
-			VectorScale( ent->pos2, -1, out );
-			G_RotatePoint( out, m );
-
-			if ( mover->s.apos.trType == TR_STATIONARY ) {
-				standoff = 8.0f
-					+ ent->parent->r.maxs[0] * fabs( out[0] )
-					+ ent->parent->r.maxs[1] * fabs( out[1] )
-					+ ( out[2] < 0 ? ent->parent->r.maxs[2] : -ent->parent->r.mins[2] ) * fabs( out[2] );
-			} else {
-				standoff = GRAPPLE_LATCH_STANDOFF;
-			}
-
-			VectorScale( ent->pos2, -standoff, loc );
-			VectorAdd( ent->pos1, loc, loc );
-			G_RotatePoint( loc, m );
-			VectorAdd( morg, loc, loc );
-
-			// tight sockets: the tether sets longer, out to where the body
-			// fits clear of everything but the anchor; no fit = a pinned
-			// capture, and the squeeze check resolves the lethal pins
-			{
-				vec3_t		probe;
-				int			k;
-				qboolean	linked;
-
-				linked = mover->r.linked ? qtrue : qfalse;
-				if ( linked ) {
-					trap_UnlinkEntity( mover );
-				}
-				for ( k = 0; k <= 64; k += 8 ) {
-					VectorMA( loc, (float)k, out, probe );
-					trap_Trace( &tr, probe, ent->parent->r.mins, ent->parent->r.maxs,
-						probe, ent->parent->s.number, MASK_PLAYERSOLID );
-					if ( tr.startsolid ) {
-						continue;
-					}
-					if ( k > 0 ) {
-						// margin holds the brush frame-lead off the foreign
-						// blocker; bare fit when even that is blocked
-						VectorMA( loc, (float)k + GRAPPLE_FIT_MARGIN, out, probe );
-						trap_Trace( &tr, probe, ent->parent->r.mins, ent->parent->r.maxs,
-							probe, ent->parent->s.number, MASK_PLAYERSOLID );
-						if ( tr.startsolid ) {
-							VectorMA( loc, (float)k, out, probe );
-						}
-					}
-					VectorCopy( probe, loc );
-					break;
-				}
-				if ( linked ) {
-					trap_LinkEntity( mover );
-				}
-			}
-
-			trap_Trace( &tr, ent->parent->r.currentOrigin, ent->parent->r.mins,
-				ent->parent->r.maxs, loc, ent->parent->s.number, MASK_PLAYERSOLID );
-			if ( !tr.startsolid ) {
-				VectorCopy( tr.endpos, loc );
-			}
-			VectorSubtract( loc, morg, loc );
-			G_RotatePoint( loc, mt );
-
-			VectorCopy( loc, ent->movedir );
 			ent->s.generic1 = 1;
 
 			// the whole co-mover set rides with the anchor: resolve
@@ -1018,36 +950,19 @@ void Weapon_HookThink (gentity_t *ent)
 			}
 		}
 
-		// G_SetOrigin wipes trDelta every think, so re-stamp the wire copy
-		// of the captured pose
+		// the mover can't push a hooked player, so crush here when the carry is blocked and the brush overlaps them
 		if ( ent->s.generic1 ) {
-			VectorCopy( ent->movedir, ent->s.pos.trDelta );
-		}
+			gclient_t	*wielder = ent->parent->client;
 
-		// the mover cannot see its captive to push or reverse: when the
-		// world pins the wielder and the brush overruns them, crush is here
-		if ( ent->s.generic1 ) {
-			vec3_t	pose, o2, a2;
-			vec3_t	m2[3], mt2[3];
-			int		t;
-
-			// both operands at the same instant, or lag reads as strain
-			t = ent->parent->client->ps.commandTime;
-			BG_EvaluateTrajectory( &mover->s.pos, t, o2 );
-			BG_EvaluateTrajectory( &mover->s.apos, t, a2 );
-			G_CreateRotationMatrix( a2, mt2 );
-			G_TransposeMatrix( mt2, m2 );
-			VectorCopy( ent->movedir, pose );
-			G_RotatePoint( pose, m2 );
-			VectorAdd( o2, pose, pose );
-			if ( Distance( pose, ent->parent->r.currentOrigin ) > GRAPPLE_CRUSH_STRAIN ) {
+			if ( wielder->grappleStrain > 0 ) {
 				trap_Trace( &tr, ent->parent->r.currentOrigin, ent->parent->r.mins,
 					ent->parent->r.maxs, ent->parent->r.currentOrigin,
 					ent->parent->s.number, MASK_PLAYERSOLID );
-				if ( tr.startsolid ) {
+				if ( wielder->grappleStrain > GRAPPLE_CRUSH_STRAIN && tr.startsolid ) {
 					G_Damage( ent->parent, mover, mover, NULL, NULL, 99999, 0, MOD_CRUSH );
 				}
 			}
+			wielder->grappleStrain = 0;
 		}
 	}
 

@@ -734,6 +734,27 @@ If "g_synchronousClients 1" is set, this will be called exactly
 once for each server frame, which makes for smooth demo recording.
 ==============
 */
+// the hooked mover and its parts, saved so they can be restored after pmove places them for collision
+static gentity_t	*grappleSet[4];
+static vec3_t		grappleSetOrigin[4], grappleSetAngles[4];
+static int			grappleSetCount;
+
+static void G_GrappleAnchor( int serverTime ) {
+	int		i;
+
+	for ( i = 0 ; i < grappleSetCount ; i++ ) {
+		gentity_t	*m = grappleSet[i];
+
+		if ( serverTime < 0 ) {
+			trap_UnlinkEntity( m );
+			continue;
+		}
+		BG_EvaluateTrajectory( &m->s.pos, serverTime, m->r.currentOrigin );
+		BG_EvaluateTrajectory( &m->s.apos, serverTime, m->r.currentAngles );
+		trap_LinkEntity( m );
+	}
+}
+
 void ClientThink_real( gentity_t *ent ) {
 	gclient_t	*client;
 	pmove_t		pm;
@@ -931,26 +952,29 @@ void ClientThink_real( gentity_t *ent ) {
 	pm.pmove_msec = pmove_msec.integer;
 	pm.pmove_mode = g_mode.integer;
 
-	// hand pmove the anchor trajectories and the captured pose
+	// from the same fields the client predicts from
 	pm.grappleLatch = qfalse;
 	if ( client->hook && client->hook->s.generic1
 			&& client->hook->target_ent
 			&& client->hook->target_ent->inuse
 			&& client->hook->target_ent->s.eType == ET_MOVER ) {
 		pm.grappleLatch = qtrue;
-		VectorCopy( client->hook->s.pos.trDelta, pm.grappleLatchLocal );
+		VectorCopy( client->hook->s.origin2, pm.grappleAnchorLocal );
+		VectorCopy( client->hook->s.angles2, pm.grappleEmbedLocal );
 		pm.grappleMoverPos = client->hook->target_ent->s.pos;
 		pm.grappleMoverApos = client->hook->target_ent->s.apos;
+		pm.grappleAnchor = G_GrappleAnchor;
 	}
 
 	VectorCopy( client->ps.origin, client->oldOrigin );
 
-	// the co-mover set cannot collide with its captive: absent while the hold runs
+	// unlink the hooked mover and its parts during pmove; G_GrappleAnchor links them only for the pull's traces
 	{
 		gentity_t	*comover[4];
 		int			mk, mcount;
 
 		mcount = 0;
+		grappleSetCount = 0;
 		if ( pm.grappleLatch ) {
 			comover[mcount++] = client->hook->target_ent;
 			for ( mk = 0 ; mk < 3 ; mk++ ) {
@@ -961,9 +985,11 @@ void ClientThink_real( gentity_t *ent ) {
 			}
 			for ( mk = 0 ; mk < mcount ; mk++ ) {
 				if ( comover[mk]->r.linked ) {
+					grappleSet[grappleSetCount] = comover[mk];
+					VectorCopy( comover[mk]->r.currentOrigin, grappleSetOrigin[grappleSetCount] );
+					VectorCopy( comover[mk]->r.currentAngles, grappleSetAngles[grappleSetCount] );
+					grappleSetCount++;
 					trap_UnlinkEntity( comover[mk] );
-				} else {
-					comover[mk] = NULL;
 				}
 			}
 		}
@@ -986,10 +1012,14 @@ void ClientThink_real( gentity_t *ent ) {
 		Pmove (&pm);
 #endif
 
-		for ( mk = 0 ; mk < mcount ; mk++ ) {
-			if ( comover[mk] ) {
-				trap_LinkEntity( comover[mk] );
-			}
+		for ( mk = 0 ; mk < grappleSetCount ; mk++ ) {
+			VectorCopy( grappleSetOrigin[mk], grappleSet[mk]->r.currentOrigin );
+			VectorCopy( grappleSetAngles[mk], grappleSet[mk]->r.currentAngles );
+			trap_LinkEntity( grappleSet[mk] );
+		}
+		grappleSetCount = 0;
+		if ( pm.grappleLatch && pm.grappleStrain > client->grappleStrain ) {
+			client->grappleStrain = pm.grappleStrain;
 		}
 	}
 

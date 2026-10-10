@@ -746,12 +746,12 @@ PM_GrappleMove
 
 ===================
 */
-static void PM_GrappleMove( void ) {
+static void PM_GrappleMove( const vec3_t pad ) {
 	vec3_t vel, v;
 	float vlen;
 
 	VectorScale(pml.forward, -GRAPPLE_MODEL_TOW_TARGET_INSET, v);
-	VectorAdd(pm->ps->grapplePoint, v, v);
+	VectorAdd(pad, v, v);
 	VectorSubtract(v, pm->ps->origin, vel);
 	vlen = VectorLength(vel);
 	VectorNormalize( vel );
@@ -770,42 +770,77 @@ static void PM_GrappleMove( void ) {
 ===================
 PM_GrappleLatchMove
 
-Hold the captured pose through the anchor's motion, as though the wielder
-stood on it: the hold IS the anchor's push, so the anchor never blocks
-its own captive
+A player hooked to a mover is carried with it, then swings as from a static
+surface. The mover is out of collision for the carry and placed at the
+command's time for the swing, so client and server agree.
 ===================
 */
 static void PM_GrappleLatchMove( void ) {
-	vec3_t	morg, mang, a0, target, delta;
-	vec3_t	m[3];
-	trace_t	trace;
-	float	dyaw;
+	const int	t0 = pm->cmd.serverTime - pml.msec, t1 = pm->cmd.serverTime;
+	vec3_t		o0, o1, a0, a1, off, local, ride, rideVel, pad, out;
+	vec3_t		m0[3], m1[3];
+	trace_t		trace;
+	float		strain;
+	int			k;
 
-	BG_EvaluateTrajectory( &pm->grappleMoverPos, pm->cmd.serverTime, morg );
-	BG_EvaluateTrajectory( &pm->grappleMoverApos, pm->cmd.serverTime, mang );
-	BG_CreateRotationMatrix( mang, m );
-	BG_MoverLocalToWorld( m, pm->grappleLatchLocal, target );
-	VectorAdd( morg, target, target );
+	BG_EvaluateTrajectory( &pm->grappleMoverPos, t0, o0 );
+	BG_EvaluateTrajectory( &pm->grappleMoverApos, t0, a0 );
+	BG_EvaluateTrajectory( &pm->grappleMoverPos, t1, o1 );
+	BG_EvaluateTrajectory( &pm->grappleMoverApos, t1, a1 );
+	BG_CreateRotationMatrix( a0, m0 );
+	BG_CreateRotationMatrix( a1, m1 );
 
-	// release inherits the ride
-	VectorSubtract( target, pm->ps->origin, delta );
-	VectorScale( delta, 1.0f / pml.frametime, pm->ps->velocity );
-
-	// the anchor's co-mover set is absent from this trace on both sides
-	pm->trace( &trace, pm->ps->origin, pm->mins, pm->maxs, target, pm->ps->clientNum, pm->tracemask );
-	if ( trace.fraction == 1.0f ) {
-		VectorCopy( target, pm->ps->origin );
-	} else {
-		VectorCopy( trace.endpos, pm->ps->origin );
+	// carry the player with the mover; any distance the world blocks is strain, which the server crushes on
+	VectorSubtract( pm->ps->origin, o0, off );
+	BG_MoverWorldToLocal( m0, off, local );
+	BG_MoverLocalToWorld( m1, local, ride );
+	VectorAdd( o1, ride, ride );
+	pm->trace( &trace, pm->ps->origin, pm->mins, pm->maxs, ride, pm->ps->clientNum, pm->tracemask );
+	strain = Distance( ride, trace.endpos );
+	if ( strain > pm->grappleStrain ) {
+		pm->grappleStrain = strain;
 	}
+	VectorSubtract( trace.endpos, pm->ps->origin, rideVel );
+	VectorScale( rideVel, 1.0f / pml.frametime, rideVel );
+	VectorCopy( trace.endpos, pm->ps->origin );
 
 	// the frame's spin turns the base yaw; the mouse stays free
-	BG_EvaluateTrajectory( &pm->grappleMoverApos, pm->cmd.serverTime - pml.msec, a0 );
-	dyaw = mang[YAW] - a0[YAW];
-	if ( dyaw != 0.0f ) {
-		pm->ps->delta_angles[YAW] += ANGLE2SHORT( dyaw );
+	if ( a1[YAW] != a0[YAW] ) {
+		pm->ps->delta_angles[YAW] += ANGLE2SHORT( a1[YAW] - a0[YAW] );
 	}
 
+	BG_MoverLocalToWorld( m1, pm->grappleAnchorLocal, pad );
+	VectorAdd( o1, pad, pad );
+	if ( pm->grappleAnchor ) {
+		pm->grappleAnchor( t1 );
+
+		// a rotating face can sweep into the player; push out along its normal until clear
+		pm->trace( &trace, pm->ps->origin, pm->mins, pm->maxs, pm->ps->origin, pm->ps->clientNum, pm->tracemask );
+		if ( trace.startsolid ) {
+			BG_MoverLocalToWorld( m1, pm->grappleEmbedLocal, out );
+			VectorNegate( out, out );
+			for ( k = 4 ; k <= GRAPPLE_LATCH_STANDOFF ; k += 4 ) {
+				vec3_t	probe;
+
+				VectorMA( pm->ps->origin, k, out, probe );
+				pm->trace( &trace, probe, pm->mins, pm->maxs, probe, pm->ps->clientNum, pm->tracemask );
+				if ( !trace.startsolid ) {
+					VectorCopy( probe, pm->ps->origin );
+					break;
+				}
+			}
+		}
+	}
+
+	// then the normal grapple pull and air move, toward where the hook is now
+	PM_GrappleMove( pad );
+	PM_AirMove();
+	if ( pm->grappleAnchor ) {
+		pm->grappleAnchor( -1 );
+	}
+
+	// letting go keeps both the carry and the player's own velocity
+	VectorAdd( pm->ps->velocity, rideVel, pm->ps->velocity );
 	pml.groundPlane = qfalse;
 }
 
@@ -2156,7 +2191,7 @@ void PmoveSingle (pmove_t *pmove) {
 			PM_GrappleLatchMove();
 		} else {
 			// an anchored tether out-pulls the flight powerup
-			PM_GrappleMove();
+			PM_GrappleMove( pm->ps->grapplePoint );
 			// We can wiggle a bit
 			PM_AirMove();
 		}
@@ -2225,6 +2260,7 @@ void Pmove (pmove_t *pmove) {
 	}
 
 	pmove->ps->pmove_framecount = (pmove->ps->pmove_framecount+1) & ((1<<PS_PMOVEFRAMECOUNTBITS)-1);
+	pmove->grappleStrain = 0;
 
 	if ( pmove->ps->pm_flags & PMF_RESPAWNED && pm_respawntimer == 0 ) {
 		pm_respawntimer = NO_RESPAWN_OVERBOUNCE;
