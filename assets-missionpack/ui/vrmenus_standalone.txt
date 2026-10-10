@@ -1,7 +1,0 @@
-// VR menu defs (standalone headsets) - loaded by the UI when cl_platform names a standalone headset
-//
-{
-	loadMenu { "ui/vroptions_standalone.menu" }
-	loadMenu { "ui/ingame_vroptions_standalone.menu" }
-	loadMenu { "ui/vrbindings.menu" }
-}

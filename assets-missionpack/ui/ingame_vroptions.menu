@@ -1,7 +1,7 @@
 #include "ui/menudef.h"
 
 {
-\\ IN-GAME VR OPTIONS (STANDALONE) - tabbed Team Arena style \\
+\\ IN-GAME VR OPTIONS - tabbed Team Arena style \\
 
 menuDef {
 	name "ingame_vroptions"
@@ -12,7 +12,7 @@ menuDef {
 	focusColor 1 .75 0 1
 	style 1
 	border 1
-	onOpen { hide grpVR ; show comfort }
+	onOpen { hide grpVR ; show comfort ; uiScript vrMirrorSetup }
 
 itemDef {
 	name window
@@ -204,7 +204,7 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 30 26 62 20
+	rect 26 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
@@ -223,7 +223,7 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 121 26 62 20
+	rect 97 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
@@ -242,7 +242,7 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 212 26 62 20
+	rect 168 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
@@ -254,6 +254,27 @@ itemDef {
 	mouseExit { setitemcolor tab_hud backcolor .37 .1 .1 1 }
 	}
 itemDef {
+	name tab_mirror
+	group grpTabButtons
+	text "Mirror"
+	type 1
+	textscale .2
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 239 26 62 20
+	textalign 1
+	textalignx 31
+	textaligny 15
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 1
+	cvarTest "ui_vrMirrorAvailable"
+	showCvar { "1" }
+	action { hide grpVR ; show mirror ; uiScript vrMirrorSetup }
+	mouseEnter { setitemcolor tab_mirror backcolor .1 .37 .1 1 }
+	mouseExit { setitemcolor tab_mirror backcolor .37 .1 .1 1 }
+	}
+itemDef {
 	name tab_console
 	group grpTabButtons
 	text "Console"
@@ -261,13 +282,37 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 303 26 62 20
+	rect 310 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
 	forecolor 1 1 1 1
 	backcolor .37 .1 .1 1
 	visible 1
+	cvarTest "ui_vrMirrorAvailable"
+	showCvar { "1" }
+	action { exec "toggleconsole" }
+	mouseEnter { setitemcolor tab_console backcolor .1 .37 .1 1 }
+	mouseExit { setitemcolor tab_console backcolor .37 .1 .1 1 }
+	}
+// takes the Mirror slot where there is no mirror
+itemDef {
+	name tab_console
+	group grpTabButtons
+	text "Console"
+	type 1
+	textscale .2
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 239 26 62 20
+	textalign 1
+	textalignx 31
+	textaligny 15
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 1
+	cvarTest "ui_vrMirrorAvailable"
+	hideCvar { "1" }
 	action { exec "toggleconsole" }
 	mouseEnter { setitemcolor tab_console backcolor .1 .37 .1 1 }
 	mouseExit { setitemcolor tab_console backcolor .37 .1 .1 1 }
@@ -596,7 +641,7 @@ itemDef {
 	visible 0
 	}
 
-// HUD & DISPLAY GROUP (STANDALONE)	//
+// HUD & DISPLAY GROUP	//
 
 itemDef {
 	name hud
@@ -832,6 +877,115 @@ itemDef {
 	backcolor .37 .1 .1 1
 	visible 0
 	action { play "sound/misc/kcaction.wav" ; exec "vid_restart" }
+	mouseEnter { setcolor backcolor .1 .37 .1 1 }
+	mouseExit { setcolor backcolor .37 .1 .1 1 }
+	}
+
+// DESKTOP MIRROR GROUP (PC ONLY)	//
+
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Mode:"
+	cvar "ui_vrDesktopMode"
+	cvarFloatList { "Off" 0 "Windowed" 1 "Fullscreen" 2 }
+	rect 28 50 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	text "Window Resolution:"
+	rect 28 68 180 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	decoration
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_TEXT
+	cvar "ui_vrDesktopRes"
+	rect 213 68 170 18
+	textalign ITEM_ALIGN_LEFT
+	textalignx 0
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	action { uiScript vrMirrorNextRes }
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Content type:"
+	cvar "vr_desktopContentType"
+	cvarFloatList { "Left eye" 0 "Right eye" 1 "Both eyes" 2 }
+	rect 28 86 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Content fit:"
+	cvar "vr_desktopContentFit"
+	cvarFloatList { "Fit / Contain" 0 "Fill / Crop" 1 }
+	rect 28 104 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Menu style:"
+	cvar "vr_desktopMenuStyle"
+	cvarFloatList { "Desktop view" 0 "VR view" 1 }
+	rect 28 122 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	text "Apply"
+	type 1
+	textscale .25
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 159 155 100 20
+	textalign 1
+	textalignx 50
+	textaligny 15
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; uiScript vrMirrorApply }
 	mouseEnter { setcolor backcolor .1 .37 .1 1 }
 	mouseExit { setcolor backcolor .37 .1 .1 1 }
 	}

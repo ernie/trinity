@@ -1,0 +1,7 @@
+// VR menu defs - loaded by the UI while VR is active
+//
+{
+	loadMenu { "ui/vroptions.menu" }
+	loadMenu { "ui/ingame_vroptions.menu" }
+	loadMenu { "ui/vrbindings.menu" }
+}

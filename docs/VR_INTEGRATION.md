@@ -112,10 +112,9 @@ You also need the VR settings screens, for each UI you build. baseq3: six C
 menu files (`ui_vroptions.c`, the hub, plus `ui_vrbindings.c`,
 `ui_vrcomfort.c`, `ui_vrcontrols.c`, `ui_vrhud_display.c`, `ui_vrmirror.c`);
 one build serves both platforms. Team Arena: the VR `.menu` files
-(`vroptions_*`, `ingame_vroptions_*`, `vrbindings.menu`) together with
-**both** manifests (`vrmenus_pc.txt`, `vrmenus_standalone.txt`). Bundle the
-pc and standalone variants both, because the same `ui.qvm` may be loaded by either engine and
-`UI_VR_LoadMenus` picks the manifest at runtime from the platform. Step 7
+(`vroptions.menu`, `ingame_vroptions.menu`, `vrbindings.menu`) and their
+manifest, `vrmenus.txt`; they serve every platform, showing the Desktop Mirror
+entries only where `ui_vrMirrorAvailable` is set. Step 7
 explains why the screens are required and what a replacement must reproduce.
 
 ---
@@ -145,7 +144,7 @@ module's include path (this tree includes the host pair from the tail of
 missionpack cgame and the missionpack UI — it links everywhere `ui_shared.c`
 does, because both links call its shared transform.
 
-If you build the missionpack UI: its `.menu` files and `vrmenus_*` manifests
+If you build the missionpack UI: its `.menu` files and the `vrmenus.txt` manifest
 are runtime assets. This tree ships them in the missionpack asset pak, which
 only loads under `fs_game missionpack`; a mod under its own `fs_game` stacks
 on baseq3, so ship the files in your own pak.
@@ -867,9 +866,9 @@ the couplings behind the screens:
   a click anywhere on the virtual screen; a non-fullscreen menu treats a
   click outside its own rect as out-of-bounds and dismisses. Every shipped
   standalone VR screen sets `fullscreen 1`: the six q3_ui screens
-  (`menu.fullscreen = qtrue`) and Team Arena's `vroptions_*.menu` and
+  (`menu.fullscreen = qtrue`) and Team Arena's `vroptions.menu` and
   `vrbindings.menu`. The
-  in-game `ingame_vroptions_*.menu` panels are the deliberate exception:
+  in-game `ingame_vroptions.menu` panel is the deliberate exception:
   `fullscreen 0` with `outOfBoundsClick`, so a click outside the panel
   closes it back to the game. A replacement full-screen menu that omits
   `fullscreen 1` will misbehave under laser input with no error anywhere.
@@ -935,8 +934,8 @@ its flatscreen CONTROLS entry for a VR OPTIONS entry when
 `UI_VR_Platform() != VRP_NONE` (VR binds live in VR OPTIONS; the keyboard
 binds page is flatscreen-only). Dormancy-safe: on a flatscreen engine the
 menu is stock. The VR OPTIONS hub opens the bindings screen. Team Arena:
-the `vrmenus` manifests packed into the missionpack pak are the only load
-path, `UI_VR_LoadMenus` (Step 6) reads them, and they load
+the `vrmenus.txt` manifest packed into the missionpack pak is the only load
+path, `UI_VR_LoadMenus` (Step 6) reads it, and it loads
 `vrbindings.menu` beside the option menus. The entries that open them go
 in your own menus, on `cvarTest "ui_vrActive"`: in `setup.menu`, a VR
 Options item in the Controls slot (`open vroptions_menu`) with the

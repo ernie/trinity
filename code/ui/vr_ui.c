@@ -210,6 +210,7 @@ void UI_VR_Init( void ) {
 	trap_Cvar_Set( "ui_vrActive", vrActive ? "1" : "0" );
 	trap_Cvar_Set( "ui_vrBindingsAvailable", UI_VR_BindingsAvailable() ? "1" : "0" );
 	trap_Cvar_Set( "ui_vrFoveationAvailable", UI_FoveationMax() >= 0 ? "1" : "0" );
+	trap_Cvar_Set( "ui_vrMirrorAvailable", UI_VR_Platform() == VRP_PC ? "1" : "0" );
 }
 
 void UI_VR_Shutdown( void ) {
@@ -389,22 +390,18 @@ void UI_VR_FillScreen( qhandle_t shader ) {
 ===============
 UI_VR_LoadMenus
 
-Loads the VR options pages when running under a VR engine. Platform-variant
-pages are selected by UI_VR_Platform(), which applies the two-gate rule: a
-dormant mirror (flatscreen) or an unrecognized cl_platform value both
-collapse to VRP_NONE, and no VR pages are parsed either way.
+Loads the VR options pages while VR is active. Every platform shares them;
+the Desktop Mirror entries show only where ui_vrMirrorAvailable is set.
 ===============
 */
 void UI_VR_LoadMenus( void ) {
-	vrPlatform_t platform = UI_VR_Platform();
-	const char *manifest;
+	const char *manifest = "ui/vrmenus.txt";
 	fileHandle_t f;
 	int len;
 
-	if ( platform == VRP_NONE ) {
+	if ( UI_VR_Platform() == VRP_NONE ) {
 		return;
 	}
-	manifest = ( platform == VRP_STANDALONE ) ? "ui/vrmenus_standalone.txt" : "ui/vrmenus_pc.txt";
 
 	len = trap_FS_FOpenFile( manifest, &f, FS_READ );
 	if ( f ) {

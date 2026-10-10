@@ -1,7 +1,7 @@
 #include "ui/menudef.h"
 
 {
-\\ VR OPTIONS (STANDALONE) - self-contained sidebar menu \\
+\\ VR OPTIONS - self-contained sidebar menu \\
 
 menuDef {
 	name "vroptions_menu"
@@ -15,7 +15,7 @@ menuDef {
 	onOpen { setitemcolor fadebox backcolor 0 0 0 1 ;
 		fadeout fadebox ;
 		hide back_alt ; show back ; hide grpmessage ;
-		hide grpVR ; show comfort }
+		hide grpVR ; show comfort ; uiScript vrMirrorSetup }
 	onEsc { close vroptions_menu ; open setup_menu }
 
 // SIDEBAR //
@@ -41,7 +41,7 @@ itemDef {
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 95 178 40
+	rect 0 70 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
@@ -60,7 +60,7 @@ itemDef {
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 145 178 40
+	rect 0 120 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
@@ -79,7 +79,7 @@ itemDef {
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 195 178 40
+	rect 0 170 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
@@ -100,7 +100,7 @@ itemDef {
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 245 178 40
+	rect 0 220 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
@@ -113,19 +113,64 @@ itemDef {
 	}
 
 itemDef {
-	name sb_console
-	text "Console"
+	name sb_mirror
+	text "Desktop Mirror"
 	style 0
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 295 178 40
+	rect 0 270 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
 	backcolor 0 0 0 0
 	forecolor 1 1 1 1
 	visible 1
+	cvarTest "ui_vrMirrorAvailable"
+	showCvar { "1" }
+	action { play "sound/misc/kcaction.wav" ; hide grpVR ; show mirror ; uiScript vrMirrorSetup }
+	mouseEnter { setitemcolor sb_mirror forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_mirror forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_console
+	text "Console"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 320 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 1
+	cvarTest "ui_vrMirrorAvailable"
+	showCvar { "1" }
+	action { play "sound/misc/kcaction.wav" ; exec "toggleconsole" }
+	mouseEnter { setitemcolor sb_console forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_console forecolor 1 1 1 1 }
+	}
+
+// takes the Desktop Mirror slot where there is no mirror
+itemDef {
+	name sb_console
+	text "Console"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 270 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	backcolor 0 0 0 0
+	forecolor 1 1 1 1
+	visible 1
+	cvarTest "ui_vrMirrorAvailable"
+	hideCvar { "1" }
 	action { play "sound/misc/kcaction.wav" ; exec "toggleconsole" }
 	mouseEnter { setitemcolor sb_console forecolor 1 .75 0 1 }
 	mouseExit { setitemcolor sb_console forecolor 1 1 1 1 }
@@ -732,6 +777,115 @@ itemDef {
 	rect 476 363 13 26
 	visible 0
 	decoration
+	}
+
+// DESKTOP MIRROR GROUP //
+
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Mode:"
+	cvar "ui_vrDesktopMode"
+	cvarFloatList { "Off" 0 "Windowed" 1 "Fullscreen" 2 }
+	rect 301 146 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	text "Window Resolution:"
+	rect 301 168 128 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	decoration
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_TEXT
+	cvar "ui_vrDesktopRes"
+	rect 434 168 200 20
+	textalign ITEM_ALIGN_LEFT
+	textalignx 0
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	action { uiScript vrMirrorNextRes }
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Content type:"
+	cvar "vr_desktopContentType"
+	cvarFloatList { "Left eye" 0 "Right eye" 1 "Both eyes" 2 }
+	rect 301 190 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Content fit:"
+	cvar "vr_desktopContentFit"
+	cvarFloatList { "Fit / Contain" 0 "Fill / Crop" 1 }
+	rect 301 212 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Menu style:"
+	cvar "vr_desktopMenuStyle"
+	cvarFloatList { "Desktop view" 0 "VR view" 1 }
+	rect 301 234 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name mirror
+	group grpVR
+	text "Apply"
+	type 1
+	textscale .333
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 377 264 100 24
+	textalign ITEM_ALIGN_CENTER
+	textalignx 50
+	textaligny 18
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; uiScript vrMirrorApply }
+	mouseEnter { setcolor backcolor .1 .37 .1 1 }
+	mouseExit { setcolor backcolor .37 .1 .1 1 }
 	}
 
 // BACK BAR //
