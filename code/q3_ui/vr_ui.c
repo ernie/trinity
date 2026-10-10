@@ -15,7 +15,7 @@ qboolean vrActive = qfalse;
 qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
 void	(*trap_HapticEvent)( const char *event, int position, int channel, int intensity, float yaw, float height );
-void	(*trap_VKeyboard_Show)( void );
+void	(*trap_VKeyboard_Show)( int fieldBottom );
 void	(*trap_VKeyboard_Hide)( void );
 qboolean (*trap_VKeyboard_IsActive)( void );
 qboolean (*trap_VKeyboard_HandleKey)( int key );
@@ -218,10 +218,10 @@ void UI_VRHaptic( const char *event, int position, int channel, int intensity, f
 
 // Virtual keyboard wrappers; dormant on a flatscreen engine.
 
-void UI_VKeyboardShow( void ) {
+void UI_VKeyboardShow( int fieldBottom ) {
 	if ( !vrActive )
 		return;
-	trap_VKeyboard_Show();
+	trap_VKeyboard_Show( fieldBottom );
 }
 
 qboolean UI_VKeyboardIsActive( void ) {
@@ -234,52 +234,45 @@ qboolean UI_VR_StickNavActive( void ) {
 	return vrActive && vr->pointerMode == VR_POINTER_STICK;
 }
 
-// The keyboard's own Tab, arrows and DONE send these; the field keeps focus until the keyboard closes.
-static qboolean UI_VR_KeyboardNavKey( int key ) {
-	switch ( key ) {
-	case K_TAB:
-	case K_UPARROW:
-	case K_KP_UPARROW:
-	case K_DOWNARROW:
-	case K_KP_DOWNARROW:
-	case K_ENTER:
-	case K_KP_ENTER:
-	case K_JOY1:
-	case K_JOY2:
-	case K_JOY3:
-	case K_JOY4:
-		return qtrue;
-	default:
-		return qfalse;
-	}
+static qboolean UI_VR_NavKey( int key ) {
+	return key == K_TAB || key == K_UPARROW || key == K_KP_UPARROW || key == K_DOWNARROW || key == K_KP_DOWNARROW;
 }
 
 /*
 ================
-UI_VR_KeyEvent
+UI_VR_KeyHandled
 
-First-chance key routing. The engine hands an open keyboard its keys before
-the UI sees them; this opens the keyboard when a click lands on a text field
-and holds the field's focus while it is open.
+After each key, opens the keyboard clear of a text field reached by stick
+navigation, a click or Enter, and closes it when focus leaves text fields.
 ================
 */
-qboolean UI_VR_KeyEvent( int key, qboolean down ) {
+void UI_VR_KeyHandled( int key ) {
 	menucommon_s *item;
 
-	if ( !vrActive || !down ) {
-		return qfalse;
+	if ( !vrActive || !uis.activemenu ) {
+		return;
+	}
+	item = Menu_ItemAtCursor( uis.activemenu );
+	if ( !item || item->type != MTYPE_FIELD || ( item->flags & ( QMF_GRAYED | QMF_INACTIVE ) ) ) {
+		if ( UI_VKeyboardIsActive() ) {
+			trap_VKeyboard_Hide();
+		}
+		return;
 	}
 	if ( UI_VKeyboardIsActive() ) {
-		return UI_VR_KeyboardNavKey( key );
-	}
-	if ( key == K_MOUSE1 && uis.activemenu ) {
-		item = Menu_ItemAtCursor( uis.activemenu );
-		if ( item && item->type == MTYPE_FIELD && ( item->flags & QMF_HASMOUSEFOCUS ) &&
-			 !( item->flags & ( QMF_GRAYED | QMF_INACTIVE ) ) ) {
-			UI_VKeyboardShow();
+		UI_VKeyboardShow( item->bottom );
+	} else if ( key == K_ENTER || key == K_KP_ENTER || ( key == K_MOUSE1 && ( item->flags & QMF_HASMOUSEFOCUS ) ) ||
+				( UI_VR_StickNavActive() && UI_VR_NavKey( key ) ) ) {
+		// start with the cursor at the end of the text
+		mfield_t *field = &( (menufield_s *)item )->field;
+
+		field->cursor = strlen( field->buffer );
+		field->scroll = field->cursor - field->widthInChars + 1;
+		if ( field->scroll < 0 ) {
+			field->scroll = 0;
 		}
+		UI_VKeyboardShow( item->bottom );
 	}
-	return qfalse;
 }
 
 qboolean UI_VR_CursorOverride( float *x, float *y ) {

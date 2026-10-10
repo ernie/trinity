@@ -35,6 +35,36 @@ static qboolean g_editingField = qfalse;
 static itemDef_t *g_bindItem = NULL;
 static itemDef_t *g_editItem = NULL;
 
+// The field taking typed text, or NULL.
+itemDef_t *Menu_EditingItem( void ) {
+	return g_editingField ? g_editItem : NULL;
+}
+
+// Puts the cursor at the end of the field's text.
+static void Item_TextField_StartEdit( itemDef_t *item ) {
+	editFieldDef_t	*editPtr = (editFieldDef_t *)item->typeData;
+	char			buff[1024];
+	int				len = 0;
+
+	if ( item->cvar ) {
+		DC->getCVarString( item->cvar, buff, sizeof( buff ) );
+		len = strlen( buff );
+	}
+	item->cursorPos = len;
+	if ( editPtr ) {
+		editPtr->paintOffset = editPtr->maxPaintChars > 0 && len > editPtr->maxPaintChars ? len - editPtr->maxPaintChars : 0;
+	}
+}
+
+// Starts editing item as a click or Enter does, or ends the edit when NULL.
+void Menu_SetEditingItem( itemDef_t *item ) {
+	if ( item ) {
+		Item_TextField_StartEdit( item );
+	}
+	g_editingField = item != NULL;
+	g_editItem = item;
+}
+
 menuDef_t Menus[MAX_MENUS];      // defined menus
 int menuCount = 0;               // how many
 
@@ -2173,9 +2203,13 @@ qboolean Item_TextField_HandleKey(itemDef_t *item, int key) {
 			    return qtrue;
 		    }
 
+			// buzz on non-digits, as baseq3 does, and keep editing
 			if (item->type == ITEM_TYPE_NUMERICFIELD) {
 				if (key < '0' || key > '9') {
-					return qfalse;
+					if ( DC->Assets.menuBuzzSound ) {
+						DC->startLocalSound( DC->Assets.menuBuzzSound, CHAN_LOCAL_SOUND );
+					}
+					return qtrue;
 				}
 			}
 
@@ -2258,6 +2292,8 @@ qboolean Item_TextField_HandleKey(itemDef_t *item, int key) {
 		if (key == K_TAB || key == K_DOWNARROW || key == K_KP_DOWNARROW) {
 			newItem = Menu_SetNextCursorItem(item->parent);
 			if (newItem && (newItem->type == ITEM_TYPE_EDITFIELD || newItem->type == ITEM_TYPE_NUMERICFIELD)) {
+				// the next field starts with the cursor at the end
+				Item_TextField_StartEdit( newItem );
 				g_editItem = newItem;
 			}
 		}
@@ -2265,6 +2301,7 @@ qboolean Item_TextField_HandleKey(itemDef_t *item, int key) {
 		if (key == K_UPARROW || key == K_KP_UPARROW) {
 			newItem = Menu_SetPrevCursorItem(item->parent);
 			if (newItem && (newItem->type == ITEM_TYPE_EDITFIELD || newItem->type == ITEM_TYPE_NUMERICFIELD)) {
+				Item_TextField_StartEdit( newItem );
 				g_editItem = newItem;
 			}
 		}
@@ -2876,12 +2913,9 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 					}
 				} else if (item->type == ITEM_TYPE_EDITFIELD || item->type == ITEM_TYPE_NUMERICFIELD) {
 					if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory)) {
-						item->cursorPos = 0;
+						Item_TextField_StartEdit( item );
 						g_editingField = qtrue;
 						g_editItem = item;
-						if (DC->vrEditField) {
-							DC->vrEditField();
-						}
 					}
 				} else {
 					if (Rect_ContainsPoint(&item->window.rect, DC->cursorx, DC->cursory)) {
@@ -2916,12 +2950,9 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 		case K_ENTER:
 			if (item) {
 				if (item->type == ITEM_TYPE_EDITFIELD || item->type == ITEM_TYPE_NUMERICFIELD) {
-					item->cursorPos = 0;
+					Item_TextField_StartEdit( item );
 					g_editingField = qtrue;
 					g_editItem = item;
-					if (DC->vrEditField) {
-						DC->vrEditField();
-					}
 				} else {
 						Item_Action(item);
 				}

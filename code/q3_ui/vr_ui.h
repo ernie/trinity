@@ -17,13 +17,13 @@ vrPlatform_t UI_VR_Platform( void );
 void UI_VR_Init( void );
 void UI_VR_Shutdown( void );
 void UI_VRHaptic( const char *event, int position, int channel, int intensity, float yaw, float height );
-void UI_VKeyboardShow( void );
+void UI_VKeyboardShow( int fieldBottom );	// fieldBottom: bottom edge of the field to stay clear of
 qboolean UI_VKeyboardIsActive( void );
 qboolean UI_VR_StickNavActive( void );
 qboolean UI_VR_BindingsAvailable( void );
 // The VR key index (0-35) of an engine key code, or -1 when it isn't a VR key.
 int UI_VR_KeyIndex( int key );
-qboolean UI_VR_KeyEvent( int key, qboolean down );
+void UI_VR_KeyHandled( int key );
 qboolean UI_VR_CursorOverride( float *x, float *y );
 qboolean UI_VR_HideCursor( void );
 void UI_VR_OnMenuMove( void );

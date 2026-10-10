@@ -799,12 +799,10 @@ the focus moves and, under stick navigation, rests the cursor on the
 focused item (a slider's thumb) so stock key paths that test the cursor
 act on that item, with the cursor draw gated behind `!UI_VR_HideCursor()`
 (it covers the open keyboard too); in `_UI_MouseEvent`,
-the `UI_VR_StickNavActive()` early-out and the same cursor override; the
-keyboard opener wired into the display context
-(`uiInfo.uiDC.vrEditField = &UI_VR_OnEditField`), with `Menu_HandleKey`
-calling `DC->vrEditField()` where an edit field starts editing: after
-`g_editItem = item;` in its mouse-click and Enter cases, NULL-safe
-because the cgame link leaves it unset (Appendix D);
+the `UI_VR_StickNavActive()` early-out and the same cursor override;
+`UI_VR_KeyHandled( key )` at the end of `_UI_KeyEvent` for key-down events,
+with `Menu_EditingItem()` and `Menu_SetEditingItem()` added to `ui_shared.c`
+to read and set the field being edited (Appendix D);
 `UI_VR_LoadMenus()` after every `UI_LoadMenus` wave — both `_UI_Init` and
 `UI_Load`; the connect-screen background gated the same way as baseq3's
 (`if ( vrActive && menu->window.background )
@@ -1081,11 +1079,15 @@ Deliberate differences, noted so the two `vr_ui.c` files don't surprise you:
 
 - **Opening the virtual keyboard.** The engine hands an open keyboard its
   keys before either UI sees them and closes it on DONE, Escape or a click
-  off it, so each UI only opens it and holds the field's focus meanwhile
-  (`UI_VR_KeyEvent` swallows Tab, the arrows and Enter). baseq3's
-  `UI_VR_KeyEvent` opens it on a click over a text field. Team Arena's
-  editing state is private to `ui_shared.c`, so `Menu_HandleKey` reports
-  the start through `DC->vrEditField`.
+  off it, so each UI only follows focus with it. After the menu takes a key,
+  `UI_VR_KeyHandled` opens it when stick navigation lands on a text field or
+  a click or Enter chooses one, passing the field's bottom edge to
+  `trap_VKeyboard_Show` so the keyboard sits clear of the text being typed,
+  and closes it when focus leaves text fields. The arrows, Tab and Enter
+  move focus as usual, from the keyboard's keys or the controller. Team
+  Arena's editing state is private to `ui_shared.c`, so `Menu_EditingItem`
+  and `Menu_SetEditingItem` let stick navigation start editing the field it
+  lands on and end an edit that focus has left.
 - **On-screen model transform.** baseq3 writes the VR scale into
   `uis.xscale/yscale/bias/biasY` once per frame and keeps
   `UI_AdjustFrom640` free of any VR branch, so its body simply applies
@@ -1197,10 +1199,10 @@ text painters (`UI_DrawBannerString2`, `UI_DrawProportionalString2`,
 it 0 and the stock values stand; in VR, `UI_VR_UpdateScale` writes all
 four each frame. And
 `uis.cursorx` / `uis.cursory` become `float` (stock: `int`), because
-`UI_VR_CursorOverride` writes the cursor through `float *`. Team Arena: the
-`vrEditField` member on `displayContextDef_t`, wired to the drop's keyboard
-opener (Step 6), and that struct's `cursorx` / `cursory` become `float` for the
-same cursor-override reason. `ui/menudef.h` defines the VR owner-draw IDs
+`UI_VR_CursorOverride` writes the cursor through `float *`. Team Arena:
+`Menu_EditingItem` and `Menu_SetEditingItem` in `ui_shared.c`, which the
+drop's keyboard handling uses (Step 6), and `displayContextDef_t`'s `cursorx` / `cursory` become `float`
+for the same cursor-override reason. `ui/menudef.h` defines the VR owner-draw IDs
 (265 to 271, listed in Step 7), which the drop's `vr_ui.c` switches on.
 
 If a symbol is still unresolved after `vr_host.h` is satisfied, it is a bug

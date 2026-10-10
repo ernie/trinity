@@ -16,7 +16,7 @@ qboolean vrActive = qfalse;
 qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
 void	(*trap_HapticEvent)( const char *event, int position, int channel, int intensity, float yaw, float height );
-void	(*trap_VKeyboard_Show)( void );
+void	(*trap_VKeyboard_Show)( int fieldBottom );
 void	(*trap_VKeyboard_Hide)( void );
 qboolean (*trap_VKeyboard_IsActive)( void );
 qboolean (*trap_VKeyboard_HandleKey)( int key );
@@ -226,10 +226,10 @@ void UI_VRHaptic( const char *event, int position, int channel, int intensity, f
 
 // Virtual keyboard wrappers; dormant on a flatscreen engine.
 
-void UI_VKeyboardShow( void ) {
+void UI_VKeyboardShow( int fieldBottom ) {
 	if ( !vrActive )
 		return;
-	trap_VKeyboard_Show();
+	trap_VKeyboard_Show( fieldBottom );
 }
 
 qboolean UI_VKeyboardIsActive( void ) {
@@ -242,20 +242,8 @@ qboolean UI_VR_StickNavActive( void ) {
 	return vrActive && vr->pointerMode == VR_POINTER_STICK;
 }
 
-// The keyboard's own Tab, arrows and DONE send these; the field keeps focus until the keyboard closes.
-static qboolean UI_VR_KeyboardNavKey( int key ) {
-	switch ( key ) {
-	case K_TAB:
-	case K_UPARROW:
-	case K_KP_UPARROW:
-	case K_DOWNARROW:
-	case K_KP_DOWNARROW:
-	case K_ENTER:
-	case K_KP_ENTER:
-		return qtrue;
-	default:
-		return qfalse;
-	}
+static qboolean UI_VR_NavKey( int key ) {
+	return key == K_TAB || key == K_UPARROW || key == K_KP_UPARROW || key == K_DOWNARROW || key == K_KP_DOWNARROW;
 }
 
 static itemDef_t *UI_VR_FocusedItem( void ) {
@@ -292,9 +280,8 @@ static qboolean UI_VR_StepSlider( int key ) {
 UI_VR_KeyEvent
 
 First-chance key routing. While a bindings row waits for a button, every key
-belongs to the bindings model; closing the menu ends the wait. The engine
-hands an open keyboard its keys before the UI sees them; the edit field keeps
-focus while it is open. Stick navigation steps the focused slider.
+belongs to the bindings model; closing the menu ends the wait. Stick
+navigation steps the focused slider.
 ================
 */
 qboolean UI_VR_KeyEvent( int key, qboolean down ) {
@@ -312,9 +299,6 @@ qboolean UI_VR_KeyEvent( int key, qboolean down ) {
 	}
 	if ( !down ) {
 		return qfalse;
-	}
-	if ( UI_VKeyboardIsActive() ) {
-		return UI_VR_KeyboardNavKey( key );
 	}
 	if ( UI_VR_StickNavActive() ) {
 		return UI_VR_StepSlider( key );
@@ -366,9 +350,37 @@ void UI_VR_OnMenuMove( void ) {
 	UI_VRHaptic( "menu_move", 0, 0, 30, 0, 0 );
 }
 
-// displayContextDef_t.vrEditField: an edit field started editing.
-void UI_VR_OnEditField( void ) {
-	UI_VKeyboardShow();
+/*
+================
+UI_VR_KeyHandled
+
+After each key, keeps the keyboard clear of the field being edited. Stick
+navigation onto a text field starts editing it, and focus leaving ends the edit
+(stock would keep it) and closes the keyboard.
+================
+*/
+void UI_VR_KeyHandled( int key ) {
+	itemDef_t	*item, *editing;
+
+	if ( !vrActive ) {
+		return;
+	}
+	item = UI_VR_FocusedItem();
+	editing = Menu_EditingItem();
+	if ( item && ( item->type == ITEM_TYPE_EDITFIELD || item->type == ITEM_TYPE_NUMERICFIELD ) &&
+		 editing != item && UI_VR_StickNavActive() && UI_VR_NavKey( key ) ) {
+		Menu_SetEditingItem( item );
+		editing = item;
+	}
+	if ( editing && editing != item ) {
+		Menu_SetEditingItem( NULL );
+		editing = NULL;
+	}
+	if ( editing ) {
+		UI_VKeyboardShow( (int)( editing->window.rect.y + editing->window.rect.h ) );
+	} else if ( UI_VKeyboardIsActive() ) {
+		trap_VKeyboard_Hide();
+	}
 }
 
 /*

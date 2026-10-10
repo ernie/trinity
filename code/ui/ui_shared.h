@@ -379,8 +379,6 @@ typedef struct {
 	float				screenYmax;
 	int					lastVideoCheck;
 
-	// Opens the VR keyboard at edit start; NULL in the cgame link.
-	void (*vrEditField)( void );
 
 } displayContextDef_t;
 
@@ -393,6 +391,8 @@ void Menu_Init(menuDef_t *menu);
 void Item_Init(itemDef_t *item);
 void Menu_PostParse(menuDef_t *menu);
 menuDef_t *Menu_GetFocused();
+itemDef_t *Menu_EditingItem( void );
+void Menu_SetEditingItem( itemDef_t *item );
 void Menu_HandleKey(menuDef_t *menu, int key, qboolean down);
 void Menu_HandleMouseMove(menuDef_t *menu, float x, float y);
 void Menu_ScrollFeeder(menuDef_t *menu, int feeder, qboolean down);

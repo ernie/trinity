@@ -390,8 +390,8 @@ void trap_HapticEvent( const char *event, int position, int channel, int intensi
 	syscall( dll_trap_HapticEvent, event, position, channel, intensity, PASSFLOAT(yaw), PASSFLOAT(height) );
 }
 
-void trap_VKeyboard_Show( void ) {
-	syscall( dll_trap_VKeyboard_Show );
+void trap_VKeyboard_Show( int fieldBottom ) {
+	syscall( dll_trap_VKeyboard_Show, fieldBottom );
 }
 
 void trap_VKeyboard_Hide( void ) {

@@ -44,7 +44,7 @@ typedef struct {
 static vrbindings_t s_vrb;
 
 // Five letters at most, as the stock Controls tabs, so they stay inside the frame art.
-static const char *vrbTabNames[VRBM_TABS] = {"MOVE", "SHOOT", "WATCH", "MISC"};
+static const char *vrbTabNames[VRBM_TABS] = {"MOVE", "SHOOT", "WATCH", "VKB", "MISC"};
 
 // The cell under the pointer in item's row, -1 off the row; the label counts as Plain.
 static int VRBindings_ColumnAt( menucommon_s *item ) {

@@ -87,8 +87,8 @@ itemDef {
 	}
 
 itemDef {
-	name sb_system
-	text "Misc"
+	name sb_keyboard
+	text "VKB"
 	style 0
 	type 1
 	textstyle 6
@@ -99,10 +99,29 @@ itemDef {
 	textaligny 28
 	forecolor 1 1 1 1
 	visible 1
+	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_keyboard }
+	mouseEnter { setitemcolor sb_keyboard forecolor 1 .75 0 1 }
+	mouseExit { setitemcolor sb_keyboard forecolor 1 1 1 1 }
+	}
+
+itemDef {
+	name sb_system
+	text "Misc"
+	style 0
+	type 1
+	textstyle 6
+	textscale .4
+	rect 0 300 178 40
+	textalign ITEM_ALIGN_CENTER
+	textalignx 89
+	textaligny 28
+	forecolor 1 1 1 1
+	visible 1
 	action { play "sound/misc/kcaction.wav" ; hide grpVB ; show vb_system }
 	mouseEnter { setitemcolor sb_system forecolor 1 .75 0 1 }
 	mouseExit { setitemcolor sb_system forecolor 1 1 1 1 }
 	}
+
 
 itemDef {
 	name sb_reset
@@ -111,7 +130,7 @@ itemDef {
 	type 1
 	textstyle 6
 	textscale .4
-	rect 0 330 178 40
+	rect 0 380 178 40
 	textalign ITEM_ALIGN_CENTER
 	textalignx 89
 	textaligny 28
@@ -410,10 +429,10 @@ itemDef {
 	visible 0
 	}
 
-// MISC (rows 21-31; 26 and 29 are headers) //
+// VKB (rows 21-24) //
 
 itemDef {
-	name vb_system
+	name vb_keyboard
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 21
@@ -424,7 +443,7 @@ itemDef {
 	visible 0
 	}
 itemDef {
-	name vb_system
+	name vb_keyboard
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 22
@@ -435,7 +454,7 @@ itemDef {
 	visible 0
 	}
 itemDef {
-	name vb_system
+	name vb_keyboard
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 23
@@ -446,7 +465,7 @@ itemDef {
 	visible 0
 	}
 itemDef {
-	name vb_system
+	name vb_keyboard
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 24
@@ -456,12 +475,16 @@ itemDef {
 	forecolor 1 1 1 1
 	visible 0
 	}
+
+
+// MISC (rows 25-35; 30 and 33 are headers) //
+
 itemDef {
 	name vb_system
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 25
-	rect 196 148 436 20
+	rect 196 60 436 20
 	textaligny 16
 	textscale .3
 	forecolor 1 1 1 1
@@ -472,6 +495,50 @@ itemDef {
 	group grpVB
 	ownerdraw UI_VRBIND
 	special 26
+	rect 196 82 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 27
+	rect 196 104 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 28
+	rect 196 126 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 29
+	rect 196 148 436 20
+	textaligny 16
+	textscale .3
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name vb_system
+	group grpVB
+	ownerdraw UI_VRBIND
+	special 30
 	rect 196 178 436 20
 	textaligny 16
 	textscale .3
@@ -483,7 +550,7 @@ itemDef {
 	name vb_system
 	group grpVB
 	ownerdraw UI_VRBIND
-	special 27
+	special 31
 	rect 196 200 436 20
 	textaligny 16
 	textscale .3
@@ -494,7 +561,7 @@ itemDef {
 	name vb_system
 	group grpVB
 	ownerdraw UI_VRBIND
-	special 28
+	special 32
 	rect 196 222 436 20
 	textaligny 16
 	textscale .3
@@ -505,7 +572,7 @@ itemDef {
 	name vb_system
 	group grpVB
 	ownerdraw UI_VRBIND
-	special 29
+	special 33
 	rect 196 252 436 20
 	textaligny 16
 	textscale .3
@@ -517,7 +584,7 @@ itemDef {
 	name vb_system
 	group grpVB
 	ownerdraw UI_VRBIND
-	special 30
+	special 34
 	rect 196 274 436 20
 	textaligny 16
 	textscale .3
@@ -528,7 +595,7 @@ itemDef {
 	name vb_system
 	group grpVB
 	ownerdraw UI_VRBIND
-	special 31
+	special 35
 	rect 196 296 436 20
 	textaligny 16
 	textscale .3

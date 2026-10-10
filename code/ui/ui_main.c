@@ -6349,7 +6349,6 @@ void _UI_Init( qboolean inGameLoad ) {
 	uiInfo.uiDC.stopCinematic = &UI_StopCinematic;
 	uiInfo.uiDC.drawCinematic = &UI_DrawCinematic;
 	uiInfo.uiDC.runCinematicFrame = &UI_RunCinematicFrame;
-	uiInfo.uiDC.vrEditField = &UI_VR_OnEditField;
 
 	Init_Display(&uiInfo.uiDC);
 
@@ -6446,6 +6445,10 @@ void _UI_KeyEvent( int key, qboolean down ) {
 			trap_Key_ClearStates();
 			trap_Cvar_Set( "cl_paused", "0" );
 		}
+  }
+
+  if ( down ) {
+    UI_VR_KeyHandled( key );
   }
 
   //if ((s > 0) && (s != menu_null_sound)) {

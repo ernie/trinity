@@ -5,6 +5,7 @@
 #define A VRBM_TAB_ACTIONS
 #define F VRBM_TAB_FOLLOW
 #define S VRBM_TAB_SYSTEM
+#define K VRBM_TAB_KEYBOARD
 
 const vrbmRow_t vrbmRows[VRBM_ROW_COUNT] = {
 	{M, "Jump", "+moveup", "gameplay", 0, 0, 0},
@@ -28,6 +29,10 @@ const vrbmRow_t vrbmRows[VRBM_ROW_COUNT] = {
 	{F, "Pause", "demopause", "follow", 0, 0, 0},
 	{F, "Scrub", "+tv_scrub", "follow", 0, 0, 0},
 	{F, "Cancel scrub", "tv_scrub_cancel", "scrub", 0, 0, 0},
+	{K, "Space", "+key SPACE", "keyboard", 0, 0, 0},
+	{K, "Backspace", "+key BACKSPACE", "keyboard", 0, 0, 0},
+	{K, "Tab", "+key TAB", "keyboard", 0, 0, 0},
+	{K, "Enter", "+key ENTER", "keyboard", 0, 0, 0},
 	{S, "Menu", "+key ESCAPE", "global", VRBM_REQUIRED, 0, 0},
 	{S, "Alt button", "+alt", "global", VRBM_NOALT, 0, 0},
 	{S, "Console", "toggleconsole", "global", 0, 0, 0},
@@ -45,6 +50,7 @@ const vrbmRow_t vrbmRows[VRBM_ROW_COUNT] = {
 #undef A
 #undef F
 #undef S
+#undef K
 
 vrbmState_t vrbm = {-1, 0, -1, VRBM_COL_PLAIN};
 
@@ -57,10 +63,10 @@ static int cellsTime;
 static char cancelKeys[VRBM_CELL];	// the Menu button, read when a wait starts
 
 // Every layer, global first; the Alt names sit at the same index.
-static const char *const layerNames[] = {"global", "menu", "adjust", "scrub", "scoreboard", "vote", "wheel",
-										 "follow", "gameplay"};
-static const char *const layerAltNames[] = {"global+alt", "menu+alt", "adjust+alt", "scrub+alt", "scoreboard+alt",
-											 "vote+alt", "wheel+alt", "follow+alt", "gameplay+alt"};
+static const char *const layerNames[] = {"global", "keyboard", "menu", "adjust", "scrub", "scoreboard", "vote",
+										 "wheel", "follow", "gameplay"};
+static const char *const layerAltNames[] = {"global+alt", "keyboard+alt", "menu+alt", "adjust+alt", "scrub+alt",
+											 "scoreboard+alt", "vote+alt", "wheel+alt", "follow+alt", "gameplay+alt"};
 #define VRBM_LAYERS ( (int)( sizeof( layerNames ) / sizeof( layerNames[0] ) ) )
 static vrbmIO_t io;
 

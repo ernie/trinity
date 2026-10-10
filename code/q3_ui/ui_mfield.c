@@ -64,9 +64,8 @@ void MField_Draw( mfield_t *edit, int x, int y, int style, vec4_t color ) {
 		UI_DrawString( x, y, str, style, color );
 	}
 
-	// draw the cursor
-	// When keyboard is active, always show cursor (don't require UI_PULSE)
-	if ( !VirtualKeyboard_IsActive() && !(style & UI_PULSE) ) {
+	// only the focused field draws a cursor
+	if ( !(style & UI_PULSE) ) {
 		return;
 	}
 
@@ -429,7 +428,8 @@ sfxHandle_t MenuField_Key( menufield_s* m, int* key )
 					keycode -= 'a' - 'A';
 				else if ((m->generic.flags & QMF_LOWERCASE) && Q_isupper( keycode ))
 					keycode -= 'A' - 'a';
-				else if ((m->generic.flags & QMF_NUMBERSONLY) && Q_isalpha( keycode ))
+				// reject printable non-digits, space included; control keys still edit
+				else if ((m->generic.flags & QMF_NUMBERSONLY) && keycode >= ' ' && ( keycode < '0' || keycode > '9' ))
 					return (menu_buzz_sound);
 
 				MField_CharEvent( &m->field, keycode);

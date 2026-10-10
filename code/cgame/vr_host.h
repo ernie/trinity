@@ -123,9 +123,9 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //   and the three text painters; UI_VR_UpdateScale writes all four in VR.
 //   uis.cursorx/uis.cursory become float (stock: int) -
 //   UI_VR_CursorOverride writes the cursor through float * (see Appendix E).
-// * Team Arena UI: displayContextDef_t gains void (*vrEditField)(void),
-//   which Menu_HandleKey calls where an edit field starts editing; the ui
-//   link wires it to UI_VR_OnEditField. Its cursorx/cursory also become
+// * Team Arena UI: ui_shared.c gains Menu_EditingItem and
+//   Menu_SetEditingItem, which UI_VR_KeyHandled uses after each key to open
+//   the keyboard clear of the field being edited. displayContextDef_t's cursorx/cursory become
 //   float (stock: int) - UI_VR_CursorOverride writes the cursor through
 //   float *. ui/menudef.h defines the VR owner-draw IDs 265 to 271, which
 //   vr_ui.c switches on.

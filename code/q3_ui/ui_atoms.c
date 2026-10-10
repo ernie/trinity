@@ -850,10 +850,6 @@ void UI_KeyEvent( int key, int down ) {
 		return;
 	}
 
-	if ( UI_VR_KeyEvent( key, down ) ) {
-		return;
-	}
-
 	if (uis.activemenu->key)
 		s = uis.activemenu->key( key );
 	else
@@ -861,6 +857,8 @@ void UI_KeyEvent( int key, int down ) {
 
 	if ((s > 0) && (s != menu_null_sound))
 		trap_S_StartLocalSound( s, CHAN_LOCAL_SOUND );
+
+	UI_VR_KeyHandled( key );
 }
 
 

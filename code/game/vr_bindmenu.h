@@ -4,11 +4,11 @@
 #define VR_BINDMENU_H
 
 #define VRBM_KEYS 36
-#define VRBM_ROW_COUNT 32
+#define VRBM_ROW_COUNT 36
 #define VRBM_BINDING 256
 #define VRBM_CELL 16	// a cell's text: two key markers and " / " between them
 
-typedef enum { VRBM_TAB_MOVE, VRBM_TAB_ACTIONS, VRBM_TAB_FOLLOW, VRBM_TAB_SYSTEM, VRBM_TABS } vrbmTab_t;
+typedef enum { VRBM_TAB_MOVE, VRBM_TAB_ACTIONS, VRBM_TAB_FOLLOW, VRBM_TAB_KEYBOARD, VRBM_TAB_SYSTEM, VRBM_TABS } vrbmTab_t;
 typedef enum { VRBM_COL_PLAIN, VRBM_COL_ALT, VRBM_COL_CLEAR } vrbmColumn_t;
 
 #define VRBM_HEADER 1	// a section heading, no binding
