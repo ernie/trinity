@@ -3979,18 +3979,14 @@ static void UI_Update(const char *name) {
 			break;
 		}
 	} else if (Q_stricmp(name, "ui_glCustom") == 0) {
-		// the preset tuples split on the VR mirror: VR-tuned values under
-		// VR, the stock tables on a flatscreen engine
+		// VR-tuned presets under VR, stock ones on flatscreen; VR leaves r_fullscreen
+		// and the bit depths alone, since their rows are hidden
 		if (vrActive) {
 			switch (val) {
 				case 0:	// high quality
-					trap_Cvar_SetValue( "r_fullScreen", 1 );
 					trap_Cvar_SetValue( "r_subdivisions", 1 );
 					trap_Cvar_SetValue( "r_vertexlight", 0 );
 					trap_Cvar_SetValue( "r_lodbias", -2 );
-					trap_Cvar_SetValue( "r_colorbits", 32 );
-					trap_Cvar_SetValue( "r_depthbits", 24 );
-					trap_Cvar_SetValue( "r_stencilbits", 8 );
 					trap_Cvar_SetValue( "r_picmip", 0 );
 					trap_Cvar_SetValue( "r_texturebits", 32 );
 					trap_Cvar_SetValue( "r_fastSky", 0 );
@@ -4000,13 +3996,9 @@ static void UI_Update(const char *name) {
 					trap_Cvar_Set( "r_texturemode", "GL_LINEAR_MIPMAP_LINEAR" );
 				break;
 				case 1: // normal
-					trap_Cvar_SetValue( "r_fullScreen", 1 );
 					trap_Cvar_SetValue( "r_subdivisions", 2 );
 					trap_Cvar_SetValue( "r_vertexlight", 0 );
 					trap_Cvar_SetValue( "r_lodbias", -1 );
-					trap_Cvar_SetValue( "r_colorbits", 0 );
-					trap_Cvar_SetValue( "r_depthbits", 0 );
-					trap_Cvar_Reset( "r_stencilbits" );
 					trap_Cvar_SetValue( "r_picmip", 1 );
 					trap_Cvar_SetValue( "r_texturebits", 0 );
 					trap_Cvar_SetValue( "r_fastSky", 0 );
@@ -4016,13 +4008,9 @@ static void UI_Update(const char *name) {
 					trap_Cvar_SetValue( "cg_shadows", 0 );
 				break;
 				case 2: // fast
-					trap_Cvar_SetValue( "r_fullScreen", 1 );
 					trap_Cvar_SetValue( "r_subdivisions", 4 );
 					trap_Cvar_SetValue( "r_vertexlight", 0 );
 					trap_Cvar_SetValue( "r_lodbias", 0 );
-					trap_Cvar_SetValue( "r_colorbits", 0 );
-					trap_Cvar_SetValue( "r_depthbits", 0 );
-					trap_Cvar_Reset( "r_stencilbits" );
 					trap_Cvar_SetValue( "r_picmip", 1 );
 					trap_Cvar_SetValue( "r_texturebits", 0 );
 					trap_Cvar_SetValue( "cg_shadows", 0 );
@@ -4032,13 +4020,9 @@ static void UI_Update(const char *name) {
 					trap_Cvar_Set( "r_texturemode", "GL_LINEAR_MIPMAP_NEAREST" );
 				break;
 				case 3: // fastest
-					trap_Cvar_SetValue( "r_fullScreen", 1 );
 					trap_Cvar_SetValue( "r_subdivisions", 12 );
 					trap_Cvar_SetValue( "r_vertexlight", 1 );
 					trap_Cvar_SetValue( "r_lodbias", 1 );
-					trap_Cvar_SetValue( "r_colorbits", 16 );
-					trap_Cvar_SetValue( "r_depthbits", 16 );
-					trap_Cvar_SetValue( "r_stencilbits", 0 );
 					trap_Cvar_SetValue( "r_picmip", 2 );
 					trap_Cvar_SetValue( "r_texturebits", 16 );
 					trap_Cvar_SetValue( "cg_shadows", 0 );
@@ -4597,8 +4581,10 @@ static void UI_RunMenuScript(char **args) {
 			}
 		} else if (Q_stricmp(name, "glCustom") == 0) {
 			trap_Cvar_Set("ui_glCustom", "4");
-			// the Video Mode row writes r_mode; fullscreen reads r_modeFullscreen, so keep them together
-			trap_Cvar_Set("r_modeFullscreen", UI_Cvar_VariableString("r_mode"));
+			// fullscreen reads r_modeFullscreen, so copy r_mode there, except under VR, where the Video Mode row is hidden
+			if (!vrActive) {
+				trap_Cvar_Set("r_modeFullscreen", UI_Cvar_VariableString("r_mode"));
+			}
 		} else if (Q_stricmp(name, "update") == 0) {
 			if (String_Parse(args, &name2)) {
 				UI_Update(name2);
