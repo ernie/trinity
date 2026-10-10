@@ -20,16 +20,15 @@ NETWORK OPTIONS MENU
 #define ID_DISPLAY			11
 #define ID_SOUND			12
 #define ID_NETWORK			13
-#define ID_RATE				14
+#define ID_PACKETDUP		14
 #define ID_BACK				15
 
 
-static const char *rate_items[] = {
-	"<= 28.8K",
-	"33.6K",
-	"56K",
-	"ISDN",
-	"LAN/Cable/xDSL",
+// cl_packetdup 1-3; rate and cl_maxpackets stay at the engine defaults
+static const char *packetdup_items[] = {
+	"Low",
+	"Medium",
+	"High",
 	NULL
 };
 
@@ -45,12 +44,18 @@ typedef struct {
 	menutext_s		sound;
 	menutext_s		network;
 
-	menulist_s		rate;
+	menulist_s		packetdup;
 
 	menubitmap_s	back;
 } networkOptionsInfo_t;
 
 static networkOptionsInfo_t	networkOptionsInfo;
+
+
+static void UI_NetworkOptionsMenu_PacketDupStatusBar( void *self ) {
+	UI_DrawString( SCREEN_WIDTH * 0.50, 424, "Send duplicate input packets", UI_SMALLFONT|UI_CENTER, colorWhite );
+	UI_DrawString( SCREEN_WIDTH * 0.50, 424 + SMALLCHAR_HEIGHT, "(raise if on unreliable network)", UI_SMALLFONT|UI_CENTER, colorWhite );
+}
 
 
 /*
@@ -82,22 +87,8 @@ static void UI_NetworkOptionsMenu_Event( void* ptr, int event ) {
 	case ID_NETWORK:
 		break;
 
-	case ID_RATE:
-		if( networkOptionsInfo.rate.curvalue == 0 ) {
-			trap_Cvar_SetValue( "rate", 2500 );
-		}
-		else if( networkOptionsInfo.rate.curvalue == 1 ) {
-			trap_Cvar_SetValue( "rate", 3000 );
-		}
-		else if( networkOptionsInfo.rate.curvalue == 2 ) {
-			trap_Cvar_SetValue( "rate", 4000 );
-		}
-		else if( networkOptionsInfo.rate.curvalue == 3 ) {
-			trap_Cvar_SetValue( "rate", 5000 );
-		}
-		else if( networkOptionsInfo.rate.curvalue == 4 ) {
-			trap_Cvar_SetValue( "rate", 25000 );
-		}
+	case ID_PACKETDUP:
+		trap_Cvar_SetValue( "cl_packetdup", networkOptionsInfo.packetdup.curvalue + 1 );
 		break;
 
 	case ID_BACK:
@@ -114,7 +105,7 @@ UI_NetworkOptionsMenu_Init
 */
 static void UI_NetworkOptionsMenu_Init( void ) {
 	int			y;
-	int			rate;
+	int			packetdup;
 
 	memset( &networkOptionsInfo, 0, sizeof(networkOptionsInfo) );
 
@@ -189,14 +180,15 @@ static void UI_NetworkOptionsMenu_Init( void ) {
 
 	// content column (1 row) centered on the frame
 	y = 242 - ( 1 * (BIGCHAR_HEIGHT+2) ) / 2;
-	networkOptionsInfo.rate.generic.type		= MTYPE_SPINCONTROL;
-	networkOptionsInfo.rate.generic.name		= "Data Rate:";
-	networkOptionsInfo.rate.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	networkOptionsInfo.rate.generic.callback	= UI_NetworkOptionsMenu_Event;
-	networkOptionsInfo.rate.generic.id			= ID_RATE;
-	networkOptionsInfo.rate.generic.x			= 400;
-	networkOptionsInfo.rate.generic.y			= y;
-	networkOptionsInfo.rate.itemnames			= rate_items;
+	networkOptionsInfo.packetdup.generic.type		= MTYPE_SPINCONTROL;
+	networkOptionsInfo.packetdup.generic.name		= "Packet Recovery:";
+	networkOptionsInfo.packetdup.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	networkOptionsInfo.packetdup.generic.callback	= UI_NetworkOptionsMenu_Event;
+	networkOptionsInfo.packetdup.generic.statusbar	= UI_NetworkOptionsMenu_PacketDupStatusBar;
+	networkOptionsInfo.packetdup.generic.id			= ID_PACKETDUP;
+	networkOptionsInfo.packetdup.generic.x			= 400;
+	networkOptionsInfo.packetdup.generic.y			= y;
+	networkOptionsInfo.packetdup.itemnames			= packetdup_items;
 
 	networkOptionsInfo.back.generic.type		= MTYPE_BITMAP;
 	networkOptionsInfo.back.generic.name		= ART_BACK0;
@@ -216,25 +208,11 @@ static void UI_NetworkOptionsMenu_Init( void ) {
 	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.display );
 	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.sound );
 	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.network );
-	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.rate );
+	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.packetdup );
 	Menu_AddItem( &networkOptionsInfo.menu, ( void * ) &networkOptionsInfo.back );
 
-	rate = trap_Cvar_VariableValue( "rate" );
-	if( rate <= 2500 ) {
-		networkOptionsInfo.rate.curvalue = 0;
-	}
-	else if( rate <= 3000 ) {
-		networkOptionsInfo.rate.curvalue = 1;
-	}
-	else if( rate <= 4000 ) {
-		networkOptionsInfo.rate.curvalue = 2;
-	}
-	else if( rate <= 5000 ) {
-		networkOptionsInfo.rate.curvalue = 3;
-	}
-	else {
-		networkOptionsInfo.rate.curvalue = 4;
-	}
+	packetdup = trap_Cvar_VariableValue( "cl_packetdup" );
+	networkOptionsInfo.packetdup.curvalue = packetdup <= 1 ? 0 : packetdup >= 3 ? 2 : 1;
 }
 
 

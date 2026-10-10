@@ -223,9 +223,9 @@ itemDef {
 	text "Capture Limit:"
 	cvar "capturelimit"
 	ownerdrawflag UI_SHOW_NETANYTEAMGAME
- 	rect 260 57 128 12
+ 	rect 240 57 148 12
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 65
+	textalignx 85
 	textaligny 12
 	maxchars 4
 	textscale .25        
@@ -272,9 +272,9 @@ itemDef {
       	type ITEM_TYPE_YESNO
 	text "Friendly Fire:"
 	cvar "g_friendlyfire"
-      	rect 260 87 128 12
+      	rect 247 87 141 12
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 78
       	textaligny 12
 	textscale .25        
       	forecolor 1 1 1 1
@@ -287,9 +287,9 @@ itemDef {
       	type ITEM_TYPE_YESNO
 	text "Pure Server:"
 	cvar "sv_pure"
-      	rect 260 102 128 12
+      	rect 251 102 137 12
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 74
       	textaligny 12
 	textscale .25        
       	forecolor 1 1 1 1
@@ -322,7 +322,7 @@ itemDef {
 		// Trinity movement+combat ruleset; labels match BG_ModeName in bg_mode.c
 		cvar "ui_mode"
 		cvarFloatList { "Quake 3" 0 "CPMA" 1 "Quake Live" 2 "QL Turbo" 3 }
-		rect 260 132 128 12
+		rect 260 132 140 12
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 65
 		textaligny 12
@@ -375,9 +375,9 @@ itemDef {
       	type ITEM_TYPE_YESNO
 	text "Auto Download:"
 	cvar "sv_allowdownload"
-	rect 260 190 128 12 
+	rect 233 190 155 12 
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 65
+	textalignx 92
 	textaligny 12
 	textscale .25        
 	forecolor 1 1 1 1
@@ -390,9 +390,9 @@ itemDef {
       	type ITEM_TYPE_YESNO
 	text "Enable Voting:"
 	cvar "g_allowvote"
-      	rect 260 205 128 12 
+      	rect 240 205 148 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 85
       	textaligny 12
 	textscale .25        
       	forecolor 1 1 1 1
@@ -407,9 +407,9 @@ itemDef {
       	type ITEM_TYPE_NUMERICFIELD
 	text "Maximum Players:"
 	cvar "sv_maxclients"
-      	rect 260 220 128 12 
+      	rect 217 220 171 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 108
 	maxchars 4
       	textaligny 12
 	textscale .25        
@@ -425,9 +425,9 @@ itemDef {
       	type ITEM_TYPE_NUMERICFIELD
 	text "Minimum Ping:"
 	cvar "sv_minping"
-      	rect 260 235 128 12 
+      	rect 238 235 150 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 87
 	maxchars 4
       	textaligny 12
 	textscale .25        
@@ -441,9 +441,9 @@ itemDef {
       	type ITEM_TYPE_NUMERICFIELD
 	text "Maximum Ping:"
 	cvar "sv_maxping"
-      	rect 260 250 128 12 
+      	rect 235 250 153 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 90
       	textaligny 12
 	maxchars 4
 	textscale .25        
@@ -472,9 +472,9 @@ itemDef {
       	type ITEM_TYPE_YESNO
 	text "Even Teams:"
 	cvar "g_teamforcebalance"
-      	rect 260 280 128 12 
+      	rect 250 280 138 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 75
       	textaligny 12
 	textscale .25        
       	forecolor 1 1 1 1
@@ -487,9 +487,9 @@ itemDef {
       	type ITEM_TYPE_YESNO
 	text "Do Warmup:"
 	cvar "g_dowarmup"
-      	rect 260 295 128 12 
+      	rect 253 295 135 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 72
       	textaligny 12
 	textscale .25        
       	forecolor 1 1 1 1
@@ -502,9 +502,9 @@ itemDef {
       	type ITEM_TYPE_NUMERICFIELD
 	text "Warmup time:"
 	cvar "g_warmup"
-      	rect 260 310 128 12 
+      	rect 242 310 146 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 83
       	textaligny 12
 	textscale .25  
 	maxchars 4
@@ -518,9 +518,9 @@ itemDef {
       	type ITEM_TYPE_YESNO
 	text "Synchronous Client:"
 	cvar "g_synchronousclients"
-      	rect 260 325 128 12 
+      	rect 206 325 182 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 119
       	textaligny 12
 	textscale .25        
       	forecolor 1 1 1 1
@@ -549,10 +549,10 @@ itemDef {
       	type ITEM_TYPE_NUMERICFIELD
 	text "Zombie Time:"
 	cvar "sv_zombietime"
-      	rect 260 355 128 12 
+      	rect 246 355 142 12 
 	maxchars 4
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 79
       	textaligny 12
 	textscale .25        
       	forecolor 1 1 1 1
@@ -566,9 +566,9 @@ itemDef {
 	text "Reconnect Limit:"
 	cvar "sv_reconnectlimit"
 	maxchars 4
-      	rect 260 370 128 12 
+      	rect 225 370 163 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 100
       	textaligny 12
 	textscale .25        
       	forecolor 1 1 1 1
@@ -580,9 +580,9 @@ itemDef {
  	type ITEM_TYPE_YESNO
 	text "Require Password:"
 	cvar "g_needpassword"
-      	rect 260 385 128 12 
+      	rect 215 385 173 12 
       	textalign ITEM_ALIGN_RIGHT
-      	textalignx 65
+      	textalignx 110
       	textaligny 12
 	textscale .25        
       	forecolor 1 1 1 1

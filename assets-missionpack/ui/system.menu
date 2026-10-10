@@ -225,7 +225,7 @@ itemDef {
 		text "Texture Filter:"
 		cvar "r_texturemode"
 		cvarStrList { "Bilinear", "GL_LINEAR_MIPMAP_NEAREST", "Trilinear", "GL_LINEAR_MIPMAP_LINEAR"  }
-		rect 99 203 256 20
+		rect 99 203 353 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -241,9 +241,9 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Compress Textures:"
 		cvar "r_ext_compressed_textures"
-		rect 99 223 256 20
+		rect 76 223 279 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
+      		textalignx 151
       		textaligny 20
 		textscale .333
       		forecolor 1 1 1 1
@@ -258,7 +258,7 @@ itemDef {
 		text "Video Mode:"
 		cvar "r_mode"
 		cvarFloatList { "Desktop" -2 "320*240" 0 "400*300" 1 "512*384" 2 "640*480" 3 "800*600" 4 "960*720" 5 "1024*768" 6 "1152*864" 7 "1280*1024" 8 "1600*1200" 9 "2048*1536" 10 "856*480 Wide Screen" 11 }
-		rect 99 243 256 20
+		rect 99 243 302 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -650,9 +650,9 @@ itemDef {
 		text "SDL Sound Quality:"
 		cvar "s_khz"
 		cvarFloatList { "44 khz (high)" 44 "22 khz (medium)" 22 "11 khz (low)" 11 }
-		rect 99 208 256 20
+		rect 88 208 272 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
+      		textalignx 139
       		textaligny 20
 		textscale .333
       		forecolor 1 1 1 1
@@ -986,21 +986,48 @@ itemDef {
     	}
 
 	itemDef {
-      		name other
+		name other
 		group grpSystem
-      		type ITEM_TYPE_MULTI
-		text "Net Data Rate:"
-		cvar "rate"
-		cvarFloatList { "<=28.8k" 2500 "33.6k" 3000 "56k" 4000 "ISDN" 5000 "LAN/CABLE/xDSl" 25000  }
+		type ITEM_TYPE_MULTI
+		text "Packet Recovery:"
+		cvar "cl_packetdup"
+		cvarFloatList { "Low" 1 "Medium" 2 "High" 3 }
 		rect 99 222 256 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
-      		textaligny 20
-		textscale .333        
-      		forecolor 1 1 1 1
-      		visible 0 
-			action { uiScript update ui_setRate }
-   		}
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .333
+		forecolor 1 1 1 1
+		visible 0
+		mouseEnter { show msg_packetdup }
+		mouseExit { hide msg_packetdup }
+	}
+
+	itemDef {
+		name msg_packetdup
+		text "Send duplicate input packets"
+		rect 0 290 443 16
+		textalign ITEM_ALIGN_CENTER
+		textalignx 221
+		textaligny 12
+		textscale .25
+		forecolor 1 .75 0 1
+		visible 0
+		decoration
+	}
+
+	itemDef {
+		name msg_packetdup
+		text "(raise if on unreliable network)"
+		rect 0 306 443 16
+		textalign ITEM_ALIGN_CENTER
+		textalignx 221
+		textaligny 12
+		textscale .25
+		forecolor 1 .75 0 1
+		visible 0
+		decoration
+	}
 
 	itemDef {
 		name other

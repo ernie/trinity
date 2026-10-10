@@ -38,9 +38,9 @@ itemDef {
 	text "View Empty:"
 	cvar "ui_browserShowEmpty"
 	textscale .25
-	rect 107 72 110 20
+	rect 69 72 148 20
 	textalign ITEM_ALIGN_CENTER
-	textalignx 0
+	textalignx 38
 	textaligny 17
 	forecolor 1 1 1 1
 	visible 1
@@ -53,9 +53,9 @@ itemDef {
 	text "View Full:"
 	cvar "ui_browserShowFull"
 	textscale .25
-	rect 107 100 110 20
+	rect 76 100 141 20
 	textalign ITEM_ALIGN_CENTER
-	textalignx 0
+	textalignx 31
 	textaligny 17
 	forecolor 1 1 1 1
 	visible 1
@@ -68,9 +68,9 @@ itemDef {
 	text "Exclude Bots:"
 	cvar "ui_browserExcludeBots"
 	textscale .25
-	rect 107 128 110 20
+	rect 64 128 153 20
 	textalign ITEM_ALIGN_CENTER
-	textalignx 0
+	textalignx 43
 	textaligny 17
 	forecolor 1 1 1 1
 	visible 1

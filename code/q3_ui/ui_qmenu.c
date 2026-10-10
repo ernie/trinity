@@ -805,6 +805,9 @@ static sfxHandle_t SpinControl_Key( menulist_s *s, int key )
 	sound = 0;
 	switch (key)
 	{
+		// Enter cycles like a click, as it toggles a radio button
+		case K_ENTER:
+		case K_KP_ENTER:
 		case K_MOUSE1:
 			s->curvalue++;
 			if (s->curvalue >= s->numitems)

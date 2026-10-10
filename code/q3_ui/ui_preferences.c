@@ -48,8 +48,8 @@ GAME OPTIONS MENU
 #define ID_TVDOWNLOAD			144
 #define ID_CROSSHAIRSIZE		145
 #define ID_CROSSHAIRHEALTH		146
-#define ID_DRAWFFABACKGROUND	147
 #define ID_BLOODDENSITY			148
+#define ID_DRAWTIMER			149
 
 #define	NUM_CROSSHAIRS			10
 
@@ -74,7 +74,7 @@ typedef struct {
 	menuradiobutton_s	synceveryframe;
 	menuradiobutton_s	forcemodel;
 	menulist_s			drawteamoverlay;
-	menulist_s			drawffabackground;
+	menuradiobutton_s	drawtimer;
 	menulist_s			damageeffect;
 	menulist_s			blood;
 	menulist_s			blooddensity;
@@ -99,13 +99,6 @@ static const char *teamoverlay_names[] =
 	"upper right",
 	"lower right",
 	"lower left",
-	NULL
-};
-
-static const char *hudbackground_names[] =
-{
-	"Team",
-	"Always",
 	NULL
 };
 
@@ -204,7 +197,7 @@ static void Preferences_SetMenuItems( void ) {
 	s_preferences.synceveryframe.curvalue	= trap_Cvar_VariableValue( "r_swapinterval" ) != 0;
 	s_preferences.forcemodel.curvalue		= trap_Cvar_VariableValue( "cg_forcemodel" ) != 0;
 	s_preferences.drawteamoverlay.curvalue	= Com_Clamp( 0, 3, trap_Cvar_VariableValue( "cg_drawTeamOverlay" ) );
-	s_preferences.drawffabackground.curvalue = Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_drawFFABackground" ) );
+	s_preferences.drawtimer.curvalue		= trap_Cvar_VariableValue( "cg_drawTimer" ) != 0;
 	s_preferences.damageeffect.curvalue		= trap_Cvar_VariableValue( "cg_damageEffect" ) != 0;
 	s_preferences.blood.curvalue			= Com_Clamp( 0, 2, trap_Cvar_VariableValue( "com_blood" ) );
 	s_preferences.blooddensity.curvalue		= Com_Clamp( 0, 2, trap_Cvar_VariableValue( "cg_bloodDensity" ) );
@@ -281,8 +274,8 @@ static void Preferences_Event( void* ptr, int notification ) {
 		trap_Cvar_SetValue( "cg_drawTeamOverlay", s_preferences.drawteamoverlay.curvalue );
 		break;
 
-	case ID_DRAWFFABACKGROUND:
-		trap_Cvar_SetValue( "cg_drawFFABackground", s_preferences.drawffabackground.curvalue );
+	case ID_DRAWTIMER:
+		trap_Cvar_SetValue( "cg_drawTimer", s_preferences.drawtimer.curvalue );
 		break;
 
 	case ID_ALLOWDOWNLOAD:
@@ -641,14 +634,13 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.drawteamoverlay.itemnames			= teamoverlay_names;
 
 	y += BIGCHAR_HEIGHT;
-	s_preferences.drawffabackground.generic.type     = MTYPE_SPINCONTROL;
-	s_preferences.drawffabackground.generic.name	 = "HUD Background:";
-	s_preferences.drawffabackground.generic.flags	 = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_preferences.drawffabackground.generic.callback = Preferences_Event;
-	s_preferences.drawffabackground.generic.id       = ID_DRAWFFABACKGROUND;
-	s_preferences.drawffabackground.generic.x	     = PREFERENCES_X_POS;
-	s_preferences.drawffabackground.generic.y	     = y;
-	s_preferences.drawffabackground.itemnames		 = hudbackground_names;
+	s_preferences.drawtimer.generic.type     = MTYPE_RADIOBUTTON;
+	s_preferences.drawtimer.generic.name	 = "Show Time:";
+	s_preferences.drawtimer.generic.flags	 = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.drawtimer.generic.callback = Preferences_Event;
+	s_preferences.drawtimer.generic.id       = ID_DRAWTIMER;
+	s_preferences.drawtimer.generic.x	     = PREFERENCES_X_POS;
+	s_preferences.drawtimer.generic.y	     = y;
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.damageeffect.generic.type       = MTYPE_SPINCONTROL;
@@ -750,7 +742,7 @@ static void Preferences_MenuInit( void ) {
 	}
 	Menu_AddItem( &s_preferences.menu, &s_preferences.forcemodel );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.drawteamoverlay );
-	Menu_AddItem( &s_preferences.menu, &s_preferences.drawffabackground );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.drawtimer );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageeffect );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.blood );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.blooddensity );

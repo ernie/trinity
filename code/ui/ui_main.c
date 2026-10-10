@@ -2427,7 +2427,8 @@ static void UI_DrawCrosshair(rectDef_t *rect, float scale, vec4_t color) {
 	crosshairColor[3] = 1.0f;
 
 	trap_R_SetColor( crosshairColor );
-	UI_DrawHandlePic( rect->x, rect->y - rect->h, rect->w, rect->h, uiInfo.uiDC.Assets.crosshairShader[uiInfo.currentCrosshair]);
+	// square at the row height; a full-width row only widens the hit area
+	UI_DrawHandlePic( rect->x, rect->y - rect->h, rect->h, rect->h, uiInfo.uiDC.Assets.crosshairShader[uiInfo.currentCrosshair]);
 	trap_R_SetColor( NULL );
 }
 
@@ -3949,24 +3950,6 @@ static void UI_Update(const char *name) {
 
  	if (Q_stricmp(name, "ui_SetName") == 0) {
 		trap_Cvar_Set( "name", UI_Cvar_VariableString("ui_Name"));
- 	} else if (Q_stricmp(name, "ui_setRate") == 0) {
-		float rate = trap_Cvar_VariableValue("rate");
-		if (rate >= 5000) {
-#if 0
-			trap_Cvar_Set("cl_maxpackets", "30");
-#endif
-			trap_Cvar_Set("cl_packetdup", "1");
-		} else if (rate >= 4000) {
-#if 0
-			trap_Cvar_Set("cl_maxpackets", "15");
-#endif
-			trap_Cvar_Set("cl_packetdup", "2");		// favor less prediction errors when there's packet loss
-		} else {
-#if 0
-			trap_Cvar_Set("cl_maxpackets", "15");
-#endif
-			trap_Cvar_Set("cl_packetdup", "1");		// favor lower bandwidth
-		}
  	} else if (Q_stricmp(name, "ui_GetName") == 0) {
 		trap_Cvar_Set( "ui_Name", UI_Cvar_VariableString("name"));
  	} else if (Q_stricmp(name, "r_colorbits") == 0) {

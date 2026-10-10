@@ -35,10 +35,10 @@ itemDef {
       		name options
 		group grpOptions
 		text "Crosshair:"
-		rect 158 85 20 20
+		rect 30 85 210 20
 		ownerdraw UI_CROSSHAIR
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 0
+      		textalignx 128
       		textaligny 20
 		textscale .3
       		forecolor 1 1 1 1
@@ -48,9 +48,24 @@ itemDef {
 itemDef {
 		name options
 		group grpOptions
+		type ITEM_TYPE_SLIDER
+		text "Crosshair Size:"
+		cvarfloat "cg_crosshairSize" 24 8 24
+		rect 30 105 270 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+	}
+
+itemDef {
+		name options
+		group grpOptions
 		text "Crosshair Color:"
 		ownerdraw UI_CROSSHAIRCOLOR
-		rect 30 105 210 20
+		rect 30 125 270 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -65,9 +80,9 @@ itemDef {
 		type ITEM_TYPE_YESNO
 		text "Crosshair Health Tint:"
 		cvar "cg_crosshairHealth"
-		rect 30 125 210 20
+		rect 8 145 232 20
 		textalign ITEM_ALIGN_RIGHT
-		textalignx 128
+		textalignx 150
 		textaligny 20
 		textscale .3
 		forecolor 1 1 1 1
@@ -80,7 +95,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Simple Items:"
 		cvar "cg_simpleItems"
-		rect 30 145 210 20
+		rect 30 165 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -95,7 +110,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Marks On Walls:"
 		cvar "cg_marks"
-		rect 30 165 210 20
+		rect 30 185 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -110,9 +125,9 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Show Floating Scores:"
 		cvar "cg_scorePlums"
-		rect 30 185 210 20
+		rect 9 205 231 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
+      		textalignx 149
       		textaligny 20
 		textscale .3
       		forecolor 1 1 1 1
@@ -126,7 +141,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "cg_brassTime"
 		cvarFloatList { "High" 2500 "Med" 1250 "Off" 0 }
-		rect 30 205 210 20
+		rect 30 225 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -140,7 +155,7 @@ itemDef {
 		group grpOptions
 		text "Dynamic Lights:"
 		ownerdraw UI_DYNAMICLIGHTS
-		rect 30 225 210 20
+		rect 30 245 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -155,7 +170,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Identify Target:"
 		cvar "cg_drawCrosshairNames"
-		rect 30 245 210 20
+		rect 30 265 210 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -170,9 +185,9 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Force Player Models:"
 		cvar "cg_forceModel"
-		rect 30 265 210 20
+		rect 16 285 224 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
+      		textalignx 142
       		textaligny 20
 		textscale .3
       		forecolor 1 1 1 1
@@ -185,9 +200,9 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Draw Team Overlay:"
 		cvar "cg_drawTeamOverlay"
-		rect 30 285 210 20
+		rect 23 305 217 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
+      		textalignx 135
       		textaligny 20
 		textscale .3
       		forecolor 1 1 1 1
@@ -200,9 +215,9 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Show Time:"
 		cvar "cg_drawTimer"
-		rect 30 305 210 20
+		rect 300 325 155 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
+      		textalignx 73
       		textaligny 20
 		textscale .3
       		forecolor 1 1 1 1
@@ -216,7 +231,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "cg_followMode"
 		cvarFloatList { "First-person" 0 "Third-person" 1 }
-		rect 30 325 210 20
+		rect 30 325 270 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -247,9 +262,9 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Taunts Off:"
 		cvar "cg_noTaunt"
-		rect 245 105 210 20
+		rect 300 105 155 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
+      		textalignx 73
       		textaligny 20
 		textscale .3
       		forecolor 1 1 1 1
@@ -258,12 +273,13 @@ itemDef {
 	itemDef {
       		name options
 		group grpOptions
-      		type ITEM_TYPE_YESNO
-		text "Voice Text Off:"
+      		type ITEM_TYPE_MULTI
+		text "Voice Text:"
 		cvar "cg_noVoiceText"
-		rect 245 125 210 20
+		cvarFloatList { "On" 0 "Off" 1 }
+		rect 300 125 155 20
       		textalign ITEM_ALIGN_RIGHT
-      		textalignx 128
+      		textalignx 73
       		textaligny 20
 		textscale .3
       		forecolor 1 1 1 1
