@@ -1829,8 +1829,11 @@ static void UI_DrawMapCinematic(rectDef_t *rect, float scale, vec4_t color, qboo
 static qboolean updateModel = qtrue;
 static qboolean q3Model = qfalse;
 
-static void UI_DrawPlayerModel(rectDef_t *rect) {
-  static playerInfo_t info;
+static playerInfo_t playerModelInfo;
+
+// menu init runs this too, so the first draw doesn't stall on model registration
+static void UI_PreparePlayerModel(void) {
+  playerInfo_t *info = &playerModelInfo;
   char model[MAX_QPATH];
   char team[256];
 	char head[256];
@@ -1856,19 +1859,21 @@ static void UI_DrawPlayerModel(rectDef_t *rect) {
 		}
 	}
   if (updateModel) {
-  	memset( &info, 0, sizeof(playerInfo_t) );
+  	memset( info, 0, sizeof(playerInfo_t) );
   	viewangles[YAW]   = 180 - 10;
   	viewangles[PITCH] = 0;
   	viewangles[ROLL]  = 0;
   	VectorClear( moveangles );
-    UI_PlayerInfo_SetModel( &info, model, head, team);
-    UI_PlayerInfo_SetInfo( &info, LEGS_IDLE, TORSO_STAND, viewangles, vec3_origin, WP_MACHINEGUN, qfalse );
-//		UI_RegisterClientModelname( &info, model, head, team);
+    UI_PlayerInfo_SetModel( info, model, head, team);
+    UI_PlayerInfo_SetInfo( info, LEGS_IDLE, TORSO_STAND, viewangles, vec3_origin, WP_MACHINEGUN, qfalse );
+//		UI_RegisterClientModelname( info, model, head, team);
     updateModel = qfalse;
   }
+}
 
-  UI_DrawPlayer( rect->x, rect->y, rect->w, rect->h, &info, uiInfo.uiDC.realTime / 2);
-
+static void UI_DrawPlayerModel(rectDef_t *rect) {
+  UI_PreparePlayerModel();
+  UI_DrawPlayer( rect->x, rect->y, rect->w, rect->h, &playerModelInfo, uiInfo.uiDC.realTime / 2);
 }
 
 static void UI_DrawNetSource(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
@@ -5282,6 +5287,17 @@ static void UI_BuildServerStatus(qboolean force) {
 	}
 }
 
+static qboolean q3ModelListBuilt;
+static void UI_BuildQ3Model_List( void );
+
+// the list scans every player model's skins, so it waits for the menu that shows it
+static void UI_EnsureQ3ModelList( void ) {
+	if ( !q3ModelListBuilt ) {
+		q3ModelListBuilt = qtrue;
+		UI_BuildQ3Model_List();
+	}
+}
+
 /*
 ==================
 UI_FeederCount
@@ -5291,6 +5307,7 @@ static int UI_FeederCount(float feederID) {
 	if (feederID == FEEDER_HEADS) {
 		return UI_HeadCountByTeam();
 	} else if (feederID == FEEDER_Q3HEADS) {
+		UI_EnsureQ3ModelList();
 		return uiInfo.q3HeadCount;
 	} else if (feederID == FEEDER_CINEMATICS) {
 		return uiInfo.movieCount;
@@ -5490,6 +5507,7 @@ static const char *UI_FeederItemText(float feederID, int index, int column, qhan
 		int actual;
 		return UI_SelectedHead(index, &actual);
 	} else if (feederID == FEEDER_Q3HEADS) {
+		UI_EnsureQ3ModelList();
 		if (index >= 0 && index < uiInfo.q3HeadCount) {
 			return uiInfo.q3HeadNames[index];
 		}
@@ -5603,6 +5621,7 @@ static qhandle_t UI_FeederItemImage(float feederID, int index) {
 		return uiInfo.characterList[index].headImage;
 	}
   } else if (feederID == FEEDER_Q3HEADS) {
+  	UI_EnsureQ3ModelList();
     if (index >= 0 && index < uiInfo.q3HeadCount) {
       return uiInfo.q3HeadIcons[index];
     }
@@ -5631,6 +5650,7 @@ static void UI_FeederSelection(float feederID, int index) {
 		updateModel = qtrue;
     }
   } else if (feederID == FEEDER_Q3HEADS) {
+  	UI_EnsureQ3ModelList();
     if (index >= 0 && index < uiInfo.q3HeadCount) {
       trap_Cvar_Set( "model", uiInfo.q3HeadNames[index]);
       trap_Cvar_Set( "headmodel", uiInfo.q3HeadNames[index]);
@@ -6393,7 +6413,6 @@ void _UI_Init( qboolean inGameLoad ) {
 	trap_LAN_LoadCachedServers();
 	UI_LoadBestScores(uiInfo.mapList[ui_currentMap.integer].mapLoadName, uiInfo.gameTypes[ui_gameType.integer].gtEnum);
 
-	UI_BuildQ3Model_List();
 	UI_LoadBots();
 
 	// sets defaults for ui temp cvars
@@ -6415,6 +6434,8 @@ void _UI_Init( qboolean inGameLoad ) {
 	trap_Cvar_Set("ui_actualNetGameType", va("%d", ui_netGameType.integer));
 
 	UI_UpdateHDRAvail( qtrue );
+
+	UI_PreparePlayerModel();
 }
 
 
