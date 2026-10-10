@@ -225,9 +225,9 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "SP 6DoF Movement:"
 	cvar "vr_6dof"
-	rect 301 183 256 20
+	rect 283 183 274 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 146
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -269,9 +269,9 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "bHaptics Support:"
 	cvar "vr_bhaptics"
-	rect 301 249 256 20
+	rect 293 249 264 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 136
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -314,9 +314,9 @@ itemDef {
 	text "Two-Handed Weapons:"
 	cvar "vr_twoHandedWeapons"
 	cvarFloatList { "Disabled" 0 "Enabled (Basic)" 1 "Enabled (VR Gun Stock)" 2 }
-	rect 301 62 256 20
+	rect 260 62 351 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 169
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -329,7 +329,7 @@ itemDef {
 	text "Direction Mode:"
 	cvar "vr_directionMode"
 	cvarFloatList { "HMD (Default)" 0 "Off-hand Controller" 1 }
-	rect 301 84 256 20
+	rect 301 84 284 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
 	textaligny 20
@@ -358,9 +358,9 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Smooth turn speed:"
 	cvarfloat "vr_sensitivity" 100 50 150
-	rect 301 128 256 20
+	rect 282 128 275 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 147
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -388,9 +388,9 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Switch Thumbsticks:"
 	cvar "vr_switchThumbsticks"
-	rect 301 172 256 20
+	rect 273 172 284 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 156
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -402,9 +402,9 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Trigger Sensitivity:"
 	cvarfloat "vr_triggerSensitivity" 0.5 0.1 0.9
-	rect 301 194 256 20
+	rect 283 194 274 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 146
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -461,9 +461,23 @@ itemDef {
 	text "Weapon Wheel Mode:"
 	cvar "vr_weaponSelectorMode"
 	cvarFloatList { "VR Style / Pointing" 0 "Classic / Thumbstick" 1 }
-	rect 301 238 256 20
+	rect 269 238 329 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 160
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
+	text "Gauntlet On Weapon Wheel:"
+	cvar "cg_weaponSelectorGauntlet"
+	rect 222 260 335 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 207
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -475,9 +489,9 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Simple Items (Weapon Wheel):"
 	cvar "cg_weaponSelectorSimple2DIcons"
-	rect 301 260 256 20
+	rect 199 282 358 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 230
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -489,9 +503,9 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Autoswitch Weapons:"
 	cvar "cg_autoswitch"
-	rect 301 282 256 20
+	rect 268 304 289 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 161
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -503,7 +517,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Send Roll Angle:"
 	cvar "vr_sendRollToServer"
-	rect 301 304 256 20
+	rect 301 326 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
 	textaligny 20
@@ -564,9 +578,9 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "HUD Vertical Position:"
 	cvarfloat "vr_hudYOffset" 0 -200 200
-	rect 301 95 256 20
+	rect 264 95 293 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 165
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -579,9 +593,9 @@ itemDef {
 	text "Virtual screen mode:"
 	cvar "vr_virtualScreenMode"
 	cvarFloatList { "Fixed" 0 "Follow" 1 }
-	rect 301 117 256 20
+	rect 272 117 285 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 157
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -593,9 +607,9 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Virtual screen controllers:"
 	cvar "vr_controllerModels"
-	rect 301 139 256 20
+	rect 228 139 329 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 201
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -607,9 +621,9 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Draw HUD On Weapon Wheel:"
 	cvar "vr_weaponSelectorWithHud"
-	rect 301 161 256 20
+	rect 214 161 343 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 215
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -621,9 +635,9 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Show Item In Hand:"
 	cvar "vr_showItemInHand"
-	rect 301 183 256 20
+	rect 285 183 272 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 144
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -635,9 +649,9 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Show Console Messages:"
 	cvar "vr_showConsoleMessages"
-	rect 301 205 256 20
+	rect 240 205 317 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 189
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1
@@ -678,9 +692,9 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Screen Curvature:"
 	cvarfloat "vr_screenCurvature" 0 0 1
-	rect 301 271 256 20
+	rect 290 271 267 20
 	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
+	textalignx 139
 	textaligny 20
 	textscale .333
 	forecolor 1 1 1 1

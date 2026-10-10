@@ -58,6 +58,7 @@ VR CONTROLS OPTIONS MENU
 #define ID_AUTOSWITCH			141
 #define ID_SENDROLL				142
 #define ID_WEAPONPITCHRESET		143
+#define ID_WHEELGAUNTLET		144
 
 #define ID_BACK					150
 
@@ -83,6 +84,7 @@ typedef struct {
 	menutext_s			weaponpitchvalue;
 	menubitmap_s		weaponpitchreset;
 	menulist_s			weaponselectormode;
+	menuradiobutton_s	wheelgauntlet;
 	menuradiobutton_s	holster2d;
 	menuradiobutton_s	autoswitch;
 	menuradiobutton_s	sendroll;
@@ -116,6 +118,7 @@ static void VRControls_SetMenuItems( void ) {
 	s_vrcontrols.weaponpitch.curvalue		= trap_Cvar_VariableValue( "vr_weaponPitch" ) + 25;
 	VRControls_UpdatePitchLabel();
 	s_vrcontrols.weaponselectormode.curvalue	= (int)trap_Cvar_VariableValue( "vr_weaponSelectorMode" ) % 2;
+	s_vrcontrols.wheelgauntlet.curvalue		= trap_Cvar_VariableValue( "cg_weaponSelectorGauntlet" ) != 0;
 	s_vrcontrols.holster2d.curvalue			= trap_Cvar_VariableValue( "cg_weaponSelectorSimple2DIcons" ) != 0;
 	s_vrcontrols.autoswitch.curvalue		= trap_Cvar_VariableValue( "cg_autoswitch" ) != 0;
 	s_vrcontrols.sendroll.curvalue			= trap_Cvar_VariableValue( "vr_sendRollToServer" ) != 0;
@@ -173,6 +176,10 @@ static void VRControls_MenuEvent( void* ptr, int notification ) {
 
 		case ID_WEAPONSELECTORMODE:
 			trap_Cvar_SetValue( "vr_weaponSelectorMode", s_vrcontrols.weaponselectormode.curvalue );
+			break;
+
+		case ID_WHEELGAUNTLET:
+			trap_Cvar_SetValue( "cg_weaponSelectorGauntlet", s_vrcontrols.wheelgauntlet.curvalue );
 			break;
 
 		case ID_HOLSTER2D:
@@ -286,8 +293,8 @@ static void VRControls_MenuInit( void ) {
 	s_vrcontrols.framer.width			= 256;
 	s_vrcontrols.framer.height			= 334;
 
-	// Center the 13-row block (small-font rows) in the frame interior.
-	y = VR_FRAME_CENTER_Y - ( 12 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
+	// Center the 14-row block (small-font rows) in the frame interior.
+	y = VR_FRAME_CENTER_Y - ( 13 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
 	s_vrcontrols.scope.generic.type			= MTYPE_RADIOBUTTON;
 	s_vrcontrols.scope.generic.name			= "Railgun Scope:";
 	s_vrcontrols.scope.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -420,6 +427,15 @@ static void VRControls_MenuInit( void ) {
 	s_vrcontrols.weaponselectormode.numitems			= 2;
 
 	y += BIGCHAR_HEIGHT+2;
+	s_vrcontrols.wheelgauntlet.generic.type		= MTYPE_RADIOBUTTON;
+	s_vrcontrols.wheelgauntlet.generic.name		= "Gauntlet On Weapon Wheel:";
+	s_vrcontrols.wheelgauntlet.generic.flags	= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_vrcontrols.wheelgauntlet.generic.callback	= VRControls_MenuEvent;
+	s_vrcontrols.wheelgauntlet.generic.id		= ID_WHEELGAUNTLET;
+	s_vrcontrols.wheelgauntlet.generic.x		= VR_X_POS;
+	s_vrcontrols.wheelgauntlet.generic.y		= y;
+
+	y += BIGCHAR_HEIGHT+2;
 	s_vrcontrols.holster2d.generic.type		= MTYPE_RADIOBUTTON;
 	s_vrcontrols.holster2d.generic.name		= "Simple Items (Weapon Wheel):";
 	s_vrcontrols.holster2d.generic.flags	= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -475,6 +491,7 @@ static void VRControls_MenuInit( void ) {
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponpitchvalue );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponpitchreset );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponselectormode );
+	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.wheelgauntlet );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.holster2d );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.autoswitch );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.sendroll );

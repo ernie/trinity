@@ -60,6 +60,7 @@ static float vrc_hudYawX, vrc_hudYawY, vrc_hudPitch;
 static vmCvar_t cg_debugWeaponAiming;
 static vmCvar_t cg_weaponSelectorSimple2DIcons;
 static vmCvar_t cg_weaponSelectorWeapons;
+static vmCvar_t cg_weaponSelectorGauntlet;
 static vmCvar_t cg_firstPersonBodyScale;
 static vmCvar_t vr_snapturn;
 
@@ -209,6 +210,7 @@ void CG_VR_Init( void ) {
 	// archived list would leak into other mods' first-run configs through
 	// the search path. A customized list belongs in autoexec.cfg.
 	trap_Cvar_Register( &cg_weaponSelectorWeapons, "cg_weaponSelectorWeapons", "", 0 );
+	trap_Cvar_Register( &cg_weaponSelectorGauntlet, "cg_weaponSelectorGauntlet", "0", CVAR_ARCHIVE );
 	trap_Cvar_Register( &cg_firstPersonBodyScale, "cg_firstPersonBodyScale", "0", CVAR_ARCHIVE );
 	trap_Cvar_Register( &vr_snapturn, "vr_snapturn", "0", 0 );
 
@@ -1784,9 +1786,9 @@ static float length(float x, float y)
 // default set in place, and "!name" hides a weapon from later tokens and
 // "*" expansions (exclusions come before the "*" they filter). Unknown and
 // duplicate tokens are dropped, so listing a weapon before "*" promotes it
-// out of the default order. Empty (the default) is "*": every weapon
-// except the gauntlet, and the grappling hook only while the server
-// doesn't hand it out (g_grapple), in weapon_t order.
+// out of the default order. Empty (the default) is "*": every weapon in
+// weapon_t order, the gauntlet only with cg_weaponSelectorGauntlet, and the
+// grapple last while g_grapple is on.
 static int vrc_wheelSlots[WP_NUM_WEAPONS];
 static int vrc_wheelSlotCount = 0;
 
@@ -1818,10 +1820,11 @@ static void VR_WheelAppendBuiltins( qboolean *seen )
 {
 	int weaponId;
 
+	trap_Cvar_Update( &cg_weaponSelectorGauntlet );
 	for ( weaponId = 1; weaponId < WP_NUM_WEAPONS; ++weaponId ) {
-		// the grapple joins the built-in set when the server hands it out
-		if ( weaponId == WP_GAUNTLET
-			|| ( weaponId == WP_GRAPPLING_HOOK && !VR_HostGrappleEnabled() ) ) {
+		// the grapple goes last below, so it keeps the top slot in Team Arena too
+		if ( weaponId == WP_GRAPPLING_HOOK
+			|| ( weaponId == WP_GAUNTLET && !cg_weaponSelectorGauntlet.integer ) ) {
 			continue;
 		}
 		if ( seen[weaponId] ) {
@@ -1829,6 +1832,10 @@ static void VR_WheelAppendBuiltins( qboolean *seen )
 		}
 		seen[weaponId] = qtrue;
 		vrc_wheelSlots[vrc_wheelSlotCount++] = weaponId;
+	}
+	if ( VR_HostGrappleEnabled() && !seen[WP_GRAPPLING_HOOK] ) {
+		seen[WP_GRAPPLING_HOOK] = qtrue;
+		vrc_wheelSlots[vrc_wheelSlotCount++] = WP_GRAPPLING_HOOK;
 	}
 }
 
@@ -1918,6 +1925,16 @@ static void VR_ParseWheelWeapons( void )
 	if ( vrc_wheelSlotCount == 0 ) {
 		Com_Printf( "cg_weaponSelectorWeapons: every weapon excluded - the wheel is empty\n" );
 	}
+}
+
+/* A slot's icon position, reach out from the wheel's center, and the wheel's forward there. */
+static void VR_WheelIcon( const vec3_t wheelOrigin, const vec3_t wheelAngles, float slotAngle, float reach, vec3_t iconOrigin,
+	vec3_t forward ) {
+	vec3_t angles, up;
+
+	VectorSet( angles, wheelAngles[PITCH], wheelAngles[YAW], slotAngle );
+	AngleVectors( angles, forward, NULL, up );
+	VectorMA( wheelOrigin, reach, up, iconOrigin );
 }
 
 void CG_DrawWeaponSelector( void )
@@ -2082,6 +2099,39 @@ void CG_DrawWeaponSelector( void )
 	}
 
 	selected = qfalse;
+	// the nearest icon in reach wins, so neighboring icons split the space between them evenly
+	if (selectorMode == WS_CONTROLLER && frac == 1.0f)
+	{
+		float nearest = 1.4f;
+		int nearestWeapon = WP_NONE;
+
+		for (angleIndex = 1; angleIndex <= vrc_wheelSlotCount; ++angleIndex)
+		{
+			vec3_t iconOrigin, forward, diff;
+			float length;
+
+			weaponId = vrc_wheelSlots[angleIndex - 1];
+			if (!CG_WeaponSelectable(weaponId) || !cg.snap->ps.ammo[weaponId])
+				continue;
+			VR_WheelIcon(wheelOrigin, wheelAngles, wheelIconAngles[angleIndex], radius, iconOrigin, forward);
+			VectorSubtract(selectorOrigin, iconOrigin, diff);
+			length = VectorLength(diff);
+			if (length <= nearest)
+			{
+				nearest = length;
+				nearestWeapon = weaponId;
+			}
+		}
+		if (nearestWeapon != WP_NONE)
+		{
+			if (vrc_weaponSelectorSelection != nearestWeapon)
+			{
+				vrc_weaponSelectorSelection = nearestWeapon;
+				CG_VRHaptic("selector_icon", 0, 0, 100, 0, 0);
+			}
+			selected = qtrue;
+		}
+	}
 	for (angleIndex = 1; angleIndex <= vrc_wheelSlotCount; ++angleIndex)
 	{
 		weaponId = vrc_wheelSlots[angleIndex - 1];
@@ -2090,39 +2140,14 @@ void CG_DrawWeaponSelector( void )
 
 		{
 			qboolean selectable = CG_WeaponSelectable(weaponId) && cg.snap->ps.ammo[weaponId];
-			vec3_t angles, iconOrigin,iconBackground,iconForeground;
-			vec3_t forward, up;
+			vec3_t iconOrigin,iconBackground,iconForeground;
+			vec3_t forward;
 
-			//first calculate wheel slot position
-			VectorClear(angles);
-			angles[YAW] = wheelAngles[YAW];
-			angles[PITCH] = wheelAngles[PITCH];
-			angles[ROLL] = wheelIconAngles[angleIndex];
-			AngleVectors(angles, forward, NULL, up);
-
-			VectorMA(wheelOrigin, (radius*frac), up, iconOrigin);
+			VR_WheelIcon(wheelOrigin, wheelAngles, wheelIconAngles[angleIndex], radius*frac, iconOrigin, forward);
 			VectorMA(iconOrigin, 0.2f, forward, iconBackground);
 			VectorMA(iconOrigin, -0.2f, forward, iconForeground);
 
-			if (selectorMode == WS_CONTROLLER)
-			{
-				vec3_t diff;
-				float length;
-
-				VectorSubtract(selectorOrigin, iconOrigin, diff);
-				length = VectorLength(diff);
-				if (length <= 1.4f && frac == 1.0f && selectable)
-				{
-					if (vrc_weaponSelectorSelection != weaponId)
-					{
-						vrc_weaponSelectorSelection = weaponId;
-						CG_VRHaptic("selector_icon", 0, 0, 100, 0, 0);
-					}
-
-					selected = qtrue;
-				}
-			}
-			else
+			if (selectorMode != WS_CONTROLLER)
 			{
 				//For HMD selector, the weapon can be selected before the selector has finished
 				//its opening animation, use angles to identify the selected weapon, rather than

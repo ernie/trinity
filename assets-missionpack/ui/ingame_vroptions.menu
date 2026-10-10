@@ -545,7 +545,7 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Weapon Pitch:"
 	cvarfloat "vr_weaponPitch" 0 -25 25
-	rect 28 194 286 18
+	rect 28 194 294 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -602,9 +602,23 @@ itemDef {
 	name controls
 	group grpVR
 	type ITEM_TYPE_YESNO
+	text "Gauntlet On Weapon Wheel:"
+	cvar "cg_weaponSelectorGauntlet"
+	rect 28 230 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_YESNO
 	text "Simple Items (Weapon Wheel):"
 	cvar "cg_weaponSelectorSimple2DIcons"
-	rect 28 230 340 18
+	rect 28 248 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -618,7 +632,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Autoswitch Weapons:"
 	cvar "cg_autoswitch"
-	rect 28 248 340 18
+	rect 28 266 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -632,7 +646,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Send Roll Angle:"
 	cvar "vr_sendRollToServer"
-	rect 28 266 340 18
+	rect 28 284 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
