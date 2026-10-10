@@ -163,9 +163,8 @@ static void VRHudDisplay_ReadFoveationCaps( void ) {
 }
 
 
-// Engines without vr_refreshrates get the classic choices
+// with no runtime list, offer the engine's current rate rather than invent choices
 static void VRHudDisplay_ReadRefreshRates( void ) {
-	static const int fallback[] = { 60, 72, 80, 90, 120 };
 	char list[256];
 	char *p;
 	int i;
@@ -181,10 +180,7 @@ static void VRHudDisplay_ReadRefreshRates( void ) {
 		s_refreshRates[s_numRefreshRates++] = (int)( atof( token ) + 0.5f );
 	}
 	if ( s_numRefreshRates == 0 ) {
-		for ( i = 0; i < ARRAY_LEN( fallback ); i++ ) {
-			s_refreshRates[i] = fallback[i];
-		}
-		s_numRefreshRates = ARRAY_LEN( fallback );
+		s_refreshRates[s_numRefreshRates++] = (int)( trap_Cvar_VariableValue( "vr_refreshrate" ) + 0.5f );
 	}
 	for ( i = 0; i < s_numRefreshRates; i++ ) {
 		Com_sprintf( s_refreshRateNames[i], sizeof( s_refreshRateNames[i] ), "%i", s_refreshRates[i] );

@@ -199,6 +199,8 @@ static void UI_VR_Attach( void ) {
 	vr->menuCursorActive = vrActive;
 }
 
+static int UI_FoveationMax( void );
+
 // Menus gate their VR rows on these with cvarTest; a flatscreen engine reads 0.
 void UI_VR_Init( void ) {
 	trap_Cvar_Set( "ui_vrModeSwitchAvailable", UI_VR_CanSwitchMode() ? "1" : "0" );
@@ -207,6 +209,7 @@ void UI_VR_Init( void ) {
 	trap_Cvar_Register( NULL, "ui_vrActive", "0", CVAR_ROM );
 	trap_Cvar_Set( "ui_vrActive", vrActive ? "1" : "0" );
 	trap_Cvar_Set( "ui_vrBindingsAvailable", UI_VR_BindingsAvailable() ? "1" : "0" );
+	trap_Cvar_Set( "ui_vrFoveationAvailable", UI_FoveationMax() >= 0 ? "1" : "0" );
 }
 
 void UI_VR_Shutdown( void ) {
@@ -563,11 +566,10 @@ entry points below from their default cases; the IDs are in ui/menudef.h.
 static int uiRefreshRates[MAX_REFRESH_RATES];
 static int uiNumRefreshRates;
 
+// with no runtime list, offer the engine's current rate rather than invent choices
 static void UI_ReadRefreshRates(void) {
-	static const int fallback[] = { 60, 72, 80, 90, 120 };
 	char list[256];
 	char *p;
-	int i;
 
 	uiNumRefreshRates = 0;
 	trap_Cvar_VariableStringBuffer("vr_refreshrates", list, sizeof(list));
@@ -580,10 +582,7 @@ static void UI_ReadRefreshRates(void) {
 		uiRefreshRates[uiNumRefreshRates++] = (int)(atof(token) + 0.5f);
 	}
 	if (uiNumRefreshRates == 0) {
-		for (i = 0; i < ARRAY_LEN(fallback); i++) {
-			uiRefreshRates[i] = fallback[i];
-		}
-		uiNumRefreshRates = ARRAY_LEN(fallback);
+		uiRefreshRates[uiNumRefreshRates++] = (int)(trap_Cvar_VariableValue("vr_refreshrate") + 0.5f);
 	}
 }
 

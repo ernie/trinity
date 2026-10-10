@@ -401,12 +401,25 @@ itemDef {
 itemDef {
 	name controls
 	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	ownerdraw UI_WEAPONPITCH
+	rect 536 216 22 20
+	textalign ITEM_ALIGN_LEFT
+	textaligny 20
+	textscale .333
+	forecolor 1 .75 0 1
+	visible 0
+	decoration
+	}
+itemDef {
+	name controls
+	group grpVR
 	text "Reset"
 	type 1
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
 	backcolor .37 .1 .1 1
-	rect 560 216 50 20
+	rect 574 216 50 20
 	textalign ITEM_ALIGN_CENTER
 	textalignx 25
 	textaligny 15
@@ -674,6 +687,8 @@ itemDef {
 	textscale .333
 	forecolor 1 1 1 1
 	visible 0
+	cvarTest "ui_vrFoveationAvailable"
+	showCvar { "1" }
 	}
 itemDef {
 	name hud
@@ -688,6 +703,8 @@ itemDef {
 	textscale .333
 	forecolor 1 1 1 1
 	visible 0
+	cvarTest "ui_vrFoveationAvailable"
+	showCvar { "1" }
 	}
 itemDef {
 	name hud
