@@ -49,6 +49,7 @@ GAME OPTIONS MENU
 #define ID_CROSSHAIRSIZE		145
 #define ID_CROSSHAIRHEALTH		146
 #define ID_DRAWFFABACKGROUND	147
+#define ID_BLOODDENSITY			148
 
 #define	NUM_CROSSHAIRS			10
 
@@ -76,6 +77,7 @@ typedef struct {
 	menulist_s			drawffabackground;
 	menulist_s			damageeffect;
 	menulist_s			blood;
+	menulist_s			blooddensity;
 	menuradiobutton_s	damageplums;
 	menulist_s			followmode;
 	menuradiobutton_s	allowdownload;
@@ -122,6 +124,14 @@ static const char *blood_names[] =
 	NULL
 };
 
+static const char *blooddensity_names[] =
+{
+	"Light",
+	"Medium",
+	"Heavy",
+	NULL
+};
+
 static const char *followmode_names[] =
 {
 	"First-person",
@@ -145,6 +155,25 @@ static const char *tvdownload_names[] =
 	"Accept",
 	NULL
 };
+
+// only a headset pays the cost the hint warns about
+static void Preferences_BloodDensityStatusBar( void *self ) {
+	if ( UI_VR_Platform() == VRP_NONE ) {
+		return;
+	}
+	UI_DrawString( SCREEN_WIDTH * 0.50, 424, "Blood density is performance-heavy", UI_SMALLFONT|UI_CENTER, colorWhite );
+	UI_DrawString( SCREEN_WIDTH * 0.50, 424 + SMALLCHAR_HEIGHT, "on standalone headsets", UI_SMALLFONT|UI_CENTER, colorWhite );
+}
+
+// density tunes Modern blood only
+static void Preferences_UpdateBloodDensity( void ) {
+	if ( s_preferences.blood.curvalue == 2 ) {
+		s_preferences.blooddensity.generic.flags &= ~QMF_GRAYED;
+	} else {
+		s_preferences.blooddensity.generic.flags |= QMF_GRAYED;
+	}
+}
+
 
 static void Preferences_SetMenuItems( void ) {
 	int c;
@@ -178,6 +207,8 @@ static void Preferences_SetMenuItems( void ) {
 	s_preferences.drawffabackground.curvalue = Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_drawFFABackground" ) );
 	s_preferences.damageeffect.curvalue		= trap_Cvar_VariableValue( "cg_damageEffect" ) != 0;
 	s_preferences.blood.curvalue			= Com_Clamp( 0, 2, trap_Cvar_VariableValue( "com_blood" ) );
+	s_preferences.blooddensity.curvalue		= Com_Clamp( 0, 2, trap_Cvar_VariableValue( "cg_bloodDensity" ) );
+	Preferences_UpdateBloodDensity();
 	s_preferences.damageplums.curvalue		= trap_Cvar_VariableValue( "cg_damagePlums" ) != 0;
 	s_preferences.followmode.curvalue		= Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_followMode" ) );
 	s_preferences.allowdownload.curvalue	= trap_Cvar_VariableValue( "cl_allowDownload" ) != 0;
@@ -273,6 +304,11 @@ static void Preferences_Event( void* ptr, int notification ) {
 
 	case ID_BLOODPARTICLES:
 		trap_Cvar_SetValue( "com_blood", s_preferences.blood.curvalue );
+		Preferences_UpdateBloodDensity();
+		break;
+
+	case ID_BLOODDENSITY:
+		trap_Cvar_SetValue( "cg_bloodDensity", s_preferences.blooddensity.curvalue );
 		break;
 
 	case ID_DAMAGEPLUMS:
@@ -462,7 +498,7 @@ static void Preferences_MenuInit( void ) {
 	// center the option column on the frame center (y=242): the count runs from
 	// Crosshair through Automatic Downloading, less the VR-gated Sync Every Frame
 	// row and plus the TVD Download row when cl_tvDownload is set
-	rows = 19;
+	rows = 20;
 	if ( vrEnabled ) {
 		rows--;
 	}
@@ -635,6 +671,17 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.blood.itemnames          = blood_names;
 
 	y += BIGCHAR_HEIGHT;
+	s_preferences.blooddensity.generic.type       = MTYPE_SPINCONTROL;
+	s_preferences.blooddensity.generic.name       = "Blood Density:";
+	s_preferences.blooddensity.generic.flags      = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.blooddensity.generic.callback   = Preferences_Event;
+	s_preferences.blooddensity.generic.statusbar  = Preferences_BloodDensityStatusBar;
+	s_preferences.blooddensity.generic.id         = ID_BLOODDENSITY;
+	s_preferences.blooddensity.generic.x          = PREFERENCES_X_POS;
+	s_preferences.blooddensity.generic.y          = y;
+	s_preferences.blooddensity.itemnames          = blooddensity_names;
+
+	y += BIGCHAR_HEIGHT;
 	s_preferences.damageplums.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.damageplums.generic.name	   = "Damage Numbers:";
 	s_preferences.damageplums.generic.flags	   = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -706,6 +753,7 @@ static void Preferences_MenuInit( void ) {
 	Menu_AddItem( &s_preferences.menu, &s_preferences.drawffabackground );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageeffect );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.blood );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.blooddensity );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageplums );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.followmode );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.allowdownload );

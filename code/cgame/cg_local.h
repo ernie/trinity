@@ -1703,6 +1703,22 @@ void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClien
 //
 // cg_effects.c
 //
+// enhanced blood tuning for one cg_bloodDensity level
+typedef struct {
+	float		gibSpray;		// 0-1 gib-spray gout density
+	float		goutScale;		// gout sprite radius scale
+	float		nearCull;		// cull a gout covering more than this fraction of screen height; 0 off
+	int			bleedGouts;		// max gouts per hit
+	int			bleedDecals;	// max decals per hit
+	int			trailStep;		// units between trail gouts
+	int			trailDecalStep;	// trail decal every Nth gout; 0 none
+	qboolean	decals;			// projected blood decals at all
+	float		decalScale;		// painted decal size multiplier
+	float		decalReach;		// surface-reach multiplier, decoupled from size
+	int			decalTime;		// decal lifetime, ms
+} bloodTuning_t;
+
+const bloodTuning_t *CG_BloodTuning( void );
 localEntity_t *CG_SmokePuff( const vec3_t p, 
 				   const vec3_t vel, 
 				   float radius,

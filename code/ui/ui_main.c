@@ -6889,6 +6889,10 @@ void UI_RegisterCvars( void ) {
 		if ( vrActive && cv->vmCvar == &ui_drawCrosshairNames ) {
 			defaultString = "0";
 		}
+		// matches cgame's standalone default
+		if ( UI_VR_Platform() == VRP_STANDALONE && cv->vmCvar == &ui_bloodDensity ) {
+			defaultString = "0";
+		}
 		trap_Cvar_Register( cv->vmCvar, cv->cvarName, defaultString, cv->cvarFlags );
 	}
 

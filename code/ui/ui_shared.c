@@ -3251,6 +3251,14 @@ void Item_TextField_Paint(itemDef_t *item) {
 
 }
 
+// gray a disabled row's value to match its label
+static void Item_ValueDisabledColor(itemDef_t *item, vec4_t color) {
+	menuDef_t *parent = (menuDef_t*)item->parent;
+	if (item->cvarFlags & (CVAR_ENABLE | CVAR_DISABLE) && !Item_EnableShowViaCvar(item, CVAR_ENABLE)) {
+		memcpy(color, parent->disableColor, sizeof(vec4_t));
+	}
+}
+
 void Item_YesNo_Paint(itemDef_t *item) {
 	vec4_t newColor, lowLight;
 	float value;
@@ -3267,6 +3275,7 @@ void Item_YesNo_Paint(itemDef_t *item) {
 	} else {
 		memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
 	}
+	Item_ValueDisabledColor(item, newColor);
 
 	if (item->text) {
 		Item_Text_Paint(item);
@@ -3290,6 +3299,7 @@ void Item_Multi_Paint(itemDef_t *item) {
 	} else {
 		memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
 	}
+	Item_ValueDisabledColor(item, newColor);
 
 	text = Item_Multi_Setting(item);
 

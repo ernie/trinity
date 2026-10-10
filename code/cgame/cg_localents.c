@@ -126,14 +126,14 @@ void CG_BloodTrail( localEntity_t *le ) {
 	}
 
 	// Modern: gout trail by distance traveled (speed-independent). Accumulate
-	// from the last emission point, dropping a gout every cg_bloodTrailStep units.
+	// from the last emission point, dropping a gout every trailStep units.
 	{
 		vec3_t	dir;
 		float	dist;
 		int		n;
 		int		step;
 
-		step = cg_bloodTrailStep.integer;
+		step = CG_BloodTuning()->trailStep;
 		if ( step < 1 ) {
 			step = 1;
 		}
@@ -147,7 +147,7 @@ void CG_BloodTrail( localEntity_t *le ) {
 			dist -= step;
 
 			blood = CG_SmokePuff( le->trailOrigin, vec3_origin,
-						  ( 24 + random() * 16 ) * cg_bloodGoutScale.value, 1, 1, 1, 1,
+						  ( 24 + random() * 16 ) * CG_BloodTuning()->goutScale, 1, 1, 1, 1,
 						  300 + random() * 66,		// ~333ms: one 30fps animMap cycle
 						  cg.time, 0, LEF_PUFF_DONT_SCALE,
 						  cgs.media.bloodGoutShader );
@@ -161,8 +161,8 @@ void CG_BloodTrail( localEntity_t *le ) {
 			blood->angles.trBase[0] = blood->refEntity.rotation;
 			blood->angles.trDelta[0] = crandom() * 50;	// deg/sec
 
-			if ( cg_bloodTrailDecalStep.integer > 0 &&
-				 n % cg_bloodTrailDecalStep.integer == 0 ) {
+			if ( CG_BloodTuning()->trailDecalStep > 0 &&
+				 n % CG_BloodTuning()->trailDecalStep == 0 ) {
 				CG_BloodDecal( le->trailOrigin, 16 + random() * 16 );
 			}
 		}
@@ -594,7 +594,7 @@ static void CG_UpdateGoutSprite( localEntity_t *le ) {
 CG_BloodGoutCulled
 
 True when a blood gout is too close to draw this frame: the eye is inside the
-sprite, or it covers more than cg_bloodNearCull of the screen height. The caller
+sprite, or it covers more than the nearCull fraction of the screen height. The caller
 skips the draw without freeing, so the gout reappears once it pulls back.
 ==================
 */
@@ -607,8 +607,8 @@ static qboolean CG_BloodGoutCulled( const refEntity_t *re ) {
 	if ( dist <= re->radius ) {
 		return qtrue;
 	}
-	if ( cg_bloodNearCull.value > 0 &&
-		 re->radius > cg_bloodNearCull.value * dist * tan( cg.refdef.fov_y * ( M_PI / 360.0f ) ) ) {
+	if ( CG_BloodTuning()->nearCull > 0 &&
+		 re->radius > CG_BloodTuning()->nearCull * dist * tan( cg.refdef.fov_y * ( M_PI / 360.0f ) ) ) {
 		return qtrue;
 	}
 	return qfalse;

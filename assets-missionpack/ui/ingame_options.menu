@@ -12,7 +12,7 @@ menuDef {
 	focusColor 1 .75 0 1
 	style 1
 	border 1
-	disableColor .5 .5 .5 0
+	disableColor .5 .5 .5 1
 
 itemDef {
 	name window
@@ -421,10 +421,28 @@ itemDef {
 itemDef {
 	name options
 	group grpOptions
+	text "Blood Density:"
+	type ITEM_TYPE_MULTI
+	cvar "cg_bloodDensity"
+	cvarFloatList { "Light" 0 "Medium" 1 "Heavy" 2 }
+	rect 3 303 200 17
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 146
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 1
+	cvarTest "com_blood"
+	enableCvar { "2" }
+	}
+
+itemDef {
+	name options
+	group grpOptions
 	text "Damage Numbers:"
 	type ITEM_TYPE_YESNO
 	cvar "cg_damagePlums"
-	rect 3 303 200 17
+	rect 3 320 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -440,7 +458,7 @@ itemDef {
 	type ITEM_TYPE_MULTI
 	cvar "cg_followMode"
 	cvarFloatList { "First-person" 0 "Third-person" 1 }
-	rect 3 320 200 17
+	rect 3 337 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -456,7 +474,7 @@ itemDef {
 	type ITEM_TYPE_MULTI
 	cvar "cl_tvDownload"
 	cvarFloatList { "Off" 0 "Decline" 1 "Accept" 2 }
-	rect 3 337 200 17
+	rect 3 354 200 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14

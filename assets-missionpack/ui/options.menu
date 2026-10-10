@@ -9,6 +9,7 @@ menuDef {
     	fullscreen 0
 	rect 186 0 443 426
     	focusColor 1 .75 0 1
+    	disableColor .5 .5 .5 1
     	style 1
     	border 1
 	onOpen { setitemcolor fadebox backcolor 0 0 0 1 ;
@@ -382,9 +383,10 @@ itemDef {
 itemDef {
 		name options
 		group grpOptions
-		text "Damage Numbers:"
-		type ITEM_TYPE_YESNO
-		cvar "cg_damagePlums"
+		text "Blood Density:"
+		type ITEM_TYPE_MULTI
+		cvar "cg_bloodDensity"
+		cvarFloatList { "Light" 0 "Medium" 1 "Heavy" 2 }
 		rect 245 285 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
@@ -392,6 +394,40 @@ itemDef {
 		textscale .3
 		forecolor 1 1 1 1
 		visible 1
+		cvarTest "com_blood"
+		enableCvar { "2" }
+		mouseEnter { show msg_blooddensity }
+		mouseExit { hide msg_blooddensity }
+	}
+
+itemDef {
+		name options
+		group grpOptions
+		text "Damage Numbers:"
+		type ITEM_TYPE_YESNO
+		cvar "cg_damagePlums"
+		rect 245 305 210 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+	}
+
+itemDef {
+		name msg_blooddensity
+		text "Blood density is performance-heavy on standalone headsets"
+		rect 0 360 443 20
+		textalign ITEM_ALIGN_CENTER
+		textalignx 221
+		textaligny 14
+		textscale .25
+		forecolor 1 .75 0 1
+		visible 0
+		decoration
+		cvarTest "ui_vrActive"
+		showCvar { "1" }
 	}
 
 itemDef {

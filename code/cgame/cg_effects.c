@@ -539,6 +539,17 @@ localEntity_t *CG_MakeExplosion( const vec3_t origin, const vec3_t dir,
 }
 
 
+static const bloodTuning_t bloodTuning[] = {
+	{ 0.2f, 1.0f, 0.3f, 8, 8, 30, 3, qtrue, 0.75f, 1.0f, 4000 },	// light
+	{ 0.6f, 1.0f, 0.4f, 8, 8, 20, 3, qtrue, 0.875f, 1.0f, 6000 },	// medium
+	{ 1.0f, 1.0f, 0.5f, 8, 8, 10, 3, qtrue, 1.0f, 1.0f, 8000 },	// heavy
+};
+
+const bloodTuning_t *CG_BloodTuning( void ) {
+	return &bloodTuning[ (int)Com_Clamp( 0, ARRAY_LEN( bloodTuning ) - 1, cg_bloodDensity.integer ) ];
+}
+
+
 /*
 =================
 CG_BloodDecal
@@ -549,16 +560,17 @@ floor, ceiling), unlike a single traced mark. Modern blood path only.
 */
 void CG_BloodDecal( const vec3_t origin, float radius ) {
 	static const float red[4] = { 1.0f, 1.0f, 1.0f, 1.0f };	// shader supplies the red
-	float size  = radius * cg_bloodDecalScale.value;	// painted footprint
-	float reach = radius * cg_bloodDecalReach.value;	// surface-search distance
+	const bloodTuning_t *tuning = CG_BloodTuning();
+	float size  = radius * tuning->decalScale;	// painted footprint
+	float reach = radius * tuning->decalReach;	// surface-search distance
 
 	// projectDecal is the A1 capability flag: false on an engine without the
 	// extension, so Modern blood silently falls back to no engine decals.
-	if ( !cg_bloodDecals.integer || !projectDecal || size <= 0 ) {
+	if ( !tuning->decals || !projectDecal || size <= 0 ) {
 		return;
 	}
 	trap_R_ProjectDecal( origin, size, reach, random() * 360.0f,
-		cgs.media.bloodSplatShader[ rand() & 3 ], red, cg_bloodDecalTime.integer );
+		cgs.media.bloodSplatShader[ rand() & 3 ], red, tuning->decalTime );
 }
 
 
@@ -645,12 +657,12 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean di
 	}
 
 	goutCount = count;
-	if ( goutCount > cg_bloodBleedGouts.integer ) {
-		goutCount = cg_bloodBleedGouts.integer;
+	if ( goutCount > CG_BloodTuning()->bleedGouts ) {
+		goutCount = CG_BloodTuning()->bleedGouts;
 	}
 	decalCount = count;
-	if ( decalCount > cg_bloodBleedDecals.integer ) {
-		decalCount = cg_bloodBleedDecals.integer;
+	if ( decalCount > CG_BloodTuning()->bleedDecals ) {
+		decalCount = CG_BloodTuning()->bleedDecals;
 	}
 
 	// Cosmetic floating gouts (never mark; the decals below are the surface blood).
@@ -675,7 +687,7 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean di
 		VectorCopy( le->pos.trBase, re->origin );
 		re->reType = RT_SPRITE;
 		re->rotation = rand() % 360;
-		re->radius = ( 18 + random() * 12 ) * cg_bloodGoutScale.value;
+		re->radius = ( 18 + random() * 12 ) * CG_BloodTuning()->goutScale;
 		re->customShader = cgs.media.bloodGoutShader;
 		if ( animFrame ) {
 			re->renderfx |= RF_ANIMFRAME;	// play the gout once across its life
@@ -794,13 +806,13 @@ static void CG_GibBloodSpray( const vec3_t org ) {
 	localEntity_t	*le;
 	refEntity_t		*re;
 
-	perStream = (int)( GIB_STREAM_COUNT * cg_bloodGibSpray.value + 0.5f );
+	perStream = (int)( GIB_STREAM_COUNT * CG_BloodTuning()->gibSpray + 0.5f );
 	if ( perStream > GIB_STREAM_COUNT ) {
 		perStream = GIB_STREAM_COUNT;
 	}
 	if ( perStream < 1 ) {
 		// density 0: no gout streams, but still drop the ground pool (it's
-		// governed by cg_bloodDecals, not density).
+		// governed by the decals switch, not density).
 		CG_BloodDecal( org, 60 + random() * 60 );
 		return;
 	}
@@ -857,7 +869,7 @@ static void CG_GibBloodSpray( const vec3_t org ) {
 			VectorCopy( o, re->origin );
 			re->reType = RT_SPRITE;
 			re->rotation = le->angles.trBase[0];
-			re->radius = ( 11 + random() * 15 ) * cg_bloodGoutScale.value;
+			re->radius = ( 11 + random() * 15 ) * CG_BloodTuning()->goutScale;
 			re->customShader = cgs.media.bloodGoutShader;
 			if ( animFrame ) {
 				re->renderfx |= RF_ANIMFRAME;
