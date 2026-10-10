@@ -488,6 +488,10 @@ UI_VRMirrorMenu
 ===============
 */
 void UI_VRMirrorMenu( void ) {
+	// a headset has no desktop to mirror to
+	if ( UI_VR_Platform() != VRP_PC ) {
+		return;
+	}
 	VRMirror_MenuInit();
 	UI_PushMenu( &s_vrmirror.menu );
 }

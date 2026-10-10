@@ -1,4 +1,4 @@
-// VR menu defs (standalone headsets) - loaded by the UI only when vr_platform is "standalone"
+// VR menu defs (standalone headsets) - loaded by the UI when cl_platform names a standalone headset
 //
 {
 	loadMenu { "ui/vroptions_standalone.menu" }

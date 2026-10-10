@@ -1,4 +1,4 @@
-// VR menu defs (PC) - loaded by the UI only when vr_platform is "pc"
+// VR menu defs (PC) - loaded by the UI when cl_platform names a PC
 //
 {
 	loadMenu { "ui/vroptions_pc.menu" }

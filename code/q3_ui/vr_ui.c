@@ -150,7 +150,7 @@ qboolean UI_VR_BindingsAvailable( void ) {
 ================
 UI_VR_Platform
 
-Menu content keys on this, never on the raw vr_platform cvar; see VR_Platform
+Menu content keys on this, never on the raw cl_platform cvar; see VR_Platform
 for the two-gate rule.
 ================
 */

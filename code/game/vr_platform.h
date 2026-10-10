@@ -1,4 +1,4 @@
-// Vendored VR API - shared platform query (vr_platform). Compiles into the
+// Vendored VR API - shared platform query (cl_platform). Compiles into the
 // cgame and ui modules; the game module has no use for it.
 #ifndef VR_PLATFORM_H
 #define VR_PLATFORM_H

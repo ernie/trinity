@@ -967,7 +967,7 @@ writes these names.
 | `vr_hudDrawStatus`, `vr_hudDepth`, `vr_hudScale`, `vr_hudYOffset` | archived | HUD visibility preference and in-world placement |
 | `vr_currentHudDrawStatus`, `vr_currentHudDepth` | transient | Written by `CG_VR_Frame` for the renderer to read |
 | `vr_thirdPersonSpectator` | transient | Written each frame; read only by trinity-standalone's renderer, which drops sky in spectator views |
-| `vr_platform` | ROM (engine-set) | `pc` (trinity-engine) or `standalone` (trinity-standalone); read **only** through `UI_VR_Platform()` (see below) |
+| `cl_platform` | ROM (engine-set) | The device, on every build: `windows`, `macos`, `linux` (PC) or `frame`, `pico`, `quest` (standalone). Read **only** through `UI_VR_Platform()` (see below) |
 | `vr_6dof` | archived | Seeds `use_6dof` (singleplayer only) |
 | `vr_mirrorEnabled` / `vr_mirrorFullscreen` | archived | Desktop-mirror mode, staged/applied by the menu scripts |
 | `vr_mirrorWidth`, `vr_mirrorHeight` | archived (PC engine only) | Desktop-mirror resolution, staged and written by the mirror Apply (Step 7); unregistered on other engines, where the writes are inert |
@@ -982,11 +982,10 @@ writes these names.
 There is no `vr_stabilised` cvar; weapon stabilization is a mirror flag, not
 a cvar.
 
-**Menu content must never read `vr_platform` raw.** The flatscreen engine
-never registers the cvar, so a stale value lingering in a user config (an
-older build, a hand-`seta`) must not impersonate a headset. Key VR rows on
-`UI_VR_Platform()`, which returns `VRP_NONE` whenever the mirror is dormant
-regardless of the cvar. The two-gate body lives in `VR_Platform`
+**Menu content must never read `cl_platform` raw.** It names the device on
+every build, flatscreen included, while VR pages belong only to a live VR
+session. Key VR rows on `UI_VR_Platform()`, which returns `VRP_NONE` whenever
+the mirror is dormant, whatever the cvar says. The two-gate body lives in `VR_Platform`
 (`game/vr_platform.c`); each UI module wraps it:
 
 ```c
@@ -996,11 +995,11 @@ vrPlatform_t VR_Platform( qboolean vrActive ) {
 	if ( !vrActive ) {
 		return VRP_NONE;
 	}
-	trap_Cvar_VariableStringBuffer( "vr_platform", buf, sizeof( buf ) );
-	if ( !Q_stricmp( buf, "pc" ) ) {
+	trap_Cvar_VariableStringBuffer( "cl_platform", buf, sizeof( buf ) );
+	if ( !Q_stricmp( buf, "windows" ) || !Q_stricmp( buf, "macos" ) || !Q_stricmp( buf, "linux" ) ) {
 		return VRP_PC;
 	}
-	if ( !Q_stricmp( buf, "standalone" ) ) {
+	if ( !Q_stricmp( buf, "frame" ) || !Q_stricmp( buf, "pico" ) || !Q_stricmp( buf, "quest" ) ) {
 		return VRP_STANDALONE;
 	}
 	return VRP_NONE;

@@ -147,7 +147,7 @@ qboolean UI_VR_BindingsAvailable( void ) {
 ================
 UI_VR_Platform
 
-Menu content keys on this, never on the raw vr_platform cvar; see VR_Platform
+Menu content keys on this, never on the raw cl_platform cvar; see VR_Platform
 for the two-gate rule.
 ================
 */
@@ -388,7 +388,7 @@ UI_VR_LoadMenus
 
 Loads the VR options pages when running under a VR engine. Platform-variant
 pages are selected by UI_VR_Platform(), which applies the two-gate rule: a
-dormant mirror (flatscreen engine) or an unrecognized vr_platform value both
+dormant mirror (flatscreen) or an unrecognized cl_platform value both
 collapse to VRP_NONE, and no VR pages are parsed either way.
 ===============
 */
@@ -447,7 +447,7 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 	} else if ( Q_stricmp( name, "vrMirrorSetup" ) == 0 ) {
 		// Stage the restart-class desktop-mirror values into ui_ cvars.
 		// Mode: 0=Off, 1=Windowed, 2=Fullscreen from vr_mirrorEnabled + vr_mirrorFullscreen.
-		if ( UI_VR_Platform() != VRP_NONE ) {
+		if ( UI_VR_Platform() == VRP_PC ) {
 			int mirror, fullscreen, w, h;
 			mirror = (int)trap_Cvar_VariableValue( "vr_mirrorEnabled" );
 			fullscreen = (int)trap_Cvar_VariableValue( "vr_mirrorFullscreen" );
@@ -469,7 +469,7 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 		return qtrue;
 	} else if ( Q_stricmp( name, "vrMirrorNextRes" ) == 0 ) {
 		// Cycle the staged resolution through the engine-detected mode list.
-		if ( UI_VR_Platform() != VRP_NONE ) {
+		if ( UI_VR_Platform() == VRP_PC ) {
 			char modes[MAX_STRING_CHARS];
 			char cur[32];
 			char *s, *first, *pick;
@@ -500,7 +500,7 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 		return qtrue;
 	} else if ( Q_stricmp( name, "vrMirrorApply" ) == 0 ) {
 		// Restart only when staged mirror settings changed.
-		if ( UI_VR_Platform() != VRP_NONE ) {
+		if ( UI_VR_Platform() == VRP_PC ) {
 			int stagedMode, curMode, mirror, fullscreen, dirty;
 			char res[32];
 			char *xp;

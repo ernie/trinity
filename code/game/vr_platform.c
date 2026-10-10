@@ -9,9 +9,8 @@ void trap_Cvar_VariableStringBuffer( const char *var_name, char *buffer, int buf
 ============
 VR_Platform
 
-Two-gate rule: vr_platform is believed only when the caller's VR handshake is
-live. The flatscreen engine never registers the cvar, so a stale value in a
-user config must not impersonate a headset.
+cl_platform names the device on every build, but it counts as a VR platform
+only while the caller's VR handshake is live.
 ============
 */
 vrPlatform_t VR_Platform( qboolean vrActive ) {
@@ -20,11 +19,11 @@ vrPlatform_t VR_Platform( qboolean vrActive ) {
 	if ( !vrActive ) {
 		return VRP_NONE;
 	}
-	trap_Cvar_VariableStringBuffer( "vr_platform", buf, sizeof( buf ) );
-	if ( !Q_stricmp( buf, "pc" ) ) {
+	trap_Cvar_VariableStringBuffer( "cl_platform", buf, sizeof( buf ) );
+	if ( !Q_stricmp( buf, "windows" ) || !Q_stricmp( buf, "macos" ) || !Q_stricmp( buf, "linux" ) ) {
 		return VRP_PC;
 	}
-	if ( !Q_stricmp( buf, "standalone" ) ) {
+	if ( !Q_stricmp( buf, "frame" ) || !Q_stricmp( buf, "pico" ) || !Q_stricmp( buf, "quest" ) ) {
 		return VRP_STANDALONE;
 	}
 	return VRP_NONE;
