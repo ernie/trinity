@@ -1369,6 +1369,18 @@ qboolean BG_MoverCoMoves( const entityState_t *a, const entityState_t *b ) {
 			|| !VectorCompare( a->apos.trDelta, b->apos.trDelta ) ) {
 		return qfalse;
 	}
+	// rotating movers stay together only on a shared axis; yaw turns about
+	// the vertical, so stacked movers match. Map origins aren't exact
+	if ( a->apos.trType != TR_STATIONARY ) {
+		if ( fabs( a->pos.trBase[0] - b->pos.trBase[0] ) > 0.125f
+				|| fabs( a->pos.trBase[1] - b->pos.trBase[1] ) > 0.125f ) {
+			return qfalse;
+		}
+		if ( ( a->apos.trDelta[PITCH] != 0 || a->apos.trDelta[ROLL] != 0 )
+				&& fabs( a->pos.trBase[2] - b->pos.trBase[2] ) > 0.125f ) {
+			return qfalse;
+		}
+	}
 	return qtrue;
 }
 
