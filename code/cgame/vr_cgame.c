@@ -3526,11 +3526,8 @@ void CG_VR_FirstPersonBodyAxes( refEntity_t *legs, refEntity_t *torso ) {
 =================
 CG_VR_IsLocalClientEntity
 
-True when cent is the local VR player's own entity, by entity number. Used
-by CG_PlayerShadow/CG_PlayerSplash/CG_Player to pick the VR-specific cvar
-(cg_playerShadow vs cg_shadows). NOT the clientNum-based comparison used by
-CG_VR_OffHandCarriesFlag/CG_VR_SuppressOffHandItem/CG_VR_OffHandItemPose,
-which route off-hand item/flag rendering and have different semantics.
+True when cent is the local VR player's own entity, by entity number, which
+CG_PlayerShadow uses to drop the shadow under a dead VR player's view.
 =================
 */
 qboolean CG_VR_IsLocalClientEntity( const centity_t *cent ) {

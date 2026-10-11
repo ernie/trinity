@@ -2448,13 +2448,10 @@ static qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
 	vec3_t		end, mins = {-15, -15, 0}, maxs = {15, 15, 2};
 	trace_t		trace;
 	float		alpha;
-	qboolean	clientPlayer;
 
 	*shadowPlane = 0;
 
-	clientPlayer = CG_VR_IsLocalClientEntity( cent );
-
-	if ( (clientPlayer && cg_playerShadow.integer == 0) || (!clientPlayer && cg_shadows.integer == 0) ) {
+	if ( cg_shadows.integer == 0 ) {
 		return qfalse;
 	}
 
@@ -2464,7 +2461,7 @@ static qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
 	}
 
 	// no shadow if the VR player is dead (the corpse entity casts its own)
-	if ( clientPlayer && cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {
+	if ( CG_VR_IsLocalClientEntity( cent ) && cg.predictedPlayerState.stats[STAT_HEALTH] <= 0 ) {
 		return qfalse;
 	}
 
@@ -2481,7 +2478,7 @@ static qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
 
 	*shadowPlane = trace.endpos[2] + 1;
 
-	if ( (clientPlayer && cg_playerShadow.integer != 1) || (!clientPlayer && cg_shadows.integer != 1) ) {	// no mark for stencil or projection shadows
+	if ( cg_shadows.integer != 1 ) {	// no mark for stencil or projection shadows
 		return qtrue;
 	}
 
@@ -2512,11 +2509,8 @@ static void CG_PlayerSplash( const centity_t *cent ) {
 	trace_t		trace;
 	int			contents;
 	polyVert_t	verts[4];
-	qboolean	clientPlayer;
 
-	clientPlayer = CG_VR_IsLocalClientEntity( cent );
-
-	if ( (clientPlayer && !cg_playerShadow.integer) || (!clientPlayer && !cg_shadows.integer) ) {
+	if ( !cg_shadows.integer ) {
 		return;
 	}
 
@@ -2702,7 +2696,6 @@ void CG_Player( centity_t *cent ) {
 	qboolean		shadow;
 	float			shadowPlane;
 	qboolean		firstPersonBody;
-	qboolean		clientPlayer;
 #ifdef MISSIONPACK
 	refEntity_t		skull;
 	refEntity_t		powerup;
@@ -2776,9 +2769,7 @@ void CG_Player( centity_t *cent ) {
 	// add a water splash if partially in and out of water
 	CG_PlayerSplash( cent );
 
-	clientPlayer = CG_VR_IsLocalClientEntity( cent );
-
-	if ( shadow && ( (clientPlayer && cg_playerShadow.integer == 3) || (!clientPlayer && cg_shadows.integer == 3) ) ) {
+	if ( shadow && cg_shadows.integer == 3 ) {
 		renderfx |= RF_SHADOW_PLANE;
 	}
 	renderfx |= RF_LIGHTING_ORIGIN;			// use the same origin for all
