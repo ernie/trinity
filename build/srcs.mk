@@ -37,8 +37,8 @@ ifeq ($(CONFIG),missionpack)
 # Missionpack uses code/ui
 UI_SRC = \
  ui_main $(UIDIR)/ui_syscalls.asm \
- ui_atoms ui_gameinfo ui_players ui_shared ui_util vr_ui vr_uishared \
- bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_ui_mode vr_bindmenu vr_glyph vr_supersample \
+ ui_atoms ui_gameinfo ui_players ui_shared ui_util ui_displaymenu vr_ui vr_uishared \
+ bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_ui_mode ui_displaymodes vr_bindmenu vr_glyph vr_supersample \
  q_math q_shared \
 
 else
@@ -51,9 +51,9 @@ UI_SRC = \
  ui_playermodel ui_players ui_playersettings ui_preferences ui_qmenu \
  ui_removebots ui_saveconfig ui_serverinfo ui_servers2 ui_setup ui_sound \
  ui_sparena ui_specifyserver ui_splevel ui_sppostgame ui_spskill \
- ui_startserver ui_team ui_teamorders ui_video ui_vrcomfort ui_vrcontrols \
+ ui_startserver ui_team ui_teamorders ui_video ui_customres ui_vrcomfort ui_vrcontrols \
  ui_vrhud_display ui_vrbindings ui_vrmirror ui_vroptions vr_ui \
- bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_ui_mode vr_bindmenu vr_glyph vr_supersample \
+ bg_hostlabels bg_mode bg_misc bg_lib vr_bg vr_platform vr_ui_mode ui_displaymodes vr_bindmenu vr_glyph vr_supersample \
  q_math q_shared \
 
 endif

@@ -33,6 +33,7 @@ SOUND OPTIONS MENU
 #define ID_VOIP				22
 #define ID_VOIPVAD			23
 #define ID_VOIPTHRESHOLD	24
+#define ID_VOIPDUCK			25
 
 
 static const char *quality_items[] = {
@@ -74,6 +75,7 @@ typedef struct {
 	menulist_s			quality;
 //	menuradiobutton_s	a3d;
 	menuslider_s		voipvolume;
+	menuslider_s		voipDuck;
 	menulist_s  		soundSystem;
 
 	menubitmap_s		back;
@@ -82,6 +84,7 @@ typedef struct {
 	float				sfxvolume_original;
 	float				musicvolume_original;
 	float				voipvolume_original;
+	float				voipDuck_original;
 	int					voip_original;
 	int					voipVad_original;
 	float				voipThreshold_original;
@@ -144,6 +147,9 @@ static void UI_SoundOptionsMenu_Event( void* ptr, int event ) {
 
 		trap_Cvar_SetValue( "cl_voipVolume", soundOptionsInfo.voipvolume.curvalue / 5 );
 		soundOptionsInfo.voipvolume_original = soundOptionsInfo.voipvolume.curvalue;
+
+		trap_Cvar_SetValue( "cl_voipGainDuringCapture", soundOptionsInfo.voipDuck.curvalue / 10 );
+		soundOptionsInfo.voipDuck_original = soundOptionsInfo.voipDuck.curvalue;
 
 		trap_Cvar_SetValue( "cl_voip", soundOptionsInfo.voip.curvalue );
 		soundOptionsInfo.voip_original = soundOptionsInfo.voip.curvalue;
@@ -225,6 +231,10 @@ static void SoundOptions_UpdateMenuItems( void )
 	{
 		soundOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
+	if ( soundOptionsInfo.voipDuck_original != soundOptionsInfo.voipDuck.curvalue )
+	{
+		soundOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
 	if ( soundOptionsInfo.voip_original != soundOptionsInfo.voip.curvalue )
 	{
 		soundOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
@@ -254,6 +264,13 @@ void SoundOptions_MenuDraw (void)
 	}
 
 	Menu_Draw( &soundOptionsInfo.menu );
+}
+
+
+// keeps game audio your own mic picks up out of what you send
+static void UI_SoundOptionsMenu_VoipDuckStatusBar( void *self ) {
+	UI_DrawString( SCREEN_WIDTH * 0.50, 424, "Game volume while transmitting", UI_SMALLFONT|UI_CENTER, colorWhite );
+	UI_DrawString( SCREEN_WIDTH * 0.50, 424 + SMALLCHAR_HEIGHT, "(lower if your mic sends game audio)", UI_SMALLFONT|UI_CENTER, colorWhite );
 }
 
 
@@ -338,8 +355,8 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.network.style				= UI_RIGHT;
 	soundOptionsInfo.network.color				= color_red;
 
-	// content column (8 rows) centered on the frame
-	y = 242 - ( 8 * (BIGCHAR_HEIGHT + 2) ) / 2;
+	// content column (9 rows) centered on the frame
+	y = 242 - ( 9 * (BIGCHAR_HEIGHT + 2) ) / 2;
 	soundOptionsInfo.sfxvolume.generic.type		= MTYPE_SLIDER;
 	soundOptionsInfo.sfxvolume.generic.name		= "Effects Volume:";
 	soundOptionsInfo.sfxvolume.generic.flags	= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -402,6 +419,19 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.voipvolume.generic.y				= y;
 	soundOptionsInfo.voipvolume.minvalue				= 0;
 	soundOptionsInfo.voipvolume.maxvalue				= 10;
+
+	// game audio while transmitting: full volume, or ducked to as low as a fifth
+	y += BIGCHAR_HEIGHT+2;
+	soundOptionsInfo.voipDuck.generic.type			= MTYPE_SLIDER;
+	soundOptionsInfo.voipDuck.generic.name			= "Transmit Game Volume:";
+	soundOptionsInfo.voipDuck.generic.flags			= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	soundOptionsInfo.voipDuck.generic.callback		= UI_SoundOptionsMenu_Event;
+	soundOptionsInfo.voipDuck.generic.id			= ID_VOIPDUCK;
+	soundOptionsInfo.voipDuck.generic.statusbar		= UI_SoundOptionsMenu_VoipDuckStatusBar;
+	soundOptionsInfo.voipDuck.generic.x				= 400;
+	soundOptionsInfo.voipDuck.generic.y				= y;
+	soundOptionsInfo.voipDuck.minvalue				= 2;
+	soundOptionsInfo.voipDuck.maxvalue				= 10;
 
 	y += BIGCHAR_HEIGHT+2;
 	soundOptionsInfo.soundSystem.generic.type		= MTYPE_SPINCONTROL;
@@ -467,6 +497,7 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.voipVad );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.voipThreshold );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.voipvolume );
+	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.voipDuck );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.soundSystem );
 	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.quality );
 //	Menu_AddItem( &soundOptionsInfo.menu, ( void * ) &soundOptionsInfo.a3d );
@@ -476,6 +507,7 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.sfxvolume.curvalue = soundOptionsInfo.sfxvolume_original = trap_Cvar_VariableValue( "s_volume" ) * 10;
 	soundOptionsInfo.musicvolume.curvalue = soundOptionsInfo.musicvolume_original = trap_Cvar_VariableValue( "s_musicvolume" ) * 10;
 	soundOptionsInfo.voipvolume.curvalue = soundOptionsInfo.voipvolume_original = trap_Cvar_VariableValue( "cl_voipVolume" ) * 5;
+	soundOptionsInfo.voipDuck.curvalue = soundOptionsInfo.voipDuck_original = Com_Clamp( 2, 10, trap_Cvar_VariableValue( "cl_voipGainDuringCapture" ) * 10 );
 	soundOptionsInfo.voip.curvalue = soundOptionsInfo.voip_original = trap_Cvar_VariableValue( "cl_voip" ) != 0;
 	soundOptionsInfo.voipVad.curvalue = soundOptionsInfo.voipVad_original = trap_Cvar_VariableValue( "cl_voipUseVAD" ) != 0;
 	soundOptionsInfo.voipThreshold.curvalue = soundOptionsInfo.voipThreshold_original = trap_Cvar_VariableValue( "cl_voipVADThreshold" ) * 20;

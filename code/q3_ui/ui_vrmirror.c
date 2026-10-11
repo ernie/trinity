@@ -30,6 +30,7 @@ VR DESKTOP MIRROR OPTIONS MENU (PC-only)
 
 
 #include "ui_local.h"
+#include "../game/ui_displaymodes.h"
 
 
 #define ART_FRAMEL				"menu/art/frame2_l"
@@ -75,127 +76,36 @@ static vrmirror_t s_vrmirror;
 static int s_ivo_desktopmode;
 static int s_ivo_desktopresolution;
 
-/*
-=================
-Resolutions
-=================
-*/
-#define MAX_RESOLUTIONS	33
-static char resbuf[ MAX_STRING_CHARS ];
-static const char* detectedResolutions[ MAX_RESOLUTIONS ];
-static const char** allResolutions = NULL;
-static const char** listedResolutions = NULL;
-static char currentResolution[ 20 ];
-static char vrResolution[ 20 ];
-static char vrHalvedResolution[ 20 ];
-static const char** resolutions = NULL;
-static qboolean resolutionsDetected = qfalse;
-// Fallback so the Resolution spin control always has a valid NULL-terminated
-// itemnames array even if r_availableModes came back empty (SpinControl_Init
-// dereferences itemnames[0]).
-static const char* fallbackResolutions[] = { "default", NULL };
+// Window Resolution rows: the mirror list, then Custom when the saved size is in none of it
+static dmList_t		s_mirrorList;
+static const char	*s_mirrorNames[DM_MAX_MODES + 2];
+static char			s_mirrorCustom[40];
+static int			s_mirrorCustomRow;
 
-static void VRMirror_SetPreviousResolutionOption( void )
-{
-	int currentWidth, currentHeight;
-	int idx;
-
-	s_vrmirror.resolution.curvalue = s_ivo_desktopresolution = 0;
-	resolutions = allResolutions;
-
-	if (!resolutions)
-	{
-		return;
-	}
-
-	currentWidth = trap_Cvar_VariableValue("vr_mirrorWidth");
-	currentHeight = trap_Cvar_VariableValue("vr_mirrorHeight");
-	if (currentWidth <= 0 || currentHeight <= 0)
-	{
-		return;
-	}
-
-	Com_sprintf(currentResolution, sizeof(currentResolution), "custom (%dx%d)", currentWidth, currentHeight);
-
-	for (idx = 0; listedResolutions[idx] != NULL; ++idx)
-	{
-		char w[ 16 ], h[ 16 ];
-		int width, height;
-		Q_strncpyz( w, listedResolutions[idx], sizeof( w ) );
-		*strchr( w, 'x' ) = 0;
-		Q_strncpyz( h, strchr( listedResolutions[idx], 'x' ) + 1, sizeof( h ) );
-		width = atoi(w);
-		height = atoi(h);
-		if (currentWidth == width && currentHeight == height) {
-			s_vrmirror.resolution.curvalue = s_ivo_desktopresolution = idx;
-			resolutions = listedResolutions;
-			return;
-		}
-	}
-}
-
-/*
-=================
-VRMirror_GetResolutions
-=================
-*/
 static void VRMirror_GetResolutions( void )
 {
-	trap_Cvar_VariableStringBuffer("r_availableModes", resbuf, sizeof(resbuf));
-	if(*resbuf)
-	{
-		char* s = resbuf;
-		unsigned int i = 0;
+	char modes[MAX_STRING_CHARS], desktop[32];
+	int dw, dh, w, h, i, n = 0;
 
-		// Set first resolution as `custom`, this option will be visible if the user
-		// sets something outside of this list via cvars manually
-		// exact values will be added in SetPreviousResolutionOption()
-		Com_sprintf(currentResolution, sizeof(currentResolution), "custom");
-		detectedResolutions[i++] = currentResolution;
-		detectedResolutions[i] = NULL;
+	trap_Cvar_VariableStringBuffer( "r_availableModes", modes, sizeof( modes ) );
+	trap_Cvar_VariableStringBuffer( "r_desktopMode", desktop, sizeof( desktop ) );
+	DM_DesktopSize( desktop, modes, &dw, &dh );
+	// under VR the renderer's size is the eye buffer
+	DM_BuildMirrorList( &s_mirrorList, modes, dw, dh, uis.glconfig.vidWidth, uis.glconfig.vidHeight );
+	for ( i = 0; i < s_mirrorList.numModes; i++ )
+		s_mirrorNames[n++] = s_mirrorList.modes[i].label;
 
-		while( s && i < ARRAY_LEN(detectedResolutions)-1 )
-		{
-			detectedResolutions[i++] = s;
-			s = strchr(s, ' ');
-			if( s )
-				*s++ = '\0';
-		}
-		detectedResolutions[ i ] = NULL;
-
-		// add custom swapchain resolution and halved if not in mode list
-		if ( i < ARRAY_LEN(detectedResolutions)-2 )
-		{
-			Com_sprintf( vrResolution, sizeof ( vrResolution ), "%dx%d", uis.glconfig.vidWidth, uis.glconfig.vidHeight );
-
-			for( i = 0; detectedResolutions[ i ]; i++ )
-			{
-				if ( strcmp( detectedResolutions[ i ], vrResolution ) == 0 )
-					break;
-			}
-
-			if ( detectedResolutions[ i ] == NULL )
-			{
-				detectedResolutions[ i++ ] = vrResolution;
-				detectedResolutions[ i ] = NULL;
-
-				if ( i < ARRAY_LEN(detectedResolutions)-2 )
-				{
-					Com_sprintf( vrHalvedResolution, sizeof ( vrHalvedResolution ), "%dx%d", uis.glconfig.vidWidth / 2, uis.glconfig.vidHeight / 2 );
-					detectedResolutions[ i++ ] = vrHalvedResolution;
-					detectedResolutions[ i ] = NULL;
-				}
-			}
-		}
-
-		allResolutions = detectedResolutions;
-		listedResolutions = detectedResolutions + 1;
-
-		resolutions = allResolutions;
-		resolutionsDetected = qtrue;
+	w = trap_Cvar_VariableValue( "vr_mirrorWidth" );
+	h = trap_Cvar_VariableValue( "vr_mirrorHeight" );
+	i = DM_FindMode( &s_mirrorList, w, h );
+	s_mirrorCustomRow = -1;
+	if ( i < 0 && w > 0 && h > 0 ) {
+		Com_sprintf( s_mirrorCustom, sizeof( s_mirrorCustom ), "Custom (%dx%d)", w, h );
+		i = s_mirrorCustomRow = n;
+		s_mirrorNames[n++] = s_mirrorCustom;
 	}
-
-	VRMirror_SetPreviousResolutionOption();
+	s_mirrorNames[n] = NULL;
+	s_vrmirror.resolution.curvalue = s_ivo_desktopresolution = i < 0 ? 0 : i;
 }
 
 static void VRMirror_SetMenuItems( void ) {
@@ -222,6 +132,12 @@ static void VRMirror_SetMenuItems( void ) {
 
 static void VRMirror_UpdateMenuItems( void )
 {
+	// the size only shapes a windowed mirror
+	if ( s_vrmirror.mode.curvalue == 1 )
+		s_vrmirror.resolution.generic.flags &= ~QMF_GRAYED;
+	else
+		s_vrmirror.resolution.generic.flags |= QMF_GRAYED;
+
 	s_vrmirror.apply.generic.flags |= QMF_HIDDEN|QMF_INACTIVE;
 
 	if ( s_ivo_desktopmode != s_vrmirror.mode.curvalue )
@@ -258,14 +174,13 @@ static void VRMirror_ApplyChanges( void *unused, int notification )
 		}
 	}
 
-	if ( s_ivo_desktopresolution != s_vrmirror.resolution.curvalue && resolutions )
+	if ( s_ivo_desktopresolution != s_vrmirror.resolution.curvalue &&
+		s_vrmirror.resolution.curvalue < s_mirrorList.numModes )
 	{
-		char w[ 16 ], h[ 16 ];
-		Q_strncpyz( w, resolutions[ s_vrmirror.resolution.curvalue ], sizeof( w ) );
-		*strchr( w, 'x' ) = 0;
-		Q_strncpyz( h, strchr( resolutions[ s_vrmirror.resolution.curvalue ], 'x' ) + 1, sizeof( h ) );
-		trap_Cvar_Set( "vr_mirrorWidth", w );
-		trap_Cvar_Set( "vr_mirrorHeight", h );
+		const dmMode_t *m = &s_mirrorList.modes[s_vrmirror.resolution.curvalue];
+
+		trap_Cvar_SetValue( "vr_mirrorWidth", m->width );
+		trap_Cvar_SetValue( "vr_mirrorHeight", m->height );
 	}
 
 	trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
@@ -388,10 +303,10 @@ static void VRMirror_MenuInit( void ) {
 	y += BIGCHAR_HEIGHT+2;
 	s_vrmirror.resolution.generic.type     = MTYPE_SPINCONTROL;
 	s_vrmirror.resolution.generic.name     = "Window Resolution:";
-	s_vrmirror.resolution.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_vrmirror.resolution.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT|QMF_WRAP;
 	s_vrmirror.resolution.generic.x        = VR_X_POS;
 	s_vrmirror.resolution.generic.y        = y;
-	s_vrmirror.resolution.itemnames        = resolutions ? resolutions : fallbackResolutions;
+	s_vrmirror.resolution.itemnames        = s_mirrorNames;
 	s_vrmirror.resolution.generic.callback = VRMirror_MenuEvent;
 	s_vrmirror.resolution.generic.id       = ID_DESKTOPRESOLUTION;
 
@@ -464,6 +379,7 @@ static void VRMirror_MenuInit( void ) {
 	Menu_AddItem( &s_vrmirror.menu, &s_vrmirror.back );
 
 	VRMirror_SetMenuItems();
+	VRMirror_UpdateMenuItems();
 }
 
 

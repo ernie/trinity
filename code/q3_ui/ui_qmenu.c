@@ -822,6 +822,11 @@ static sfxHandle_t SpinControl_Key( menulist_s *s, int key )
 				s->curvalue--;
 				sound = menu_move_sound;
 			}
+			else if ( ( s->generic.flags & QMF_WRAP ) && s->numitems > 1 )
+			{
+				s->curvalue = s->numitems - 1;
+				sound = menu_move_sound;
+			}
 			else
 				sound = menu_buzz_sound;
 			break;
@@ -831,6 +836,11 @@ static sfxHandle_t SpinControl_Key( menulist_s *s, int key )
 			if (s->curvalue < s->numitems-1)
 			{
 				s->curvalue++;
+				sound = menu_move_sound;
+			}
+			else if ( ( s->generic.flags & QMF_WRAP ) && s->numitems > 1 )
+			{
+				s->curvalue = 0;
 				sound = menu_move_sound;
 			}
 			else
@@ -1435,6 +1445,10 @@ void Menu_CursorMoved( menuframework_s *m )
 	
 	if (m->cursor >= 0 && m->cursor < m->nitems)
 	{
+		// a field takes typing where its text ends, however it got focus
+		if ( ((menucommon_s*)(m->items[m->cursor]))->type == MTYPE_FIELD )
+			MField_KeyDownEvent( &((menufield_s*)(m->items[m->cursor]))->field, K_END );
+
 		callback = ((menucommon_s*)(m->items[m->cursor]))->callback;
 		if (callback)
 			callback(m->items[m->cursor],QM_GOTFOCUS);
@@ -1445,10 +1459,6 @@ void Menu_CursorMoved( menuframework_s *m )
 =================
 Menu_SetCursor
 =================
-		// a field takes typing where its text ends, however it got focus
-		if ( ((menucommon_s*)(m->items[m->cursor]))->type == MTYPE_FIELD )
-			MField_KeyDownEvent( &((menufield_s*)(m->items[m->cursor]))->field, K_END );
-
 */
 void Menu_SetCursor( menuframework_s *m, int cursor )
 {

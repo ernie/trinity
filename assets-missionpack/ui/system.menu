@@ -12,7 +12,7 @@ menuDef {
     	disableColor .5 .5 .5 1
     	style 1
     	border 1
-	onOpen { uiScript vrModeSetup ; setitemcolor fadebox backcolor 0 0 0 1 ; fadeout fadebox ; hide grpSystem ; show graphics ; uiScript updateHDRAvail }
+	onOpen { uiScript vrModeSetup ; setitemcolor fadebox backcolor 0 0 0 1 ; fadeout fadebox ; hide grpSystem ; show graphics ; uiScript updateHDRAvail ; uiScript refreshModes ; collapseHidden 243 390 }
 	onEsc { close system_menu ; close setup_menu ; open main }
 
 
@@ -50,7 +50,7 @@ itemDef {
 	backcolor .37 .1 .1 1 
 	visible 1
 	action { play "sound/misc/kcaction.wav" ; 
-	hide grpSystem ; show graphics }
+	hide grpSystem ; show graphics ; collapseHidden 243 390 }
 	mouseEnter { show message_graphics ; setitemcolor ctr_graphics backcolor .1 .37 .1 1 } 
 	mouseExit { hide message_graphics ; setitemcolor ctr_graphics backcolor .37 .1 .1 1 } 
 	}
@@ -254,17 +254,15 @@ itemDef {
 	itemDef {
    		name graphics
 		group grpSystem
-   		type ITEM_TYPE_MULTI	
-		text "Video Mode:"
-		cvar "r_mode"
-		cvarFloatList { "Desktop" -2 "320*240" 0 "400*300" 1 "512*384" 2 "640*480" 3 "800*600" 4 "960*720" 5 "1024*768" 6 "1152*864" 7 "1280*1024" 8 "1600*1200" 9 "2048*1536" 10 "856*480 Wide Screen" 11 }
+		text "Resolution:"
+		ownerdraw UI_RESOLUTION
 		rect 99 243 302 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
-		textscale .333        
+		textscale .333
       		forecolor 1 1 1 1
-      		visible 0 
+      		visible 0
 		cvarTest "ui_vrActive"
 		hideCvar { 1 }
 		action { uiScript glCustom }
@@ -273,11 +271,26 @@ itemDef {
 	itemDef {
    		name graphics
 		group grpSystem
-   		type ITEM_TYPE_MULTI
-		text "Color Depth:"
-		cvar "r_colorbits"
-		cvarFloatList { "Desktop Default" 0 "16-bit" 16 "32-bit" 32 }
+		text "Custom Size:"
+		ownerdraw UI_CUSTOMSIZE
 		rect 99 263 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
+		cvarTest "ui_vrActive"
+		hideCvar { 1 }
+		action { uiScript customResOpen ; open customres_popmenu }
+	}
+
+	itemDef {
+   		name graphics
+		group grpSystem
+		text "Color Depth:"
+		ownerdraw UI_COLORDEPTH
+		rect 99 283 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -292,16 +305,34 @@ itemDef {
 	itemDef {
    		name graphics
 		group grpSystem
-      		type ITEM_TYPE_YESNO
-		text "Fullscreen:"
+		type ITEM_TYPE_MULTI
+		text "Window Mode:"
 		cvar "r_fullscreen"
-		rect 99 283 256 20
+		cvarFloatList { "Windowed" 0 "Borderless" 2 "Fullscreen" 1 }
+		rect 99 303 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
-		textscale .333        
+		textscale .333
       		forecolor 1 1 1 1
-      		visible 0 
+      		visible 0
+		cvarTest "ui_vrActive"
+		hideCvar { 1 }
+		action { uiScript glCustom }
+	}
+
+	itemDef {
+   		name graphics
+		group grpSystem
+		text "Refresh Rate:"
+		ownerdraw UI_DISPLAYREFRESH
+		rect 99 323 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
 		cvarTest "ui_vrActive"
 		hideCvar { 1 }
 		action { uiScript glCustom }
@@ -315,7 +346,7 @@ itemDef {
 	textscale .3
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 181 327 100 26
+	rect 181 357 100 26
 	textalign 1
 	textalignx 50
 	textaligny 20
@@ -333,7 +364,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/framebutton.tga"
- 		rect 181 327 100 26
+ 		rect 181 357 100 26
       		visible 1
 		decoration
     		}
@@ -343,7 +374,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/leftbutton.tga"
-   	   	rect 169 327 13 26
+   	   	rect 169 357 13 26
    	   	visible 1 
 		decoration  	  
    	 	}
@@ -353,7 +384,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/rightbutton.tga"
-      		rect 280 327 13 26
+      		rect 280 357 13 26
      	 	visible 1 
 		decoration  	  
     		}
@@ -494,7 +525,7 @@ itemDef {
 itemDef {
 	name sound
 	group grpSystem
-	rect 2 4 439 256
+	rect 2 4 439 281
 	style WINDOW_STYLE_FILLED
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -623,6 +654,49 @@ itemDef {
       		visible 0
     		}
 
+itemDef {
+      		name sound
+		group grpSystem
+      		type ITEM_TYPE_SLIDER
+		text "Transmit Game Volume:"
+		cvarfloat "cl_voipGainDuringCapture" 1 0.2 1
+		rect 99 183 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .333
+      		forecolor 1 1 1 1
+      		visible 0
+		mouseEnter { show msg_voipduck }
+		mouseExit { hide msg_voipduck }
+    		}
+
+	itemDef {
+		name msg_voipduck
+		text "Game volume while transmitting"
+		rect 0 325 443 16
+		textalign ITEM_ALIGN_CENTER
+		textalignx 221
+		textaligny 12
+		textscale .25
+		forecolor 1 .75 0 1
+		visible 0
+		decoration
+	}
+
+	itemDef {
+		name msg_voipduck
+		text "(lower if your mic sends game audio)"
+		rect 0 341 443 16
+		textalign ITEM_ALIGN_CENTER
+		textalignx 221
+		textaligny 12
+		textscale .25
+		forecolor 1 .75 0 1
+		visible 0
+		decoration
+	}
+
 	
 
 itemDef {
@@ -632,7 +706,7 @@ itemDef {
 		text "Sound System:"
 		cvar "s_useOpenAL"
 		cvarFloatList { "SDL" 0 "OpenAL" 1 }
-		rect 99 183 256 20
+		rect 99 208 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -650,7 +724,7 @@ itemDef {
 		text "SDL Sound Quality:"
 		cvar "s_khz"
 		cvarFloatList { "44 khz (high)" 44 "22 khz (medium)" 22 "11 khz (low)" 11 }
-		rect 88 208 272 20
+		rect 88 233 272 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 139
       		textaligny 20
@@ -669,7 +743,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Doppler Sound:"
 		cvar "s_doppler"
-		rect 99 233 256 20
+		rect 99 258 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -686,7 +760,7 @@ itemDef {
 		textscale .3
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 171 268 100 26
+		rect 171 293 100 26
 		textalign 1
 		textalignx 50
 		textaligny 20
@@ -703,7 +777,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/framebutton.tga"
-		rect 171 268 100 26
+		rect 171 293 100 26
 		visible 1
 		decoration
 	}
@@ -713,7 +787,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/leftbutton.tga"
-		rect 159 268 13 26
+		rect 159 293 13 26
 		visible 1
 		decoration
 	}
@@ -723,7 +797,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/rightbutton.tga"
-		rect 270 268 13 26
+		rect 270 293 13 26
 		visible 1
 		decoration
 	}
@@ -745,7 +819,7 @@ itemDef {
 	backcolor .37 .1 .1 1 
 	visible 1
 	action { play "sound/misc/kcaction.wav" ;
-	hide grpSystem ; show other ; show ctr_hdrcalib ; collapseHidden 28 190 }
+	hide grpSystem ; show other ; show ctr_hdrcalib ; collapseHidden 28 210 }
 	mouseEnter { show message_other ; setitemcolor ctr_other backcolor .1 .37 .1 1 } 
 	mouseExit { hide message_other ; setitemcolor ctr_other backcolor .37 .1 .1 1} 	
 	}
@@ -780,7 +854,7 @@ itemDef {
 itemDef {
 	name other
 	group grpSystem
-	rect 2 4 439 186
+	rect 2 4 439 206
 	style WINDOW_STYLE_FILLED
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -793,7 +867,7 @@ itemDef {
 itemDef {
 	name other
 	group grpSystem
-	rect 2 194 439 52
+	rect 2 214 439 52
 	style WINDOW_STYLE_FILLED
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -888,10 +962,28 @@ itemDef {
 	itemDef {
 		name other
 		group grpSystem
+		type ITEM_TYPE_MULTI
+		text "SDR Gamma:"
+		cvar "r_hdrSdrCurve"
+		cvarFloatList { "sRGB" 0 "2.2" 1 }
+		rect 99 108 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .333
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "r_hdrActive"
+		enableCvar { 1 }
+	}
+
+	itemDef {
+		name other
+		group grpSystem
 		type ITEM_TYPE_YESNO
 		text "Bloom:"
 		cvar "r_bloom"
-		rect 99 108 256 20
+		rect 99 128 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -909,7 +1001,7 @@ itemDef {
 		type ITEM_TYPE_YESNO
 		text "Flares:"
 		cvar "r_flares"
-		rect 99 128 256 20
+		rect 99 148 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -926,7 +1018,7 @@ itemDef {
 		textscale .3
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 136 160 170 26
+		rect 136 180 170 26
 		textalign 1
 		textalignx 85
 		textaligny 20
@@ -945,7 +1037,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/framebutton.tga"
-		rect 136 160 170 26
+		rect 136 180 170 26
 		visible 0
 		decoration
 	}
@@ -955,7 +1047,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/leftbutton.tga"
-		rect 124 160 13 26
+		rect 124 180 13 26
 		visible 0
 		decoration
 	}
@@ -965,7 +1057,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/rightbutton.tga"
-		rect 305 160 13 26
+		rect 305 180 13 26
 		visible 0
 		decoration
 	}
@@ -975,7 +1067,7 @@ itemDef {
 	group grpSystem
       	style 1
 	text "Network"
-	rect 163 198 128 20
+	rect 163 218 128 20
       	textalign 1
       	textalignx 64 
       	textaligny 20
@@ -992,7 +1084,7 @@ itemDef {
 		text "Packet Recovery:"
 		cvar "cl_packetdup"
 		cvarFloatList { "Low" 1 "Medium" 2 "High" 3 }
-		rect 99 222 256 20
+		rect 99 242 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -1006,7 +1098,7 @@ itemDef {
 	itemDef {
 		name msg_packetdup
 		text "Send duplicate input packets"
-		rect 0 290 443 16
+		rect 0 310 443 16
 		textalign ITEM_ALIGN_CENTER
 		textalignx 221
 		textaligny 12
@@ -1019,7 +1111,7 @@ itemDef {
 	itemDef {
 		name msg_packetdup
 		text "(raise if on unreliable network)"
-		rect 0 306 443 16
+		rect 0 326 443 16
 		textalign ITEM_ALIGN_CENTER
 		textalignx 221
 		textaligny 12
@@ -1037,7 +1129,7 @@ itemDef {
 		textscale .3
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 171 256 100 26
+		rect 171 276 100 26
 		textalign 1
 		textalignx 50
 		textaligny 20
@@ -1054,7 +1146,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/framebutton.tga"
-		rect 171 256 100 26
+		rect 171 276 100 26
 		visible 1
 		decoration
 	}
@@ -1064,7 +1156,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/leftbutton.tga"
-		rect 159 256 13 26
+		rect 159 276 13 26
 		visible 1
 		decoration
 	}
@@ -1074,7 +1166,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_SHADER
 		background "ui/assets/rightbutton.tga"
-		rect 270 256 13 26
+		rect 270 276 13 26
 		visible 1
 		decoration
 	}

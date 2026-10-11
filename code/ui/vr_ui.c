@@ -5,6 +5,7 @@
 #include "../game/vr_bindmenu.h"
 #include "../game/vr_glyph.h"
 #include "../game/vr_supersample.h"
+#include "../game/ui_displaymodes.h"
 
 const char vr_api_sentinel[] = VR_API_SENTINEL;
 
@@ -426,6 +427,28 @@ void UI_VR_LoadMenus( void ) {
 	UI_LoadMenus( manifest, qfalse );
 }
 
+// desktop mirror window sizes, as staged by the VR options' Window Resolution row
+static dmList_t uiMirrorList;
+
+static void UI_VR_BuildMirrorList( void ) {
+	char modes[MAX_STRING_CHARS], desktop[32];
+	int dw, dh;
+
+	trap_Cvar_VariableStringBuffer( "r_availableModes", modes, sizeof( modes ) );
+	trap_Cvar_VariableStringBuffer( "r_desktopMode", desktop, sizeof( desktop ) );
+	DM_DesktopSize( desktop, modes, &dw, &dh );
+	// under VR the renderer's size is the eye buffer
+	DM_BuildMirrorList( &uiMirrorList, modes, dw, dh, uiInfo.uiDC.glconfig.vidWidth, uiInfo.uiDC.glconfig.vidHeight );
+}
+
+// ui_vrDesktopRes holds the plain size Apply writes; the label is what the row shows
+static void UI_VR_StageMirrorRes( int w, int h ) {
+	int i = DM_FindMode( &uiMirrorList, w, h );
+
+	trap_Cvar_Set( "ui_vrDesktopRes", va( "%dx%d", w, h ) );
+	trap_Cvar_Set( "ui_vrDesktopResLabel", i >= 0 ? uiMirrorList.modes[i].label : va( "Custom (%dx%d)", w, h ) );
+}
+
 /*
 ===============
 UI_VR_RunMenuScript
@@ -472,41 +495,30 @@ qboolean UI_VR_RunMenuScript( const char *name ) {
 			}
 			w = (int)trap_Cvar_VariableValue( "vr_mirrorWidth" );
 			h = (int)trap_Cvar_VariableValue( "vr_mirrorHeight" );
+			UI_VR_BuildMirrorList();
 			if ( w > 0 && h > 0 ) {
-				trap_Cvar_Set( "ui_vrDesktopRes", va( "%dx%d", w, h ) );
+				UI_VR_StageMirrorRes( w, h );
 			} else {
 				trap_Cvar_Set( "ui_vrDesktopRes", "default" );
+				trap_Cvar_Set( "ui_vrDesktopResLabel", "Default" );
 			}
 		}
 		return qtrue;
 	} else if ( Q_stricmp( name, "vrMirrorNextRes" ) == 0 ) {
-		// Cycle the staged resolution through the engine-detected mode list.
+		// step the staged size through the mirror list, wrapping to the first
 		if ( UI_VR_Platform() == VRP_PC ) {
-			char modes[MAX_STRING_CHARS];
-			char cur[32];
-			char *s, *first, *pick;
-			trap_Cvar_VariableStringBuffer( "r_availableModes", modes, sizeof( modes ) );
-			if ( modes[0] != '\0' ) {
-				trap_Cvar_VariableStringBuffer( "ui_vrDesktopRes", cur, sizeof( cur ) );
-				// split the space-separated list in place; pick the entry
-				// after the staged one, wrapping to the first
-				first = modes;
-				pick = NULL;
-				s = modes;
-				while ( s && *s ) {
-					char *next = strchr( s, ' ' );
-					if ( next ) {
-						*next++ = '\0';
-					}
-					if ( pick == NULL && Q_stricmp( s, cur ) == 0 ) {
-						pick = next; // may be NULL/empty -> wrap below
-					}
-					s = next;
-				}
-				if ( pick == NULL || *pick == '\0' ) {
-					pick = first;
-				}
-				trap_Cvar_Set( "ui_vrDesktopRes", pick );
+			char cur[32], *xp;
+			int i = -1;
+
+			UI_VR_BuildMirrorList();
+			trap_Cvar_VariableStringBuffer( "ui_vrDesktopRes", cur, sizeof( cur ) );
+			xp = strchr( cur, 'x' );
+			if ( xp ) {
+				i = DM_FindMode( &uiMirrorList, atoi( cur ), atoi( xp + 1 ) );
+			}
+			if ( uiMirrorList.numModes > 0 ) {
+				const dmMode_t *m = &uiMirrorList.modes[( i + 1 ) % uiMirrorList.numModes];
+				UI_VR_StageMirrorRes( m->width, m->height );
 			}
 		}
 		return qtrue;

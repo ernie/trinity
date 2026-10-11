@@ -13,7 +13,7 @@ menuDef {
     	disableColor .5 .5 .5 1
     	style 1
     	border 1
-	onopen { uiScript vrModeSetup ; hide grpsystem ; show graphics ; uiScript updateHDRAvail }
+	onopen { uiScript vrModeSetup ; hide grpsystem ; show graphics ; uiScript updateHDRAvail ; uiScript refreshModes ; collapseHidden 52 340 }
 
 itemDef {
 	name window
@@ -174,7 +174,7 @@ itemDef {
 	forecolor 1 1 1 1
 	backcolor .37 .1 .1 1 
 	visible 1
-	action { hide grpSystem ; show graphics }
+	action { hide grpSystem ; show graphics ; collapseHidden 52 340 }
 	mouseEnter { setitemcolor ctr_graphics backcolor .1 .37 .1 1 }
       	mouseExit { setitemcolor ctr_graphics backcolor .37 .1 .1 1 }
 	}
@@ -186,7 +186,7 @@ itemDef {
 			text "Quality:"
 		cvar "ui_glCustom"
 		cvarFloatList { "High Quality" 0 "Normal" 1 "Fast" 2 "Fastest" 3 "Custom" 4 }
-		rect 0 76 256 20
+		rect 0 52 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -203,7 +203,7 @@ itemDef {
 		text "MSAA:"
 		cvar "r_ext_multisample"
 		cvarFloatList { "Off" 0 "2x" 2 "4x" 4 "8x" 8 }
-		rect 0 95 256 20
+		rect 0 69 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -221,7 +221,7 @@ itemDef {
 		text "Lighting:"
 		cvar "r_vertexlight"
 		cvarFloatList { "Light Map (high)" 0 "Vertex (low)" 1  }
-		rect 0 114 256 20
+		rect 0 86 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -238,7 +238,7 @@ itemDef {
 		text "Shadows:"
 		cvar "cg_shadows"
 		cvarFloatList { "None" 0 "Low" 1 "High" 2 }
-		rect 0 133 256 20
+		rect 0 103 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -254,7 +254,7 @@ itemDef {
 		text "Model Detail:"
 		cvar "r_lodbias"
 		cvarFloatList { "Very Low" 2 "Low" 1 "Medium" 0 "High" -1 "Very High" -2 }
-		rect 0 152 256 20
+		rect 0 120 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -271,7 +271,7 @@ itemDef {
 		text "Curve Detail:"
 		cvar "r_subdivisions"
 		cvarFloatList { "Very Low" 20 "Low" 12 "Medium" 4 "High" 2 "Very High" 1 }
-		rect 0 171 256 20
+		rect 0 137 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -288,7 +288,7 @@ itemDef {
 		text "Texture Detail:"
 		cvar "r_picmip"
 		cvarFloatList { "Low" 2 "Normal" 1 "High" 0 }
-		rect 0 190 256 20
+		rect 0 154 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -305,7 +305,7 @@ itemDef {
 		text "Texture Quality:"
 		cvar "r_texturebits"
 		cvarFloatList { "Default" 0 "16 bit" 16 "32 bit" 32 }
-		rect 0 209 256 20
+		rect 0 171 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -321,7 +321,7 @@ itemDef {
 		text "Texture Filter:"
 		cvar "r_texturemode"
 		cvarStrList { "Bilinear", "GL_LINEAR_MIPMAP_NEAREST", "Trilinear", "GL_LINEAR_MIPMAP_LINEAR"  }
-		rect 0 228 314 20
+		rect 0 188 314 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -337,7 +337,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Compress Textures:"
 		cvar "r_ext_compressed_textures"
-		rect 0 247 256 20
+		rect 0 205 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -346,6 +346,201 @@ itemDef {
       		visible 0 
 		action { uiScript glCustom }
     		}
+
+	itemDef {
+		name graphics
+		group grpSystem
+		ownerdraw UI_RESOLUTION
+		text "Resolution:"
+		rect 0 222 256 17
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "ui_vrActive"
+		hideCvar { 1 }
+		action { uiScript glCustom }
+	}
+
+	itemDef {
+		name graphics
+		group grpSystem
+		ownerdraw UI_CUSTOMSIZE
+		text "Custom Size:"
+		rect 0 239 256 17
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "ui_vrActive"
+		hideCvar { 1 }
+		action { uiScript customResOpen ; hide graphics ; show customres }
+	}
+
+	itemDef {
+		name graphics
+		group grpSystem
+		ownerdraw UI_COLORDEPTH
+		text "Color Depth:"
+		rect 0 256 256 17
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "ui_vrActive"
+		hideCvar { 1 }
+		action { uiScript glCustom ; uiScript update "r_colorbits" }
+	}
+
+	itemDef {
+		name graphics
+		group grpSystem
+		type ITEM_TYPE_MULTI
+		cvar "r_fullscreen"
+		cvarFloatList { "Windowed" 0 "Borderless" 2 "Fullscreen" 1 }
+		text "Window Mode:"
+		rect 0 273 256 17
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "ui_vrActive"
+		hideCvar { 1 }
+		action { uiScript glCustom }
+	}
+
+	itemDef {
+		name graphics
+		group grpSystem
+		ownerdraw UI_DISPLAYREFRESH
+		text "Refresh Rate:"
+		rect 0 290 256 17
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "ui_vrActive"
+		hideCvar { 1 }
+		action { uiScript glCustom }
+	}
+
+// Custom Resolution, shown in place of the Graphics rows like the in-game Leave confirmation
+	itemDef {
+		name customres
+		group grpSystem
+		text "Custom Resolution"
+		style 0
+		textscale .3
+		textstyle 3
+		rect 0 70 276 20
+		textalign ITEM_ALIGN_CENTER
+		textalignx 138
+		textaligny 15
+		forecolor 1 1 1 1
+		visible 0
+		decoration
+	}
+
+	itemDef {
+		name customres
+		group grpSystem
+		type ITEM_TYPE_MULTI
+		cvar "ui_customRatio"
+		cvarFloatList { "Free" 0 "16:9" 1 "16:10" 2 "21:9" 3 "32:9" 4 "4:3" 5 }
+		action { uiScript customResFillWidth }
+		text "Aspect:"
+		rect 0 100 256 17
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+	}
+
+	itemDef {
+		name customres
+		group grpSystem
+		type ITEM_TYPE_NUMERICFIELD
+		cvar "ui_customW"
+		maxchars 5
+		onEditEnd { uiScript customResFillWidth }
+		text "Width:"
+		rect 0 117 256 17
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+	}
+
+	itemDef {
+		name customres
+		group grpSystem
+		type ITEM_TYPE_NUMERICFIELD
+		cvar "ui_customH"
+		maxchars 5
+		onEditEnd { uiScript customResFillHeight }
+		text "Height:"
+		rect 0 134 256 17
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 133
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+	}
+
+	itemDef {
+		name customres
+		text "Accept"
+		type 1
+		textscale .25
+		group grpSystem
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/button_back.tga"
+		rect 55 165 75 20
+		textalign 1
+		textalignx 37
+		textaligny 15
+		forecolor 1 1 1 1
+		backcolor .37 .1 .1 1
+		visible 0
+		action { play "sound/misc/kcaction.wav" ; uiScript customResAccept ; hide customres ; show graphics }
+		mouseEnter { setcolor backcolor .1 .37 .1 1 }
+		mouseExit { setcolor backcolor .37 .1 .1 1 }
+	}
+
+	itemDef {
+		name customres
+		text "Cancel"
+		type 1
+		textscale .25
+		group grpSystem
+		style WINDOW_STYLE_FILLED
+		background "ui/assets/button_back.tga"
+		rect 146 165 75 20
+		textalign 1
+		textalignx 37
+		textaligny 15
+		forecolor 1 1 1 1
+		backcolor .37 .1 .1 1
+		visible 0
+		action { play "sound/misc/nomenu.wav" ; hide customres ; show graphics }
+		mouseEnter { setcolor backcolor .1 .37 .1 1 }
+		mouseExit { setcolor backcolor .37 .1 .1 1 }
+	}
 
 //here
 
@@ -522,11 +717,55 @@ itemDef {
 	itemDef {
       		name sound
 		group grpSystem
+      		type ITEM_TYPE_SLIDER
+		text "Tx Game Volume:"
+		cvarfloat "cl_voipGainDuringCapture" 1 0.2 1
+		rect 0 185 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 17
+		textscale .25
+      		forecolor 1 1 1 1
+      		visible 0
+		mouseEnter { show msg_voipduck }
+		mouseExit { hide msg_voipduck }
+    		}
+
+	itemDef {
+		name msg_voipduck
+		text "Game volume while transmitting"
+		rect 0 302 276 14
+		textalign ITEM_ALIGN_CENTER
+		textalignx 138
+		textaligny 11
+		textscale .22
+		forecolor 1 .75 0 1
+		visible 0
+		decoration
+	}
+
+	itemDef {
+		name msg_voipduck
+		text "(lower if your mic sends game audio)"
+		rect 0 316 276 14
+		textalign ITEM_ALIGN_CENTER
+		textalignx 138
+		textaligny 11
+		textscale .22
+		forecolor 1 .75 0 1
+		visible 0
+		decoration
+	}
+
+
+	itemDef {
+      		name sound
+		group grpSystem
       		type ITEM_TYPE_MULTI
 		text "Sound System:"
 		cvar "s_useOpenAL"
 		cvarFloatList { "SDL" 0 "OpenAL" 1 }
-		rect 0 185 256 20
+		rect 0 205 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -543,7 +782,7 @@ itemDef {
 		text "SDL Sound Quality:"
 		cvar "s_khz"
 		cvarFloatList { "44 khz (high)" 44 "22 khz (medium)" 22 "11 khz (low)" 11 }
-		rect 0 205 256 20
+		rect 0 225 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -561,7 +800,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Doppler Sound:"
 		cvar "s_doppler"
-		rect 0 225 256 20
+		rect 0 245 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -578,7 +817,7 @@ itemDef {
 	group grpSystem
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 101 255 75 20
+	rect 101 275 75 20
 	textalign 1
 	textalignx 37
 	textaligny 15
@@ -605,7 +844,7 @@ itemDef {
 	forecolor 1 1 1 1
 	backcolor .37 .1 .1 1 
 	visible 1
-	action { hide grpSystem ; show other ; collapseHidden 65 205 }
+	action { hide grpSystem ; show other ; collapseHidden 65 225 }
 	mouseEnter { setitemcolor ctr_other backcolor .1 .37 .1 1 }
       	mouseExit { setitemcolor ctr_other backcolor .37 .1 .1 1 }
 	}
@@ -697,10 +936,28 @@ itemDef {
 	itemDef {
 		name other
 		group grpSystem
+		type ITEM_TYPE_MULTI
+		text "SDR Gamma:"
+		cvar "r_hdrSdrCurve"
+		cvarFloatList { "sRGB" 0 "2.2" 1 }
+		rect 0 145 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "r_hdrActive"
+		enableCvar { 1 }
+	}
+
+	itemDef {
+		name other
+		group grpSystem
 		type ITEM_TYPE_YESNO
 		text "Bloom:"
 		cvar "r_bloom"
-		rect 0 145 256 20
+		rect 0 165 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -718,7 +975,7 @@ itemDef {
 		type ITEM_TYPE_YESNO
 		text "Flares:"
 		cvar "r_flares"
-		rect 0 165 256 20
+		rect 0 185 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -735,7 +992,7 @@ itemDef {
 		textscale .25
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 63 189 130 20
+		rect 63 209 130 20
 		textalign 1
 		textalignx 65
 		textaligny 16
@@ -754,7 +1011,7 @@ itemDef {
 	group grpSystem
       	style 1
 	text "Network"
-	rect 0 209 128 20
+	rect 0 229 128 20
       	textalign ITEM_ALIGN_CENTER
       	textalignx 128
       	textaligny 17
@@ -771,7 +1028,7 @@ itemDef {
 		text "Packet Recovery:"
 		cvar "cl_packetdup"
 		cvarFloatList { "Low" 1 "Medium" 2 "High" 3 }
-		rect 0 229 256 20
+		rect 0 249 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -785,7 +1042,7 @@ itemDef {
 	itemDef {
 		name msg_packetdup
 		text "Send duplicate input packets"
-		rect 0 282 276 14
+		rect 0 302 276 14
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 11
@@ -798,7 +1055,7 @@ itemDef {
 	itemDef {
 		name msg_packetdup
 		text "(raise if on unreliable network)"
-		rect 0 296 276 14
+		rect 0 316 276 14
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 11
@@ -816,7 +1073,7 @@ itemDef {
 	group grpsystem
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 101 269 75 20
+	rect 101 313 75 20
 	textalign 1
 	textalignx 37
 	textaligny 15
@@ -836,7 +1093,7 @@ itemDef {
 	group grpSystem
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 101 255 75 20
+	rect 101 275 75 20
 	textalign 1
 	textalignx 37
 	textaligny 15

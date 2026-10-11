@@ -2943,7 +2943,9 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 			}
 			break;
     default:
-      UI_VR_OwnerDraw(x, y, w, h, text_x, text_y, ownerDraw, ownerDrawFlags, align, special, scale, color, shader, textStyle);
+      if ( !UI_Display_OwnerDraw( &rect, ownerDraw, scale, color, textStyle ) ) {
+        UI_VR_OwnerDraw(x, y, w, h, text_x, text_y, ownerDraw, ownerDrawFlags, align, special, scale, color, shader, textStyle);
+      }
       break;
   }
 
@@ -3542,6 +3544,11 @@ static qboolean UI_OwnerDrawHandleKey(int ownerDraw, int flags, float *special, 
 		case UI_SELECTEDPLAYER:
 			UI_SelectedPlayer_HandleKey(flags, special, key);
 			break;
+    case UI_RESOLUTION:
+    case UI_DISPLAYREFRESH:
+    case UI_CUSTOMSIZE:
+    case UI_COLORDEPTH:
+      return UI_Display_OwnerDrawHandleKey(ownerDraw, key);
     default:
       return UI_VR_OwnerDrawHandleKey(ownerDraw, flags, special, key);
   }
@@ -4569,10 +4576,6 @@ static void UI_RunMenuScript(char **args) {
 			}
 		} else if (Q_stricmp(name, "glCustom") == 0) {
 			trap_Cvar_Set("ui_glCustom", "4");
-			// fullscreen reads r_modeFullscreen, so copy r_mode there, except under VR, where the Video Mode row is hidden
-			if (!vrActive) {
-				trap_Cvar_Set("r_modeFullscreen", UI_Cvar_VariableString("r_mode"));
-			}
 		} else if (Q_stricmp(name, "update") == 0) {
 			if (String_Parse(args, &name2)) {
 				UI_Update(name2);
@@ -4596,7 +4599,7 @@ static void UI_RunMenuScript(char **args) {
 			trap_Cvar_SetValue( "r_hdrPaperWhite", 0 );  // keep paper-white on auto; experts set it via console
 		} else if ( Q_stricmp( name, "systemSettingsApply" ) == 0 ) {
 			trap_Cmd_ExecuteText( EXEC_APPEND, "snd_restart\n" );
-		} else if ( UI_VR_RunMenuScript( name ) ) {
+		} else if ( UI_Display_RunMenuScript( name ) || UI_VR_RunMenuScript( name ) ) {
 			// handled
 		}
 		else {

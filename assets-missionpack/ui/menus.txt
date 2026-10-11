@@ -27,6 +27,7 @@
 	loadMenu { "ui/quake3.menu" }
 	loadMenu { "ui/quit.menu" }
 	loadMenu { "ui/vid_restart.menu" }
+	loadMenu { "ui/customres.menu" }
 	loadMenu { "ui/default.menu" }
 	loadMenu { "ui/addfilter.menu" }
 	loadMenu { "ui/error.menu" }

@@ -139,4 +139,9 @@ UI_CVAR( ui_hdrCalibAvail, "ui_hdrCalibAvail", "0", CVAR_ROM )
 UI_CVAR( ui_hdrDisplay, "ui_hdrDisplay", "0", 0 )
 UI_CVAR( ui_hdrWarning, "ui_hdrWarning", "", CVAR_ROM )
 
+// the Custom resolution popup
+UI_CVAR( ui_customW, "ui_customW", "1920", CVAR_TEMP )
+UI_CVAR( ui_customH, "ui_customH", "1080", CVAR_TEMP )
+UI_CVAR( ui_customRatio, "ui_customRatio", "0", CVAR_TEMP )
+
 #undef UI_CVAR

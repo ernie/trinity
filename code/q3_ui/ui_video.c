@@ -1,6 +1,7 @@
 // Copyright (C) 1999-2000 Id Software, Inc.
 //
 #include "ui_local.h"
+#include "../game/ui_displaymodes.h"
 
 void GraphicsOptions_MenuInit( void );
 
@@ -229,6 +230,8 @@ GRAPHICS OPTIONS MENU
 #define ID_NETWORK		109
 #define ID_SHADOWS		112
 #define ID_MSAA			115
+#define ID_REFRESH		116
+#define ID_CUSTOMSIZE	117
 
 #define NUM_SHADOWS 3
 #define NUM_MSAA		4
@@ -260,6 +263,8 @@ typedef struct {
 
 	menulist_s		shadows;
 	menulist_s		msaa;
+	menulist_s		refresh;
+	menuaction_s	customsize;
 
 	menubitmap_s	apply;
 	menubitmap_s	back;
@@ -282,6 +287,8 @@ typedef struct
 	int shadows;
 	int msaa;
 	int compressed;
+	int refresh;
+	int customW, customH;
 } InitialVideoOptions_s;
 
 static InitialVideoOptions_s	s_ivo;
@@ -310,35 +317,115 @@ static InitialVideoOptions_s s_ivo_templates[] =
 
 static qboolean graphicsOptions_vr;
 
-// spinner indexes past the fixed list: r_mode -2 and -1
-#define MODE_DESKTOP 12
-#define MODE_CUSTOM  13
+// Resolution rows: Desktop, the display's own modes, Custom
+static dmList_t		s_dmList;
+static const char	*s_resNames[DM_MAX_MODES + 3];
+static char			s_customName[40];
+static int			s_customW, s_customH;
+static int			s_desktopW, s_desktopH;
+static int			s_resBeforeBorderless = -1;
 
-// fullscreen reads r_modeFullscreen when it is set, so the row shows whichever mode applies
-static int GraphicsOptions_ModeIndex( void )
+#define RES_DESKTOP		0
+#define RES_CUSTOM		( s_dmList.numModes + 1 )
+
+// Refresh Rate rows: Default, then the selected size's rates
+static const char	*s_rateNames[DM_MAX_RATES + 2];
+static char			s_rateText[DM_MAX_RATES][16];
+static int			s_selectedHz;	// the chosen rate, kept across size changes; 0 is Default
+
+// Window Mode rows in order, as r_fullscreen values
+static const int	s_fsValue[] = { 0, 2, 1 };
+#define FS_WINDOWED		0
+#define FS_BORDERLESS	1
+#define FS_FULLSCREEN	2
+
+static void GraphicsOptions_BuildModeList( void )
+{
+	char modes[MAX_STRING_CHARS], desktop[32];
+	int i, n = 0;
+
+	trap_Cvar_VariableStringBuffer( "r_availableModes", modes, sizeof( modes ) );
+	trap_Cvar_VariableStringBuffer( "r_desktopMode", desktop, sizeof( desktop ) );
+	DM_DesktopSize( desktop, modes, &s_desktopW, &s_desktopH );
+	DM_BuildList( &s_dmList, modes, s_desktopW, s_desktopH );
+	s_resNames[n++] = "Desktop";
+	for ( i = 0; i < s_dmList.numModes; i++ )
+		s_resNames[n++] = s_dmList.modes[i].label;
+	s_resNames[n++] = s_customName;
+	s_resNames[n] = NULL;
+}
+
+static void GraphicsOptions_SetCustom( int w, int h )
+{
+	s_customW = w;
+	s_customH = h;
+	if ( w > 0 && h > 0 )
+		Com_sprintf( s_customName, sizeof( s_customName ), "Custom (%dx%d)", w, h );
+	else
+		Q_strncpyz( s_customName, "Custom", sizeof( s_customName ) );
+}
+
+// the saved size: r_modeFullscreen when fullscreen reads it, else r_mode
+static int GraphicsOptions_ResolutionIndex( void )
 {
 	char fs[8];
-	int mode;
+	int mode, row, w, h;
+	qboolean borderless = trap_Cvar_VariableValue( "r_fullscreen" ) == 2;
 
 	trap_Cvar_VariableStringBuffer( "r_modeFullscreen", fs, sizeof( fs ) );
 	if ( trap_Cvar_VariableValue( "r_fullscreen" ) && fs[0] )
 		mode = atoi( fs );
 	else
 		mode = trap_Cvar_VariableValue( "r_mode" );
-	if ( mode == -1 )
-		return MODE_CUSTOM;
-	if ( mode < 0 || mode >= MODE_DESKTOP )
-		return MODE_DESKTOP;
-	return mode;
+	w = trap_Cvar_VariableValue( "r_customWidth" );
+	h = trap_Cvar_VariableValue( "r_customHeight" );
+	// Borderless runs at the desktop size, which says nothing about a table index
+	row = DM_SavedRow( &s_dmList, mode, &w, &h, borderless ? 0 : uis.glconfig.vidWidth, borderless ? 0 : uis.glconfig.vidHeight );
+	GraphicsOptions_SetCustom( w, h );
+	return row;
 }
 
-static const char *GraphicsOptions_ModeValue( int index )
+// the detected mode a Resolution row stands for; Desktop uses the desktop's own entry
+static const dmMode_t *GraphicsOptions_SelectedMode( void )
 {
-	if ( index == MODE_CUSTOM )
-		return "-1";
-	if ( index < 0 || index >= MODE_DESKTOP )
-		return "-2";
-	return va( "%d", index );
+	int res = s_graphicsoptions.mode.curvalue;
+	int i;
+
+	if ( res == RES_DESKTOP ) {
+		i = DM_FindMode( &s_dmList, s_desktopW, s_desktopH );
+		return i >= 0 ? &s_dmList.modes[i] : NULL;
+	}
+	if ( res < RES_CUSTOM )
+		return &s_dmList.modes[res - 1];
+	i = DM_FindMode( &s_dmList, s_customW, s_customH );
+	return i >= 0 ? &s_dmList.modes[i] : NULL;
+}
+
+static void GraphicsOptions_BuildRateList( void )
+{
+	const dmMode_t *m = GraphicsOptions_SelectedMode();
+	int i, n = 0;
+
+	s_rateNames[n++] = "Default";
+	for ( i = 0; m && i < m->numRates; i++ ) {
+		Com_sprintf( s_rateText[i], sizeof( s_rateText[i] ), "%d Hz", m->rates[i] );
+		s_rateNames[n++] = s_rateText[i];
+	}
+	s_rateNames[n] = NULL;
+	s_graphicsoptions.refresh.numitems = n;
+	// the same rate if this size offers it, else Default
+	s_graphicsoptions.refresh.curvalue = 0;
+	for ( i = 0; m && s_selectedHz > 0 && i < m->numRates; i++ ) {
+		if ( m->rates[i] == s_selectedHz )
+			s_graphicsoptions.refresh.curvalue = i + 1;
+	}
+}
+
+static void GraphicsOptions_CustomDone( int w, int h )
+{
+	GraphicsOptions_SetCustom( w, h );
+	s_graphicsoptions.mode.curvalue = RES_CUSTOM;
+	GraphicsOptions_BuildRateList();
 }
 
 /*
@@ -360,6 +447,9 @@ static void GraphicsOptions_GetInitialVideo( void )
 	s_ivo.compressed  = s_graphicsoptions.compressed.curvalue;
 	s_ivo.shadows     = s_graphicsoptions.shadows.curvalue;
 	s_ivo.msaa        = s_graphicsoptions.msaa.curvalue;
+	s_ivo.refresh     = s_graphicsoptions.refresh.curvalue;
+	s_ivo.customW     = s_customW;
+	s_ivo.customH     = s_customH;
 }
 
 /*
@@ -378,8 +468,6 @@ static void GraphicsOptions_CheckConfig( void )
 		if ( !graphicsOptions_vr )
 		{
 			if ( s_ivo_templates[i].colordepth != s_graphicsoptions.colordepth.curvalue )
-				continue;
-			if ( s_ivo_templates[i].fullscreen != s_graphicsoptions.fs.curvalue )
 				continue;
 		}
 		if ( s_ivo_templates[i].tq != s_graphicsoptions.tq.curvalue )
@@ -400,6 +488,31 @@ static void GraphicsOptions_CheckConfig( void )
 	s_graphicsoptions.list.curvalue = 4;
 }
 
+// the Custom Size row: drawn like a spin control, but only Enter or a click opens the builder
+static void GraphicsOptions_DrawCustomSize( void *self )
+{
+	menuaction_s *a = (menuaction_s *)self;
+	qboolean focus = ( a->generic.parent->cursor == a->generic.menuPosition );
+	int style = UI_SMALLFONT;
+	float *color;
+
+	if ( a->generic.flags & QMF_GRAYED )
+		color = text_color_disabled;
+	else if ( focus ) {
+		color = text_color_highlight;
+		style |= UI_PULSE;
+	} else
+		color = text_color_normal;
+
+	if ( focus && !( a->generic.flags & QMF_GRAYED ) ) {
+		UI_FillRect( a->generic.left, a->generic.top, a->generic.right - a->generic.left + 1, a->generic.bottom - a->generic.top + 1, listbar_color );
+		UI_DrawChar( a->generic.x, a->generic.y, 13, UI_CENTER|UI_BLINK|UI_SMALLFONT, color );
+	}
+	UI_DrawString( a->generic.x - SMALLCHAR_WIDTH, a->generic.y, a->generic.name, style|UI_RIGHT, color );
+	UI_DrawString( a->generic.x + SMALLCHAR_WIDTH, a->generic.y,
+		( s_customW > 0 && s_customH > 0 ) ? va( "%dx%d", s_customW, s_customH ) : "Set...", style|UI_LEFT, color );
+}
+
 /*
 =================
 GraphicsOptions_UpdateMenuItems
@@ -409,7 +522,8 @@ static void GraphicsOptions_UpdateMenuItems( void )
 {
 	if ( !graphicsOptions_vr )
 	{
-		if ( s_graphicsoptions.fs.curvalue == 0 )
+		// only exclusive fullscreen sets a display mode; the others take the desktop's
+		if ( s_graphicsoptions.fs.curvalue != FS_FULLSCREEN )
 		{
 			s_graphicsoptions.colordepth.curvalue = 0;
 			s_graphicsoptions.colordepth.generic.flags |= QMF_GRAYED;
@@ -418,6 +532,19 @@ static void GraphicsOptions_UpdateMenuItems( void )
 		{
 			s_graphicsoptions.colordepth.generic.flags &= ~QMF_GRAYED;
 		}
+		if ( s_graphicsoptions.fs.curvalue == FS_FULLSCREEN && s_graphicsoptions.refresh.numitems > 1 )
+			s_graphicsoptions.refresh.generic.flags &= ~QMF_GRAYED;
+		else
+			s_graphicsoptions.refresh.generic.flags |= QMF_GRAYED;
+		// borderless always covers the desktop at its own size
+		if ( s_graphicsoptions.fs.curvalue == FS_BORDERLESS )
+			s_graphicsoptions.mode.generic.flags |= QMF_GRAYED;
+		else
+			s_graphicsoptions.mode.generic.flags &= ~QMF_GRAYED;
+		if ( s_graphicsoptions.fs.curvalue != FS_BORDERLESS && s_graphicsoptions.mode.curvalue == RES_CUSTOM )
+			s_graphicsoptions.customsize.generic.flags &= ~QMF_GRAYED;
+		else
+			s_graphicsoptions.customsize.generic.flags |= QMF_GRAYED;
 	}
 
 	// Apply lights on any pending change to a row that needs the restart;
@@ -437,6 +564,10 @@ static void GraphicsOptions_UpdateMenuItems( void )
 			s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 		}
 		if ( s_ivo.colordepth != s_graphicsoptions.colordepth.curvalue )
+		{
+			s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+		}
+		if ( s_ivo.refresh != s_graphicsoptions.refresh.curvalue || s_ivo.customW != s_customW || s_ivo.customH != s_customH )
 		{
 			s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 		}
@@ -524,10 +655,30 @@ static void GraphicsOptions_ApplyChanges( void *unused, int notification )
 	// display under VR
 	if ( !graphicsOptions_vr )
 	{
+		int res = s_graphicsoptions.mode.curvalue;
+		const dmMode_t *m = GraphicsOptions_SelectedMode();
+		const char *mode = "-2";
+
+		// borderless keeps the saved size for a later switch back to Fullscreen
+		if ( s_graphicsoptions.fs.curvalue == FS_BORDERLESS && s_resBeforeBorderless >= 0 )
+			res = s_resBeforeBorderless;
+		if ( res == RES_CUSTOM ) {
+			mode = "-1";
+			trap_Cvar_SetValue( "r_customWidth", s_customW );
+			trap_Cvar_SetValue( "r_customHeight", s_customH );
+		} else if ( res > RES_DESKTOP ) {
+			mode = "-1";
+			trap_Cvar_SetValue( "r_customWidth", s_dmList.modes[res - 1].width );
+			trap_Cvar_SetValue( "r_customHeight", s_dmList.modes[res - 1].height );
+		}
 		// both, so the choice holds whether the window is fullscreen or not
-		trap_Cvar_Set( "r_mode", GraphicsOptions_ModeValue( s_graphicsoptions.mode.curvalue ) );
-		trap_Cvar_Set( "r_modeFullscreen", GraphicsOptions_ModeValue( s_graphicsoptions.mode.curvalue ) );
-		trap_Cvar_SetValue( "r_fullscreen", s_graphicsoptions.fs.curvalue );
+		trap_Cvar_Set( "r_mode", mode );
+		trap_Cvar_Set( "r_modeFullscreen", mode );
+		trap_Cvar_SetValue( "r_fullscreen", s_fsValue[s_graphicsoptions.fs.curvalue] );
+		// only exclusive fullscreen sets a rate; the saved one waits for it
+		if ( s_graphicsoptions.fs.curvalue == FS_FULLSCREEN )
+			trap_Cvar_SetValue( "r_displayRefresh", ( m && s_graphicsoptions.refresh.curvalue > 0 ) ?
+				m->rates[s_graphicsoptions.refresh.curvalue - 1] : 0 );
 
 		switch ( s_graphicsoptions.colordepth.curvalue )
 		{
@@ -565,6 +716,29 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 
 	switch( ((menucommon_s*)ptr)->id ) {
 	case ID_MODE:
+		GraphicsOptions_BuildRateList();
+		break;
+
+	case ID_CUSTOMSIZE:
+		UI_CustomResolutionMenu( s_customW, s_customH, GraphicsOptions_CustomDone );
+		break;
+
+	case ID_REFRESH: {
+			const dmMode_t *m = GraphicsOptions_SelectedMode();
+			s_selectedHz = ( m && s_graphicsoptions.refresh.curvalue > 0 ) ? m->rates[s_graphicsoptions.refresh.curvalue - 1] : 0;
+		}
+		break;
+
+	case ID_FULLSCREEN:
+		// borderless shows Desktop, keeping the chosen size for a switch back
+		if ( s_graphicsoptions.fs.curvalue == FS_BORDERLESS ) {
+			s_resBeforeBorderless = s_graphicsoptions.mode.curvalue;
+			s_graphicsoptions.mode.curvalue = RES_DESKTOP;
+		} else if ( s_resBeforeBorderless >= 0 ) {
+			s_graphicsoptions.mode.curvalue = s_resBeforeBorderless;
+			s_resBeforeBorderless = -1;
+		}
+		GraphicsOptions_BuildRateList();
 		break;
 
 	case ID_LIST:
@@ -578,9 +752,9 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 		s_graphicsoptions.filter.curvalue      = ivo->filter;
 		// presets carry no values for the newer rows (compress textures,
 		// the instant rows), which stay untouched by preset selection
+		// a quality preset leaves how the window is shown alone
 		if ( !graphicsOptions_vr ) {
 			s_graphicsoptions.colordepth.curvalue  = ivo->colordepth;
-			s_graphicsoptions.fs.curvalue          = ivo->fullscreen;
 		}
 		break;
 
@@ -795,8 +969,22 @@ static void GraphicsOptions_SetMenuItems( void )
 		return;
 	}
 
-	s_graphicsoptions.mode.curvalue = GraphicsOptions_ModeIndex();
-	s_graphicsoptions.fs.curvalue = trap_Cvar_VariableValue("r_fullscreen");
+	s_graphicsoptions.mode.curvalue = GraphicsOptions_ResolutionIndex();
+	switch ( (int)trap_Cvar_VariableValue( "r_fullscreen" ) ) {
+	case 0:
+		s_graphicsoptions.fs.curvalue = FS_WINDOWED;
+		break;
+	case 1:
+		s_graphicsoptions.fs.curvalue = FS_FULLSCREEN;
+		break;
+	default:
+		s_graphicsoptions.fs.curvalue = FS_BORDERLESS;
+		s_resBeforeBorderless = s_graphicsoptions.mode.curvalue;
+		s_graphicsoptions.mode.curvalue = RES_DESKTOP;
+		break;
+	}
+	s_selectedHz = trap_Cvar_VariableValue( "r_displayRefresh" );
+	GraphicsOptions_BuildRateList();
 
 	switch ( ( int ) trap_Cvar_VariableValue( "r_colorbits" ) )
 	{
@@ -812,7 +1000,7 @@ static void GraphicsOptions_SetMenuItems( void )
 		break;
 	}
 
-	if ( s_graphicsoptions.fs.curvalue == 0 )
+	if ( s_graphicsoptions.fs.curvalue != FS_FULLSCREEN )
 	{
 		s_graphicsoptions.colordepth.curvalue = 0;
 	}
@@ -859,23 +1047,12 @@ void GraphicsOptions_MenuInit( void )
 		0
 	};
 
-	static const char *resolutions[] = 
+	static const char *windowmode_names[] =
 	{
-		"320x240",
-		"400x300",
-		"512x384",
-		"640x480",
-		"800x600",
-		"960x720",
-		"1024x768",
-		"1152x864",
-		"1280x1024",
-		"1600x1200",
-		"2048x1536",
-		"856x480 wide screen",
-		"Desktop",
-		"Custom",
-		0
+		"Windowed",
+		"Borderless",
+		"Fullscreen",
+		NULL
 	};
 	static const char *filter_names[] =
 	{
@@ -892,13 +1069,6 @@ void GraphicsOptions_MenuInit( void )
 		"Very High",
 		NULL
 	};
-	static const char *enabled_names[] =
-	{
-		"Off",
-		"On",
-		NULL
-	};
-
 	static const char *s_shadows[] =
 	{
 		"None",
@@ -920,6 +1090,11 @@ void GraphicsOptions_MenuInit( void )
 
 	// zero set all our globals
 	memset( &s_graphicsoptions, 0 ,sizeof(graphicsoptions_t) );
+	s_resBeforeBorderless = -1;
+	GraphicsOptions_SetCustom( 0, 0 );
+	GraphicsOptions_BuildModeList();
+	s_rateNames[0] = "Default";
+	s_rateNames[1] = NULL;
 
 	GraphicsOptions_Cache();
 
@@ -997,8 +1172,8 @@ void GraphicsOptions_MenuInit( void )
 		y = 242 - ( 11 * (BIGCHAR_HEIGHT + 2) ) / 2;
 	}
 	else {
-		// 13 settings rows + Driver Info link = 14 slots centered on the frame
-		y = 242 - ( 14 * (BIGCHAR_HEIGHT + 2) ) / 2;
+		// 15 settings rows + Driver Info link = 16 slots centered on the frame
+		y = 242 - ( 16 * (BIGCHAR_HEIGHT + 2) ) / 2;
 	}
 
 	s_graphicsoptions.list.generic.type     = MTYPE_SPINCONTROL;
@@ -1012,15 +1187,30 @@ void GraphicsOptions_MenuInit( void )
 	y += BIGCHAR_HEIGHT+2;
 
 	if( !graphicsOptions_vr ) {
-		// references/modifies "r_mode"
+		// references/modifies "r_mode", "r_modeFullscreen", "r_customWidth" and "r_customHeight"
 		s_graphicsoptions.mode.generic.type     = MTYPE_SPINCONTROL;
-		s_graphicsoptions.mode.generic.name     = "Video Mode:";
-		s_graphicsoptions.mode.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+		s_graphicsoptions.mode.generic.name     = "Resolution:";
+		s_graphicsoptions.mode.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT|QMF_WRAP;
 		s_graphicsoptions.mode.generic.x        = 400;
 		s_graphicsoptions.mode.generic.y        = y;
-		s_graphicsoptions.mode.itemnames        = resolutions;
+		s_graphicsoptions.mode.itemnames        = s_resNames;
 		s_graphicsoptions.mode.generic.callback = GraphicsOptions_Event;
 		s_graphicsoptions.mode.generic.id       = ID_MODE;
+		y += BIGCHAR_HEIGHT+2;
+
+		// opens the builder for "r_customWidth" and "r_customHeight"; bounds set here as a spin row's
+		s_graphicsoptions.customsize.generic.type      = MTYPE_ACTION;
+		s_graphicsoptions.customsize.generic.name      = "Custom Size:";
+		s_graphicsoptions.customsize.generic.flags     = QMF_NODEFAULTINIT|QMF_SMALLFONT;
+		s_graphicsoptions.customsize.generic.x         = 400;
+		s_graphicsoptions.customsize.generic.y         = y;
+		s_graphicsoptions.customsize.generic.left      = 400 - SMALLCHAR_WIDTH * ( 1 + strlen( "Custom Size:" ) );
+		s_graphicsoptions.customsize.generic.right     = 400 + SMALLCHAR_WIDTH * ( 1 + strlen( "16384x16384" ) );
+		s_graphicsoptions.customsize.generic.top       = y;
+		s_graphicsoptions.customsize.generic.bottom    = y + SMALLCHAR_HEIGHT;
+		s_graphicsoptions.customsize.generic.callback  = GraphicsOptions_Event;
+		s_graphicsoptions.customsize.generic.ownerdraw = GraphicsOptions_DrawCustomSize;
+		s_graphicsoptions.customsize.generic.id        = ID_CUSTOMSIZE;
 		y += BIGCHAR_HEIGHT+2;
 
 		// references "r_colorbits"
@@ -1034,11 +1224,24 @@ void GraphicsOptions_MenuInit( void )
 
 		// references/modifies "r_fullscreen"
 		s_graphicsoptions.fs.generic.type     = MTYPE_SPINCONTROL;
-		s_graphicsoptions.fs.generic.name	  = "Fullscreen:";
+		s_graphicsoptions.fs.generic.name	  = "Window Mode:";
 		s_graphicsoptions.fs.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
 		s_graphicsoptions.fs.generic.x	      = 400;
 		s_graphicsoptions.fs.generic.y	      = y;
-		s_graphicsoptions.fs.itemnames	      = enabled_names;
+		s_graphicsoptions.fs.generic.callback = GraphicsOptions_Event;
+		s_graphicsoptions.fs.generic.id       = ID_FULLSCREEN;
+		s_graphicsoptions.fs.itemnames	      = windowmode_names;
+		y += BIGCHAR_HEIGHT+2;
+
+		// references/modifies "r_displayRefresh"
+		s_graphicsoptions.refresh.generic.type     = MTYPE_SPINCONTROL;
+		s_graphicsoptions.refresh.generic.name     = "Refresh Rate:";
+		s_graphicsoptions.refresh.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+		s_graphicsoptions.refresh.generic.x        = 400;
+		s_graphicsoptions.refresh.generic.y        = y;
+		s_graphicsoptions.refresh.generic.callback = GraphicsOptions_Event;
+		s_graphicsoptions.refresh.generic.id       = ID_REFRESH;
+		s_graphicsoptions.refresh.itemnames        = s_rateNames;
 		y += BIGCHAR_HEIGHT+2;
 	}
 
@@ -1178,8 +1381,10 @@ void GraphicsOptions_MenuInit( void )
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.list );
 	if( !graphicsOptions_vr ) {
 		Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.mode );
+		Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.customsize );
 		Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.colordepth );
 		Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.fs );
+		Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.refresh );
 	}
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.msaa );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.lighting );

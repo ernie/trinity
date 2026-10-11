@@ -1,0 +1,136 @@
+#include "ui/menudef.h"
+
+{
+\\ CUSTOM RESOLUTION POPUP MENU \\
+
+menuDef {
+	name "customres_popmenu"
+	visible 0
+	fullscreen 0
+	rect 160 80 320 320
+	focusColor 1 .75 0 1
+	style 1
+	border 1
+	popup
+	onESC { close customres_popmenu ; open setup_menu ; open system_menu }
+
+itemDef {
+	name window
+	rect 0 0 320 320
+	style 3
+	background "ui/assets/mainpop.tga"
+	visible 1
+	decoration
+	}
+
+itemDef {
+	name title
+	text "Custom Resolution"
+	style 0
+	textscale .3
+	textstyle 3
+	rect 0 94 320 20
+	textalign ITEM_ALIGN_CENTER
+	textalignx 160
+	textaligny 15
+	decoration
+	forecolor 1 1 1 1
+	visible 1
+	}
+
+itemDef {
+	name customres
+	type ITEM_TYPE_MULTI
+	text "Aspect:"
+	cvar "ui_customRatio"
+	cvarFloatList { "Free" 0 "16:9" 1 "16:10" 2 "21:9" 3 "32:9" 4 "4:3" 5 }
+	action { uiScript customResFillWidth }
+	rect 40 124 240 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 120
+	textaligny 15
+	textscale .25
+	forecolor 1 1 1 1
+	visible 1
+	}
+
+itemDef {
+	name customres
+	type ITEM_TYPE_NUMERICFIELD
+	text "Width:"
+	cvar "ui_customW"
+	maxchars 5
+	onEditEnd { uiScript customResFillWidth }
+	rect 40 148 240 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 120
+	textaligny 15
+	textscale .25
+	forecolor 1 1 1 1
+	visible 1
+	}
+
+itemDef {
+	name customres
+	type ITEM_TYPE_NUMERICFIELD
+	text "Height:"
+	cvar "ui_customH"
+	maxchars 5
+	onEditEnd { uiScript customResFillHeight }
+	rect 40 172 240 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 120
+	textaligny 15
+	textscale .25
+	forecolor 1 1 1 1
+	visible 1
+	}
+
+itemDef {
+	name accept
+	text "ACCEPT"
+	type 1
+	textscale .25
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 97 204 56 26
+	textalign 1
+	textalignx 28
+	textaligny 20
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 1
+	action { play "sound/misc/kcaction.wav" ;
+	uiScript customResAccept ;
+	close customres_popmenu ;
+	open setup_menu ;
+	open system_menu }
+	mouseEnter { setitemcolor accept backcolor .1 .37 .1 1 }
+	mouseExit { setitemcolor accept backcolor .37 .1 .1 1 }
+	}
+
+itemDef {
+	name cancel
+	text "CANCEL"
+	type 1
+	textscale .25
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	rect 167 204 56 26
+	textalign 1
+	textalignx 28
+	textaligny 20
+	forecolor 1 1 1 1
+	backcolor .37 .1 .1 1
+	visible 1
+	action { play "sound/misc/nomenu.wav" ;
+	close customres_popmenu ;
+	open setup_menu ;
+	open system_menu }
+	mouseEnter { setitemcolor cancel backcolor .1 .37 .1 1 }
+	mouseExit { setitemcolor cancel backcolor .37 .1 .1 1 }
+	}
+
+}
+
+}

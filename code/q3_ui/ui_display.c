@@ -21,7 +21,6 @@ DISPLAY OPTIONS MENU
 #define ID_SOUND			12
 #define ID_NETWORK			13
 #define ID_BRIGHTNESS		14
-#define ID_SCREENSIZE		15
 #define ID_BACK				16
 #define ID_HDRCALIB			17
 #define ID_VRMODE			18
@@ -30,6 +29,8 @@ DISPLAY OPTIONS MENU
 #define ID_HDR				21
 #define ID_BLOOM			22
 #define ID_FLARES			23
+#define ID_VSYNC			24
+#define ID_SDRGAMMA			25
 #define ART_APPLY0 "menu/art/accept_0"
 #define ART_APPLY1 "menu/art/accept_1"
 
@@ -49,9 +50,10 @@ typedef struct {
 	menuslider_s	brightness;
 	menuradiobutton_s	fbo;
 	menuradiobutton_s	hdr;
+	menulist_s		sdrgamma;
 	menuradiobutton_s	bloom;
 	menuradiobutton_s	flares;
-	menuslider_s	screensize;
+	menuradiobutton_s	vsync;
 
 	menutext_s		hdrcalib;
 
@@ -63,6 +65,7 @@ typedef struct {
 	int				initialFbo;
 	int				initialHdr;
 	int				initialBloom;
+	int				initialVsync;
 } displayOptionsInfo_t;
 
 static displayOptionsInfo_t	displayOptionsInfo;
@@ -98,6 +101,12 @@ static void UI_DisplayOptionsMenu_UpdateItems( void ) {
 	} else {
 		displayOptionsInfo.hdrcalib.generic.flags |= QMF_GRAYED;
 	}
+	// the curve only shapes HDR output, which follows the live renderer
+	if ( trap_Cvar_VariableValue( "r_hdrActive" ) != 0 ) {
+		displayOptionsInfo.sdrgamma.generic.flags &= ~QMF_GRAYED;
+	} else {
+		displayOptionsInfo.sdrgamma.generic.flags |= QMF_GRAYED;
+	}
 	if ( fbo ) {
 		displayOptionsInfo.bloom.generic.flags &= ~QMF_GRAYED;
 	} else {
@@ -107,6 +116,7 @@ static void UI_DisplayOptionsMenu_UpdateItems( void ) {
 	if ( displayOptionsInfo.fbo.curvalue != displayOptionsInfo.initialFbo ||
 		displayOptionsInfo.hdr.curvalue != displayOptionsInfo.initialHdr ||
 		displayOptionsInfo.bloom.curvalue != displayOptionsInfo.initialBloom ||
+		displayOptionsInfo.vsync.curvalue != displayOptionsInfo.initialVsync ||
 		UI_VR_ModePending() ) {
 		displayOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	} else {
@@ -130,6 +140,9 @@ static void UI_DisplayOptionsMenu_ApplyChanges( void ) {
 	}
 	if ( displayOptionsInfo.bloom.curvalue != displayOptionsInfo.initialBloom ) {
 		trap_Cvar_SetValue( "r_bloom", displayOptionsInfo.bloom.curvalue );
+	}
+	if ( displayOptionsInfo.vsync.curvalue != displayOptionsInfo.initialVsync ) {
+		trap_Cvar_SetValue( "r_swapInterval", displayOptionsInfo.vsync.curvalue );
 	}
 	trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
 }
@@ -168,20 +181,19 @@ static void UI_DisplayOptionsMenu_Event( void* ptr, int event ) {
 		trap_Cvar_SetValue( "r_gamma", displayOptionsInfo.brightness.curvalue / 10.0f );
 		break;
 
-	case ID_SCREENSIZE:
-		if ( !displayOptions_vr ) {
-			trap_Cvar_SetValue( "cg_viewsize", displayOptionsInfo.screensize.curvalue * 10 );
-		}
-		break;
-
 	case ID_FBO:
 	case ID_HDR:
 	case ID_BLOOM:
+	case ID_VSYNC:
 		UI_DisplayOptionsMenu_UpdateItems();
 		break;
 
 	case ID_FLARES:
 		trap_Cvar_SetValue( "r_flares", displayOptionsInfo.flares.curvalue );
+		break;
+
+	case ID_SDRGAMMA:
+		trap_Cvar_SetValue( "r_hdrSdrCurve", displayOptionsInfo.sdrgamma.curvalue );
 		break;
 
 	case ID_VRMODE:
@@ -210,6 +222,7 @@ UI_DisplayOptionsMenu_Init
 ===============
 */
 static void UI_DisplayOptionsMenu_Init( void ) {
+	static const char *sdrgamma_names[] = { "sRGB", "2.2", NULL };
 	int		y;
 	int		rows;
 
@@ -286,8 +299,8 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.network.style				= UI_RIGHT;
 	displayOptionsInfo.network.color				= color_red;
 
-	// rows counted for centering the content column, including the optional Display Mode and Screen Size
-	rows = 7;
+	// rows counted for centering the content column, including the optional Display Mode and V-Sync
+	rows = 8;
 	if ( UI_VR_CanSwitchMode() ) {
 		rows++;
 	}
@@ -340,6 +353,16 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.hdr.generic.y			= y;
 	y += BIGCHAR_HEIGHT+2;
 
+	displayOptionsInfo.sdrgamma.generic.type		= MTYPE_SPINCONTROL;
+	displayOptionsInfo.sdrgamma.generic.name		= "SDR Gamma:";
+	displayOptionsInfo.sdrgamma.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	displayOptionsInfo.sdrgamma.generic.callback	= UI_DisplayOptionsMenu_Event;
+	displayOptionsInfo.sdrgamma.generic.id			= ID_SDRGAMMA;
+	displayOptionsInfo.sdrgamma.generic.x			= 400;
+	displayOptionsInfo.sdrgamma.generic.y			= y;
+	displayOptionsInfo.sdrgamma.itemnames			= sdrgamma_names;
+	y += BIGCHAR_HEIGHT+2;
+
 	displayOptionsInfo.bloom.generic.type		= MTYPE_RADIOBUTTON;
 	displayOptionsInfo.bloom.generic.name		= "Bloom:";
 	displayOptionsInfo.bloom.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -358,17 +381,15 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.flares.generic.y			= y;
 	y += BIGCHAR_HEIGHT+2;
 
-	// Screen Size is a flatscreen-only control; the runtime owns the view under VR
+	// flatscreen-only controls: the runtime paces frames and owns the view under VR
 	if( !displayOptions_vr ) {
-		displayOptionsInfo.screensize.generic.type		= MTYPE_SLIDER;
-		displayOptionsInfo.screensize.generic.name		= "Screen Size:";
-		displayOptionsInfo.screensize.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-		displayOptionsInfo.screensize.generic.callback	= UI_DisplayOptionsMenu_Event;
-		displayOptionsInfo.screensize.generic.id		= ID_SCREENSIZE;
-		displayOptionsInfo.screensize.generic.x			= 400;
-		displayOptionsInfo.screensize.generic.y			= y;
-		displayOptionsInfo.screensize.minvalue			= 3;
-		displayOptionsInfo.screensize.maxvalue			= 10;
+		displayOptionsInfo.vsync.generic.type		= MTYPE_RADIOBUTTON;
+		displayOptionsInfo.vsync.generic.name		= "V-Sync:";
+		displayOptionsInfo.vsync.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+		displayOptionsInfo.vsync.generic.callback	= UI_DisplayOptionsMenu_Event;
+		displayOptionsInfo.vsync.generic.id			= ID_VSYNC;
+		displayOptionsInfo.vsync.generic.x			= 400;
+		displayOptionsInfo.vsync.generic.y			= y;
 		y += BIGCHAR_HEIGHT+2;
 	}
 
@@ -418,19 +439,17 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.brightness );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.fbo );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.hdr );
+	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.sdrgamma );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.bloom );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.flares );
 	if( !displayOptions_vr ) {
-		Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.screensize );
+		Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.vsync );
 	}
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.hdrcalib );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.apply );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.back );
 
 	displayOptionsInfo.brightness.curvalue  = trap_Cvar_VariableValue("r_gamma") * 10;
-	if( !displayOptions_vr ) {
-		displayOptionsInfo.screensize.curvalue  = trap_Cvar_VariableValue( "cg_viewsize")/10;
-	}
 
 	// an HDR request without the frame buffer never takes effect, so switch it off rather than show it on
 	if ( UI_HDR_FBOOff() && trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0 ) {
@@ -441,9 +460,12 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.hdr.curvalue		= UI_HDR_Available() && trap_Cvar_VariableValue( "r_hdrDisplay" ) != 0;
 	displayOptionsInfo.bloom.curvalue	= trap_Cvar_VariableValue( "r_bloom" ) != 0;
 	displayOptionsInfo.flares.curvalue	= trap_Cvar_VariableValue( "r_flares" ) != 0;
+	displayOptionsInfo.sdrgamma.curvalue	= trap_Cvar_VariableValue( "r_hdrSdrCurve" ) != 0;
+	displayOptionsInfo.vsync.curvalue	= trap_Cvar_VariableValue( "r_swapInterval" ) != 0;
 	displayOptionsInfo.initialFbo		= displayOptionsInfo.fbo.curvalue;
 	displayOptionsInfo.initialHdr		= displayOptionsInfo.hdr.curvalue;
 	displayOptionsInfo.initialBloom		= displayOptionsInfo.bloom.curvalue;
+	displayOptionsInfo.initialVsync		= displayOptionsInfo.vsync.curvalue;
 
 	UI_DisplayOptionsMenu_UpdateItems();
 }

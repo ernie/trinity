@@ -1054,4 +1054,10 @@ typedef struct postGameInfo_s {
 
 #include "vr_ui.h"
 
+// ui_displaymenu.c: System menu display rows (Resolution, Custom Size, Color Depth, Refresh Rate)
+void UI_Display_RefreshModes( void );
+qboolean UI_Display_OwnerDraw( rectDef_t *rect, int ownerDraw, float scale, vec4_t color, int textStyle );
+qboolean UI_Display_OwnerDrawHandleKey( int ownerDraw, int key );
+qboolean UI_Display_RunMenuScript( const char *name );
+
 #endif

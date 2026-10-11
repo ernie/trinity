@@ -112,6 +112,7 @@ void UI_VRMirror_Cache( void );
 #define QMF_LOWERCASE			0x00040000u	// edit field is all lower case
 #define QMF_UPPERCASE			0x00080000u	// edit field is all upper case
 #define QMF_SILENT				0x00100000u
+#define QMF_WRAP				0x00200000u	// spin control arrows wrap past the ends
 
 // callback notifications
 #define QM_GOTFOCUS				1
@@ -427,6 +428,11 @@ extern void ServerInfo_Cache( void );
 //
 extern void UI_GraphicsOptionsMenu( void );
 extern void GraphicsOptions_Cache( void );
+
+//
+// ui_customres.c
+//
+extern void UI_CustomResolutionMenu( int w, int h, void (*done)( int w, int h ) );
 extern void DriverInfo_Cache( void );
 
 //
