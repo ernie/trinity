@@ -116,6 +116,9 @@ one build serves both platforms. Team Arena: the VR `.menu` files
 manifest, `vrmenus.txt`; they serve every platform, showing the Desktop Mirror
 entries only where `ui_vrMirrorAvailable` is set. Step 7
 explains why the screens are required and what a replacement must reproduce.
+Both UIs' Desktop Mirror sizes come from `game/ui_displaymodes.c` / `.h`
+(streaming, vertical, square and desktop-fraction sizes, then the display's
+own); copy it with the screens.
 
 ---
 
@@ -132,7 +135,7 @@ Add the copied sources to your build's module lists.
 | `q3_ui/vr_ui.c` | baseq3 UI |
 | `ui/vr_ui.c` | missionpack UI |
 | `ui/vr_uishared.c` | missionpack cgame **and** missionpack UI |
-| `vr_ui_mode.c`, `vr_bindmenu.c`, `vr_supersample.c` | both UI targets |
+| `vr_ui_mode.c`, `vr_bindmenu.c`, `vr_supersample.c`, `ui_displaymodes.c` | both UI targets |
 | `vr_glyph.c` | cgame **and** both UI targets |
 | baseq3 VR menu C files | baseq3 UI |
 
@@ -1084,7 +1087,11 @@ Deliberate differences, noted so the two `vr_ui.c` files don't surprise you:
   a click or Enter chooses one, passing the field's bottom edge to
   `trap_VKeyboard_Show` so the keyboard sits clear of the text being typed,
   and closes it when focus leaves text fields. The arrows, Tab and Enter
-  move focus as usual, from the keyboard's keys or the controller. Team
+  move focus as usual, from the keyboard's keys or the controller. baseq3
+  types at the end of a field's text because its `Menu_CursorMoved` moves
+  the cursor there as a field gains focus; the reference template adds
+  that one line to stock `ui_qmenu.c`. `ui_vrmirror.c` wraps its size list
+  past the ends when the host's `ui_local.h` defines `QMF_WRAP`. Team
   Arena's editing state is private to `ui_shared.c`, so `Menu_EditingItem`
   and `Menu_SetEditingItem` let stick navigation start editing the field it
   lands on and end an edit that focus has left.
