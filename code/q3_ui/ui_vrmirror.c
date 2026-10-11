@@ -303,7 +303,10 @@ static void VRMirror_MenuInit( void ) {
 	y += BIGCHAR_HEIGHT+2;
 	s_vrmirror.resolution.generic.type     = MTYPE_SPINCONTROL;
 	s_vrmirror.resolution.generic.name     = "Window Resolution:";
-	s_vrmirror.resolution.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT|QMF_WRAP;
+	s_vrmirror.resolution.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+#ifdef QMF_WRAP	// a host menu framework without it leaves the long list unwrapped
+	s_vrmirror.resolution.generic.flags    |= QMF_WRAP;
+#endif
 	s_vrmirror.resolution.generic.x        = VR_X_POS;
 	s_vrmirror.resolution.generic.y        = y;
 	s_vrmirror.resolution.itemnames        = s_mirrorNames;
