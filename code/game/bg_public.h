@@ -204,6 +204,8 @@ void Pmove (pmove_t *pmove);
 #define GRAPPLE_LATCH_REACH		64.0f
 // max push-out from a rotating face that sweeps into the player
 #define GRAPPLE_LATCH_STANDOFF	48.0f
+// horizontal reach of a carried player from the pad; hanging normally is about 25
+#define GRAPPLE_LATCH_HOLD		40.0f
 // the carry is exact unless blocked, so this only needs to exceed float error
 #define GRAPPLE_CRUSH_STRAIN	8.0f
 void BG_CreateRotationMatrix( const vec3_t angles, vec3_t matrix[3] );

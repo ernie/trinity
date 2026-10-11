@@ -780,7 +780,7 @@ static void PM_GrappleLatchMove( void ) {
 	vec3_t		o0, o1, a0, a1, off, local, ride, rideVel, pad, out;
 	vec3_t		m0[3], m1[3];
 	trace_t		trace;
-	float		strain;
+	float		strain, rideFraction;
 	int			k;
 
 	BG_EvaluateTrajectory( &pm->grappleMoverPos, t0, o0 );
@@ -803,11 +803,7 @@ static void PM_GrappleLatchMove( void ) {
 	VectorSubtract( trace.endpos, pm->ps->origin, rideVel );
 	VectorScale( rideVel, 1.0f / pml.frametime, rideVel );
 	VectorCopy( trace.endpos, pm->ps->origin );
-
-	// the frame's spin turns the base yaw; the mouse stays free
-	if ( a1[YAW] != a0[YAW] ) {
-		pm->ps->delta_angles[YAW] += ANGLE2SHORT( a1[YAW] - a0[YAW] );
-	}
+	rideFraction = trace.fraction;
 
 	BG_MoverLocalToWorld( m1, pm->grappleAnchorLocal, pad );
 	VectorAdd( o1, pad, pad );
@@ -828,6 +824,18 @@ static void PM_GrappleLatchMove( void ) {
 					VectorCopy( probe, pm->ps->origin );
 					break;
 				}
+			}
+		}
+
+		// the mover turns the view only while it holds the player: a full
+		// carry, near the pad, in clear sight of it (the pad sits a few units
+		// off the face)
+		if ( a1[YAW] != a0[YAW] && rideFraction == 1.0f
+				&& Square( pm->ps->origin[0] - pad[0] ) + Square( pm->ps->origin[1] - pad[1] )
+					<= Square( GRAPPLE_LATCH_HOLD ) ) {
+			pm->trace( &trace, pm->ps->origin, vec3_origin, vec3_origin, pad, pm->ps->clientNum, MASK_SOLID );
+			if ( Distance( trace.endpos, pad ) <= 4.0f ) {
+				pm->ps->delta_angles[YAW] += ANGLE2SHORT( a1[YAW] - a0[YAW] );
 			}
 		}
 	}
