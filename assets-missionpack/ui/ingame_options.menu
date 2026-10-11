@@ -255,24 +255,9 @@ itemDef {
 	name options
 	group grpOptions
 	type ITEM_TYPE_YESNO
-	text "Force Player Models:"
-	cvar "cg_forceModel"
-	rect 3 111 275 17
-	textalign ITEM_ALIGN_RIGHT
-	textalignx 146
-	textaligny 14
-	textscale .25
-	forecolor 1 1 1 1
-	visible 1
-	}
-
-	itemDef {
-	name options
-	group grpOptions
-	type ITEM_TYPE_YESNO
 	text "Draw Team Overlay:"
 	cvar "cg_drawTeamOverlay"
-	rect 3 128 275 17
+	rect 3 111 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -287,7 +272,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Show Time:"
 	cvar "cg_drawTimer"
-	rect 3 145 275 17
+	rect 3 128 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -302,7 +287,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Taunts Off:"
 	cvar "cg_noTaunt"
-	rect 3 162 275 17
+	rect 3 145 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -317,7 +302,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "In Game Videos:"
 	cvar "r_inGameVideo"
-	rect 3 179 275 17
+	rect 3 162 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -333,7 +318,7 @@ itemDef {
 	text "Statusbar:"
 	cvar "cg_hudfiles"
 	cvarStrList { Normal "ui/hud.txt" Small "ui/hud2.txt" }
-	rect 3 196 275 17
+	rect 3 179 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -348,7 +333,7 @@ itemDef {
 	group grpOptions
 	text "Crosshair:"
 	ownerdraw UI_CROSSHAIR
-	rect 3 213 275 17
+	rect 3 196 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -362,8 +347,8 @@ itemDef {
 	group grpOptions
 	type ITEM_TYPE_SLIDER
 	text "Crosshair Size:"
-	cvarfloat "cg_crosshairSize" 24 8 24
-	rect 3 230 275 17
+	cvarfloat "cg_crosshairSize" 8 8 24
+	rect 3 213 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -377,7 +362,7 @@ itemDef {
 	group grpOptions
 	text "Crosshair Color:"
 	ownerdraw UI_CROSSHAIRCOLOR
-	rect 3 247 286 17
+	rect 3 230 286 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -392,7 +377,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Crosshair Health Tint:"
 	cvar "cg_crosshairHealth"
-	rect 3 264 275 17
+	rect 3 247 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -408,7 +393,7 @@ itemDef {
 	type ITEM_TYPE_MULTI
 	cvar "cg_damageEffect"
 	cvarFloatList { "Classic" 0 "Modern" 1 }
-	rect 3 281 275 17
+	rect 3 264 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -424,7 +409,7 @@ itemDef {
 	type ITEM_TYPE_MULTI
 	cvar "com_blood"
 	cvarFloatList { "Off" 0 "Classic" 1 "Modern" 2 }
-	rect 3 298 275 17
+	rect 3 281 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -440,7 +425,7 @@ itemDef {
 	type ITEM_TYPE_MULTI
 	cvar "cg_bloodDensity"
 	cvarFloatList { "Light" 0 "Medium" 1 "Heavy" 2 }
-	rect 3 315 275 17
+	rect 3 298 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14
@@ -457,6 +442,22 @@ itemDef {
 	text "Damage Numbers:"
 	type ITEM_TYPE_YESNO
 	cvar "cg_damagePlums"
+	rect 3 315 275 17
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 146
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 1
+	}
+
+itemDef {
+	name options
+	group grpOptions
+	text "Hit Sounds:"
+	type ITEM_TYPE_MULTI
+	cvar "cg_hitSounds"
+	cvarFloatList { "Classic" 0 "Big Hits Low" 1 "Big Hits High" 2 }
 	rect 3 332 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146

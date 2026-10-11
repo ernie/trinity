@@ -93,6 +93,7 @@ typedef struct
 #define ID_CHAT4		33
 #define ID_VOIPTALK		34
 #define ID_VOIPTARGET	35
+#define ID_GRAPPLE		36
 
 // all others
 #define ID_FREELOOK		37
@@ -164,6 +165,7 @@ typedef struct
 	menuaction_s		railgun;
 	menuaction_s		plasma;
 	menuaction_s		bfg;
+	menuaction_s		grapple;
 	menuaction_s		attack;
 	menuaction_s		prevweapon;
 	menuaction_s		nextweapon;
@@ -247,6 +249,7 @@ static bind_t g_bindings[] =
 	{"messagemode4", 	"chat - attacker",	ID_CHAT4,		ANIM_CHAT,		-1,				-1,		-1, -1},
 	{"+voiprecord",		"voip ptt / toggle",	ID_VOIPTALK,	ANIM_CHAT,		-1,				-1,		-1, -1},
 	{"voiptarget",		"voice target",		ID_VOIPTARGET,	ANIM_CHAT,		-1,				-1,		-1, -1},
+	{"weapon 10",		"grapple",			ID_GRAPPLE,		ANIM_WEAPON10,	'0',			-1,		-1, -1},
 	{(char*)NULL,		(char*)NULL,		0,				0,				-1,				-1,		-1,	-1},
 };
 
@@ -293,6 +296,7 @@ static menucommon_s *g_weapons_controls[] = {
 	(menucommon_s *)&s_controls.railgun,          
 	(menucommon_s *)&s_controls.plasma,           
 	(menucommon_s *)&s_controls.bfg,              
+	(menucommon_s *)&s_controls.grapple,
 	NULL,
 };
 
@@ -1383,6 +1387,12 @@ static void Controls_MenuInit( void )
 	s_controls.bfg.generic.ownerdraw = Controls_DrawKeyBinding;
 	s_controls.bfg.generic.id        = ID_WEAPON9;
 
+	s_controls.grapple.generic.type	     = MTYPE_ACTION;
+	s_controls.grapple.generic.flags     = QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_GRAYED|QMF_HIDDEN;
+	s_controls.grapple.generic.callback  = Controls_ActionEvent;
+	s_controls.grapple.generic.ownerdraw = Controls_DrawKeyBinding;
+	s_controls.grapple.generic.id        = ID_GRAPPLE;
+
 	s_controls.attack.generic.type	    = MTYPE_ACTION;
 	s_controls.attack.generic.flags     = QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_GRAYED|QMF_HIDDEN;
 	s_controls.attack.generic.callback  = Controls_ActionEvent;
@@ -1609,6 +1619,7 @@ static void Controls_MenuInit( void )
 	Menu_AddItem( &s_controls.menu, &s_controls.railgun );
 	Menu_AddItem( &s_controls.menu, &s_controls.plasma );
 	Menu_AddItem( &s_controls.menu, &s_controls.bfg );
+	Menu_AddItem( &s_controls.menu, &s_controls.grapple );
 
 	Menu_AddItem( &s_controls.menu, &s_controls.showscores );
 	Menu_AddItem( &s_controls.menu, &s_controls.useitem );

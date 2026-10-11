@@ -56,8 +56,20 @@ static void Item_TextField_StartEdit( itemDef_t *item ) {
 	}
 }
 
+void Item_RunScript(itemDef_t *item, const char *s);
+
+// Enter, Escape, a click or moving to another field all end an edit
+static void Item_TextField_EndEdit( itemDef_t *item ) {
+	if ( item && item->onEditEnd ) {
+		Item_RunScript( item, item->onEditEnd );
+	}
+}
+
 // Starts editing item as a click or Enter does, or ends the edit when NULL.
 void Menu_SetEditingItem( itemDef_t *item ) {
+	if ( g_editingField && g_editItem != item ) {
+		Item_TextField_EndEdit( g_editItem );
+	}
 	if ( item ) {
 		Item_TextField_StartEdit( item );
 	}
@@ -2289,6 +2301,10 @@ qboolean Item_TextField_HandleKey(itemDef_t *item, int key) {
 			}
 		}
 
+		if (key == K_TAB || key == K_DOWNARROW || key == K_KP_DOWNARROW || key == K_UPARROW || key == K_KP_UPARROW) {
+			Item_TextField_EndEdit( item );
+		}
+
 		if (key == K_TAB || key == K_DOWNARROW || key == K_KP_DOWNARROW) {
 			newItem = Menu_SetNextCursorItem(item->parent);
 			if (newItem && (newItem->type == ITEM_TYPE_EDITFIELD || newItem->type == ITEM_TYPE_NUMERICFIELD)) {
@@ -2306,7 +2322,19 @@ qboolean Item_TextField_HandleKey(itemDef_t *item, int key) {
 			}
 		}
 
-		if ( key == K_ENTER || key == K_KP_ENTER || key == K_ESCAPE)  {
+		// Enter moves on to the next text field, as baseq3's fields do; anywhere else it ends the edit
+		if ( key == K_ENTER || key == K_KP_ENTER ) {
+			newItem = Menu_SetNextCursorItem(item->parent);
+			if (newItem && newItem != item && (newItem->type == ITEM_TYPE_EDITFIELD || newItem->type == ITEM_TYPE_NUMERICFIELD)) {
+				Item_TextField_EndEdit( item );
+				Item_TextField_StartEdit( newItem );
+				g_editItem = newItem;
+				return qtrue;
+			}
+			return qfalse;
+		}
+
+		if ( key == K_ESCAPE )  {
 			return qfalse;
 		}
 
@@ -2811,15 +2839,17 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 
 	if (g_editingField && down) {
 		if (!Item_TextField_HandleKey(g_editItem, key)) {
+			Item_TextField_EndEdit( g_editItem );
 			g_editingField = qfalse;
 			g_editItem = NULL;
 			inHandler = qfalse;
 			return;
 		} else if (key == K_MOUSE1 || key == K_MOUSE2 || key == K_MOUSE3) {
+			Item_TextField_EndEdit( g_editItem );
 			g_editingField = qfalse;
 			g_editItem = NULL;
 			Display_MouseMove(NULL, DC->cursorx, DC->cursory);
-		} else if (key == K_TAB || key == K_UPARROW || key == K_DOWNARROW) {
+		} else if (key == K_TAB || key == K_UPARROW || key == K_DOWNARROW || key == K_ENTER || key == K_KP_ENTER) {
 			return;
 		}
 	}
@@ -2850,6 +2880,11 @@ void Menu_HandleKey(menuDef_t *menu, int key, qboolean down) {
 			inHandler = qfalse;
 			return;
 		}
+	}
+
+	// a click acts on what is under the cursor, even when the mouse has not moved since the menu opened
+	if (down && (key == K_MOUSE1 || key == K_MOUSE2 || key == K_MOUSE3) && !itemCapture) {
+		Menu_HandleMouseMove(menu, DC->cursorx, DC->cursory);
 	}
 
 	// get the item with focus
@@ -3694,10 +3729,15 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 		if (down && (key == K_MOUSE1 || key == K_ENTER)) {
 			g_waitingForKey = qtrue;
 			g_bindItem = item;
+			return qtrue;
 		}
-		return qtrue;
+		// Backspace clears the row under the cursor, as the hint says and baseq3's controls menu does
+		if (!down || (key != K_BACKSPACE && key != K_DEL && key != K_KP_DEL)) {
+			return qtrue;
+		}
+		key = -1;
 	}
-
+	else
 	{
 		if (!g_waitingForKey || g_bindItem == NULL) {
 			return qtrue;
@@ -3712,17 +3752,11 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 			case K_ESCAPE:
 				g_waitingForKey = qfalse;
 				return qtrue;
-	
+
+			// cleared below, unbinding the keys too
 			case K_BACKSPACE:
-				id = BindingIDFromName(item->cvar);
-				if (id != -1) {
-					g_bindings[id].bind1 = -1;
-					g_bindings[id].bind2 = -1;
-				}
-				Controls_SetConfig(qtrue);
-				g_waitingForKey = qfalse;
-				g_bindItem = NULL;
-				return qtrue;
+				key = -1;
+				break;
 
 			case '`':
 				return qtrue;
@@ -5067,6 +5101,13 @@ qboolean ItemParse_leaveFocus( itemDef_t *item, int handle ) {
 	return qtrue;
 }
 
+qboolean ItemParse_onEditEnd( itemDef_t *item, int handle ) {
+	if (!PC_Script_Parse(handle, &item->onEditEnd)) {
+		return qfalse;
+	}
+	return qtrue;
+}
+
 qboolean ItemParse_mouseEnter( itemDef_t *item, int handle ) {
 	if (!PC_Script_Parse(handle, &item->mouseEnter)) {
 		return qfalse;
@@ -5377,6 +5418,7 @@ keywordHash_t itemParseKeywords[] = {
 	{"background", ItemParse_background, NULL},
 	{"onFocus", ItemParse_onFocus, NULL},
 	{"leaveFocus", ItemParse_leaveFocus, NULL},
+	{"onEditEnd", ItemParse_onEditEnd, NULL},
 	{"mouseEnter", ItemParse_mouseEnter, NULL},
 	{"mouseExit", ItemParse_mouseExit, NULL},
 	{"mouseEnterText", ItemParse_mouseEnterText, NULL},

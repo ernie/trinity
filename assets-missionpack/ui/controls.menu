@@ -509,7 +509,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Attack:"
 		cvar "+attack"
-		rect 99 50 256 20
+		rect 99 40 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128 
       		textaligny 20
@@ -526,7 +526,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Previous Weapon:"
 		cvar "weapprev"
-		rect 99 70 256 20
+		rect 99 60 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -543,7 +543,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Next Weapon:"
 		cvar "weapnext"
-		rect 99 90 256 20
+		rect 99 80 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -560,7 +560,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Autoswitch:"
 		cvar "cg_autoswitch"
-		rect 99 110 256 20
+		rect 99 100 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -577,7 +577,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Gauntlet:"
 		cvar "weapon 1"
-		rect 99 130 256 20
+		rect 99 120 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -594,7 +594,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Machinegun:"
 		cvar "weapon 2"
-		rect 99 150 256 20
+		rect 99 140 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -611,7 +611,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Shotgun:"
 		cvar "weapon 3"
-		rect 99 170 256 20
+		rect 99 160 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -628,7 +628,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Grenade Launcher:"
 		cvar "weapon 4"
-		rect 99 190 256 20
+		rect 99 180 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -645,7 +645,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Rocket Launcher:"
 		cvar "weapon 5"
-		rect 99 210 256 20
+		rect 99 200 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -662,7 +662,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Lightning Gun:"
 		cvar "weapon 6"
-		rect 99 230 256 20
+		rect 99 220 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -679,7 +679,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Railgun:"
 		cvar "Weapon 7"
-		rect 99 250 256 20
+		rect 99 240 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -695,7 +695,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Plasma Gun:"
 		cvar "weapon 8"
-		rect 99 270 256 20
+		rect 99 260 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -711,7 +711,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "BFG:"
 		cvar "weapon 9"
-		rect 99 290 256 20
+		rect 99 280 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -727,7 +727,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Nail Gun:"
 		cvar "weapon 11"
-		rect 99 310 256 20
+		rect 99 300 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -743,7 +743,7 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Proximity Mine:"
 		cvar "weapon 12"
-		rect 99 330 256 20
+		rect 99 320 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -759,7 +759,23 @@ itemDef {
       		type ITEM_TYPE_BIND
 		text "Chain Gun:"
 		cvar "weapon 13"
-		rect 99 350 256 20
+		rect 99 340 256 20
+      		textalign ITEM_ALIGN_RIGHT
+      		textalignx 128
+      		textaligny 20
+		textscale .3        
+      		forecolor 1 1 1 1
+      		visible 0 
+		mouseenter { show keyBindStatus }
+		mouseexit { hide keyBindStatus }
+    		}
+	itemDef {
+      		name shoot
+		group grpControls
+      		type ITEM_TYPE_BIND
+		text "Grapple:"
+		cvar "weapon 10"
+		rect 99 360 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20

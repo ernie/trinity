@@ -35,8 +35,6 @@ GAME OPTIONS MENU
 #define ID_WALLMARKS			131
 #define ID_DYNAMICLIGHTS		132
 #define ID_IDENTIFYTARGET		133
-#define ID_SYNCEVERYFRAME		134
-#define ID_FORCEMODEL			135
 #define ID_DRAWTEAMOVERLAY		136
 #define ID_ALLOWDOWNLOAD		137
 #define ID_BACK					138
@@ -50,6 +48,7 @@ GAME OPTIONS MENU
 #define ID_CROSSHAIRHEALTH		146
 #define ID_BLOODDENSITY			148
 #define ID_DRAWTIMER			149
+#define ID_HITSOUNDS			150
 
 #define	NUM_CROSSHAIRS			10
 
@@ -71,14 +70,13 @@ typedef struct {
 	menulist_s			dynamiclights;
 	menuradiobutton_s	identifytarget;
 	menuradiobutton_s	highqualitysky;
-	menuradiobutton_s	synceveryframe;
-	menuradiobutton_s	forcemodel;
 	menulist_s			drawteamoverlay;
 	menuradiobutton_s	drawtimer;
 	menulist_s			damageeffect;
 	menulist_s			blood;
 	menulist_s			blooddensity;
 	menuradiobutton_s	damageplums;
+	menulist_s			hitsounds;
 	menulist_s			followmode;
 	menuradiobutton_s	allowdownload;
 	menulist_s			tvdownload;
@@ -122,6 +120,14 @@ static const char *blooddensity_names[] =
 	"Light",
 	"Medium",
 	"Heavy",
+	NULL
+};
+
+static const char *hitsounds_names[] =
+{
+	"Classic",
+	"Big Hits Low",
+	"Big Hits High",
 	NULL
 };
 
@@ -194,8 +200,6 @@ static void Preferences_SetMenuItems( void ) {
 		s_preferences.dynamiclights.curvalue	= Com_Clamp( 1, 3, trap_Cvar_VariableValue( "r_dlightMode" ) + 1 );
 	}
 	s_preferences.highqualitysky.curvalue	= trap_Cvar_VariableValue ( "r_fastsky" ) == 0;
-	s_preferences.synceveryframe.curvalue	= trap_Cvar_VariableValue( "r_swapinterval" ) != 0;
-	s_preferences.forcemodel.curvalue		= trap_Cvar_VariableValue( "cg_forcemodel" ) != 0;
 	s_preferences.drawteamoverlay.curvalue	= Com_Clamp( 0, 3, trap_Cvar_VariableValue( "cg_drawTeamOverlay" ) );
 	s_preferences.drawtimer.curvalue		= trap_Cvar_VariableValue( "cg_drawTimer" ) != 0;
 	s_preferences.damageeffect.curvalue		= trap_Cvar_VariableValue( "cg_damageEffect" ) != 0;
@@ -203,6 +207,7 @@ static void Preferences_SetMenuItems( void ) {
 	s_preferences.blooddensity.curvalue		= Com_Clamp( 0, 2, trap_Cvar_VariableValue( "cg_bloodDensity" ) );
 	Preferences_UpdateBloodDensity();
 	s_preferences.damageplums.curvalue		= trap_Cvar_VariableValue( "cg_damagePlums" ) != 0;
+	s_preferences.hitsounds.curvalue		= Com_Clamp( 0, 2, trap_Cvar_VariableValue( "cg_hitSounds" ) );
 	s_preferences.followmode.curvalue		= Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_followMode" ) );
 	s_preferences.allowdownload.curvalue	= trap_Cvar_VariableValue( "cl_allowDownload" ) != 0;
 }
@@ -262,14 +267,6 @@ static void Preferences_Event( void* ptr, int notification ) {
 		trap_Cvar_SetValue( "cg_drawCrosshairNames", s_preferences.identifytarget.curvalue );
 		break;
 
-	case ID_SYNCEVERYFRAME:
-		trap_Cvar_SetValue( "r_swapinterval", s_preferences.synceveryframe.curvalue );
-		break;
-
-	case ID_FORCEMODEL:
-		trap_Cvar_SetValue( "cg_forcemodel", s_preferences.forcemodel.curvalue );
-		break;
-
 	case ID_DRAWTEAMOVERLAY:
 		trap_Cvar_SetValue( "cg_drawTeamOverlay", s_preferences.drawteamoverlay.curvalue );
 		break;
@@ -306,6 +303,10 @@ static void Preferences_Event( void* ptr, int notification ) {
 
 	case ID_DAMAGEPLUMS:
 		trap_Cvar_SetValue( "cg_damagePlums", s_preferences.damageplums.curvalue );
+		break;
+
+	case ID_HITSOUNDS:
+		trap_Cvar_SetValue( "cg_hitSounds", s_preferences.hitsounds.curvalue );
 		break;
 
 	case ID_FOLLOWMODE:
@@ -446,13 +447,10 @@ static void CrosshairColor_Draw( void *self ) {
 static void Preferences_MenuInit( void ) {
 	int				y;
 	int				rows;
-	qboolean		vrEnabled;
 
 	memset( &s_preferences, 0 ,sizeof(preferences_t) );
 
 	Preferences_Cache();
-
-	vrEnabled = ( UI_VR_Platform() != VRP_NONE );
 
 	// resolve the optional TVD download row before layout so it can be counted
 	{
@@ -489,12 +487,9 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.framer.height  	   = 334;
 
 	// center the option column on the frame center (y=242): the count runs from
-	// Crosshair through Automatic Downloading, less the VR-gated Sync Every Frame
-	// row and plus the TVD Download row when cl_tvDownload is set
-	rows = 20;
-	if ( vrEnabled ) {
-		rows--;
-	}
+	// Crosshair through Automatic Downloading, plus the TVD Download row when
+	// cl_tvDownload is set
+	rows = 19;
 	if ( s_preferences.hasTvDownload ) {
 		rows++;
 	}
@@ -602,27 +597,6 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.highqualitysky.generic.x	      = PREFERENCES_X_POS;
 	s_preferences.highqualitysky.generic.y	      = y;
 
-	// swap-interval is the runtime's business under VR; the list closes the gap
-	if ( !vrEnabled ) {
-		y += BIGCHAR_HEIGHT;
-		s_preferences.synceveryframe.generic.type     = MTYPE_RADIOBUTTON;
-		s_preferences.synceveryframe.generic.name	  = "Sync Every Frame:";
-		s_preferences.synceveryframe.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-		s_preferences.synceveryframe.generic.callback = Preferences_Event;
-		s_preferences.synceveryframe.generic.id       = ID_SYNCEVERYFRAME;
-		s_preferences.synceveryframe.generic.x	      = PREFERENCES_X_POS;
-		s_preferences.synceveryframe.generic.y	      = y;
-	}
-
-	y += BIGCHAR_HEIGHT;
-	s_preferences.forcemodel.generic.type     = MTYPE_RADIOBUTTON;
-	s_preferences.forcemodel.generic.name	  = "Force Player Models:";
-	s_preferences.forcemodel.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_preferences.forcemodel.generic.callback = Preferences_Event;
-	s_preferences.forcemodel.generic.id       = ID_FORCEMODEL;
-	s_preferences.forcemodel.generic.x	      = PREFERENCES_X_POS;
-	s_preferences.forcemodel.generic.y	      = y;
-
 	y += BIGCHAR_HEIGHT;
 	s_preferences.drawteamoverlay.generic.type     = MTYPE_SPINCONTROL;
 	s_preferences.drawteamoverlay.generic.name	   = "Draw Team Overlay:";
@@ -683,6 +657,16 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.damageplums.generic.y	       = y;
 
 	y += BIGCHAR_HEIGHT;
+	s_preferences.hitsounds.generic.type         = MTYPE_SPINCONTROL;
+	s_preferences.hitsounds.generic.name         = "Hit Sounds:";
+	s_preferences.hitsounds.generic.flags        = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.hitsounds.generic.callback     = Preferences_Event;
+	s_preferences.hitsounds.generic.id           = ID_HITSOUNDS;
+	s_preferences.hitsounds.generic.x            = PREFERENCES_X_POS;
+	s_preferences.hitsounds.generic.y            = y;
+	s_preferences.hitsounds.itemnames            = hitsounds_names;
+
+	y += BIGCHAR_HEIGHT;
 	s_preferences.followmode.generic.type        = MTYPE_SPINCONTROL;
 	s_preferences.followmode.generic.name        = "Follow Camera:";
 	s_preferences.followmode.generic.flags       = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -737,16 +721,13 @@ static void Preferences_MenuInit( void ) {
 	Menu_AddItem( &s_preferences.menu, &s_preferences.dynamiclights );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.identifytarget );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.highqualitysky );
-	if ( !vrEnabled ) {
-		Menu_AddItem( &s_preferences.menu, &s_preferences.synceveryframe );
-	}
-	Menu_AddItem( &s_preferences.menu, &s_preferences.forcemodel );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.drawteamoverlay );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.drawtimer );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageeffect );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.blood );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.blooddensity );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageplums );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.hitsounds );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.followmode );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.allowdownload );
 

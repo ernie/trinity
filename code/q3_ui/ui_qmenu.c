@@ -1445,6 +1445,10 @@ void Menu_CursorMoved( menuframework_s *m )
 =================
 Menu_SetCursor
 =================
+		// a field takes typing where its text ends, however it got focus
+		if ( ((menucommon_s*)(m->items[m->cursor]))->type == MTYPE_FIELD )
+			MField_KeyDownEvent( &((menufield_s*)(m->items[m->cursor]))->field, K_END );
+
 */
 void Menu_SetCursor( menuframework_s *m, int cursor )
 {

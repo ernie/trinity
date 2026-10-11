@@ -50,7 +50,7 @@ itemDef {
 		group grpOptions
 		type ITEM_TYPE_SLIDER
 		text "Crosshair Size:"
-		cvarfloat "cg_crosshairSize" 24 8 24
+		cvarfloat "cg_crosshairSize" 8 8 24
 		rect 30 105 270 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
@@ -183,24 +183,9 @@ itemDef {
       		name options
 		group grpOptions
       		type ITEM_TYPE_YESNO
-		text "Force Player Models:"
-		cvar "cg_forceModel"
-		rect 16 285 224 20
-      		textalign ITEM_ALIGN_RIGHT
-      		textalignx 142
-      		textaligny 20
-		textscale .3
-      		forecolor 1 1 1 1
-      		visible 1
-    		}
-
-	itemDef {
-      		name options
-		group grpOptions
-      		type ITEM_TYPE_YESNO
 		text "Draw Team Overlay:"
 		cvar "cg_drawTeamOverlay"
-		rect 23 305 217 20
+		rect 23 285 217 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 135
       		textaligny 20
@@ -215,7 +200,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Show Time:"
 		cvar "cg_drawTimer"
-		rect 300 325 155 20
+		rect 300 305 155 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 73
       		textaligny 20
@@ -231,7 +216,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "cg_followMode"
 		cvarFloatList { "First-person" 0 "Third-person" 1 }
-		rect 30 325 270 20
+		rect 30 305 270 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -422,7 +407,23 @@ itemDef {
 		text "Damage Numbers:"
 		type ITEM_TYPE_YESNO
 		cvar "cg_damagePlums"
-		rect 245 305 210 20
+		rect 30 325 210 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+	}
+
+itemDef {
+		name options
+		group grpOptions
+		text "Hit Sounds:"
+		type ITEM_TYPE_MULTI
+		cvar "cg_hitSounds"
+		cvarFloatList { "Classic" 0 "Big Hits Low" 1 "Big Hits High" 2 }
+		rect 30 345 270 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -434,7 +435,7 @@ itemDef {
 itemDef {
 		name msg_blooddensity
 		text "Blood density is performance-heavy on standalone headsets"
-		rect 0 360 443 20
+		rect 0 375 443 20
 		textalign ITEM_ALIGN_CENTER
 		textalignx 221
 		textaligny 14

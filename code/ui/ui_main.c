@@ -6890,12 +6890,6 @@ void UI_RegisterCvars( void ) {
 
 	for ( i = 0, cv = cvarTable ; i < cvarTableSize ; i++, cv++ ) {
 		defaultString = cv->defaultString;
-		// crosshair target names are HUD clutter in a headset: default them
-		// off under VR (ui registers this cvar before cgame loads), stock on
-		// flatscreen
-		if ( vrActive && cv->vmCvar == &ui_drawCrosshairNames ) {
-			defaultString = "0";
-		}
 		// matches cgame's standalone default
 		if ( UI_VR_Platform() == VRP_STANDALONE && cv->vmCvar == &ui_bloodDensity ) {
 			defaultString = "0";

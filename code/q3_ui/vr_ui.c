@@ -263,14 +263,6 @@ void UI_VR_KeyHandled( int key ) {
 		UI_VKeyboardShow( item->bottom );
 	} else if ( key == K_ENTER || key == K_KP_ENTER || ( key == K_MOUSE1 && ( item->flags & QMF_HASMOUSEFOCUS ) ) ||
 				( UI_VR_StickNavActive() && UI_VR_NavKey( key ) ) ) {
-		// start with the cursor at the end of the text
-		mfield_t *field = &( (menufield_s *)item )->field;
-
-		field->cursor = strlen( field->buffer );
-		field->scroll = field->cursor - field->widthInChars + 1;
-		if ( field->scroll < 0 ) {
-			field->scroll = 0;
-		}
 		UI_VKeyboardShow( item->bottom );
 	}
 }
