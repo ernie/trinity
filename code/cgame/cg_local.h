@@ -250,7 +250,7 @@ typedef struct {
 	vec3_t			muzzleOrigin;
 	int				muzzleTime;		// 0 until a drawn weapon has written the origin above
 
-	// the local first-person wielder's BODY gun (mirror-only) stashes its own
+	// the local first-person player's BODY gun (mirror-only) stashes its own
 	// tether tag here, feeding the mirror copy of the tether
 	vec3_t			bodyTetherOrigin;
 	int				bodyTetherTime;

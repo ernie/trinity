@@ -17,7 +17,7 @@
 #define VR_HOST_HAS_WARMUP_EVENTS 1
 
 // This tree hands the grapple out per server (cgs.grappleEnabled) and holds a
-// captured player on a mover (CG_GrappleLatchAnchor, CG_GrappleOwnerRGBA).
+// carries a hooked player with a mover (CG_GrappleLatchAnchor, CG_GrappleOwnerRGBA).
 #define VR_HOST_HAS_GRAPPLE 1
 
 // This tree clips view-path traces against movers at their drawn pose

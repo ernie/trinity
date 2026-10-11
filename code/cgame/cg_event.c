@@ -1064,7 +1064,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		// when the server reuses this hook's entity slot for it; time2 is the
 		// hook that actually died, so a same-snapshot next throw can't be undone
 		CG_GrappleLaunchEnded( es->otherEntityNum, es->time2 );
-		// the tent is SVF_BROADCAST, so gate the seat on the wielder being
+		// the tent is SVF_BROADCAST, so gate the seat on the owner being
 		// in view (the pad re-forms on the gun, not at the anchor).
 		// CHAN_WEAPON so a re-fire's launch replaces it the way the ramp's
 		// boost cuts the animation; neither may move to CHAN_AUTO

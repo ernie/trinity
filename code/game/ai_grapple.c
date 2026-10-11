@@ -66,7 +66,7 @@
 											//sliver, and a falling body's ideal drifts too fast for a tighter one
 #define GRAPPLE_UNSAFE_GRACE		1.5
 #define GRAPPLE_MAXHOLD				12.0	//only a lethal release keeps the hold past its grace
-#define GRAPPLE_MANTLE_SETTLE		0.2		//one more think than the hang needs to stop moving
+#define GRAPPLE_MANTLE_SETTLE		0.2		//one more think than a hanging bot needs to stop moving
 #define GRAPPLE_MANTLE_BUDGET		1.0
 #define GRAPPLE_MANTLE_PITCH_MAX	85		//the flattened forward vector stops pressing near 90
 #define GRAPPLE_MANTLE_CLIP			(MASK_PLAYERSOLID|CONTENTS_BOTCLIP)
@@ -217,7 +217,7 @@ for any origin/velocity pair, so two calls stay directly comparable.
 
 aircontrol is how hard the bot is assumed to steer through the flight, on the
 EA 0-400 stick scale. A release DECISION passes 0: it commits, and a landing
-promised by steering the bot may not actually do costs more than the ride it
+promised by steering the bot may not actually do costs more than the pull it
 replaced.
 ==================
 */
@@ -827,8 +827,8 @@ static int BotGrappleSaveAnchor(bot_state_t *bs, vec3_t point) {
 		}
 		tmp = order[j]; order[j] = order[besti]; order[besti] = tmp;
 	}
-	//first candidate the bot can come DOWN from wins: predict the drop out of
-	//the hang the tow settles into, and take the anchor only if that drop
+	//first candidate the bot can come DOWN from wins: predict the drop from
+	//where the pull leaves it hanging, and take the anchor only if that drop
 	//lands somewhere the router can route from. The anchor itself proves
 	//nothing: the underside of a floating deck reads well from below and
 	//buys only a hang over the same void. Worse candidates never pay for the
@@ -864,7 +864,7 @@ static int BotGrappleSaveAnchor(bot_state_t *bs, vec3_t point) {
 		return 1;
 	}
 	//nothing qualifies outright: a catch that merely STOPS the fall still
-	//beats riding it out. The hang it buys re-searches from where it hangs,
+	//beats riding it out. Once hanging, the bot searches again from there,
 	//so a bare wall is a ladder rung, not a destination. An underside
 	//cannot be climbed out of, and a rung must top the last one taken, or
 	//the fall between hangs re-qualifies the same height forever
@@ -1031,7 +1031,7 @@ void BotCheckGrappleSpeed(bot_state_t *bs, bot_moveresult_t *moveresult) {
 	if (bsptr.fraction >= 1 || (bsptr.surface.flags & SURF_SKY)) return;
 	dist = GRAPPLE_SPEED_MAXDIST * bsptr.fraction;
 	if (dist < GRAPPLE_SPEED_MINDIST) return;
-	//the swing has to end somewhere safe: from the hang under the anchor,
+	//the swing has to end somewhere safe: from where the bot hangs under the anchor,
 	//carrying the leg's speed
 	VectorMA(bsptr.endpos, -48, dir, hang);
 	VectorScale(bs->legdir, GRAPPLE_SPEED_RELEASE, vel);
@@ -1387,7 +1387,7 @@ static qboolean BotGrappleMantleWanted(bot_state_t *bs, gentity_t *hook, float *
 	VectorCopy(bs->origin, bs->grapplehang_org);
 	if (!bs->grapplesettle_time) bs->grapplesettle_time = FloatTime();
 	if (FloatTime() < bs->grapplesettle_time + GRAPPLE_MANTLE_SETTLE) return qfalse;
-	//the same predicate that pins the hang in the first place: where letting go
+	//the same predicate that keeps the bot hanging in the first place: where letting go
 	//is already fine there is nothing to salvage
 	if (BotGrappleReleaseSafe(bs)) return qfalse;
 	if (FloatTime() > bs->grapplepull_time + GRAPPLE_MAXHOLD) return qfalse;
@@ -1495,8 +1495,8 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 	//the vault's rise: the node's movement keeps pushing toward the deck,
 	//and air control into the face below the lip clips the corner and eats
 	//the climb. Hold the stick until the feet reach step-up range of the
-	//deck, then push in; the ride ends on ground, or falls back to the fall
-	//the reflex owns. This outranks the hook-gone ending: the ride IS the
+	//deck, then push in; the vault ends on ground, or falls back to the fall
+	//the reflex owns. This outranks the hook-gone ending: the vault IS the
 	//save's ending
 	if (bs->grapplemode == GRAPPLE_MODE_SAVE && bs->grapplevault_time > 0) {
 		vec3_t in;
@@ -1811,8 +1811,8 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 		}
 	}
 	else if (bs->grapplemode == GRAPPLE_MODE_RIDE) {
-		//wiring lands seconds after impact (CAPTURE), so also accept a
-		//trajectory match for the window before the co-mover set exists
+		//the hooked mover's parts are stored only once the carry starts, which can
+		//be seconds after impact, so also accept a trajectory match until then
 		samecomover = G_GrappleCoMoverMember(hook, bs->grappleent)
 			|| (hook->target_ent && hook->target_ent->s.eType == ET_MOVER
 				&& BG_MoverCoMoves(&hook->target_ent->s, &g_entities[bs->grappleent].s));
@@ -1857,9 +1857,9 @@ void BotTacticalGrappleFrame(bot_state_t *bs) {
 		}
 	}
 	else if (bs->grapplemode == GRAPPLE_MODE_RIDE) {
-		//arrived: standing on what we hooked, or captured and carried level
-		//with its top (a captured body has no ground, the mover is unlinked
-		//around its pmove)
+		//arrived: standing on what we hooked, or carried level with its top
+		//(a carried player has no ground, since the mover is unlinked around
+		//its pmove)
 		if (bs->cur_ps.groundEntityNum != ENTITYNUM_NONE
 				&& (bs->cur_ps.groundEntityNum == bs->grappleent
 					|| G_GrappleCoMoverMember(hook, bs->cur_ps.groundEntityNum))) wantrelease = qtrue;

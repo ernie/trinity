@@ -662,7 +662,7 @@ void Weapon_GrapplingHook_Fire (gentity_t *ent)
 ======================
 G_GrappleCoMoverMember
 
-The anchor or a member of its wired co-mover set
+The hooked mover or one of the parts stored as moving with it
 ======================
 */
 qboolean G_GrappleCoMoverMember( gentity_t *hook, int entityNum ) {
@@ -705,8 +705,8 @@ float G_GrappleKnockback( void ) {
 
 void Weapon_HookFree (gentity_t *ent)
 {
-	// the brush runs a frame ahead of the hold on approach strokes, so a
-	// captured wielder can part overlapping it: step them clear first
+	// a mover moving toward the player runs a frame ahead of the carry, so a
+	// carried player can let go while overlapping it; step them clear first
 	if ( ent->s.generic1 && ent->parent->inuse && ent->parent->client
 			&& ent->parent->client->hook == ent
 			&& ent->target_ent && ent->target_ent->inuse ) {
@@ -765,7 +765,7 @@ void Weapon_HookFree (gentity_t *ent)
 		// otherEntityNum2 flags a mover anchor (no scar)
 		tent->s.time = ent->s.time;
 		// 32 bits; generic1 is 8 on the wire. This is the release tent, not the
-		// hook: the hook entity's own time2 is the packed co-mover set instead,
+		// hook: the hook entity's own time2 packs the hooked mover's parts instead,
 		// same field name, different eType, different meaning
 		tent->s.time2 = ent->s.number;
 		tent->s.otherEntityNum2 = ent->s.otherEntityNum2;
@@ -785,7 +785,7 @@ void Weapon_HookThink (gentity_t *ent)
 		return;
 	}
 
-	// no wielder, no projection (also catches a mid-latch switch to spectator)
+	// a dead or spectating owner lets go (this also catches switching to spectator while carried)
 	if ( ent->parent->health <= 0
 			|| ent->parent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
 		Weapon_HookFree( ent );
@@ -807,7 +807,7 @@ void Weapon_HookThink (gentity_t *ent)
 
 		// re-ticks impact damage on the model's own tick; skip at 0 since G_Damage still counts a hit
 		if ( G_GrappleDamage() > 0 && level.time >= ent->timestamp ) {
-			// a tick spans seconds, so read the wielder's LIVE quad here rather
+			// a tick spans seconds, so read the owner's LIVE quad here rather
 			// than the fire-time snapshot
 			dmg = G_GrappleDamage();
 			if ( ent->parent->client && ent->parent->client->ps.powerups[PW_QUAD] > level.time ) {
@@ -867,7 +867,7 @@ void Weapon_HookThink (gentity_t *ent)
 		VectorCopy( ent->r.currentOrigin, oldorigin );
 		SnapVectorTowards( p, oldorigin );	// save net bandwidth
 
-		// rides the mover frame like the offset; vectoangles zeroing roll matches the pad's own anchor
+		// turns with the mover like the offset; vectoangles zeroing roll matches the pad's own anchor
 		VectorCopy( ent->pos2, f );
 		G_RotatePoint( f, m );
 		vectoangles( f, ent->s.angles );
@@ -877,8 +877,8 @@ void Weapon_HookThink (gentity_t *ent)
 		VectorCopy( ent->s.angles, ent->s.apos.trBase );	// angles ride the same lerp
 		trap_LinkEntity( ent );
 
-		// a sweep overrunning a grounded wielder can't be captured out of
-		// the way: snap the link; airborne overlap is an arrival instead
+		// a mover sweeping over a grounded player can't carry them out of the
+		// way, so let go; an airborne overlap starts the carry instead
 		trap_Trace( &tr, ent->parent->r.currentOrigin, ent->parent->r.mins,
 			ent->parent->r.maxs, ent->parent->r.currentOrigin,
 			ent->parent->s.number, MASK_PLAYERSOLID );
@@ -895,8 +895,8 @@ void Weapon_HookThink (gentity_t *ent)
 				&& Distance( ent->parent->r.currentOrigin, ent->r.currentOrigin ) <= GRAPPLE_LATCH_REACH ) {
 			ent->s.generic1 = 1;
 
-			// the whole co-mover set rides with the anchor: resolve
-			// the set once and wire it, so both prediction sides agree
+			// find the parts that move with the hooked mover once and store
+			// them in time2, so client and server carry with the same set
 			ent->s.time2 = 0;
 			{
 				int		n, k, itmp, slot;
@@ -921,8 +921,8 @@ void Weapon_HookThink (gentity_t *ent)
 							|| co->r.absmax[2] < mover->r.absmin[2] - 128 ) {
 						continue;
 					}
-					// bigger movers can exceed the three slots: keep the
-					// parts nearest the pad, they contact the captive first
+					// bigger movers can have more than three parts; keep the ones
+					// nearest the hook, since they touch the player first
 					for ( k = 0 ; k < 3 ; k++ ) {
 						cp[k] = ent->r.currentOrigin[k];
 						if ( cp[k] < co->r.absmin[k] ) cp[k] = co->r.absmin[k];

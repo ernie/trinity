@@ -1350,7 +1350,7 @@ void BG_MoverWorldToLocal( vec3_t matrix[3], const vec3_t in, vec3_t out ) {
 ================
 BG_MoverCoMoves
 
-Movers on identical trajectories are one rigid co-mover set
+Movers on identical trajectories move together as one rigid body
 ================
 */
 qboolean BG_MoverCoMoves( const entityState_t *a, const entityState_t *b ) {

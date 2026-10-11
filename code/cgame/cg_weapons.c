@@ -701,7 +701,7 @@ static int CG_GrappleActivity( int clientNum ) {
 CG_GrappleLaunchSeen
 
 One launch sound per hook.  EV_FIRE_WEAPON repeats every 400ms while the button
-is held (why the weapon carries no flashSound), so no state on the wielder
+is held (why the weapon carries no flashSound), so no state on the owner
 carries the edge.  The hook entity does: every throw spawns one, and a witness
 out of PVS for the shot still gets the launch when the hook arrives.  Slots
 are recycled, so the key is retired with the hook (see CG_GrappleLaunchEnded).
@@ -789,7 +789,7 @@ static float CG_GrappleEnvelope( int act ) {
 ==========================
 CG_GrapplePulse
 
-The envelope for a given wielder, for paths outside this file that draw his
+The envelope for a given owner, for paths outside this file that draw his
 energy (the pad's emission stage). NOT its dlight, which rides its own swell.
 ==========================
 */
@@ -950,7 +950,7 @@ static void CG_TetherArcs( const vec3_t start, const vec3_t dir, float len,
 CG_TetherBeam
 
 One tether polyline from a muzzle to the pad.  Split from CG_GrappleTrail so
-the local wielder can draw it twice: the view-anchored beam the eye sees, and
+the local player can draw it twice: the view-anchored beam the eye sees, and
 a body-anchored copy pinned to mirrors, where the view weapon isn't drawn.
 arcs is qfalse on the mirror copy - the arc machinery keys one-shot crackles
 per slot, and a second caller per frame would double them.
@@ -1083,7 +1083,7 @@ void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi ) {
 
 	act = CG_GrappleActivity( owner );
 
-	// the local first-person wielder draws twice: the view-anchored beam the
+	// the local first-person player draws twice: the view-anchored beam the
 	// eye sees, kept out of mirrors, and a copy from the body gun's own
 	// tether tag pinned to them - so a reflection's tether feeds from the
 	// reflected muzzle instead of a point hanging off the undrawn view weapon
@@ -1309,7 +1309,7 @@ static const arcFactors_t *CG_ArcFactors( int clientNum, int act ) {
 	}
 
 	if ( !a->time || dt < 0 || dt > ARC_FACTOR_RESET ) {
-		k = 1.0f;			// first sight of this wielder, a restart, or a seek
+		k = 1.0f;			// first sight of this owner, a restart, or a seek
 	} else {
 		k = dt / ( dt + ARC_FACTOR_TAU );
 	}
@@ -1324,7 +1324,7 @@ static const arcFactors_t *CG_ArcFactors( int clientNum, int act ) {
 ==========================
 CG_GrappleSeat
 
-How far through the materialize a wielder's pad is, 0..1. Cannot derive from
+How far through the materialize a player's pad is, 0..1. Cannot derive from
 cg.time alone, so it advances once per frame and every draw path shares it,
 the same shape as cg_arcFactors above.
 ==========================
@@ -1465,7 +1465,7 @@ float CG_GrappleClampFrac( int owner, int hookNum ) {
 ==========================
 CG_GrappleResetState
 
-Every per-wielder grapple ramp advances against cg.time, and the launch key
+Every per-player grapple ramp advances against cg.time, and the launch key
 assumes a hook entity is only ever seen appearing once.  A seek breaks both at
 once: it moves the clock out from under the ramps, and it can land before a
 hook already on the wire, which then has to read as a fresh launch.
@@ -2998,7 +2998,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			const float *dl = weapon->flashDlightColor;
 			vec3_t		grappleDl;
 
-			// the grapple's light is projected energy: the wielder's effects
+			// the grapple's light is projected energy: the owner's effects
 			// color, like the rail: dim with a slow breath, never the
 			// envelope (see GRAPPLE_DLIGHT_SCALE)
 			if ( weaponNum == WP_GRAPPLING_HOOK ) {

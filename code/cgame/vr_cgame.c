@@ -525,7 +525,7 @@ static float vr_hmdYaw = 0;
 CG_VR_DeltaYaw
 
 delta_angles yaw for the fake-6DOF compositions, carried to render time:
-a captured hold steps base yaw per command while the anchor draws at cg.time
+a mover carrying the player steps base yaw per command while the mover draws at cg.time
 ============
 */
 static float CG_VR_DeltaYaw( void ) {
@@ -2562,8 +2562,8 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			// Prevent player clipping through solid objects
 			VR_HostTraceRender( &trace, cg.refdef.vieworg, mins, maxs, vieworg, cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
 
-			// the captured anchor is transparent to the hold's own trace; the
-			// camera clip must not fight the snug ride either
+			// the carry's own trace ignores the carrying mover, and the camera clip
+			// ignores it too, since the player is carried right up against it
 			if ( trace.entityNum == VR_HostGrappleAnchor() ) {
 				VectorCopy( vieworg, cg.refdef.vieworg );
 			} else {

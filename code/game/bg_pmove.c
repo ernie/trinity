@@ -1518,7 +1518,7 @@ static void PM_Footsteps( void ) {
 		if ( pm->ps->powerups[PW_INVULNERABILITY] ) {
 			PM_ContinueLegsAnim( LEGS_IDLECR );
 		}
-		// a tethered wielder hangs in the flight float: hold the jump pose
+		// a player on the grapple floats as in flight, so hold the jump pose
 		if ( pm->ps->pm_flags & PMF_GRAPPLE_PULL ) {
 			PM_ContinueLegsAnim( LEGS_JUMP );
 			return;
@@ -2172,8 +2172,8 @@ void PmoveSingle (pmove_t *pmove) {
 		pm->ps->pm_flags &= ~PMF_GRAPPLE_PULL;
 	}
 
-	// set groundentity: no floor can claim a captured wielder, and the
-	// trace's verdict would fight the hold
+	// set groundentity: a player hooked to a mover is never on the ground,
+	// and the ground trace would fight the carry
 	if ( ( pm->ps->pm_flags & PMF_GRAPPLE_PULL ) && pm->grappleLatch ) {
 		pm->ps->groundEntityNum = ENTITYNUM_NONE;
 		pml.groundPlane = qfalse;
@@ -2195,7 +2195,7 @@ void PmoveSingle (pmove_t *pmove) {
 #endif
 	if (pm->ps->pm_flags & PMF_GRAPPLE_PULL) {
 		if ( pm->grappleLatch ) {
-			// captured: the anchor's frame moves the wielder
+			// hooked to a mover: the mover carries the player
 			PM_GrappleLatchMove();
 		} else {
 			// an anchored tether out-pulls the flight powerup

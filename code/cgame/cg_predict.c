@@ -10,8 +10,8 @@
 
 static	pmove_t		cg_pmove;
 
-// the captured anchor's co-mover set (anchor + wired co-movers), absent from
-// predicted collision while latched; -1 slots are empty
+// the hooked mover and its parts, removed from predicted collision while the
+// player is carried; -1 slots are empty
 static	int			cg_grappleCoMovers[4] = { -1, -1, -1, -1 };
 // time the hooked mover and its parts are placed at for collision, -1 while removed;
 // they are placed from the snapshot CG_GrappleLatchFill read
@@ -209,8 +209,8 @@ void	CG_TraceRender( trace_t *result, const vec3_t start, const vec3_t mins, con
 ================
 CG_TracePredict
 
-CG_Trace for the replayed commands: while captured, the anchor's co-mover
-set is absent for the ride, and posed at the command's time for the hang
+CG_Trace for replayed commands; handles the hooked mover the same way the
+server does (see PM_GrappleLatchMove)
 ================
 */
 static void	CG_TracePredict( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
@@ -1178,15 +1178,15 @@ static int CG_IsUnacceptableError( playerState_t *ps, playerState_t *pps, qboole
 	return 0;
 }
 
-// the anchor mover a captured wielder rides, for the render-time carry
+// the mover carrying the local player, for the render-time carry
 static int cg_grappleLatchMover = -1;
 
 /*
 ========================
 CG_GrappleLatchFill
 
-Hand pmove the same trajectories and captured pose the server feeds its
-own, so the hold predicts identically. snap is the snapshot the
+Hand pmove the same trajectories and hook position the server feeds its
+own, so the carry predicts identically. snap is the snapshot the
 prediction base came from, and useNext says it is cg.nextSnap
 ========================
 */
@@ -1211,8 +1211,8 @@ static void CG_GrappleLatchFill( pmove_t *pmv, const snapshot_t *snap, qboolean 
 		}
 		mover = &cg_entities[ es->otherEntityNum2 ];
 
-		// a pose from the other snapshot leaves the hold a frame out of
-		// step with the playerState prediction starts from
+		// mover state from the other snapshot leaves the carry a frame out
+		// of step with the playerState prediction starts from
 		ms = useNext ? &mover->nextState : &mover->currentState;
 
 		// under useNext the next snapshot is the truth: a mover it carries
@@ -1230,7 +1230,7 @@ static void CG_GrappleLatchFill( pmove_t *pmv, const snapshot_t *snap, qboolean 
 		pmv->grappleAnchor = CG_GrappleAnchor;
 		cg_grapplePoseNext = useNext;
 
-		// the co-mover set the server wired at capture
+		// the mover's parts, as the server stored them when the carry started
 		cg_grappleCoMovers[0] = es->otherEntityNum2;
 		for ( j = 0 ; j < 3 ; j++ ) {
 			int n = ( es->time2 >> ( j * 10 ) ) & 0x3FF;
@@ -1245,7 +1245,7 @@ static void CG_GrappleLatchFill( pmove_t *pmv, const snapshot_t *snap, qboolean 
 ========================
 CG_GrappleLatchAnchor
 
-Anchor mover the local player is captured to, or -1; the fill's statics
+Mover carrying the local player on the grapple, or -1; the fill's statics
 go stale off the predicting path
 ========================
 */

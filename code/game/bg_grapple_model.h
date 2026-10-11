@@ -9,7 +9,7 @@
 #define GRAPPLE_MODEL_TOWSPEED			800
 
 // PM_GrappleMove measures its distance to the target from this many units back
-// along the wielder's view, not from the anchor itself
+// along the player's view, not from the anchor itself
 #define GRAPPLE_MODEL_TOW_TARGET_INSET	16
 
 // inside the knee the tether decelerates, pulling at DECEL_FACTOR times the

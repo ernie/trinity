@@ -460,7 +460,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		Weapon_HookFree(self->client->hook);
 	}
 	// hooks anchored in this body come loose with it; a respawn in the same
-	// frame (team change) would otherwise tow the wielder to the new spawn
+	// frame (team change) would otherwise pull the hook's owner to the new spawn
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
 		gclient_t	*c = &level.clients[i];
 

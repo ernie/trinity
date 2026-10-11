@@ -338,7 +338,7 @@ qboolean G_MoverPush( gentity_t *pusher, vec3_t move, vec3_t amove, gentity_t **
 			continue;
 		}
 
-		// a captured wielder rides their anchor's co-mover set via pmove; a push
+		// pmove carries a player hooked to this mover; a push
 		// would be a playerstate write prediction cannot see
 		if ( check->client && check->client->hook
 				&& check->client->hook->s.generic1

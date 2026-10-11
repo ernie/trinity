@@ -77,7 +77,7 @@ void CG_WarmupEvents( void );
 #endif
 
 #if VR_HOST_HAS_GRAPPLE
-// Anchor mover the local player is captured to, or -1.
+// Mover carrying the local player on the grapple, or -1.
 int CG_GrappleLatchAnchor( void );
 // Effects color the grapple hardware's entity-color stage draws with.
 void CG_GrappleOwnerRGBA( int clientNum, byte *rgba );

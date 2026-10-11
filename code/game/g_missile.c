@@ -422,7 +422,7 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace ) {
 		// anchor perpendicular to the surface so all three claws embed
 		VectorNegate( trace->plane.normal, dir );
 		// a startsolid impact carries no plane, and vectoangles of a zero vector
-		// answers straight down, which the hang probe then walks into the floor.
+		// answers straight down, which the push-out probe then walks into the floor.
 		// The flight line is the honest fallback: that is the way the claws went in
 		if ( VectorNormalize( dir ) < 0.5f ) {
 			VectorCopy( ent->s.pos.trDelta, dir );
@@ -554,7 +554,7 @@ void G_RunMissile( gentity_t *ent ) {
 		// never explode or bounce on sky
 		if ( tr.surfaceFlags & SURF_NOIMPACT ) {
 			// a grapple lost against the sky releases properly instead of
-			// vanishing with the wielder's hook pointer left dangling
+			// vanishing with the owner's hook pointer left dangling
 			if (ent->parent && ent->parent->client && ent->parent->client->hook == ent) {
 				Weapon_HookFree( ent );
 				return;
