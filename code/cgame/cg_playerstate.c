@@ -267,10 +267,8 @@ CG_CheckLocalSounds
 ==================
 */
 void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
-#ifdef MISSIONPACK
-	int health, armor;
-#endif
-	int	highScore, reward;
+	int	hit, highScore, reward;
+	qboolean scaled;
 	sfxHandle_t sfx;
 	qboolean decayed;
 
@@ -281,25 +279,19 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 
 	// hit changes
 	if ( ps->persistant[PERS_HITS] > ops->persistant[PERS_HITS] ) {
+		// the low byte is the damage, scaled by max health on the server
+		hit = ps->persistant[PERS_ATTACKEE_ARMOR];
 #ifdef MISSIONPACK
-		armor  = ps->persistant[PERS_ATTACKEE_ARMOR] & 0xff;
-		health = ps->persistant[PERS_ATTACKEE_ARMOR] >> 8;
-		if (armor > 50 ) {
-			trap_S_StartLocalSound( cgs.media.hitSoundHighArmor, CHAN_LOCAL_SOUND );
-		} else if (armor || health > 100) {
-			trap_S_StartLocalSound( cgs.media.hitSoundLowArmor, CHAN_LOCAL_SOUND );
-		} else {
-			trap_S_StartLocalSound( cgs.media.hitSound, CHAN_LOCAL_SOUND );
-		}
+		// the high byte is the armor tone of Team Arena's classic sounds
+		scaled = cg_hitSounds.integer > 0;
 #else
-		if ( cg_hitSounds.integer > 0 && (ps->persistant[PERS_ATTACKEE_ARMOR] & 0xFF00) == 0 )
-		{
-			// high byte of PERS_ATTACKEE_ARMOR is target->health in vq3/ta i.e. it is always non-zero
-			// so we will use this value to filter legacy data from our new hitsounds where it is always 0
+		// a stock server sends the target's health in the high byte instead
+		scaled = cg_hitSounds.integer > 0 && ( hit & 0xFF00 ) == 0;
+#endif
+		if ( scaled ) {
 			int damage, index;
-			damage = ps->persistant[PERS_ATTACKEE_ARMOR] & 0xFF;
+			damage = hit & 0xFF;
 
-			// damage value is already scaled by STAT_MAX_HEALTH on server side
 			if ( damage > 75 ) index = 3;
 			else if ( damage > 50 ) index = 2;
 			else if ( damage > 25 ) index = 1;
@@ -309,12 +301,15 @@ void CG_CheckLocalSounds( playerState_t *ps, playerState_t *ops ) {
 				index = 3 - index;
 
 			trap_S_StartLocalSound( cgs.media.hitSounds[ index ], CHAN_LOCAL_SOUND );
-		} 
-		else
-		{
+		} else {
+#ifdef MISSIONPACK
+			sfx = ( hit >> 8 ) == 2 ? cgs.media.hitSoundHighArmor
+				: ( hit >> 8 ) == 1 ? cgs.media.hitSoundLowArmor : cgs.media.hitSound;
+			trap_S_StartLocalSound( sfx, CHAN_LOCAL_SOUND );
+#else
 			trap_S_StartLocalSound( cgs.media.hitSound, CHAN_LOCAL_SOUND );
-		}
 #endif
+		}
 	} else if ( ps->persistant[PERS_HITS] < ops->persistant[PERS_HITS] ) {
 		trap_S_StartLocalSound( cgs.media.hitTeamSound, CHAN_LOCAL_SOUND );
 	}

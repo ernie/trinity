@@ -1318,6 +1318,10 @@ void ClientEndFrame( gentity_t *ent ) {
 		if ( i > 255 )
 			i = 255;
 		client->ps.persistant[PERS_ATTACKEE_ARMOR] = i;
+#ifdef MISSIONPACK
+		// the client picks Team Arena's classic sound from the high byte
+		client->ps.persistant[PERS_ATTACKEE_ARMOR] |= client->damage.armorTone << 8;
+#endif
 		client->damage.amount = 0;
 	} else if ( client->damage.team ) {
 		client->ps.persistant[PERS_HITS] -= client->damage.team;

@@ -1113,14 +1113,6 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	if ( attacker->client && client && targ != attacker && targ->health > 0
 			&& targ->s.eType != ET_MISSILE
 			&& targ->s.eType != ET_GENERAL) {
-#ifdef MISSIONPACK
-		if ( OnSameTeam( targ, attacker ) ) {
-			attacker->client->ps.persistant[PERS_HITS]--;
-		} else {
-			attacker->client->ps.persistant[PERS_HITS]++;
-		}
-		attacker->client->ps.persistant[PERS_ATTACKEE_ARMOR] = (targ->health<<8)|(client->ps.stats[STAT_ARMOR]);
-#else
 		// we may hit multiple targets from different teams
 		// so usual PERS_HITS increments/decrements could result in ZERO delta
 		if ( OnSameTeam( targ, attacker ) ) {
@@ -1129,8 +1121,12 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			attacker->client->damage.enemy++;
 			// accumulate damage during server frame
 			attacker->client->damage.amount += take + asave;
-		}
+#ifdef MISSIONPACK
+			// 2 heavy armor, 1 light armor or overhealth, 0 neither
+			attacker->client->damage.armorTone = client->ps.stats[STAT_ARMOR] > 50 ? 2
+				: ( client->ps.stats[STAT_ARMOR] || targ->health > 100 ) ? 1 : 0;
 #endif
+		}
 		// accumulate damage per target this frame. Collected unconditionally;
 		// the team/cvar filters are applied at flush (g_active.c) so blood
 		// (always) and damage plums (non-team, when enabled) share one tally.

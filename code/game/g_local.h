@@ -399,6 +399,7 @@ struct gclient_s {
 		int		team;
 		int		enemy;
 		int		amount;
+		int		armorTone;		// Team Arena's classic hit sound for the last enemy hit
 	} damage;
 
 	// per-target damage accumulated this frame; drives blood (always) and
