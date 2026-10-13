@@ -844,7 +844,7 @@ itemDef {
 	forecolor 1 1 1 1
 	backcolor .37 .1 .1 1 
 	visible 1
-	action { hide grpSystem ; show other ; collapseHidden 65 225 }
+	action { hide grpSystem ; show other ; collapseHidden 65 245 }
 	mouseEnter { setitemcolor ctr_other backcolor .1 .37 .1 1 }
       	mouseExit { setitemcolor ctr_other backcolor .37 .1 .1 1 }
 	}
@@ -954,10 +954,42 @@ itemDef {
 	itemDef {
 		name other
 		group grpSystem
+		type ITEM_TYPE_SLIDER
+		text "Highlight Boost:"
+		cvarfloat "r_hdrHighlightBoost" 1 0.5 2
+		rect 0 165 256 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 17
+		textscale .25
+		forecolor 1 1 1 1
+		visible 0
+		cvarTest "r_hdrActive"
+		enableCvar { 1 }
+		mouseEnter { show msg_highlightboost }
+		mouseExit { hide msg_highlightboost }
+	}
+
+	itemDef {
+		name msg_highlightboost
+		text "Brightens HDR lights and effects"
+		rect 0 317 276 14
+		textalign ITEM_ALIGN_CENTER
+		textalignx 138
+		textaligny 11
+		textscale .22
+		forecolor 1 .75 0 1
+		visible 0
+		decoration
+	}
+
+	itemDef {
+		name other
+		group grpSystem
 		type ITEM_TYPE_YESNO
 		text "Bloom:"
 		cvar "r_bloom"
-		rect 0 165 256 20
+		rect 0 185 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -975,7 +1007,7 @@ itemDef {
 		type ITEM_TYPE_YESNO
 		text "Flares:"
 		cvar "r_flares"
-		rect 0 185 256 20
+		rect 0 205 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -992,7 +1024,7 @@ itemDef {
 		textscale .25
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 63 209 130 20
+		rect 63 229 130 20
 		textalign 1
 		textalignx 65
 		textaligny 16
@@ -1011,7 +1043,7 @@ itemDef {
 	group grpSystem
       	style 1
 	text "Network"
-	rect 0 229 128 20
+	rect 0 249 128 20
       	textalign ITEM_ALIGN_CENTER
       	textalignx 128
       	textaligny 17
@@ -1028,7 +1060,7 @@ itemDef {
 		text "Packet Recovery:"
 		cvar "cl_packetdup"
 		cvarFloatList { "Low" 1 "Medium" 2 "High" 3 }
-		rect 0 249 256 20
+		rect 0 269 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -1042,7 +1074,7 @@ itemDef {
 	itemDef {
 		name msg_packetdup
 		text "Send duplicate input packets"
-		rect 0 302 276 14
+		rect 0 317 276 14
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 11
@@ -1055,7 +1087,7 @@ itemDef {
 	itemDef {
 		name msg_packetdup
 		text "(raise if on unreliable network)"
-		rect 0 316 276 14
+		rect 0 330 276 14
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 11
@@ -1093,7 +1125,7 @@ itemDef {
 	group grpSystem
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 101 275 75 20
+	rect 101 295 75 20
 	textalign 1
 	textalignx 37
 	textaligny 15

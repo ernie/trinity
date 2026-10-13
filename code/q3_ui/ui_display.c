@@ -31,6 +31,7 @@ DISPLAY OPTIONS MENU
 #define ID_FLARES			23
 #define ID_VSYNC			24
 #define ID_SDRGAMMA			25
+#define ID_HIGHLIGHT		26
 #define ART_APPLY0 "menu/art/accept_0"
 #define ART_APPLY1 "menu/art/accept_1"
 
@@ -51,6 +52,7 @@ typedef struct {
 	menuradiobutton_s	fbo;
 	menuradiobutton_s	hdr;
 	menulist_s		sdrgamma;
+	menuslider_s	highlight;
 	menuradiobutton_s	bloom;
 	menuradiobutton_s	flares;
 	menuradiobutton_s	vsync;
@@ -101,11 +103,13 @@ static void UI_DisplayOptionsMenu_UpdateItems( void ) {
 	} else {
 		displayOptionsInfo.hdrcalib.generic.flags |= QMF_GRAYED;
 	}
-	// the curve only shapes HDR output, which follows the live renderer
+	// the curve and highlight only shape HDR output, which follows the live renderer
 	if ( trap_Cvar_VariableValue( "r_hdrActive" ) != 0 ) {
 		displayOptionsInfo.sdrgamma.generic.flags &= ~QMF_GRAYED;
+		displayOptionsInfo.highlight.generic.flags &= ~QMF_GRAYED;
 	} else {
 		displayOptionsInfo.sdrgamma.generic.flags |= QMF_GRAYED;
+		displayOptionsInfo.highlight.generic.flags |= QMF_GRAYED;
 	}
 	if ( fbo ) {
 		displayOptionsInfo.bloom.generic.flags &= ~QMF_GRAYED;
@@ -121,6 +125,22 @@ static void UI_DisplayOptionsMenu_UpdateItems( void ) {
 		displayOptionsInfo.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	} else {
 		displayOptionsInfo.apply.generic.flags |= QMF_HIDDEN|QMF_INACTIVE;
+	}
+}
+
+
+/*
+=================
+UI_DisplayOptionsMenu_Draw
+=================
+*/
+static void UI_DisplayOptionsMenu_Draw( void ) {
+	Menu_Draw( &displayOptionsInfo.menu );
+
+	// q3_ui has no hover tooltips, so the focused row carries one
+	if ( Menu_ItemAtCursor( &displayOptionsInfo.menu ) == (void*)&displayOptionsInfo.highlight ) {
+		UI_DrawString( 400, displayOptionsInfo.hdrcalib.generic.y + 2 * ( BIGCHAR_HEIGHT+2 ),
+			"Brightens HDR lights and effects", UI_CENTER|UI_SMALLFONT, text_color_disabled );
 	}
 }
 
@@ -196,6 +216,11 @@ static void UI_DisplayOptionsMenu_Event( void* ptr, int event ) {
 		trap_Cvar_SetValue( "r_hdrSdrCurve", displayOptionsInfo.sdrgamma.curvalue );
 		break;
 
+	case ID_HIGHLIGHT:
+		displayOptionsInfo.highlight.curvalue = (int)( displayOptionsInfo.highlight.curvalue + 0.5f );
+		trap_Cvar_SetValue( "r_hdrHighlightBoost", displayOptionsInfo.highlight.curvalue / 4.0f );
+		break;
+
 	case ID_VRMODE:
 		UI_VR_ChooseMode( displayOptionsInfo.mode.curvalue != 0 );
 		UI_DisplayOptionsMenu_UpdateItems();
@@ -234,6 +259,7 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 
 	displayOptionsInfo.menu.wrapAround = qtrue;
 	displayOptionsInfo.menu.fullscreen = qtrue;
+	displayOptionsInfo.menu.draw = UI_DisplayOptionsMenu_Draw;
 
 	displayOptionsInfo.banner.generic.type		= MTYPE_BTEXT;
 	displayOptionsInfo.banner.generic.flags		= QMF_CENTER_JUSTIFY;
@@ -300,7 +326,7 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.network.color				= color_red;
 
 	// rows counted for centering the content column, including the optional Display Mode and V-Sync
-	rows = 8;
+	rows = 9;
 	if ( UI_VR_CanSwitchMode() ) {
 		rows++;
 	}
@@ -361,6 +387,18 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.sdrgamma.generic.x			= 400;
 	displayOptionsInfo.sdrgamma.generic.y			= y;
 	displayOptionsInfo.sdrgamma.itemnames			= sdrgamma_names;
+	y += BIGCHAR_HEIGHT+2;
+
+	// quarter steps: 0.5..2.0
+	displayOptionsInfo.highlight.generic.type		= MTYPE_SLIDER;
+	displayOptionsInfo.highlight.generic.name		= "Highlight Boost:";
+	displayOptionsInfo.highlight.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	displayOptionsInfo.highlight.generic.callback	= UI_DisplayOptionsMenu_Event;
+	displayOptionsInfo.highlight.generic.id			= ID_HIGHLIGHT;
+	displayOptionsInfo.highlight.generic.x			= 400;
+	displayOptionsInfo.highlight.generic.y			= y;
+	displayOptionsInfo.highlight.minvalue			= 2;
+	displayOptionsInfo.highlight.maxvalue			= 8;
 	y += BIGCHAR_HEIGHT+2;
 
 	displayOptionsInfo.bloom.generic.type		= MTYPE_RADIOBUTTON;
@@ -440,6 +478,7 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.fbo );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.hdr );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.sdrgamma );
+	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.highlight );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.bloom );
 	Menu_AddItem( &displayOptionsInfo.menu, ( void * ) &displayOptionsInfo.flares );
 	if( !displayOptions_vr ) {
@@ -461,6 +500,9 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.bloom.curvalue	= trap_Cvar_VariableValue( "r_bloom" ) != 0;
 	displayOptionsInfo.flares.curvalue	= trap_Cvar_VariableValue( "r_flares" ) != 0;
 	displayOptionsInfo.sdrgamma.curvalue	= trap_Cvar_VariableValue( "r_hdrSdrCurve" ) != 0;
+	displayOptionsInfo.highlight.curvalue	= (int)( trap_Cvar_VariableValue( "r_hdrHighlightBoost" ) * 4.0f + 0.5f );
+	if ( displayOptionsInfo.highlight.curvalue < 2 )	displayOptionsInfo.highlight.curvalue = 2;
+	if ( displayOptionsInfo.highlight.curvalue > 8 )	displayOptionsInfo.highlight.curvalue = 8;
 	displayOptionsInfo.vsync.curvalue	= trap_Cvar_VariableValue( "r_swapInterval" ) != 0;
 	displayOptionsInfo.initialFbo		= displayOptionsInfo.fbo.curvalue;
 	displayOptionsInfo.initialHdr		= displayOptionsInfo.hdr.curvalue;

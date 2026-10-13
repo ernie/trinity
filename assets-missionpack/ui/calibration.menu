@@ -72,23 +72,6 @@ menuDef {
 	}
 
 	itemDef {
-		name highlight
-		text "Highlight:"
-		type ITEM_TYPE_MULTI
-		cvar "r_hdrHighlight"
-		cvarFloatList { "0.5" 0.5 "1.0" 1 "1.5" 1.5 "2.0" 2 "2.5" 2.5 "3.0" 3 "3.5" 3.5 "4.0" 4 }
-		rect 180 282 280 20
-		textalign ITEM_ALIGN_RIGHT
-		textalignx 180
-		textaligny 16
-		textscale .3
-		forecolor .5 .5 .5 1
-		visible 1
-		mouseEnter { hide help ; show hltip }
-		mouseExit  { hide hltip ; show help }
-	}
-
-	itemDef {
 		name help
 		text "Raise Peak until the inner rectangle's edge vanishes into the outer."
 		rect 0 310 640 16
@@ -113,19 +96,6 @@ menuDef {
 		textscale .25
 		forecolor 1 0 0 1
 		visible 1
-		decoration
-	}
-
-	itemDef {
-		name hltip
-		text "Extra pop for the brightest highlights. 1.0 = natural, higher is punchier."
-		rect 0 310 640 16
-		textalign ITEM_ALIGN_CENTER
-		textalignx 320
-		textaligny 12
-		textscale .25
-		forecolor .5 .5 .5 1
-		visible 0
 		decoration
 	}
 

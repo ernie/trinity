@@ -4106,7 +4106,8 @@ static void UI_UpdateHDRAvail( qboolean reset ) {
 	qboolean capable, avail, on;
 	trap_Cvar_VariableStringBuffer( "r_hdrStatus", status, sizeof( status ) );
 	// nofbo still counts, so switching Frame Buffer on unlocks the row before the restart
-	capable = (qboolean)( Q_stricmp( status, "active" ) == 0 || Q_stricmp( status, "available" ) == 0 ||
+	capable = (qboolean)( Q_stricmp( status, "active" ) == 0 || Q_stricmp( status, "edr" ) == 0 ||
+		Q_stricmp( status, "available" ) == 0 ||
 		Q_stricmp( status, "nofbo" ) == 0 || Q_stricmp( status, "ossetting" ) == 0 );
 	avail = capable;
 	if ( reset ) {
@@ -4595,7 +4596,6 @@ static void UI_RunMenuScript(char **args) {
 			// string, so CVAR_ARCHIVE_ND persists them even at default. Re-set via
 			// Cvar_SetValue (clean "%i") to keep defaults unwritten and snap Peak.
 			trap_Cvar_SetValue( "r_hdrPeak", (int)( trap_Cvar_VariableValue( "r_hdrPeak" ) + 0.5f ) );
-			trap_Cvar_SetValue( "r_hdrHighlight", trap_Cvar_VariableValue( "r_hdrHighlight" ) );
 			trap_Cvar_SetValue( "r_hdrPaperWhite", 0 );  // keep paper-white on auto; experts set it via console
 		} else if ( Q_stricmp( name, "systemSettingsApply" ) == 0 ) {
 			trap_Cmd_ExecuteText( EXEC_APPEND, "snd_restart\n" );

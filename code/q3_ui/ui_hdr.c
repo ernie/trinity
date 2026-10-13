@@ -4,18 +4,12 @@
 #include "ui_local.h"
 
 #define ID_PEAK			20	// fine slider (5-nit steps)
-#define ID_HIGHLIGHT	21
 #define ID_BACK			22
-
-// highlight presets: cvar value ×10
-static const int hdr_highlightValues[]	= { 5, 10, 15, 20, 25, 30, 35, 40 };
-static const char* hdr_highlightNames[]	= { "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", NULL };
 
 typedef struct {
 	menuframework_s	menu;
 	menutext_s		banner;
 	menuslider_s	peak;
-	menulist_s		highlight;
 	menubitmap_s	back;
 } hdrCalibrationInfo_t;
 
@@ -29,7 +23,7 @@ static void UI_HDR_Status( char *status, int size ) {
 qboolean UI_HDR_Available( void ) {
 	char status[32];
 	UI_HDR_Status( status, sizeof( status ) );
-	return (qboolean)( !Q_stricmp( status, "active" ) || !Q_stricmp( status, "available" ) ||
+	return (qboolean)( !Q_stricmp( status, "active" ) || !Q_stricmp( status, "edr" ) || !Q_stricmp( status, "available" ) ||
 		!Q_stricmp( status, "nofbo" ) || !Q_stricmp( status, "ossetting" ) );
 }
 
@@ -54,15 +48,6 @@ static qboolean UI_HDR_OnWindows( void ) {
 	return (qboolean)( strstr( buf, " win_" ) != NULL );
 }
 
-static int UI_HDR_NearestIndex( int value, const int* table, int count ) {
-	int i, best = 0, bestDiff = abs( value - table[0] );
-	for ( i = 1; i < count; i++ ) {
-		int diff = abs( value - table[i] );
-		if ( diff < bestDiff ) { bestDiff = diff; best = i; }
-	}
-	return best;
-}
-
 static void UI_HDRCalibration_Event( void* ptr, int event ) {
 	if ( event != QM_ACTIVATED ) {
 		return;
@@ -72,9 +57,6 @@ static void UI_HDRCalibration_Event( void* ptr, int event ) {
 		hdrInfo.peak.curvalue = (int)( hdrInfo.peak.curvalue + 0.5f );  // snap to a whole 5-nit step (a click can land mid-step)
 		trap_Cvar_SetValue( "r_hdrPeak", hdrInfo.peak.curvalue * 5 );
 		trap_Cvar_SetValue( "r_hdrPaperWhite", 0 );  // keep paper-white on auto; experts set it via console
-		break;
-	case ID_HIGHLIGHT:
-		trap_Cvar_SetValue( "r_hdrHighlight", hdr_highlightValues[ hdrInfo.highlight.curvalue ] / 10.0f );
 		break;
 	case ID_BACK:
 		trap_Cvar_SetValue( "r_hdrCalibrate", 0 );
@@ -112,13 +94,6 @@ static void UI_HDRCalibration_Draw( void ) {
 	Com_sprintf( nitsStr, sizeof( nitsStr ), "%i nits", (int)( hdrInfo.peak.curvalue * 5 ) );
 	UI_DrawString( hdrInfo.peak.generic.x + 120, hdrInfo.peak.generic.y,
 		nitsStr, UI_LEFT|UI_SMALLFONT, text_color_disabled );
-
-	// focus-driven tooltip for Highlight (q3_ui has no hover tooltips)
-	if ( Menu_ItemAtCursor( &hdrInfo.menu ) == (void*)&hdrInfo.highlight ) {
-		UI_DrawString( 320, 288,
-			"Extra pop for the brightest highlights. 1.0 = natural, higher is punchier.",
-			UI_CENTER|UI_SMALLFONT, text_color_disabled );
-	}
 
 	// status + instructions below the test pattern
 	UI_HDR_Status( status, sizeof( status ) );
@@ -172,16 +147,6 @@ static void UI_HDRCalibration_Init( void ) {
 	hdrInfo.peak.minvalue			= 50;
 	hdrInfo.peak.maxvalue			= 400;
 
-	// stepped highlight: 0.5..4.0 in 0.5 steps
-	hdrInfo.highlight.generic.type		= MTYPE_SPINCONTROL;
-	hdrInfo.highlight.generic.name		= "Highlight:";
-	hdrInfo.highlight.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	hdrInfo.highlight.generic.callback	= UI_HDRCalibration_Event;
-	hdrInfo.highlight.generic.id		= ID_HIGHLIGHT;
-	hdrInfo.highlight.generic.x			= 320;
-	hdrInfo.highlight.generic.y			= 262;
-	hdrInfo.highlight.itemnames			= hdr_highlightNames;
-
 	hdrInfo.back.generic.type		= MTYPE_BITMAP;
 	hdrInfo.back.generic.name		= "menu/art/back_0";
 	hdrInfo.back.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
@@ -198,12 +163,8 @@ static void UI_HDRCalibration_Init( void ) {
 	if ( hdrInfo.peak.curvalue < 50 )	hdrInfo.peak.curvalue = 50;
 	if ( hdrInfo.peak.curvalue > 400 )	hdrInfo.peak.curvalue = 400;
 
-	hdrInfo.highlight.curvalue = UI_HDR_NearestIndex( (int)( trap_Cvar_VariableValue( "r_hdrHighlight" ) * 10.0f ),
-		hdr_highlightValues, ARRAY_LEN( hdr_highlightValues ) );
-
 	Menu_AddItem( &hdrInfo.menu, &hdrInfo.banner );
 	Menu_AddItem( &hdrInfo.menu, &hdrInfo.peak );
-	Menu_AddItem( &hdrInfo.menu, &hdrInfo.highlight );
 	Menu_AddItem( &hdrInfo.menu, &hdrInfo.back );
 }
 
