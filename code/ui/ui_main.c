@@ -6294,6 +6294,7 @@ void _UI_Init( qboolean inGameLoad ) {
 
 	UI_RegisterCvars();
 	UI_InitMemory();
+	trap_Cvar_Set( "r_hdrCalibrate", "0" );
 
 	// the browser's source list must exist before anything draws it
 	UI_BuildBrowserSources();

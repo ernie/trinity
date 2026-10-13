@@ -1089,6 +1089,7 @@ void UI_Init( void ) {
 
 	uis.activemenu = NULL;
 	uis.menusp     = 0;
+	trap_Cvar_Set( "r_hdrCalibrate", "0" );
 }
 
 
