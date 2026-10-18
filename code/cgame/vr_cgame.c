@@ -237,7 +237,6 @@ void CG_VR_Init( void ) {
 	vrActive = VR_RegisterMirror( &vr_state );
 	if ( !vrActive )
 		return;
-	trap_Cvar_Set( "vr_thirdPersonSpectator", "0" );
 	vrc_hudYawX = cos( DEG2RAD( vr->hmdorientation[YAW] ) );
 	vrc_hudYawY = sin( DEG2RAD( vr->hmdorientation[YAW] ) );
 	vrc_hudPitch = vr->hmdorientation[PITCH];
@@ -288,11 +287,6 @@ void CG_VR_Frame( void ) {
 		trap_Cvar_VariableStringBuffer( "vr_hudDepth", buf, sizeof( buf ) );
 		hudDepth = atof( buf );
 
-		//HACK!! - should change this to a renderer function call
-		//Indicate to renderer whether we are in deathcam mode, We don't want sky in death cam mode
-		trap_Cvar_Set( "vr_thirdPersonSpectator", (CG_VR_IsDeathCam() ||
-	                                             cg.demoPlayback ||
-	                                             CG_VR_IsThirdPersonFollow(VRFM_QUERY) ? "1" : "0" ));
 		// SP intermission: ALWAYS force mode 1 for world-locked podium HUD
 		// This must come FIRST so user can always see and interact with UI to proceed
 		if (cg.snap && cg.snap->ps.pm_type == PM_INTERMISSION &&

@@ -4065,7 +4065,7 @@ void CG_Draw2D( stereoFrame_t stereoFrame )
 	}
 
 	// cg_draw2D is flatscreen-only; VR HUD visibility belongs to the
-	// vr_hudDrawStatus ladder (VR_INTEGRATION.md Appendix A)
+	// vr_hudDrawStatus ladder
 	if ( !CG_VR_OwnsHudVisibility() && cg_draw2D.integer == 0 ) {
 		return;
 	}
