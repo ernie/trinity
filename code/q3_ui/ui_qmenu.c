@@ -563,6 +563,25 @@ static float Slider_ArrowStep( const menuslider_s *s )
 
 /*
 =================
+Slider_StepKey
+
+Moves whole steps from the current one, so presses never accumulate float error.
+=================
+*/
+static sfxHandle_t Slider_StepKey( menuslider_s *s, int dir )
+{
+	int index = SliderValue_Index( s->curvalue, s->minvalue, s->maxvalue, s->step );
+
+	if ( ( dir < 0 && index == 0 ) || ( dir > 0 && index == SliderValue_StepCount( s->minvalue, s->maxvalue, s->step ) ) )
+		return menu_buzz_sound;
+
+	index += dir * SliderValue_KeySteps( Slider_ArrowStep( s ), s->step );
+	s->curvalue = SliderValue_Snap( s->minvalue + index * s->step, s->minvalue, s->maxvalue, s->step );
+	return menu_move_sound;
+}
+
+/*
+=================
 Slider_Key
 =================
 */
@@ -583,6 +602,8 @@ static sfxHandle_t Slider_Key( menuslider_s *s, int key )
 				s->curvalue = s->minvalue;
 			else if (s->curvalue > s->maxvalue)
 				s->curvalue = s->maxvalue;
+			if ( s->step > 0 )
+				s->curvalue = SliderValue_Snap( s->curvalue, s->minvalue, s->maxvalue, s->step );
 			if (s->curvalue != oldvalue)
 				sound = menu_move_sound;
 			else
@@ -591,7 +612,9 @@ static sfxHandle_t Slider_Key( menuslider_s *s, int key )
 
 		case K_KP_LEFTARROW:
 		case K_LEFTARROW:
-			if (s->curvalue > s->minvalue)
+			if ( s->step > 0 )
+				sound = Slider_StepKey( s, -1 );
+			else if (s->curvalue > s->minvalue)
 			{
 				s->curvalue -= Slider_ArrowStep( s );
 				if (s->curvalue < s->minvalue)
@@ -604,7 +627,9 @@ static sfxHandle_t Slider_Key( menuslider_s *s, int key )
 
 		case K_KP_RIGHTARROW:
 		case K_RIGHTARROW:
-			if (s->curvalue < s->maxvalue)
+			if ( s->step > 0 )
+				sound = Slider_StepKey( s, 1 );
+			else if (s->curvalue < s->maxvalue)
 			{
 				s->curvalue += Slider_ArrowStep( s );
 				if (s->curvalue > s->maxvalue)
@@ -689,6 +714,26 @@ static void Slider_Draw( menuslider_s *s ) {
 	}
 
 	UI_DrawHandlePic( (int)( x + 2*SMALLCHAR_WIDTH + (SLIDER_RANGE-1)*SMALLCHAR_WIDTH* s->range ) - 2, y - 2, 12, 20, button );
+
+	if ( s->valueFormat != SLIDER_VALUE_NONE ) {
+		char	text[16];
+
+		SliderValue_Text( s->valueFormat, s->curvalue * s->valueScale + s->valueOffset, text, sizeof( text ) );
+		UI_DrawString( x + SMALLCHAR_WIDTH + 104, y, text, UI_LEFT|UI_SMALLFONT, color );
+	}
+}
+
+/*
+=================
+Slider_ShowValue
+=================
+*/
+void Slider_ShowValue( menuslider_s *s, int format, float step, float scale, float offset )
+{
+	s->valueFormat = format;
+	s->step = step;
+	s->valueScale = scale;
+	s->valueOffset = offset;
 }
 #else
 /*

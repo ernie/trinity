@@ -8,7 +8,7 @@ menuDef {
 	visible 0
 	fullscreen 0
 	outOfBoundsClick			// this closes the window if it gets a click out of the rectangle
-	rect 225 30 290 397
+	rect 232 30 290 397
 	focusColor 1 .75 0 1
 	style 1
 	border 1
@@ -348,6 +348,7 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Crosshair Size:"
 	cvarfloat "cg_crosshairSize" 8 8 24
+	sliderValue SLIDER_VALUE_INT 1
 	rect 3 213 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146

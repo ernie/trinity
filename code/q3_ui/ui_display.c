@@ -217,7 +217,6 @@ static void UI_DisplayOptionsMenu_Event( void* ptr, int event ) {
 		break;
 
 	case ID_HIGHLIGHT:
-		displayOptionsInfo.highlight.curvalue = (int)( displayOptionsInfo.highlight.curvalue + 0.5f );
 		trap_Cvar_SetValue( "r_hdrHighlightBoost", displayOptionsInfo.highlight.curvalue / 4.0f );
 		break;
 
@@ -357,6 +356,7 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.brightness.generic.y			= y;
 	displayOptionsInfo.brightness.minvalue			= 5;
 	displayOptionsInfo.brightness.maxvalue			= 20;
+	Slider_ShowValue( &displayOptionsInfo.brightness, SLIDER_VALUE_PERCENT, 1, 0.1f, 0 );
 	// the brightness slider sets r_gamma, which is always valid, so the row
 	// is never grayed
 	y += BIGCHAR_HEIGHT+2;
@@ -399,6 +399,7 @@ static void UI_DisplayOptionsMenu_Init( void ) {
 	displayOptionsInfo.highlight.generic.y			= y;
 	displayOptionsInfo.highlight.minvalue			= 2;
 	displayOptionsInfo.highlight.maxvalue			= 8;
+	Slider_ShowValue( &displayOptionsInfo.highlight, SLIDER_VALUE_PERCENT, 1, 0.25f, 0 );
 	y += BIGCHAR_HEIGHT+2;
 
 	displayOptionsInfo.bloom.generic.type		= MTYPE_RADIOBUTTON;

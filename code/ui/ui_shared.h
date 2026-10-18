@@ -83,6 +83,7 @@
 #define SLIDER_HEIGHT 16.0
 #define SLIDER_THUMB_WIDTH 12.0
 #define SLIDER_THUMB_HEIGHT 20.0
+#define SLIDER_VALUE_SCALE 0.8f	// value text against the row's text scale
 #define	NUM_CROSSHAIRS			10
 
 typedef struct {
@@ -173,6 +174,8 @@ typedef struct editFieldDef_s {
   int maxChars;                  // for edit fields
   int maxPaintChars;             // for edit fields
 	int paintOffset;							 // 
+	int valueFormat;							 // sliders: SLIDER_VALUE_*
+	float step;									 // sliders: cvar units, 0 for unsnapped
 } editFieldDef_t;
 
 #define MAX_MULTI_CVARS 32
@@ -435,6 +438,9 @@ void Menus_CloseAll();
 void Menu_Paint(menuDef_t *menu, qboolean forcePaint);
 void Menu_SetFeederSelection(menuDef_t *menu, int feeder, int index, const char *name);
 void Display_CacheAll();
+float Item_Slider_KeyStep( itemDef_t *item, float base );
+float Item_Slider_BarY( itemDef_t *item );
+void Item_Slider_Write( itemDef_t *item, float value );
 
 void *UI_Alloc( int size );
 void UI_InitMemory( void );

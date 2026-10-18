@@ -39,8 +39,10 @@ VR HUD & DISPLAY OPTIONS MENU
 #define ART_BACK1				"menu/art/back_1"
 #define ART_ACCEPT0				"menu/art/accept_0"
 #define ART_ACCEPT1				"menu/art/accept_1"
+#define ART_RESET0				"menu/art/reset_0"
+#define ART_RESET1				"menu/art/reset_1"
 
-#define VR_X_POS		360
+#define VR_X_POS		312
 
 // Vertical center of the framel/framer oval interior (640x480 space).
 #define VR_FRAME_CENTER_Y	242
@@ -61,6 +63,10 @@ VR HUD & DISPLAY OPTIONS MENU
 #define ID_FOVEATION			140
 #define ID_FOVEATIONSTRENGTH	141
 #define ID_SCREENCONTROLLERS	142
+#define ID_HUDDEPTHRESET		143
+#define ID_HUDSCALERESET		144
+#define ID_HUDYOFFSETRESET		145
+#define ID_SCREENCURVATURERESET	146
 
 #define ID_BACK					150
 
@@ -76,8 +82,11 @@ typedef struct {
 
 	menulist_s			hudmode;
 	menuslider_s		huddepth;
+	menubitmap_s		huddepthreset;
 	menuslider_s		hudscale;
+	menubitmap_s		hudscalereset;
 	menuslider_s		hudyoffset;
+	menubitmap_s		hudyoffsetreset;
 	menulist_s			virtualscreenmode;
 	menuradiobutton_s	screencontrollers;
 	menuradiobutton_s	selectorwithhud;
@@ -85,9 +94,9 @@ typedef struct {
 	menuradiobutton_s	showconsole;
 	menuradiobutton_s	lasersight;
 	menuslider_s		supersampling;
-	menutext_s			supersamplingmult;
-	menutext_s			supersamplingres;
+	menutext_s			supersamplinglabel;
 	menuslider_s		screencurvature;
+	menubitmap_s		screencurvaturereset;
 	menulist_s			refreshrate;
 	menulist_s			foveation;
 	menulist_s			foveationstrength;
@@ -111,8 +120,7 @@ static int			s_numFoveationItems;
 static const char	*s_foveationStrengthItems[] = { "Low", "Medium", "High", NULL };
 
 static float		s_vrhud_display_activeSupersampling;
-static char			s_vrhud_display_supersamplingMult[8];
-static char			s_vrhud_display_supersamplingRes[24];
+static char			s_vrhud_display_supersamplingLabel[40];
 static int			s_vrhud_display_eyeSize[4];   // recommended w h, maximum w h; zeros outside VR
 
 
@@ -124,10 +132,14 @@ static int VRHudDisplay_SupersamplingTenths( void ) {
 
 static void VRHudDisplay_UpdateSupersamplingLabel( void ) {
 	const int *e = s_vrhud_display_eyeSize;
-	VRSS_Multiplier( VRHudDisplay_SupersamplingTenths(), s_vrhud_display_supersamplingMult,
-					 sizeof( s_vrhud_display_supersamplingMult ) );
-	VRSS_Resolution( VRHudDisplay_SupersamplingTenths(), e[0], e[1], e[2], e[3], s_vrhud_display_supersamplingRes,
-					 sizeof( s_vrhud_display_supersamplingRes ) );
+	char mult[8], res[24];
+	VRSS_Multiplier( VRHudDisplay_SupersamplingTenths(), mult, sizeof( mult ) );
+	VRSS_Resolution( VRHudDisplay_SupersamplingTenths(), e[0], e[1], e[2], e[3], res, sizeof( res ) );
+	if ( res[0] ) {
+		Com_sprintf( s_vrhud_display_supersamplingLabel, sizeof( s_vrhud_display_supersamplingLabel ), "%s / %s", mult, res );
+	} else {
+		Q_strncpyz( s_vrhud_display_supersamplingLabel, mult, sizeof( s_vrhud_display_supersamplingLabel ) );
+	}
 }
 
 
@@ -274,6 +286,21 @@ static void VRHudDisplay_MenuEvent( void* ptr, int notification ) {
 			trap_Cvar_SetValue( "vr_hudYOffset", s_vrhud_display.hudyoffset.curvalue - 200 );
 			break;
 
+		case ID_HUDDEPTHRESET:
+			trap_Cvar_Reset( "vr_hudDepth" );
+			s_vrhud_display.huddepth.curvalue = trap_Cvar_VariableValue( "vr_hudDepth" );
+			break;
+
+		case ID_HUDSCALERESET:
+			trap_Cvar_Reset( "vr_hudScale" );
+			s_vrhud_display.hudscale.curvalue = trap_Cvar_VariableValue( "vr_hudScale" );
+			break;
+
+		case ID_HUDYOFFSETRESET:
+			trap_Cvar_Reset( "vr_hudYOffset" );
+			s_vrhud_display.hudyoffset.curvalue = trap_Cvar_VariableValue( "vr_hudYOffset" ) + 200;
+			break;
+
 		case ID_VIRTUALSCREENMODE:
 			trap_Cvar_SetValue( "vr_virtualScreenMode", s_vrhud_display.virtualscreenmode.curvalue );
 			break;
@@ -312,6 +339,11 @@ static void VRHudDisplay_MenuEvent( void* ptr, int notification ) {
 
 		case ID_SCREENCURVATURE:
 			trap_Cvar_SetValue( "vr_screenCurvature", s_vrhud_display.screencurvature.curvalue );
+			break;
+
+		case ID_SCREENCURVATURERESET:
+			trap_Cvar_Reset( "vr_screenCurvature" );
+			s_vrhud_display.screencurvature.curvalue = trap_Cvar_VariableValue( "vr_screenCurvature" );
 			break;
 
 		case ID_REFRESHRATE:
@@ -407,6 +439,20 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.huddepth.generic.id			= ID_HUDDEPTH;
 	s_vrhud_display.huddepth.minvalue			= 0;
 	s_vrhud_display.huddepth.maxvalue			= 5;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrhud_display.huddepth, SLIDER_VALUE_DEC1, 0.1f, 1, 0 );
+#endif
+
+	s_vrhud_display.huddepthreset.generic.type		= MTYPE_BITMAP;
+	s_vrhud_display.huddepthreset.generic.name		= ART_RESET0;
+	s_vrhud_display.huddepthreset.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_vrhud_display.huddepthreset.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 140;
+	s_vrhud_display.huddepthreset.generic.y			= y - 2;
+	s_vrhud_display.huddepthreset.generic.id		= ID_HUDDEPTHRESET;
+	s_vrhud_display.huddepthreset.generic.callback	= VRHudDisplay_MenuEvent;
+	s_vrhud_display.huddepthreset.width				= 40;
+	s_vrhud_display.huddepthreset.height			= 20;
+	s_vrhud_display.huddepthreset.focuspic			= ART_RESET1;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrhud_display.hudscale.generic.type		= MTYPE_SLIDER;
@@ -418,6 +464,20 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.hudscale.generic.callback	= VRHudDisplay_MenuEvent;
 	s_vrhud_display.hudscale.minvalue			= 0.5f;
 	s_vrhud_display.hudscale.maxvalue			= 2.0f;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrhud_display.hudscale, SLIDER_VALUE_PERCENT, 0.05f, 1, 0 );
+#endif
+
+	s_vrhud_display.hudscalereset.generic.type		= MTYPE_BITMAP;
+	s_vrhud_display.hudscalereset.generic.name		= ART_RESET0;
+	s_vrhud_display.hudscalereset.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_vrhud_display.hudscalereset.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 140;
+	s_vrhud_display.hudscalereset.generic.y			= y - 2;
+	s_vrhud_display.hudscalereset.generic.id		= ID_HUDSCALERESET;
+	s_vrhud_display.hudscalereset.generic.callback	= VRHudDisplay_MenuEvent;
+	s_vrhud_display.hudscalereset.width				= 40;
+	s_vrhud_display.hudscalereset.height			= 20;
+	s_vrhud_display.hudscalereset.focuspic			= ART_RESET1;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrhud_display.hudyoffset.generic.type		= MTYPE_SLIDER;
@@ -429,6 +489,20 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.hudyoffset.generic.callback	= VRHudDisplay_MenuEvent;
 	s_vrhud_display.hudyoffset.minvalue			= 0;
 	s_vrhud_display.hudyoffset.maxvalue			= 400;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrhud_display.hudyoffset, SLIDER_VALUE_SIGNED, 1, 1, -200 );
+#endif
+
+	s_vrhud_display.hudyoffsetreset.generic.type		= MTYPE_BITMAP;
+	s_vrhud_display.hudyoffsetreset.generic.name		= ART_RESET0;
+	s_vrhud_display.hudyoffsetreset.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_vrhud_display.hudyoffsetreset.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 140;
+	s_vrhud_display.hudyoffsetreset.generic.y			= y - 2;
+	s_vrhud_display.hudyoffsetreset.generic.id			= ID_HUDYOFFSETRESET;
+	s_vrhud_display.hudyoffsetreset.generic.callback	= VRHudDisplay_MenuEvent;
+	s_vrhud_display.hudyoffsetreset.width				= 40;
+	s_vrhud_display.hudyoffsetreset.height				= 20;
+	s_vrhud_display.hudyoffsetreset.focuspic			= ART_RESET1;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrhud_display.virtualscreenmode.generic.type		= MTYPE_SPINCONTROL;
@@ -497,17 +571,13 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.supersampling.minvalue			= VRSS_MIN_TENTHS;
 	s_vrhud_display.supersampling.maxvalue			= VRSS_MAX_TENTHS;
 
-	// the multiplier over the eye size it renders at, centered in a bar's width right of the bar, the pair centered on it
-	s_vrhud_display.supersamplingmult.generic.type		= MTYPE_TEXT;
-	s_vrhud_display.supersamplingmult.generic.flags	= QMF_INACTIVE|QMF_SMALLFONT;
-	s_vrhud_display.supersamplingmult.generic.x		= VR_X_POS + 2 * SMALLCHAR_WIDTH + 96 + 96 / 2;
-	s_vrhud_display.supersamplingmult.generic.y		= y - SMALLCHAR_HEIGHT / 2;
-	s_vrhud_display.supersamplingmult.string			= s_vrhud_display_supersamplingMult;
-	s_vrhud_display.supersamplingmult.style			= UI_CENTER|UI_SMALLFONT;
-	s_vrhud_display.supersamplingmult.color			= text_color_normal;
-	s_vrhud_display.supersamplingres					= s_vrhud_display.supersamplingmult;
-	s_vrhud_display.supersamplingres.generic.y			= y + SMALLCHAR_HEIGHT / 2;
-	s_vrhud_display.supersamplingres.string			= s_vrhud_display_supersamplingRes;
+	s_vrhud_display.supersamplinglabel.generic.type		= MTYPE_TEXT;
+	s_vrhud_display.supersamplinglabel.generic.flags	= QMF_INACTIVE|QMF_SMALLFONT;
+	s_vrhud_display.supersamplinglabel.generic.x		= VR_X_POS + SMALLCHAR_WIDTH + 104;
+	s_vrhud_display.supersamplinglabel.generic.y		= y;
+	s_vrhud_display.supersamplinglabel.string			= s_vrhud_display_supersamplingLabel;
+	s_vrhud_display.supersamplinglabel.style			= UI_LEFT|UI_SMALLFONT;
+	s_vrhud_display.supersamplinglabel.color			= text_color_normal;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrhud_display.screencurvature.generic.type		= MTYPE_SLIDER;
@@ -519,6 +589,20 @@ static void VRHudDisplay_MenuInit( void ) {
 	s_vrhud_display.screencurvature.generic.callback		= VRHudDisplay_MenuEvent;
 	s_vrhud_display.screencurvature.minvalue			= 0.0f;
 	s_vrhud_display.screencurvature.maxvalue			= 1.0f;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrhud_display.screencurvature, SLIDER_VALUE_PERCENT, 0.01f, 1, 0 );
+#endif
+
+	s_vrhud_display.screencurvaturereset.generic.type		= MTYPE_BITMAP;
+	s_vrhud_display.screencurvaturereset.generic.name		= ART_RESET0;
+	s_vrhud_display.screencurvaturereset.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_vrhud_display.screencurvaturereset.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 140;
+	s_vrhud_display.screencurvaturereset.generic.y			= y - 2;
+	s_vrhud_display.screencurvaturereset.generic.id			= ID_SCREENCURVATURERESET;
+	s_vrhud_display.screencurvaturereset.generic.callback	= VRHudDisplay_MenuEvent;
+	s_vrhud_display.screencurvaturereset.width				= 40;
+	s_vrhud_display.screencurvaturereset.height				= 20;
+	s_vrhud_display.screencurvaturereset.focuspic			= ART_RESET1;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrhud_display.refreshrate.generic.type		= MTYPE_SPINCONTROL;
@@ -584,8 +668,11 @@ static void VRHudDisplay_MenuInit( void ) {
 
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.hudmode );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.huddepth );
+	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.huddepthreset );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.hudscale );
+	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.hudscalereset );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.hudyoffset );
+	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.hudyoffsetreset );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.virtualscreenmode );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.screencontrollers );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.selectorwithhud );
@@ -593,9 +680,9 @@ static void VRHudDisplay_MenuInit( void ) {
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.showconsole );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.lasersight );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.supersampling );
-	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.supersamplingmult );
-	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.supersamplingres );
+	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.supersamplinglabel );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.screencurvature );
+	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.screencurvaturereset );
 	Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.refreshrate );
 	if ( s_numFoveationItems > 0 ) {
 		Menu_AddItem( &s_vrhud_display.menu, &s_vrhud_display.foveation );
@@ -622,6 +709,8 @@ void UI_VRHudDisplay_Cache( void ) {
 	trap_R_RegisterShaderNoMip( ART_BACK1 );
 	trap_R_RegisterShaderNoMip( ART_ACCEPT0 );
 	trap_R_RegisterShaderNoMip( ART_ACCEPT1 );
+	trap_R_RegisterShaderNoMip( ART_RESET0 );
+	trap_R_RegisterShaderNoMip( ART_RESET1 );
 }
 
 

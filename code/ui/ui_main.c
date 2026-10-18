@@ -2428,7 +2428,7 @@ static void UI_DrawCrosshair(rectDef_t *rect, float scale, vec4_t color) {
 
 	trap_R_SetColor( crosshairColor );
 	// square at the row height; a full-width row only widens the hit area
-	UI_DrawHandlePic( rect->x, rect->y - rect->h, rect->h, rect->h, uiInfo.uiDC.Assets.crosshairShader[uiInfo.currentCrosshair]);
+	UI_DrawHandlePic( rect->x, rect->y - uiInfo.uiDC.textHeight( "0", scale, 0 ) / 2.0f - rect->h / 2.0f, rect->h, rect->h, uiInfo.uiDC.Assets.crosshairShader[uiInfo.currentCrosshair]);
 	trap_R_SetColor( NULL );
 }
 

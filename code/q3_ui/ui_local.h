@@ -13,6 +13,7 @@
 #include "keycodes.h"
 #include "../game/bg_public.h"
 #include "../game/vr_shared.h"
+#include "../game/ui_slidervalue.h"
 
 typedef void (*voidfunc_f)(void);
 
@@ -179,7 +180,15 @@ typedef struct
 	float curvalue;
 
 	float range;
+
+	int valueFormat;
+	float step;			// in curvalue units
+	float valueScale;	// shown value = curvalue * valueScale + valueOffset
+	float valueOffset;
 } menuslider_s;
+
+// Pages shared with hosts lacking the value readout test this before Slider_ShowValue.
+#define UI_SLIDER_VALUE
 
 typedef struct
 {
@@ -235,6 +244,7 @@ typedef struct
 extern void			Menu_Cache( void );
 extern void			Menu_Focus( menucommon_s *m );
 extern void			Menu_AddItem( menuframework_s *menu, void *item );
+extern void			Slider_ShowValue( menuslider_s *s, int format, float step, float scale, float offset );
 extern void			Menu_AdjustCursor( menuframework_s *menu, int dir );
 extern void			Menu_Draw( menuframework_s *menu );
 extern void			*Menu_ItemAtCursor( menuframework_s *m );

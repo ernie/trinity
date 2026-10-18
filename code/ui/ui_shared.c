@@ -2,6 +2,7 @@
 // string allocation/managment
 
 #include "ui_shared.h"
+#include "../game/ui_slidervalue.h"
 
 extern int Q_vsprintf( char *buffer, const char *fmt, va_list argptr );
 
@@ -1240,10 +1241,16 @@ void Script_CollapseHidden(itemDef_t *item, char **args) {
 		}
 		for (j = 0; j < menu->itemCount; j++) {
 			itemDef_t *below = menu->items[j];
-			if (below != row && (below->window.flags & WINDOW_VISIBLE) && below->window.group &&
-				Q_stricmp(below->window.group, row->window.group) == 0 &&
-				below->window.rectClient.y >= y + h && below->window.rectClient.y < bottom) {
+			if (below == row || !(below->window.flags & WINDOW_VISIBLE) || !below->window.group ||
+				Q_stricmp(below->window.group, row->window.group) != 0) {
+				continue;
+			}
+			if (below->window.rectClient.y >= y + h && below->window.rectClient.y < bottom) {
 				below->window.rectClient.y -= h;
+				Item_UpdatePosition(below);
+			} else if (below->window.rectClient.y < y && below->window.rectClient.y + below->window.rectClient.h >= y + h) {
+				// a box drawn around the rows closes up with them
+				below->window.rectClient.h -= h;
 				Item_UpdatePosition(below);
 			}
 		}
@@ -1599,11 +1606,19 @@ float Item_Slider_ThumbPosition(itemDef_t *item) {
 	return x;
 }
 
+/* The bar sits centered on the label's text height. */
+float Item_Slider_BarY( itemDef_t *item ) {
+	if ( !item->text ) {
+		return item->window.rect.y;
+	}
+	return item->textRect.y - DC->textHeight( "0", item->textscale, 0 ) / 2.0f - SLIDER_HEIGHT / 2.0f;
+}
+
 int Item_Slider_OverSlider(itemDef_t *item, float x, float y) {
 	rectDef_t r;
 
 	r.x = Item_Slider_ThumbPosition(item) - (SLIDER_THUMB_WIDTH / 2);
-	r.y = item->window.rect.y - 2;
+	r.y = Item_Slider_BarY(item) - 2;
 	r.w = SLIDER_THUMB_WIDTH;
 	r.h = SLIDER_THUMB_HEIGHT;
 
@@ -2423,6 +2438,28 @@ static void Scroll_ListBox_ThumbFunc(void *p) {
 	}
 }
 
+float Item_Slider_KeyStep( itemDef_t *item, float base ) {
+	editFieldDef_t *editDef = item->typeData;
+	if ( editDef->step <= 0 ) {
+		return base;
+	}
+	return SliderValue_KeySteps( base, editDef->step ) * editDef->step;
+}
+
+/* Snapped and written at the shown precision, so the slider's text and its cvar never disagree. */
+void Item_Slider_Write( itemDef_t *item, float value ) {
+	editFieldDef_t *editDef = item->typeData;
+	char text[32];
+
+	value = SliderValue_Snap( value, editDef->minVal, editDef->maxVal, editDef->step );
+	if ( editDef->valueFormat == SLIDER_VALUE_NONE ) {
+		DC->setCVar( item->cvar, va( "%f", value ) );
+		return;
+	}
+	SliderValue_CvarString( editDef->valueFormat, value, text, sizeof( text ) );
+	DC->setCVar( item->cvar, text );
+}
+
 static void Scroll_Slider_ThumbFunc(void *p) {
 	float x, value, cursorx;
 	scrollInfo_t *si = (scrollInfo_t*)p;
@@ -2445,7 +2482,7 @@ static void Scroll_Slider_ThumbFunc(void *p) {
 	value /= SLIDER_WIDTH;
 	value *= (editDef->maxVal - editDef->minVal);
 	value += editDef->minVal;
-	DC->setCVar(si->item->cvar, va("%f", value));
+	Item_Slider_Write(si->item, value);
 }
 
 void Item_StartCapture(itemDef_t *item, int key) {
@@ -2507,12 +2544,10 @@ qboolean Item_Slider_HandleKey(itemDef_t *item, int key, qboolean down) {
 	     (key == K_LEFTARROW || key == K_KP_LEFTARROW || key == K_RIGHTARROW || key == K_KP_RIGHTARROW) ) {
 		editFieldDef_t *editDef = item->typeData;
 		if ( editDef ) {
-			float step = (editDef->maxVal - editDef->minVal) / 40.0f;
+			float step = Item_Slider_KeyStep( item, (editDef->maxVal - editDef->minVal) / 40.0f );
 			value = DC->getCVarValue( item->cvar );
 			if ( key == K_RIGHTARROW || key == K_KP_RIGHTARROW ) value += step; else value -= step;
-			if ( value < editDef->minVal ) value = editDef->minVal;
-			if ( value > editDef->maxVal ) value = editDef->maxVal;
-			DC->setCVar( item->cvar, va("%f", value) );
+			Item_Slider_Write( item, value );
 			return qtrue;
 		}
 	}
@@ -2543,7 +2578,7 @@ qboolean Item_Slider_HandleKey(itemDef_t *item, int key, qboolean down) {
 					// vm fuckage
 					// value = (((float)(DC->cursorx - x)/ SLIDER_WIDTH) * (editDef->maxVal - editDef->minVal));
 					value += editDef->minVal;
-					DC->setCVar(item->cvar, va("%f", value));
+					Item_Slider_Write(item, value);
 					return qtrue;
 				}
 			}
@@ -2553,14 +2588,8 @@ qboolean Item_Slider_HandleKey(itemDef_t *item, int key, qboolean down) {
 				editFieldDef_t *editDef = item->typeData;
 				if (editDef) {
 					// 20 is number of steps
-					value = DC->getCVarValue(item->cvar) + (((editDef->maxVal - editDef->minVal)/20) * select);
-
-					if (value < editDef->minVal)
-						value = editDef->minVal;
-					else if (value > editDef->maxVal)
-						value = editDef->maxVal;
-
-					DC->setCVar(item->cvar, va("%f", value));
+					value = DC->getCVarValue(item->cvar) + Item_Slider_KeyStep(item, (editDef->maxVal - editDef->minVal)/20) * select;
+					Item_Slider_Write(item, value);
 					return qtrue;
 				}
 			}
@@ -3650,6 +3679,7 @@ void Item_Slider_Paint(itemDef_t *item) {
 	vec4_t newColor, lowLight;
 	float x, y, value;
 	menuDef_t *parent = (menuDef_t*)item->parent;
+	editFieldDef_t *editDef = (editFieldDef_t*)item->typeData;
 
 	value = (item->cvar) ? DC->getCVarValue(item->cvar) : 0;
 
@@ -3663,15 +3693,21 @@ void Item_Slider_Paint(itemDef_t *item) {
 		memcpy(&newColor, &item->window.foreColor, sizeof(vec4_t));
 	}
 
-	y = item->window.rect.y;
 	if (item->text) {
 		Item_Text_Paint(item);
 		x = item->textRect.x + item->textRect.w + 8;
 	} else {
 		x = item->window.rect.x;
 	}
+	y = Item_Slider_BarY(item);
 	DC->setColor(newColor);
 	DC->drawHandlePic( x, y, SLIDER_WIDTH, SLIDER_HEIGHT, DC->Assets.sliderBar );
+
+	if (editDef && editDef->valueFormat != SLIDER_VALUE_NONE) {
+		char text[16];
+		SliderValue_Text(editDef->valueFormat, value, text, sizeof(text));
+		DC->drawText(x + SLIDER_WIDTH + SLIDER_THUMB_WIDTH / 2 + 4, item->textRect.y, item->textscale * SLIDER_VALUE_SCALE, newColor, text, 0, 0, item->textStyle);
+	}
 
 	x = Item_Slider_ThumbPosition(item);
 	DC->drawHandlePic( x - (SLIDER_THUMB_WIDTH / 2), y - 2, SLIDER_THUMB_WIDTH, SLIDER_THUMB_HEIGHT, DC->Assets.sliderThumb );
@@ -5223,6 +5259,15 @@ qboolean ItemParse_cvarFloat( itemDef_t *item, int handle ) {
 	return qfalse;
 }
 
+qboolean ItemParse_sliderValue( itemDef_t *item, int handle ) {
+	editFieldDef_t *editPtr;
+
+	if (item->type != ITEM_TYPE_SLIDER || !item->typeData)
+		return qfalse;
+	editPtr = (editFieldDef_t*)item->typeData;
+	return PC_Int_Parse(handle, &editPtr->valueFormat) && PC_Float_Parse(handle, &editPtr->step);
+}
+
 qboolean ItemParse_cvarStrList( itemDef_t *item, int handle ) {
 	pc_token_t token;
 	multiDef_t *multiPtr;
@@ -5430,6 +5475,7 @@ keywordHash_t itemParseKeywords[] = {
 	{"maxPaintChars", ItemParse_maxPaintChars, NULL},
 	{"focusSound", ItemParse_focusSound, NULL},
 	{"cvarFloat", ItemParse_cvarFloat, NULL},
+	{"sliderValue", ItemParse_sliderValue, NULL},
 	{"cvarStrList", ItemParse_cvarStrList, NULL},
 	{"cvarFloatList", ItemParse_cvarFloatList, NULL},
 	{"addColorRange", ItemParse_addColorRange, NULL},

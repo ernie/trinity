@@ -366,6 +366,7 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.sfxvolume.generic.y		= y;
 	soundOptionsInfo.sfxvolume.minvalue			= 0;
 	soundOptionsInfo.sfxvolume.maxvalue			= 10;
+	Slider_ShowValue( &soundOptionsInfo.sfxvolume, SLIDER_VALUE_PERCENT, 0.1f, 0.1f, 0 );
 
 	y += BIGCHAR_HEIGHT+2;
 	soundOptionsInfo.musicvolume.generic.type		= MTYPE_SLIDER;
@@ -377,6 +378,7 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.musicvolume.generic.y			= y;
 	soundOptionsInfo.musicvolume.minvalue			= 0;
 	soundOptionsInfo.musicvolume.maxvalue			= 10;
+	Slider_ShowValue( &soundOptionsInfo.musicvolume, SLIDER_VALUE_PERCENT, 0.1f, 0.1f, 0 );
 
 	y += BIGCHAR_HEIGHT+2;
 	soundOptionsInfo.voip.generic.type		= MTYPE_SPINCONTROL;
@@ -408,6 +410,7 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.voipThreshold.generic.y		= y;
 	soundOptionsInfo.voipThreshold.minvalue		= 0;
 	soundOptionsInfo.voipThreshold.maxvalue		= 20;
+	Slider_ShowValue( &soundOptionsInfo.voipThreshold, SLIDER_VALUE_PERCENT, 0.2f, 0.05f, 0 );
 
 	y += BIGCHAR_HEIGHT+2;
 	soundOptionsInfo.voipvolume.generic.type			= MTYPE_SLIDER;
@@ -419,6 +422,7 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.voipvolume.generic.y				= y;
 	soundOptionsInfo.voipvolume.minvalue				= 0;
 	soundOptionsInfo.voipvolume.maxvalue				= 10;
+	Slider_ShowValue( &soundOptionsInfo.voipvolume, SLIDER_VALUE_PERCENT, 0.25f, 0.2f, 0 );
 
 	// game audio while transmitting: full volume, or ducked to as low as a fifth
 	y += BIGCHAR_HEIGHT+2;
@@ -432,6 +436,7 @@ static void UI_SoundOptionsMenu_Init( void ) {
 	soundOptionsInfo.voipDuck.generic.y				= y;
 	soundOptionsInfo.voipDuck.minvalue				= 2;
 	soundOptionsInfo.voipDuck.maxvalue				= 10;
+	Slider_ShowValue( &soundOptionsInfo.voipDuck, SLIDER_VALUE_PERCENT, 0.5f, 0.1f, 0 );
 
 	y += BIGCHAR_HEIGHT+2;
 	soundOptionsInfo.soundSystem.generic.type		= MTYPE_SPINCONTROL;

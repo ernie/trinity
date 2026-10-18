@@ -283,7 +283,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define UI_REFRESHRATE 265
 #define UI_FOVEATION 266
 #define UI_FOVEATION_STRENGTH 267
-#define UI_WEAPONPITCH 268
 #define UI_VRBIND 269
 #define UI_VRBIND_STATUS 270
 #define UI_VRSUPERSAMPLING 271
@@ -291,6 +290,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define UI_DISPLAYREFRESH 273
 #define UI_CUSTOMSIZE 274
 #define UI_COLORDEPTH 275
+
+// Menus shared with hosts lacking sliderValue test this first.
+#define TRINITY_SLIDER_VALUE
+#define SLIDER_VALUE_NONE		0
+#define SLIDER_VALUE_INT		1
+#define SLIDER_VALUE_SIGNED		2
+#define SLIDER_VALUE_DEC1		3
+#define SLIDER_VALUE_DEC2		4
+#define SLIDER_VALUE_PERCENT	5
 
 #define VOICECHAT_GETFLAG			"getflag"				// command someone to get the flag
 #define VOICECHAT_OFFENSE			"offense"				// command someone to go on offense

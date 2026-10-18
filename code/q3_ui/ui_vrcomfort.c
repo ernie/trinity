@@ -166,6 +166,9 @@ static void VRComfort_MenuInit( void ) {
 	s_vrcomfort.comfortvignette.generic.callback	= VRComfort_MenuEvent;
 	s_vrcomfort.comfortvignette.minvalue			= 0.0f;
 	s_vrcomfort.comfortvignette.maxvalue			= 1.0f;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrcomfort.comfortvignette, SLIDER_VALUE_PERCENT, 0.01f, 1, 0 );
+#endif
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrcomfort.heightadjust.generic.type		= MTYPE_SLIDER;
@@ -177,6 +180,9 @@ static void VRComfort_MenuInit( void ) {
 	s_vrcomfort.heightadjust.generic.callback	= VRComfort_MenuEvent;
 	s_vrcomfort.heightadjust.minvalue			= 0.0f;
 	s_vrcomfort.heightadjust.maxvalue			= 1.0f;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrcomfort.heightadjust, SLIDER_VALUE_PERCENT, 0.01f, 1, 0 );
+#endif
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrcomfort.sixdof.generic.type			= MTYPE_RADIOBUTTON;
@@ -207,6 +213,9 @@ static void VRComfort_MenuInit( void ) {
 	s_vrcomfort.hapticintensity.generic.callback	= VRComfort_MenuEvent;
 	s_vrcomfort.hapticintensity.minvalue			= 0;
 	s_vrcomfort.hapticintensity.maxvalue			= 1.0;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrcomfort.hapticintensity, SLIDER_VALUE_PERCENT, 0.01f, 1, 0 );
+#endif
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrcomfort.bhaptics.generic.type		= MTYPE_RADIOBUTTON;

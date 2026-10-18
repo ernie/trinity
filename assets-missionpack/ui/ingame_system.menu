@@ -8,7 +8,7 @@ menuDef {
     	visible 0
     	fullscreen 0
 		outOfBoundsClick			// this closes the window if it gets a click out of the rectangle
-    	rect 298 30 276 345
+    	rect 265 30 340 345
     	focusColor 1 .75 0 1
     	disableColor .5 .5 .5 1
     	style 1
@@ -17,7 +17,7 @@ menuDef {
 
 itemDef {
 	name window
-	rect 10 15 256 330
+	rect 10 15 320 330
 	style 1
 	backcolor 0 .1 0 1
 	visible 1
@@ -47,7 +47,7 @@ itemDef {
 
 itemDef {
 	name window
-	rect 167 10 64 8
+	rect 128 10 64 8
 	style 3
 	background "ui/assets/ingametop.tga"
 	visible 1
@@ -56,7 +56,25 @@ itemDef {
 
 itemDef {
 	name window
-	rect 213 10 64 64
+	rect 192 10 64 8
+	style 3
+	background "ui/assets/ingametop.tga"
+	visible 1
+	decoration
+	}
+
+itemDef {
+	name window
+	rect 213 10 64 8
+	style 3
+	background "ui/assets/ingametop.tga"
+	visible 1
+	decoration
+	}
+
+itemDef {
+	name window
+	rect 277 10 64 64
 	style 3
 	background "ui/assets/ingamerightcorner.tga"
 	visible 1
@@ -64,7 +82,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 103 0 64 16
+	rect 138 0 64 16
 	style 3
 	background "ui/assets/ingameconnection.tga"
 	visible 1
@@ -80,7 +98,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 213 284 64 64
+	rect 277 284 64 64
 	style 3
 	background "ui/assets/ingamerightcornerb.tga"
 	visible 1
@@ -117,7 +135,7 @@ itemDef {
 
 itemDef {
 	name window
-	rect 261 64 16 64
+	rect 325 64 16 64
 	style 3
 	background "ui/assets/ingameright.tga"
 	visible 1
@@ -127,7 +145,7 @@ itemDef {
 
 itemDef {
 	name window
-	rect 261 128 16 64
+	rect 325 128 16 64
 	style 3
 	background "ui/assets/ingameright.tga"
 	visible 1
@@ -135,7 +153,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 261 192 16 94
+	rect 325 192 16 94
 	style 3
 	background "ui/assets/ingameright.tga"
 	visible 1
@@ -158,6 +176,14 @@ itemDef {
 	visible 1
 	decoration
 	}
+itemDef {
+	name window
+	rect 203 340 74 8
+	style 3
+	background "ui/assets/ingamebottom.tga"
+	visible 1
+	decoration
+	}
 
 itemDef {
 	name ctr_graphics
@@ -167,7 +193,7 @@ itemDef {
 	group grpControlbutton
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 18 25 58 20
+	rect 42 25 58 20
 	textalign 1
 	textalignx 29
 	textaligny 16
@@ -186,7 +212,7 @@ itemDef {
 			text "Quality:"
 		cvar "ui_glCustom"
 		cvarFloatList { "High Quality" 0 "Normal" 1 "Fast" 2 "Fastest" 3 "Custom" 4 }
-		rect 0 52 256 17
+		rect 24 52 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -203,7 +229,7 @@ itemDef {
 		text "MSAA:"
 		cvar "r_ext_multisample"
 		cvarFloatList { "Off" 0 "2x" 2 "4x" 4 "8x" 8 }
-		rect 0 69 256 17
+		rect 24 69 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -221,7 +247,7 @@ itemDef {
 		text "Lighting:"
 		cvar "r_vertexlight"
 		cvarFloatList { "Light Map (high)" 0 "Vertex (low)" 1  }
-		rect 0 86 256 17
+		rect 24 86 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -238,7 +264,7 @@ itemDef {
 		text "Shadows:"
 		cvar "cg_shadows"
 		cvarFloatList { "None" 0 "Low" 1 "High" 2 }
-		rect 0 103 256 17
+		rect 24 103 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -254,7 +280,7 @@ itemDef {
 		text "Model Detail:"
 		cvar "r_lodbias"
 		cvarFloatList { "Very Low" 2 "Low" 1 "Medium" 0 "High" -1 "Very High" -2 }
-		rect 0 120 256 17
+		rect 24 120 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -271,7 +297,7 @@ itemDef {
 		text "Curve Detail:"
 		cvar "r_subdivisions"
 		cvarFloatList { "Very Low" 20 "Low" 12 "Medium" 4 "High" 2 "Very High" 1 }
-		rect 0 137 256 17
+		rect 24 137 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -288,7 +314,7 @@ itemDef {
 		text "Texture Detail:"
 		cvar "r_picmip"
 		cvarFloatList { "Low" 2 "Normal" 1 "High" 0 }
-		rect 0 154 256 17
+		rect 24 154 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -305,7 +331,7 @@ itemDef {
 		text "Texture Quality:"
 		cvar "r_texturebits"
 		cvarFloatList { "Default" 0 "16 bit" 16 "32 bit" 32 }
-		rect 0 171 256 17
+		rect 24 171 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -321,7 +347,7 @@ itemDef {
 		text "Texture Filter:"
 		cvar "r_texturemode"
 		cvarStrList { "Bilinear", "GL_LINEAR_MIPMAP_NEAREST", "Trilinear", "GL_LINEAR_MIPMAP_LINEAR"  }
-		rect 0 188 314 17
+		rect 24 188 314 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -337,7 +363,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Compress Textures:"
 		cvar "r_ext_compressed_textures"
-		rect 0 205 256 17
+		rect 24 205 256 17
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 133
       		textaligny 17
@@ -352,7 +378,7 @@ itemDef {
 		group grpSystem
 		ownerdraw UI_RESOLUTION
 		text "Resolution:"
-		rect 0 222 256 17
+		rect 24 222 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -369,7 +395,7 @@ itemDef {
 		group grpSystem
 		ownerdraw UI_CUSTOMSIZE
 		text "Custom Size:"
-		rect 0 239 256 17
+		rect 24 239 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -386,7 +412,7 @@ itemDef {
 		group grpSystem
 		ownerdraw UI_COLORDEPTH
 		text "Color Depth:"
-		rect 0 256 256 17
+		rect 24 256 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -405,7 +431,7 @@ itemDef {
 		cvar "r_fullscreen"
 		cvarFloatList { "Windowed" 0 "Borderless" 2 "Fullscreen" 1 }
 		text "Window Mode:"
-		rect 0 273 256 17
+		rect 24 273 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -422,7 +448,7 @@ itemDef {
 		group grpSystem
 		ownerdraw UI_DISPLAYREFRESH
 		text "Refresh Rate:"
-		rect 0 290 256 17
+		rect 24 290 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -442,7 +468,7 @@ itemDef {
 		style 0
 		textscale .3
 		textstyle 3
-		rect 0 70 276 20
+		rect 24 70 276 20
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 15
@@ -459,7 +485,7 @@ itemDef {
 		cvarFloatList { "Free" 0 "16:9" 1 "16:10" 2 "21:9" 3 "32:9" 4 "4:3" 5 }
 		action { uiScript customResFillWidth }
 		text "Aspect:"
-		rect 0 100 256 17
+		rect 24 100 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -476,7 +502,7 @@ itemDef {
 		maxchars 5
 		onEditEnd { uiScript customResFillWidth }
 		text "Width:"
-		rect 0 117 256 17
+		rect 24 117 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -493,7 +519,7 @@ itemDef {
 		maxchars 5
 		onEditEnd { uiScript customResFillHeight }
 		text "Height:"
-		rect 0 134 256 17
+		rect 24 134 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133
 		textaligny 17
@@ -510,7 +536,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 55 165 75 20
+		rect 79 165 75 20
 		textalign 1
 		textalignx 37
 		textaligny 15
@@ -530,7 +556,7 @@ itemDef {
 		group grpSystem
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 146 165 75 20
+		rect 170 165 75 20
 		textalign 1
 		textalignx 37
 		textaligny 15
@@ -552,7 +578,7 @@ itemDef {
 	group grpControlbutton
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 79 25 58 20
+	rect 103 25 58 20
 	textalign 1
 	textalignx 29
 	textaligny 16
@@ -569,7 +595,7 @@ itemDef {
 	itemDef {
 		name driver
 		group grpSystem
-		rect 15 55 230 230	
+		rect 39 55 230 230	
 		ownerdraw UI_GLINFO 
 		textalign 1
 		textscale .15
@@ -588,7 +614,7 @@ itemDef {
 	group grpControlbutton
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 140 25 58 20
+	rect 164 25 58 20
 	textalign 1
 	textalignx 29
 	textaligny 16
@@ -605,7 +631,7 @@ itemDef {
 	group grpSystem
       	style 1
 	text "Sound"
-	rect 0 45 128 20
+	rect 24 45 128 20
       	textalign ITEM_ALIGN_CENTER
       	textalignx 128
       	textaligny 17
@@ -622,7 +648,8 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Effects Volume:"
 		cvarfloat "s_volume" 0.7 0 1
-			rect 0 65 256 20
+		sliderValue SLIDER_VALUE_PERCENT 0.01
+			rect 24 65 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -638,7 +665,8 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Music Volume:"
 		cvarfloat "s_musicvolume" 0.25 0 1
-			rect 0 85 256 20
+		sliderValue SLIDER_VALUE_PERCENT 0.01
+			rect 24 85 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -655,7 +683,7 @@ itemDef {
       		text "VOIP:"
       		cvar "cl_voip"
       		cvarFloatList { "Off" 0 "On" 1 }
-		rect 0 105 256 20
+		rect 24 105 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -672,7 +700,7 @@ itemDef {
       		text "Activation:"
       		cvar "cl_voipUseVAD"
       		cvarFloatList { "Push to talk" 0 "When speaking" 1 }
-		rect 0 125 256 20
+		rect 24 125 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -688,7 +716,8 @@ itemDef {
       		type ITEM_TYPE_SLIDER
       		text "Threshold:"
       		cvarfloat "cl_voipVADThreshold" 0.1 0 1
-			rect 0 145 256 20
+		sliderValue SLIDER_VALUE_PERCENT 0.01
+			rect 24 145 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -704,7 +733,8 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "VOIP Volume:"
 		cvarfloat "cl_voipVolume" 1 0 2
-			rect 0 165 256 20
+		sliderValue SLIDER_VALUE_PERCENT 0.05
+			rect 24 165 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -720,7 +750,8 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Tx Game Volume:"
 		cvarfloat "cl_voipGainDuringCapture" 1 0.2 1
-		rect 0 185 256 20
+		sliderValue SLIDER_VALUE_PERCENT 0.05
+		rect 24 185 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -734,7 +765,7 @@ itemDef {
 	itemDef {
 		name msg_voipduck
 		text "Game volume while transmitting"
-		rect 0 302 276 14
+		rect 24 302 276 14
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 11
@@ -747,7 +778,7 @@ itemDef {
 	itemDef {
 		name msg_voipduck
 		text "(lower if your mic sends game audio)"
-		rect 0 316 276 14
+		rect 24 316 276 14
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 11
@@ -765,7 +796,7 @@ itemDef {
 		text "Sound System:"
 		cvar "s_useOpenAL"
 		cvarFloatList { "SDL" 0 "OpenAL" 1 }
-		rect 0 205 256 20
+		rect 24 205 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -782,7 +813,7 @@ itemDef {
 		text "SDL Sound Quality:"
 		cvar "s_khz"
 		cvarFloatList { "44 khz (high)" 44 "22 khz (medium)" 22 "11 khz (low)" 11 }
-		rect 0 225 256 20
+		rect 24 225 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -800,7 +831,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Doppler Sound:"
 		cvar "s_doppler"
-		rect 0 245 256 20
+		rect 24 245 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -817,7 +848,7 @@ itemDef {
 	group grpSystem
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 101 275 75 20
+	rect 125 275 75 20
 	textalign 1
 	textalignx 37
 	textaligny 15
@@ -837,7 +868,7 @@ itemDef {
 	group grpControlbutton
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 201 25 58 20
+	rect 225 25 58 20
 	textalign 1
 	textalignx 29
 	textaligny 16
@@ -855,7 +886,7 @@ itemDef {
 	group grpSystem
       	style 1
 	text "Display"
-	rect 0 45 128 20
+	rect 24 45 128 20
       	textalign ITEM_ALIGN_CENTER
       	textalignx 128
       	textaligny 17
@@ -872,7 +903,7 @@ itemDef {
 		text "Display Mode:"
 		cvar "ui_vrEnabled"
 		cvarFloatList { "Flatscreen" 0 "VR" 1 }
-		rect 0 65 256 20
+		rect 24 65 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -890,7 +921,8 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Brightness:"
 		cvarfloat "r_gamma" 1 0.5 2
-		rect 0 85 256 20
+		sliderValue SLIDER_VALUE_PERCENT 0.1
+		rect 24 85 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 17
@@ -905,7 +937,7 @@ itemDef {
 		type ITEM_TYPE_YESNO
 		text "Frame Buffer:"
 		cvar "r_fbo"
-		rect 0 105 256 20
+		rect 24 105 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -921,7 +953,7 @@ itemDef {
 		type ITEM_TYPE_YESNO
 		text "HDR Display:"
 		cvar "ui_hdrDisplay"
-		rect 0 125 256 20
+		rect 24 125 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -940,7 +972,7 @@ itemDef {
 		text "SDR Gamma:"
 		cvar "r_hdrSdrCurve"
 		cvarFloatList { "sRGB" 0 "2.2" 1 }
-		rect 0 145 256 20
+		rect 24 145 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -957,7 +989,8 @@ itemDef {
 		type ITEM_TYPE_SLIDER
 		text "Highlight Boost:"
 		cvarfloat "r_hdrHighlightBoost" 1 0.5 2
-		rect 0 165 256 20
+		sliderValue SLIDER_VALUE_PERCENT 0.25
+		rect 24 165 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -973,7 +1006,7 @@ itemDef {
 	itemDef {
 		name msg_highlightboost
 		text "Brightens HDR lights and effects"
-		rect 0 317 276 14
+		rect 24 317 276 14
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 11
@@ -989,7 +1022,7 @@ itemDef {
 		type ITEM_TYPE_YESNO
 		text "Bloom:"
 		cvar "r_bloom"
-		rect 0 185 256 20
+		rect 24 185 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -1007,7 +1040,7 @@ itemDef {
 		type ITEM_TYPE_YESNO
 		text "Flares:"
 		cvar "r_flares"
-		rect 0 205 256 20
+		rect 24 205 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -1024,7 +1057,7 @@ itemDef {
 		textscale .25
 		style WINDOW_STYLE_FILLED
 		background "ui/assets/button_back.tga"
-		rect 63 229 130 20
+		rect 87 229 130 20
 		textalign 1
 		textalignx 65
 		textaligny 16
@@ -1043,7 +1076,7 @@ itemDef {
 	group grpSystem
       	style 1
 	text "Network"
-	rect 0 249 128 20
+	rect 24 249 128 20
       	textalign ITEM_ALIGN_CENTER
       	textalignx 128
       	textaligny 17
@@ -1060,7 +1093,7 @@ itemDef {
 		text "Packet Recovery:"
 		cvar "cl_packetdup"
 		cvarFloatList { "Low" 1 "Medium" 2 "High" 3 }
-		rect 0 269 256 20
+		rect 24 269 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 17
@@ -1074,7 +1107,7 @@ itemDef {
 	itemDef {
 		name msg_packetdup
 		text "Send duplicate input packets"
-		rect 0 317 276 14
+		rect 24 317 276 14
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 11
@@ -1087,7 +1120,7 @@ itemDef {
 	itemDef {
 		name msg_packetdup
 		text "(raise if on unreliable network)"
-		rect 0 330 276 14
+		rect 24 330 276 14
 		textalign ITEM_ALIGN_CENTER
 		textalignx 138
 		textaligny 11
@@ -1105,7 +1138,7 @@ itemDef {
 	group grpsystem
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 101 313 75 20
+	rect 125 313 75 20
 	textalign 1
 	textalignx 37
 	textaligny 15
@@ -1125,7 +1158,7 @@ itemDef {
 	group grpSystem
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 101 295 75 20
+	rect 125 295 75 20
 	textalign 1
 	textalignx 37
 	textaligny 15

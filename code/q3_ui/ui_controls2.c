@@ -1502,6 +1502,7 @@ static void Controls_MenuInit( void )
 	s_controls.sensitivity.minvalue		     = 2;
 	s_controls.sensitivity.maxvalue		     = 30;
 	s_controls.sensitivity.generic.statusbar = Controls_StatusBar;
+	Slider_ShowValue( &s_controls.sensitivity, SLIDER_VALUE_DEC1, 0.1f, 1, 0 );
 
 	s_controls.gesture.generic.type	     = MTYPE_ACTION;
 	s_controls.gesture.generic.flags     = QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS|QMF_GRAYED|QMF_HIDDEN;
@@ -1562,6 +1563,7 @@ static void Controls_MenuInit( void )
 	s_controls.joythreshold.minvalue		  = 0.05f;
 	s_controls.joythreshold.maxvalue		  = 0.75f;
 	s_controls.joythreshold.generic.statusbar = Controls_StatusBar;
+	Slider_ShowValue( &s_controls.joythreshold, SLIDER_VALUE_DEC2, 0.01f, 1, 0 );
 
 	s_controls.name.generic.type	= MTYPE_PTEXT;
 	s_controls.name.generic.flags	= QMF_CENTER_JUSTIFY|QMF_INACTIVE;

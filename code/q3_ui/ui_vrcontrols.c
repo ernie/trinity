@@ -59,6 +59,8 @@ VR CONTROLS OPTIONS MENU
 #define ID_SENDROLL				142
 #define ID_WEAPONPITCHRESET		143
 #define ID_WHEELGAUNTLET		144
+#define ID_SENSITIVITYRESET		145
+#define ID_TRIGGERRESET			146
 
 #define ID_BACK					150
 
@@ -77,11 +79,12 @@ typedef struct {
 	menulist_s			directionmode;
 	menulist_s			snapturn;
 	menuslider_s		sensitivity;
+	menubitmap_s		sensitivityreset;
 	menuradiobutton_s	righthanded;
 	menuradiobutton_s	switchthumbsticks;
 	menuslider_s		triggersensitivity;
+	menubitmap_s		triggerreset;
 	menuslider_s		weaponpitch;
-	menutext_s			weaponpitchvalue;
 	menubitmap_s		weaponpitchreset;
 	menulist_s			weaponselectormode;
 	menuradiobutton_s	wheelgauntlet;
@@ -94,17 +97,6 @@ typedef struct {
 
 static vrcontrols_t s_vrcontrols;
 
-static char s_vrcontrols_pitchLabel[16];	// menutext_s keeps a pointer, so the readout needs static storage
-
-static int s_vrcontrols_hintY;	// set below the last row: the block fills the frame, so a fixed fraction lands inside it
-
-static void VRControls_UpdatePitchLabel( void ) {
-	const int offset = s_vrcontrols.weaponpitch.curvalue - 25;
-
-	Com_sprintf( s_vrcontrols_pitchLabel, sizeof( s_vrcontrols_pitchLabel ),
-		"%s%i", offset > 0 ? "+" : "", offset );
-}
-
 
 static void VRControls_SetMenuItems( void ) {
 	s_vrcontrols.scope.curvalue				= trap_Cvar_VariableValue( "vr_weaponScope" ) != 0;
@@ -116,7 +108,6 @@ static void VRControls_SetMenuItems( void ) {
 	s_vrcontrols.switchthumbsticks.curvalue	= trap_Cvar_VariableValue( "vr_switchThumbsticks" ) != 0;
 	s_vrcontrols.triggersensitivity.curvalue	= trap_Cvar_VariableValue( "vr_triggerSensitivity" );
 	s_vrcontrols.weaponpitch.curvalue		= trap_Cvar_VariableValue( "vr_weaponPitch" ) + 25;
-	VRControls_UpdatePitchLabel();
 	s_vrcontrols.weaponselectormode.curvalue	= (int)trap_Cvar_VariableValue( "vr_weaponSelectorMode" ) % 2;
 	s_vrcontrols.wheelgauntlet.curvalue		= trap_Cvar_VariableValue( "cg_weaponSelectorGauntlet" ) != 0;
 	s_vrcontrols.holster2d.curvalue			= trap_Cvar_VariableValue( "cg_weaponSelectorSimple2DIcons" ) != 0;
@@ -151,6 +142,11 @@ static void VRControls_MenuEvent( void* ptr, int notification ) {
 			trap_Cvar_SetValue( "vr_sensitivity", s_vrcontrols.sensitivity.curvalue );
 			break;
 
+		case ID_SENSITIVITYRESET:
+			trap_Cvar_Reset( "vr_sensitivity" );
+			s_vrcontrols.sensitivity.curvalue = UI_ClampCvar( 50, 150, trap_Cvar_VariableValue( "vr_sensitivity" ) );
+			break;
+
 		case ID_RIGHTHANDED:
 			trap_Cvar_SetValue( "vr_righthanded", s_vrcontrols.righthanded.curvalue );
 			break;
@@ -163,15 +159,18 @@ static void VRControls_MenuEvent( void* ptr, int notification ) {
 			trap_Cvar_SetValue( "vr_triggerSensitivity", s_vrcontrols.triggersensitivity.curvalue );
 			break;
 
+		case ID_TRIGGERRESET:
+			trap_Cvar_Reset( "vr_triggerSensitivity" );
+			s_vrcontrols.triggersensitivity.curvalue = trap_Cvar_VariableValue( "vr_triggerSensitivity" );
+			break;
+
 		case ID_WEAPONPITCH:
 			trap_Cvar_SetValue( "vr_weaponPitch", s_vrcontrols.weaponpitch.curvalue - 25 );
-			VRControls_UpdatePitchLabel();
 			break;
 
 		case ID_WEAPONPITCHRESET:
-			trap_Cvar_SetValue( "vr_weaponPitch", 0 );
-			s_vrcontrols.weaponpitch.curvalue = 25;
-			VRControls_UpdatePitchLabel();
+			trap_Cvar_Reset( "vr_weaponPitch" );
+			s_vrcontrols.weaponpitch.curvalue = trap_Cvar_VariableValue( "vr_weaponPitch" ) + 25;
 			break;
 
 		case ID_WEAPONSELECTORMODE:
@@ -202,32 +201,13 @@ static void VRControls_MenuEvent( void* ptr, int notification ) {
 	if ((int)trap_Cvar_VariableValue( "vr_snapturn" ) == 0)
 	{
 		s_vrcontrols.sensitivity.generic.flags &= ~QMF_GRAYED;
+		s_vrcontrols.sensitivityreset.generic.flags &= ~QMF_GRAYED;
 	}
 	else
 	{
 		s_vrcontrols.sensitivity.generic.flags |= QMF_GRAYED;
+		s_vrcontrols.sensitivityreset.generic.flags |= QMF_GRAYED;
 	}
-}
-
-static void VRControls_SensitivityStatusBar( void *self )
-{
-	const float currentValue = UI_ClampCvar( 50, 150, trap_Cvar_VariableValue( "vr_sensitivity" ) );
-
-	char buf[128] = { 0 };
-	Com_sprintf( buf, sizeof(buf), "Current value: %.1f (default: 100)", currentValue );
-
-	UI_DrawString( SCREEN_WIDTH * 0.50, s_vrcontrols_hintY, buf, UI_SMALLFONT|UI_CENTER, colorWhite );
-}
-
-static void VRControls_WeaponPitchStatusBar( void *self )
-{
-	// the engine applies the grip-to-aim correction itself; this is only the player's tilt on top
-	const int offset = s_vrcontrols.weaponpitch.curvalue - 25;
-
-	char buf[128] = { 0 };
-	Com_sprintf( buf, sizeof(buf), "Current offset: %s%d degrees (default: 0)", offset > 0 ? "+" : "", offset );
-
-	UI_DrawString( SCREEN_WIDTH * 0.50, s_vrcontrols_hintY, buf, UI_SMALLFONT|UI_CENTER, colorWhite );
 }
 
 static void VRControls_MenuInit( void ) {
@@ -346,11 +326,25 @@ static void VRControls_MenuInit( void ) {
 	s_vrcontrols.sensitivity.generic.callback	= VRControls_MenuEvent;
 	s_vrcontrols.sensitivity.minvalue			= 50;
 	s_vrcontrols.sensitivity.maxvalue			= 150;
-	s_vrcontrols.sensitivity.generic.statusbar	= VRControls_SensitivityStatusBar;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrcontrols.sensitivity, SLIDER_VALUE_INT, 1, 1, 0 );
+#endif
+
+	s_vrcontrols.sensitivityreset.generic.type		= MTYPE_BITMAP;
+	s_vrcontrols.sensitivityreset.generic.name		= ART_RESET0;
+	s_vrcontrols.sensitivityreset.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_vrcontrols.sensitivityreset.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 140;
+	s_vrcontrols.sensitivityreset.generic.y			= y - 2;
+	s_vrcontrols.sensitivityreset.generic.id		= ID_SENSITIVITYRESET;
+	s_vrcontrols.sensitivityreset.generic.callback	= VRControls_MenuEvent;
+	s_vrcontrols.sensitivityreset.width				= 40;
+	s_vrcontrols.sensitivityreset.height			= 20;
+	s_vrcontrols.sensitivityreset.focuspic			= ART_RESET1;
 
 	if ((int)trap_Cvar_VariableValue( "vr_snapturn" ) > 0)
 	{
 		s_vrcontrols.sensitivity.generic.flags |= QMF_GRAYED;
+		s_vrcontrols.sensitivityreset.generic.flags |= QMF_GRAYED;
 	}
 
 	y += BIGCHAR_HEIGHT+2;
@@ -381,6 +375,20 @@ static void VRControls_MenuInit( void ) {
 	s_vrcontrols.triggersensitivity.generic.callback	= VRControls_MenuEvent;
 	s_vrcontrols.triggersensitivity.minvalue			= 0.1f;
 	s_vrcontrols.triggersensitivity.maxvalue			= 0.9f;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrcontrols.triggersensitivity, SLIDER_VALUE_DEC2, 0.05f, 1, 0 );
+#endif
+
+	s_vrcontrols.triggerreset.generic.type		= MTYPE_BITMAP;
+	s_vrcontrols.triggerreset.generic.name		= ART_RESET0;
+	s_vrcontrols.triggerreset.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_vrcontrols.triggerreset.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 140;
+	s_vrcontrols.triggerreset.generic.y			= y - 2;
+	s_vrcontrols.triggerreset.generic.id		= ID_TRIGGERRESET;
+	s_vrcontrols.triggerreset.generic.callback	= VRControls_MenuEvent;
+	s_vrcontrols.triggerreset.width				= 40;
+	s_vrcontrols.triggerreset.height			= 20;
+	s_vrcontrols.triggerreset.focuspic			= ART_RESET1;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrcontrols.weaponpitch.generic.type		= MTYPE_SLIDER;
@@ -390,29 +398,22 @@ static void VRControls_MenuInit( void ) {
 	s_vrcontrols.weaponpitch.generic.name		= "Weapon Pitch:";
 	s_vrcontrols.weaponpitch.generic.id			= ID_WEAPONPITCH;
 	s_vrcontrols.weaponpitch.generic.callback	= VRControls_MenuEvent;
-	s_vrcontrols.weaponpitch.generic.statusbar	= VRControls_WeaponPitchStatusBar;
 	s_vrcontrols.weaponpitch.minvalue			= 0;
 	s_vrcontrols.weaponpitch.maxvalue			= 50;
+#ifdef UI_SLIDER_VALUE
+	Slider_ShowValue( &s_vrcontrols.weaponpitch, SLIDER_VALUE_SIGNED, 1, 1, -25 );
+#endif
 
-	// The slider bar runs from x + SMALLCHAR_WIDTH for 96 pixels, so the row is free from x + 104 on.
-	s_vrcontrols.weaponpitchvalue.generic.type		= MTYPE_TEXT;
-	s_vrcontrols.weaponpitchvalue.generic.flags		= QMF_LEFT_JUSTIFY|QMF_INACTIVE;
-	s_vrcontrols.weaponpitchvalue.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 104;
-	s_vrcontrols.weaponpitchvalue.generic.y			= y;
-	s_vrcontrols.weaponpitchvalue.string			= s_vrcontrols_pitchLabel;
-	s_vrcontrols.weaponpitchvalue.color				= text_color_normal;
-	s_vrcontrols.weaponpitchvalue.style				= UI_LEFT|UI_SMALLFONT;
-
-	// 128x64 art at half size, so it fits inside the row.
+	// 128x64 art scaled to fit beside the value without crowding the next rows.
 	s_vrcontrols.weaponpitchreset.generic.type		= MTYPE_BITMAP;
 	s_vrcontrols.weaponpitchreset.generic.name		= ART_RESET0;
 	s_vrcontrols.weaponpitchreset.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_vrcontrols.weaponpitchreset.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 128;
-	s_vrcontrols.weaponpitchreset.generic.y			= y - 8;
+	s_vrcontrols.weaponpitchreset.generic.x			= VR_X_POS + SMALLCHAR_WIDTH + 140;
+	s_vrcontrols.weaponpitchreset.generic.y			= y - 2;
 	s_vrcontrols.weaponpitchreset.generic.id		= ID_WEAPONPITCHRESET;
 	s_vrcontrols.weaponpitchreset.generic.callback	= VRControls_MenuEvent;
-	s_vrcontrols.weaponpitchreset.width				= 64;
-	s_vrcontrols.weaponpitchreset.height			= 32;
+	s_vrcontrols.weaponpitchreset.width				= 40;
+	s_vrcontrols.weaponpitchreset.height			= 20;
 	s_vrcontrols.weaponpitchreset.focuspic			= ART_RESET1;
 
 	y += BIGCHAR_HEIGHT+2;
@@ -462,8 +463,6 @@ static void VRControls_MenuInit( void ) {
 	s_vrcontrols.sendroll.generic.x			= VR_X_POS;
 	s_vrcontrols.sendroll.generic.y			= y;
 
-	s_vrcontrols_hintY = y + BIGCHAR_HEIGHT + 2;
-
 	s_vrcontrols.back.generic.type		= MTYPE_BITMAP;
 	s_vrcontrols.back.generic.name		= ART_BACK0;
 	s_vrcontrols.back.generic.flags		= QMF_LEFT_JUSTIFY|QMF_PULSEIFFOCUS;
@@ -484,11 +483,12 @@ static void VRControls_MenuInit( void ) {
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.directionmode );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.snapturn );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.sensitivity );
+	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.sensitivityreset );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.righthanded );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.switchthumbsticks );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.triggersensitivity );
+	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.triggerreset );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponpitch );
-	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponpitchvalue );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponpitchreset );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.weaponselectormode );
 	Menu_AddItem( &s_vrcontrols.menu, &s_vrcontrols.wheelgauntlet );

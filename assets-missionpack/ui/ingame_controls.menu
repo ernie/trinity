@@ -968,6 +968,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Sensitivity:"
 		cvarfloat "sensitivity" 5 1 30
+		sliderValue SLIDER_VALUE_DEC1 0.1
 		rect 0 135 320 15
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 187

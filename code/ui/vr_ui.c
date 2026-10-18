@@ -266,6 +266,10 @@ static qboolean UI_VR_StepSlider( int key ) {
 	}
 	editDef = (editFieldDef_t *)item->typeData;
 	value = trap_Cvar_VariableValue( item->cvar );
+#ifdef TRINITY_SLIDER_VALUE
+	value += ( key == K_RIGHTARROW || key == K_KP_RIGHTARROW ? 1 : -1 ) * Item_Slider_KeyStep( item, ( editDef->maxVal - editDef->minVal ) / 40.0f );
+	Item_Slider_Write( item, value );
+#else
 	value += ( key == K_RIGHTARROW || key == K_KP_RIGHTARROW ? 1 : -1 ) * ( editDef->maxVal - editDef->minVal ) / 40.0f;
 	if ( value < editDef->minVal ) {
 		value = editDef->minVal;
@@ -273,6 +277,7 @@ static qboolean UI_VR_StepSlider( int key ) {
 		value = editDef->maxVal;
 	}
 	trap_Cvar_Set( item->cvar, va( "%f", value ) );
+#endif
 	return qtrue;
 }
 
@@ -753,18 +758,6 @@ static qboolean UI_FoveationStrength_HandleKey(int flags, float *special, int ke
 	return qfalse;
 }
 
-// Only the player's own tilt: the engine applies the grip-to-aim correction itself, so zero reads as none.
-static const char *UI_WeaponPitchText(void) {
-	int offset = (int)trap_Cvar_VariableValue("vr_weaponPitch");
-
-	// Kept terse: this sits in the narrow strip beside the slider bar
-	return va("%s%i", offset > 0 ? "+" : "", offset);
-}
-
-static void UI_DrawWeaponPitch(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
-	uiInfo.uiDC.drawText(rect->x, rect->y, scale, color, UI_WeaponPitchText(), 0, 0, textStyle);
-}
-
 // vr_superSampling as a 1.0..2.0 slider in tenths, with the eye size each step renders at beside it.
 static rectDef_t uiSuperSamplingBar;   // the bar's window from its last paint, so a click can land on it
 static int uiEyeSize[4];               // recommended w h, maximum w h; zeros outside VR
@@ -794,13 +787,16 @@ static int UI_SuperSampling_TenthsAt(float cursorx) {
 	return VRSS_MIN_TENTHS + (int)(t * (VRSS_MAX_TENTHS - VRSS_MIN_TENTHS) + 0.5f);
 }
 
-static void UI_DrawSuperSampling(rectDef_t *rect, float span, float scale, vec4_t color, int textStyle) {
+static void UI_DrawSuperSampling(rectDef_t *rect, float scale, vec4_t color, int textStyle) {
 	int tenths = VRSS_Tenths(trap_Cvar_VariableValue("vr_superSampling"));
-	// rect->y is the row's text baseline; the bar sits on it like the stock slider sits in its row
-	const float top = rect->y - SLIDER_HEIGHT, gap = 4, bar = SLIDER_WIDTH;
-	const int textHeight = uiInfo.uiDC.textHeight("0", scale, 0);
-	float cx, y;
+	// rect->y is the row's text baseline; the bar centers on the text as in Item_Slider_BarY
+	const float top = rect->y - uiInfo.uiDC.textHeight("0", scale, 0) / 2.0f - SLIDER_HEIGHT / 2, gap = 4, bar = SLIDER_WIDTH;
 	char mult[8], res[24];
+#ifdef TRINITY_SLIDER_VALUE
+	const float valueScale = scale * SLIDER_VALUE_SCALE;
+#else
+	const float valueScale = scale;
+#endif
 
 	if (uiSuperSamplingDrag) {
 		if (!trap_Key_IsDown(K_MOUSE1)) {
@@ -813,9 +809,6 @@ static void UI_DrawSuperSampling(rectDef_t *rect, float span, float scale, vec4_
 	UI_ReadEyeSize();
 	VRSS_Multiplier(tenths, mult, sizeof(mult));
 	VRSS_Resolution(tenths, uiEyeSize[0], uiEyeSize[1], uiEyeSize[2], uiEyeSize[3], res, sizeof(res));
-	if (span <= bar + gap) {
-		span = bar + gap + bar;
-	}
 	uiSuperSamplingBar.x = rect->x;
 	uiSuperSamplingBar.y = top;
 	uiSuperSamplingBar.w = bar;
@@ -825,11 +818,7 @@ static void UI_DrawSuperSampling(rectDef_t *rect, float span, float scale, vec4_
 	UI_DrawHandlePic(rect->x + (tenths - VRSS_MIN_TENTHS) * bar / (VRSS_MAX_TENTHS - VRSS_MIN_TENTHS) - SLIDER_THUMB_WIDTH / 2,
 					 top - 2, SLIDER_THUMB_WIDTH, SLIDER_THUMB_HEIGHT, uiInfo.uiDC.Assets.sliderThumb);
 	trap_R_SetColor(NULL);
-	// two lines, each centered in what is left of the span, the pair centered on the bar
-	cx = rect->x + bar + gap + (span - bar - gap) / 2;
-	y = top + SLIDER_HEIGHT / 2 - (textHeight + 3) / 2.0f + textHeight / 2.0f;
-	uiInfo.uiDC.drawText(cx - uiInfo.uiDC.textWidth(mult, scale, 0) / 2, y, scale, color, mult, 0, 0, textStyle);
-	uiInfo.uiDC.drawText(cx - uiInfo.uiDC.textWidth(res, scale, 0) / 2, y + textHeight + 3, scale, color, res, 0, 0, textStyle);
+	uiInfo.uiDC.drawText(rect->x + bar + SLIDER_THUMB_WIDTH / 2 + gap, rect->y, valueScale, color, res[0] ? va("%s / %s", mult, res) : mult, 0, 0, textStyle);
 }
 
 static qboolean UI_SuperSampling_HandleKey(int flags, float *special, int key) {
@@ -1019,11 +1008,8 @@ void UI_VR_OwnerDraw( float x, float y, float w, float h, float text_x, float te
 	case UI_FOVEATION_STRENGTH:
 		UI_DrawFoveationStrength( &rect, scale, color, textStyle );
 		break;
-	case UI_WEAPONPITCH:
-		UI_DrawWeaponPitch( &rect, scale, color, textStyle );
-		break;
 	case UI_VRSUPERSAMPLING:
-		UI_DrawSuperSampling( &rect, special, scale, color, textStyle );
+		UI_DrawSuperSampling( &rect, scale, color, textStyle );
 		break;
 	case UI_VRBIND:
 		if ( (int)special >= 0 && (int)special < VRBM_ROW_COUNT ) {
@@ -1058,9 +1044,6 @@ qboolean UI_VR_OwnerDrawHandleKey( int ownerDraw, int flags, float *special, int
 }
 
 int UI_VR_OwnerDrawWidth( int ownerDraw, float scale ) {
-	if ( ownerDraw == UI_WEAPONPITCH ) {
-		return uiInfo.uiDC.textWidth( UI_WeaponPitchText(), scale, 0 );
-	}
 	return 0;
 }
 

@@ -51,6 +51,7 @@ itemDef {
 		type ITEM_TYPE_SLIDER
 		text "Crosshair Size:"
 		cvarfloat "cg_crosshairSize" 8 8 24
+		sliderValue SLIDER_VALUE_INT 1
 		rect 30 105 270 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128

@@ -558,6 +558,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Effects Volume:"
 		cvarfloat "s_volume" 0.7 0 1
+		sliderValue SLIDER_VALUE_PERCENT 0.01
 		rect 99 33 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
@@ -575,6 +576,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Music Volume:"
 		cvarfloat "s_musicvolume" 0.25 0 1
+		sliderValue SLIDER_VALUE_PERCENT 0.01
 		rect 99 58 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
@@ -628,6 +630,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
       		text "Threshold:"
       		cvarfloat "cl_voipVADThreshold" 0.1 0 1
+		sliderValue SLIDER_VALUE_PERCENT 0.01
 		rect 99 133 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
@@ -645,6 +648,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "VOIP Volume:"
 		cvarfloat "cl_voipVolume" 1 0 2
+		sliderValue SLIDER_VALUE_PERCENT 0.05
 		rect 99 158 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
@@ -660,6 +664,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Transmit Game Volume:"
 		cvarfloat "cl_voipGainDuringCapture" 1 0.2 1
+		sliderValue SLIDER_VALUE_PERCENT 0.05
 		rect 99 183 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
@@ -819,7 +824,7 @@ itemDef {
 	backcolor .37 .1 .1 1 
 	visible 1
 	action { play "sound/misc/kcaction.wav" ;
-	hide grpSystem ; show other ; show ctr_hdrcalib ; collapseHidden 28 230 }
+	hide grpSystem ; show other ; show ctr_hdrcalib ; collapseHidden 28 296 }
 	mouseEnter { show message_other ; setitemcolor ctr_other backcolor .1 .37 .1 1 } 
 	mouseExit { hide message_other ; setitemcolor ctr_other backcolor .37 .1 .1 1} 	
 	}
@@ -854,7 +859,7 @@ itemDef {
 itemDef {
 	name other
 	group grpSystem
-	rect 2 4 439 206
+	rect 2 4 439 226
 	style WINDOW_STYLE_FILLED
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -867,7 +872,7 @@ itemDef {
 itemDef {
 	name other
 	group grpSystem
-	rect 2 214 439 52
+	rect 2 234 439 52
 	style WINDOW_STYLE_FILLED
 	border 1
 	bordercolor .5 .5 .5 .5
@@ -916,6 +921,7 @@ itemDef {
       		type ITEM_TYPE_SLIDER
 		text "Brightness:"
 		cvarfloat "r_gamma" 1 0.5 2
+		sliderValue SLIDER_VALUE_PERCENT 0.1
 		rect 99 48 256 20
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
@@ -983,6 +989,7 @@ itemDef {
 		type ITEM_TYPE_SLIDER
 		text "Highlight Boost:"
 		cvarfloat "r_hdrHighlightBoost" 1 0.5 2
+		sliderValue SLIDER_VALUE_PERCENT 0.25
 		rect 99 128 256 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128

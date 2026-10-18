@@ -921,8 +921,7 @@ menu uses `UI_VRBIND` (269, one per row, the row index in the item's
 menus use `UI_REFRESHRATE` (265, cycles `vr_refreshrate` through the
 `vr_refreshrates` list), `UI_FOVEATION` and `UI_FOVEATION_STRENGTH`
 (266, 267, `vr_foveation` capped by `vr_foveationCaps`, and
-`vr_foveationStrength`), `UI_WEAPONPITCH` (268, the `vr_weaponPitch`
-value beside its slider) and `UI_VRSUPERSAMPLING` (271, `vr_superSampling`
+`vr_foveationStrength`) and `UI_VRSUPERSAMPLING` (271, `vr_superSampling`
 as a 1.0 to 2.0 slider in tenths with the eye size each step renders at,
 through `vr_supersample` and `vr_eyesize`). Your `ui/menudef.h` carries
 the IDs at these values (Appendix E), and your missionpack pak ships it:
@@ -1210,7 +1209,7 @@ four each frame. And
 `Menu_EditingItem` and `Menu_SetEditingItem` in `ui_shared.c`, which the
 drop's keyboard handling uses (Step 6), and `displayContextDef_t`'s `cursorx` / `cursory` become `float`
 for the same cursor-override reason. `ui/menudef.h` defines the VR owner-draw IDs
-(265 to 271, listed in Step 7), which the drop's `vr_ui.c` switches on.
+(265 to 267 and 269 to 271, listed in Step 7), which the drop's `vr_ui.c` switches on.
 
 If a symbol is still unresolved after `vr_host.h` is satisfied, it is a bug
 in the contract — report it; Step 2's failing build output is otherwise your

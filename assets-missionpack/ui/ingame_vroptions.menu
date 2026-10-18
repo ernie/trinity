@@ -8,7 +8,7 @@ menuDef {
 	visible 0
 	fullscreen 0
 	outOfBoundsClick			// this closes the window if it gets a click out of the rectangle
-	rect 225 30 386 375
+	rect 104 30 430 375
 	focusColor 1 .75 0 1
 	style 1
 	border 1
@@ -16,7 +16,7 @@ menuDef {
 
 itemDef {
 	name window
-	rect 10 15 376 360
+	rect 10 15 420 360
 	style 1
 	backcolor 0 .1 0 1
 	visible 1
@@ -35,7 +35,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 64 10 32 8
+	rect 64 10 64 8
 	style 3
 	background "ui/assets/ingametop.tga"
 	visible 1
@@ -43,7 +43,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 96 10 32 8
+	rect 128 10 64 8
 	style 3
 	background "ui/assets/ingametop.tga"
 	visible 1
@@ -51,7 +51,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 264 10 32 8
+	rect 192 10 64 8
 	style 3
 	background "ui/assets/ingametop.tga"
 	visible 1
@@ -59,7 +59,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 296 10 32 8
+	rect 256 10 64 8
 	style 3
 	background "ui/assets/ingametop.tga"
 	visible 1
@@ -67,7 +67,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 232 10 32 8
+	rect 313 10 64 8
 	style 3
 	background "ui/assets/ingametop.tga"
 	visible 1
@@ -75,7 +75,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 333 10 64 64
+	rect 377 10 64 64
 	style 3
 	background "ui/assets/ingamerightcorner.tga"
 	visible 1
@@ -83,7 +83,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 156 0 73 16
+	rect 178 0 73 16
 	style 3
 	background "ui/assets/ingameconnection.tga"
 	visible 1
@@ -99,7 +99,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 333 314 64 64
+	rect 377 314 64 64
 	style 3
 	background "ui/assets/ingamerightcornerb.tga"
 	visible 1
@@ -131,7 +131,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 381 64 16 84
+	rect 425 64 16 84
 	style 3
 	background "ui/assets/ingameright.tga"
 	visible 1
@@ -139,7 +139,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 381 148 16 84
+	rect 425 148 16 84
 	style 3
 	background "ui/assets/ingameright.tga"
 	visible 1
@@ -147,7 +147,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 381 232 16 84
+	rect 425 232 16 84
 	style 3
 	background "ui/assets/ingameright.tga"
 	visible 1
@@ -187,7 +187,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 320 370 64 8
+	rect 313 370 64 8
 	style 3
 	background "ui/assets/ingamebottom.tga"
 	visible 1
@@ -204,7 +204,7 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 26 26 62 20
+	rect 48 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
@@ -223,7 +223,7 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 97 26 62 20
+	rect 119 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
@@ -242,7 +242,7 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 168 26 62 20
+	rect 190 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
@@ -261,7 +261,7 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 239 26 62 20
+	rect 261 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
@@ -282,7 +282,7 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 310 26 62 20
+	rect 332 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
@@ -304,7 +304,7 @@ itemDef {
 	textscale .2
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 239 26 62 20
+	rect 261 26 62 20
 	textalign 1
 	textalignx 31
 	textaligny 15
@@ -326,7 +326,10 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Comfort Vignette:"
 	cvarfloat "vr_comfortVignette" 0.2 0 1
-	rect 28 50 340 18
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_PERCENT 0.01
+#endif
+	rect 50 50 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -340,7 +343,10 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Height Adjust:"
 	cvarfloat "vr_heightAdjust" 0.2 0 1
-	rect 28 68 340 18
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_PERCENT 0.01
+#endif
+	rect 50 68 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -354,7 +360,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "SP 6DoF Movement:"
 	cvar "vr_6dof"
-	rect 28 86 340 18
+	rect 50 86 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -370,7 +376,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Roll When Hit:"
 	cvar "vr_rollWhenHit"
-	rect 28 104 340 18
+	rect 50 104 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -384,7 +390,10 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Haptic Intensity:"
 	cvarfloat "vr_hapticIntensity" 1.0 0 1
-	rect 28 122 340 18
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_PERCENT 0.01
+#endif
+	rect 50 122 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -398,7 +407,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "bHaptics Support:"
 	cvar "vr_bhaptics"
-	rect 28 140 340 18
+	rect 50 140 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -410,7 +419,7 @@ itemDef {
 	name msg_sixdof
 	group grpVR
 	text "Physical head movement controls in-game movement (SP only)"
-	rect 28 340 352 18
+	rect 50 340 352 18
 	textalign ITEM_ALIGN_CENTER
 	textalignx 176
 	textaligny 14
@@ -428,7 +437,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Railgun Scope:"
 	cvar "vr_weaponScope"
-	rect 28 50 340 18
+	rect 50 50 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -443,7 +452,7 @@ itemDef {
 	text "Two-Handed Weapons:"
 	cvar "vr_twoHandedWeapons"
 	cvarFloatList { "Disabled" 0 "Enabled (Basic)" 1 "Enabled (VR Gun Stock)" 2 }
-	rect 28 68 340 18
+	rect 50 68 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -458,7 +467,7 @@ itemDef {
 	text "Direction Mode:"
 	cvar "vr_directionMode"
 	cvarFloatList { "HMD (Default)" 0 "Off-hand Controller" 1 }
-	rect 28 86 340 18
+	rect 50 86 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -473,7 +482,7 @@ itemDef {
 	text "Turning Mode:"
 	cvar "vr_snapturn"
 	cvarFloatList { "Smooth Turning" 0 "45 Degrees" 45 "90 Degrees" 90 }
-	rect 28 104 340 18
+	rect 50 104 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -487,7 +496,10 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Smooth turn speed:"
 	cvarfloat "vr_sensitivity" 100 50 150
-	rect 28 122 340 18
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_INT 1
+#endif
+	rect 50 122 326 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -500,10 +512,29 @@ itemDef {
 itemDef {
 	name controls
 	group grpVR
+	text "Reset"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	backcolor .37 .1 .1 1
+	rect 378 125 34 14
+	textalign ITEM_ALIGN_CENTER
+	textalignx 17
+	textaligny 11
+	textscale .18
+	forecolor 1 1 1 1
+	visible 0
+	cvarTest "vr_snapturn"
+	disableCvar { "45" ; "90" }
+	action { play "sound/misc/kcaction.wav" ; exec "reset vr_sensitivity" }
+	}
+itemDef {
+	name controls
+	group grpVR
 	type ITEM_TYPE_YESNO
 	text "Right-Handed:"
 	cvar "vr_righthanded"
-	rect 28 140 340 18
+	rect 50 140 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -517,7 +548,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Switch Thumbsticks:"
 	cvar "vr_switchThumbsticks"
-	rect 28 158 340 18
+	rect 50 158 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -531,40 +562,16 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Trigger Sensitivity:"
 	cvarfloat "vr_triggerSensitivity" 0.5 0.1 0.9
-	rect 28 176 340 18
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_DEC2 0.05
+#endif
+	rect 50 176 326 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 0
-	}
-itemDef {
-	name controls
-	group grpVR
-	type ITEM_TYPE_SLIDER
-	text "Weapon Pitch:"
-	cvarfloat "vr_weaponPitch" 0 -25 25
-	rect 28 194 294 18
-	textalign ITEM_ALIGN_RIGHT
-	textalignx 180
-	textaligny 14
-	textscale .25
-	forecolor 1 1 1 1
-	visible 0
-	}
-itemDef {
-	name controls
-	group grpVR
-	type ITEM_TYPE_OWNERDRAW
-	ownerdraw UI_WEAPONPITCH
-	rect 313 194 18 18
-	textalign ITEM_ALIGN_LEFT
-	textaligny 14
-	textscale .25
-	forecolor 1 .75 0 1
-	visible 0
-	decoration
 	}
 itemDef {
 	name controls
@@ -574,14 +581,48 @@ itemDef {
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
 	backcolor .37 .1 .1 1
-	rect 333 194 40 18
+	rect 378 179 34 14
 	textalign ITEM_ALIGN_CENTER
-	textalignx 18
-	textaligny 13
-	textscale .2
+	textalignx 17
+	textaligny 11
+	textscale .18
 	forecolor 1 1 1 1
 	visible 0
-	action { play "sound/misc/kcaction.wav" ; setcvar vr_weaponPitch 0 }
+	action { play "sound/misc/kcaction.wav" ; exec "reset vr_triggerSensitivity" }
+	}
+itemDef {
+	name controls
+	group grpVR
+	type ITEM_TYPE_SLIDER
+	text "Weapon Pitch:"
+	cvarfloat "vr_weaponPitch" 0 -25 25
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_SIGNED 1
+#endif
+	rect 50 194 294 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	}
+itemDef {
+	name controls
+	group grpVR
+	text "Reset"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	backcolor .37 .1 .1 1
+	rect 378 197 34 14
+	textalign ITEM_ALIGN_CENTER
+	textalignx 17
+	textaligny 11
+	textscale .18
+	forecolor 1 1 1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; exec "reset vr_weaponPitch" }
 	}
 itemDef {
 	name controls
@@ -590,7 +631,7 @@ itemDef {
 	text "Weapon Wheel Mode:"
 	cvar "vr_weaponSelectorMode"
 	cvarFloatList { "VR Style / Pointing" 0 "Classic / Thumbstick" 1 }
-	rect 28 212 340 18
+	rect 50 212 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -604,7 +645,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Gauntlet On Weapon Wheel:"
 	cvar "cg_weaponSelectorGauntlet"
-	rect 28 230 340 18
+	rect 50 230 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -618,7 +659,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Simple Items (Weapon Wheel):"
 	cvar "cg_weaponSelectorSimple2DIcons"
-	rect 28 248 340 18
+	rect 50 248 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -632,7 +673,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Autoswitch Weapons:"
 	cvar "cg_autoswitch"
-	rect 28 266 340 18
+	rect 50 266 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -646,7 +687,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Send Roll Angle:"
 	cvar "vr_sendRollToServer"
-	rect 28 284 340 18
+	rect 50 284 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -664,7 +705,7 @@ itemDef {
 	text "HUD Mode:"
 	cvar "vr_hudDrawStatus"
 	cvarFloatList { "Off" 0 "Floating" 1 "Fixed to View" 2 }
-	rect 28 50 340 18
+	rect 50 50 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -679,13 +720,33 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "HUD Depth:"
 	cvarfloat "vr_hudDepth" 1 0 5
-	rect 28 68 340 18
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_DEC1 0.1
+#endif
+	rect 50 68 326 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	text "Reset"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	backcolor .37 .1 .1 1
+	rect 378 71 34 14
+	textalign ITEM_ALIGN_CENTER
+	textalignx 17
+	textaligny 11
+	textscale .18
+	forecolor 1 1 1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; exec "reset vr_hudDepth" }
 	}
 itemDef {
 	name hud
@@ -693,7 +754,10 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "HUD Scale:"
 	cvarfloat "vr_hudScale" 1.0 0.5 2.0
-	rect 28 86 340 18
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_PERCENT 0.05
+#endif
+	rect 50 86 326 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -704,16 +768,53 @@ itemDef {
 itemDef {
 	name hud
 	group grpVR
+	text "Reset"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	backcolor .37 .1 .1 1
+	rect 378 89 34 14
+	textalign ITEM_ALIGN_CENTER
+	textalignx 17
+	textaligny 11
+	textscale .18
+	forecolor 1 1 1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; exec "reset vr_hudScale" }
+	}
+itemDef {
+	name hud
+	group grpVR
 	type ITEM_TYPE_SLIDER
 	text "HUD Vertical Position:"
 	cvarfloat "vr_hudYOffset" 0 -200 200
-	rect 28 104 340 18
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_SIGNED 1
+#endif
+	rect 50 104 326 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
 	textscale .25
 	forecolor 1 1 1 1
 	visible 0
+	}
+itemDef {
+	name hud
+	group grpVR
+	text "Reset"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	backcolor .37 .1 .1 1
+	rect 378 107 34 14
+	textalign ITEM_ALIGN_CENTER
+	textalignx 17
+	textaligny 11
+	textscale .18
+	forecolor 1 1 1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; exec "reset vr_hudYOffset" }
 	}
 itemDef {
 	name hud
@@ -722,7 +823,7 @@ itemDef {
 	text "Virtual screen mode:"
 	cvar "vr_virtualScreenMode"
 	cvarFloatList { "Fixed" 0 "Follow" 1 }
-	rect 28 122 340 18
+	rect 50 122 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -736,7 +837,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Virtual screen controllers:"
 	cvar "vr_controllerModels"
-	rect 28 140 340 18
+	rect 50 140 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -750,7 +851,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Draw HUD On Weapon Wheel:"
 	cvar "vr_weaponSelectorWithHud"
-	rect 28 158 340 18
+	rect 50 158 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -764,7 +865,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Show Item In Hand:"
 	cvar "vr_showItemInHand"
-	rect 28 176 340 18
+	rect 50 176 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -778,7 +879,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Show Console Messages:"
 	cvar "vr_showConsoleMessages"
-	rect 28 194 340 18
+	rect 50 194 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -792,7 +893,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Laser Sight:"
 	cvar "vr_lasersight"
-	rect 28 212 340 18
+	rect 50 212 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -806,8 +907,7 @@ itemDef {
 	type ITEM_TYPE_OWNERDRAW
 	text "Supersampling:"
 	ownerdraw UI_VRSUPERSAMPLING
-	special 169
-	rect 28 230 356 18
+	rect 50 230 356 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -821,7 +921,10 @@ itemDef {
 	type ITEM_TYPE_SLIDER
 	text "Screen Curvature:"
 	cvarfloat "vr_screenCurvature" 0 0 1
-	rect 28 248 340 18
+#ifdef TRINITY_SLIDER_VALUE
+	sliderValue SLIDER_VALUE_PERCENT 0.01
+#endif
+	rect 50 248 326 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -832,10 +935,27 @@ itemDef {
 itemDef {
 	name hud
 	group grpVR
+	text "Reset"
+	type 1
+	style WINDOW_STYLE_FILLED
+	background "ui/assets/button_back.tga"
+	backcolor .37 .1 .1 1
+	rect 378 251 34 14
+	textalign ITEM_ALIGN_CENTER
+	textalignx 17
+	textaligny 11
+	textscale .18
+	forecolor 1 1 1 1
+	visible 0
+	action { play "sound/misc/kcaction.wav" ; exec "reset vr_screenCurvature" }
+	}
+itemDef {
+	name hud
+	group grpVR
 	type ITEM_TYPE_OWNERDRAW
 	text "Refresh Rate:"
 	ownerdraw UI_REFRESHRATE
-	rect 28 266 340 18
+	rect 50 266 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -849,7 +969,7 @@ itemDef {
 	type ITEM_TYPE_OWNERDRAW
 	text "Foveated Rendering:"
 	ownerdraw UI_FOVEATION
-	rect 28 284 340 18
+	rect 50 284 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -865,7 +985,7 @@ itemDef {
 	type ITEM_TYPE_OWNERDRAW
 	text "Foveation Strength:"
 	ownerdraw UI_FOVEATION_STRENGTH
-	rect 28 302 340 18
+	rect 50 302 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -883,7 +1003,7 @@ itemDef {
 	textscale .25
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 159 326 100 20
+	rect 181 326 100 20
 	textalign 1
 	textalignx 50
 	textaligny 15
@@ -904,7 +1024,7 @@ itemDef {
 	text "Mode:"
 	cvar "ui_vrDesktopMode"
 	cvarFloatList { "Off" 0 "Windowed" 1 "Fullscreen" 2 }
-	rect 28 50 340 18
+	rect 50 50 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -916,7 +1036,7 @@ itemDef {
 	name mirror
 	group grpVR
 	text "Window Resolution:"
-	rect 28 68 180 18
+	rect 50 68 180 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -930,7 +1050,7 @@ itemDef {
 	group grpVR
 	type ITEM_TYPE_TEXT
 	cvar "ui_vrDesktopResLabel"
-	rect 213 68 170 18
+	rect 235 68 170 18
 	textalign ITEM_ALIGN_LEFT
 	textalignx 0
 	textaligny 14
@@ -948,7 +1068,7 @@ itemDef {
 	text "Content type:"
 	cvar "vr_desktopContentType"
 	cvarFloatList { "Left eye" 0 "Right eye" 1 "Both eyes" 2 }
-	rect 28 86 340 18
+	rect 50 86 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -963,7 +1083,7 @@ itemDef {
 	text "Content fit:"
 	cvar "vr_desktopContentFit"
 	cvarFloatList { "Fit / Contain" 0 "Fill / Crop" 1 }
-	rect 28 104 340 18
+	rect 50 104 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -978,7 +1098,7 @@ itemDef {
 	text "Menu style:"
 	cvar "vr_desktopMenuStyle"
 	cvarFloatList { "Desktop view" 0 "VR view" 1 }
-	rect 28 122 340 18
+	rect 50 122 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -994,7 +1114,7 @@ itemDef {
 	textscale .25
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 159 155 100 20
+	rect 181 155 100 20
 	textalign 1
 	textalignx 50
 	textaligny 15

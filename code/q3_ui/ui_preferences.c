@@ -517,6 +517,7 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.crosshairsize.generic.y			= y;
 	s_preferences.crosshairsize.minvalue			= 0.5f;
 	s_preferences.crosshairsize.maxvalue			= 1.5f;
+	Slider_ShowValue( &s_preferences.crosshairsize, SLIDER_VALUE_INT, 1 / 16.0f, 16, 0 );
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.crosshaircolor.generic.type		= MTYPE_SPINCONTROL;
