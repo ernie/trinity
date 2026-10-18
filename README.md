@@ -197,4 +197,5 @@ Trinity bundles HD asset improvements derived from **High Quality Quake 3 Team A
 ## Documentation
 
 - [Color schemes reference](docs/COLOR_SCHEMES.md) — chat `^N`, `color1`/`color2`, `cg_enemyColors`, the UI slider, and how they all map to each other
-- [VR protocol](docs/VR_PROTOCOL.md) — how VR head tracking is networked
+- [VR integration guide](https://github.com/ernie/quake3-vr-mod-template/blob/v1.0/docs/VR_INTEGRATION.md): adding the Trinity VR API to another mod, with a worked example in the same repo
+- [VR protocol](https://github.com/ernie/quake3-vr-mod-template/blob/v1.0/docs/VR_PROTOCOL.md): how VR head tracking is networked
