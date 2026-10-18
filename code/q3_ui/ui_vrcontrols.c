@@ -215,7 +215,7 @@ static void VRControls_MenuInit( void ) {
 
 	static const char *s_directionmode[] =
 			{
-					"HMD (Default)",
+					"HMD",
 					"Off-hand Controller",
 					NULL
 			};
