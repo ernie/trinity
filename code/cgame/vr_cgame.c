@@ -956,6 +956,12 @@ qboolean CG_VR_OffsetView( void ) {
 
 	if ((CG_VR_IsDeathCam() && !vr->first_person_following) || (cg.demoPlayback && !vr->first_person_following) || CG_VR_IsThirdPersonFollow(VRFM_QUERY))
 	{
+		// a dead player's viewangles hold the corpse still, so the 6DoF head view comes from the engine
+		if ( vr->use_6dof && CG_VR_IsDeathCam() ) {
+			VectorCopy( vr->clientviewangles, cg.refdefViewAngles );
+			cg.refdefViewAngles[YAW] += CG_VR_DeltaYaw();
+		}
+
 		//If dead, or spectating, view the map from above
 		CG_OffsetVRThirdPersonView();
 	}

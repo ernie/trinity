@@ -10,22 +10,6 @@ extern vr_shared_t *vr;
 
 /*
 ============
-BG_VR_DeadViewLocked
-
-The stock "dead players get no view changes" gate with the VR exception:
-VR players keep looking around while dead.
-============
-*/
-qboolean BG_VR_DeadViewLocked( const playerState_t *ps ) {
-	if ( ps->pm_type != PM_SPECTATOR && ps->stats[STAT_HEALTH] <= 0
-			&& !( ps->eFlags & EF_VR_PLAYER ) ) {
-		return qtrue;
-	}
-	return qfalse;
-}
-
-/*
-============
 BG_VR_UpdateViewAngles
 
 6DOF: the engine feeds absolute HMD-relative angles, so only YAW keeps the

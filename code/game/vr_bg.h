@@ -17,7 +17,6 @@ typedef struct {
 	float	yawOffset;
 } vrHeadOrient_t;
 
-qboolean BG_VR_DeadViewLocked( const playerState_t *ps );
 qboolean BG_VR_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd );
 float BG_VR_PmoveFriction( const playerState_t *ps, float stockFriction );
 float BG_VR_PmoveAccelerate( const playerState_t *ps, float stockAccelerate );
