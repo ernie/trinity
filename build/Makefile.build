@@ -47,15 +47,19 @@ endif
 FORCE:
 .PHONY: FORCE
 
-$(DISTDIR)/$(PK3): $(STAGING)/vm/qagame.qvm $(STAGING)/vm/cgame.qvm $(STAGING)/vm/ui.qvm $(ASSETS_FORCE)
+$(DISTDIR)/$(PK3): $(STAGING)/vm/qagame.qvm $(STAGING)/vm/cgame.qvm $(STAGING)/vm/ui.qvm $(STAGING)/vm/qagame.jts $(STAGING)/vm/cgame.jts $(STAGING)/vm/ui.jts $(ASSETS_FORCE)
 	echo $(VERSION) > $(STAGING)/trinity.ver
 	rm -f $(DISTDIR)/$(PK3)
-	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm trinity.ver
+	cd $(STAGING) && $(7Z) ../$(DISTDIR)/$(PK3) vm/*.qvm vm/*.jts trinity.ver
 	cd ../assets && $(7Z) ../build/$(DISTDIR)/$(PK3) *
 	if [ -n "$$(ls -A ../assets-$(CONFIG) 2>/dev/null)" ]; then cd ../assets-$(CONFIG) && $(7Z) ../build/$(DISTDIR)/$(PK3) *; fi
 
 $(STAGING)/vm/%.qvm: $(BD)/%.qvm
 	cp $< $@
+
+# q3asm writes the .jts beside the .qvm
+$(STAGING)/vm/%.jts: $(BD)/%.qvm
+	cp $(BD)/$*.jts $@
 
 cc = cd $(BD)/$1 && $(Q3LCC) $2 $(VERSION_DEF) -o $(notdir $@).tmp ../../$< && mv $(notdir $@).tmp $(notdir $@)
 qa_cc = $(call cc,game,$(QA_CFLAGS))
