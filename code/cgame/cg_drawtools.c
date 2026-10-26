@@ -5,34 +5,6 @@
 
 /*
 ================
-CG_GetViewable4x3Dimensions
-
-Calculate the maximum 4:3 area that fits within the framebuffer.
-For ultra-wide headsets (e.g., Pimax 8KX with ~2:1 ratio), we may be height-limited
-rather than width-limited.
-================
-*/
-void CG_GetViewable4x3Dimensions(float *outWidth, float *outHeight)
-{
-	float fbWidth = cgs.glconfig.vidWidth;
-	float fbHeight = cgs.glconfig.vidHeight;
-
-	float heightFromWidth = fbWidth * 0.75f;  // 4:3 height if we use full width
-	float widthFromHeight = fbHeight * (4.0f / 3.0f); // 4:3 width if we use full height
-
-	if (heightFromWidth <= fbHeight) {
-		// Normal case: width-limited, full width fits with 4:3 height
-		*outWidth = fbWidth;
-		*outHeight = heightFromWidth;
-	} else {
-		// Ultra-wide case: height-limited, constrain width to fit 4:3
-		*outHeight = fbHeight;
-		*outWidth = widthFromHeight;
-	}
-}
-
-/*
-================
 CG_AdjustFrom640
 
 Adjusted for resolution and screen aspect ratio
@@ -40,9 +12,6 @@ Adjusted for resolution and screen aspect ratio
 */
 void CG_AdjustFrom640( float *x, float *y, float *w, float *h )
 {
-	if ( CG_VR_AdjustFrom640( x, y, w, h ) ) {
-		return;
-	}
 	// scale for screen sizes
 	*x = *x * cgs.screenXScale + cgs.screenXBias;
 	*y = *y * cgs.screenYScale + cgs.screenYBias;
@@ -51,24 +20,17 @@ void CG_AdjustFrom640( float *x, float *y, float *w, float *h )
 }
 
 static float pushedXmin, pushedXmax, pushedYmin, pushedYmax;
-static float pushedXBias, pushedYBias;
 static qboolean anchorsPushed = qfalse;
 
-// While drawing into the VR HUD panel, trinity's widescreen anchors must
-// describe the panel's own box: 640x480 author space. When the HUD is
-// zoomed, CG_AdjustFrom640's zoomed branch already remaps that authored
-// Y range onto the 640 square, so the anchors themselves stay at 480 --
-// pushing Ymax to 640 here would double-extend the remap and draw
-// bottom-anchored elements too low.
+// While drawing into a VR HUD target, trinity's widescreen anchors must
+// describe the target's own box: 640x480 author space.
 void CG_PushHUDAnchors( void ) {
 	if ( anchorsPushed )
 		return;
 	pushedXmin = cgs.screenXmin;   pushedXmax = cgs.screenXmax;
 	pushedYmin = cgs.screenYmin;   pushedYmax = cgs.screenYmax;
-	pushedXBias = cgs.screenXBias; pushedYBias = cgs.screenYBias;
 	cgs.screenXmin = 0;   cgs.screenXmax = 640;
 	cgs.screenYmin = 0;   cgs.screenYmax = 480;
-	cgs.screenXBias = 0;  cgs.screenYBias = 0;
 	anchorsPushed = qtrue;
 }
 
@@ -77,7 +39,6 @@ void CG_PopHUDAnchors( void ) {
 		return;
 	cgs.screenXmin = pushedXmin;   cgs.screenXmax = pushedXmax;
 	cgs.screenYmin = pushedYmin;   cgs.screenYmax = pushedYmax;
-	cgs.screenXBias = pushedXBias; cgs.screenYBias = pushedYBias;
 	anchorsPushed = qfalse;
 }
 

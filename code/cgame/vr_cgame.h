@@ -88,10 +88,11 @@ qboolean CG_VR_OwnsHiddenGunMuzzle( void );
 qboolean CG_VR_SuppressDeadScoreboard( void );
 qboolean CG_VR_OwnsHoldableIcon( void );
 
-// cg_drawtools.c CG_AdjustFrom640 keystone: the entire vrActive scaling body,
-// moved verbatim. qtrue: *x/*y/*w/*h scaled for VR, caller returns; qfalse:
-// caller runs the stock flatscreen scale.
-qboolean CG_VR_AdjustFrom640( float *x, float *y, float *w, float *h );
+// cg_main.c 2D scaling, called at the end of the host's setup: in VR it writes
+// the centered uniform letterbox of 640x480 into the frame and returns qtrue,
+// and the host sets each of its other scale fields to *scale. Flatscreen
+// returns qfalse and keeps the host's values.
+qboolean CG_VR_HostScale( float *scale, float *xBias, float *yBias );
 
 // cg_draw.c CG_ScanForCrosshairEntity aim ray: qtrue when the VR weapon-axis
 // ray was written to start/end; qfalse: caller runs the stock view ray.
@@ -119,7 +120,6 @@ void CG_VR_CvarSet( const char *name, float value );
 // inside vr_cgame.c; hosts read and re-arm it only through these).
 void CG_VR_DeathCamReset( void );          // local player (re)spawn / new gamestate
 void CG_VR_PortraitReset( void );          // timeline jump without a teleport (demo seek)
-qboolean CG_VR_DrawingZoomedHUD( void );   // inside the zoom minimal-HUD pass
 qhandle_t CG_VR_ReticleShader( void );     // zoom scope mask, 0 until media loads
 qboolean CG_VR_ClientIsVR( int clientNum ); // server-flagged VR player (vr\ configstring field)
 

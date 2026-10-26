@@ -168,6 +168,7 @@ void UI_VideoCheck( int time )
 				scale = uis.glconfig.vidWidth * (1.0/640.0);
 				uis.biasY = 0.5 * ( uis.glconfig.vidHeight - ( uis.glconfig.vidWidth * (480.0/640) ) );
 			}
+			UI_VR_HostScale( &scale, &uis.bias, &uis.biasY );
 			uis.xscale = scale;
 			uis.yscale = scale;
 

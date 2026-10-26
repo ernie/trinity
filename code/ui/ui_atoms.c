@@ -398,19 +398,6 @@ Adjusted for resolution and screen aspect ratio
 ================
 */
 void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
-	if ( UI_VR_AdjustFrom640( x, y, w, h ) ) {
-		return;
-	}
-
-	if ( vrActive && vr->sp_intermission_active ) {
-		// SP intermission: drawing to the HUD buffer (1280x960), 2x scale, no offset
-		*x = *x * 2.0f;
-		*y = *y * 2.0f;
-		*w *= 2.0f;
-		*h *= 2.0f;
-		return;
-	}
-
 	// expect valid pointers
 	*x = *x * uiInfo.uiDC.scale + uiInfo.uiDC.biasX;
 	*y = *y * uiInfo.uiDC.scale + uiInfo.uiDC.biasY;

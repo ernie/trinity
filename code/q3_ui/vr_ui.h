@@ -27,8 +27,10 @@ void UI_VR_KeyHandled( int key );
 qboolean UI_VR_CursorOverride( float *x, float *y );
 qboolean UI_VR_HideCursor( void );
 void UI_VR_OnMenuMove( void );
-void UI_VR_UpdateScale( void );
 void UI_VR_FillScreen( qhandle_t shader );
+// Called at the end of the host's 2D scaling setup; qtrue in VR, where the host
+// sets its other scale fields to *scale. Flatscreen keeps the host's values.
+qboolean UI_VR_HostScale( float *scale, float *xBias, float *yBias );
 void UI_VR_CompensateModelFov( refdef_t *rd, float desiredFovX, float desiredFovY );
 
 qboolean UI_VR_CanSwitchMode(void);

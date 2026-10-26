@@ -29,6 +29,11 @@ qboolean UI_VR_HideCursor( void );
 void UI_VR_OnMenuMove( void );
 void UI_VR_KeyHandled( int key );
 void UI_VR_FillScreen( qhandle_t shader );
+// Called at the end of the host's 2D scaling setup; qtrue in VR, where the host
+// sets its other scale fields to *scale. Flatscreen keeps the host's values.
+qboolean UI_VR_HostScale( float *scale, float *xBias, float *yBias );
+// UI_DrawCinematic hook: qtrue when it set the extents and drew the frame.
+qboolean UI_VR_DrawCinematic( int handle, float x, float y, float w, float h );
 void UI_VR_LoadMenus( void );
 qboolean UI_VR_RunMenuScript( const char *name );
 void UI_VR_OwnerDraw( float x, float y, float w, float h, float text_x, float text_y, int ownerDraw, int ownerDrawFlags, int align, float special, float scale, vec4_t color, qhandle_t shader, int textStyle );

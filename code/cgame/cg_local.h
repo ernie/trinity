@@ -1483,9 +1483,6 @@ void CG_TVResumeFollowing( void );
 // cg_drawtools.c
 //
 void CG_AdjustFrom640( float *x, float *y, float *w, float *h );
-void CG_GetViewable4x3Dimensions( float *outWidth, float *outHeight );
-void CG_GetProjectionCenter( float *outX, float *outY );
-float CG_GetCombinedFovScale( void );
 void CG_PushHUDAnchors( void );
 void CG_PopHUDAnchors( void );
 void CG_FillRect( float x, float y, float width, float height, const float *color );

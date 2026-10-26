@@ -35,10 +35,6 @@ static qboolean bindCaptureAvailable;
 // The engine's first VR key code; engines number their keys differently.
 static int vrKeyFirst;
 
-// The host's own transform, kept for the frames VR draws without the virtual screen or the HUD buffer.
-static float hostXscale, hostYscale, hostBias, hostBiasY;
-static qboolean hostScaleSaved;
-
 int UI_VR_KeyIndex( int key ) {
 	return bindCaptureAvailable && key >= vrKeyFirst && key < vrKeyFirst + VRBM_KEYS ? key - vrKeyFirst : -1;
 }
@@ -170,7 +166,6 @@ void UI_VR_Init( void ) {
 	vrActive = qfalse;
 	VRG_SetIO( &uiVRGlyphIO );
 	bindCaptureAvailable = qfalse;
-	hostScaleSaved = qfalse;
 	memset( &vr_state, 0, sizeof( vr_state ) );
 
 	// keep the sentinel referenced so the toolchain retains it in the image
@@ -286,119 +281,6 @@ void UI_VR_OnMenuMove( void ) {
 
 /*
 ================
-UI_GetProjectionCenterYOffset
-
-Returns the Y offset (in virtual 480 coordinates) of the optical center
-from the geometric center (240). VR headsets have asymmetric FOV, shifting
-the optical center upward.
-================
-*/
-static float UI_GetProjectionCenterYOffset( void )
-{
-	float tanUp;
-	float tanDown;
-	float tanHeight;
-
-	tanUp = tan( vr->fov_angle_up );
-	tanDown = tan( vr->fov_angle_down );
-	tanHeight = tanUp - tanDown;
-
-	if ( fabs( tanHeight ) > 0.001f ) {
-		float m9 = ( tanUp + tanDown ) / tanHeight;
-		// Projection center Y in virtual 480 coords = 240 * (1 + m9)
-		// Offset from geometric center = 240 * m9
-		return 240.0f * m9;
-	}
-
-	return 0.0f;
-}
-
-/*
-================
-UI_GetViewable4x3Dimensions
-
-Calculate the maximum 4:3 area that fits within the framebuffer.
-For ultra-wide headsets (e.g., Pimax 8KX with ~2:1 ratio), we may be
-height-limited rather than width-limited.
-================
-*/
-static void UI_GetViewable4x3Dimensions( float *outWidth, float *outHeight )
-{
-	float fbWidth = uis.glconfig.vidWidth;
-	float fbHeight = uis.glconfig.vidHeight;
-	float heightFromWidth = fbWidth * 0.75f;			// 4:3 height if we use full width
-	float widthFromHeight = fbHeight * ( 4.0f / 3.0f );	// 4:3 width if we use full height
-
-	if ( heightFromWidth <= fbHeight ) {
-		// Normal case: width-limited, full width fits with 4:3 height
-		*outWidth = fbWidth;
-		*outHeight = heightFromWidth;
-	} else {
-		// Ultra-wide case: height-limited, constrain width to fit 4:3
-		*outHeight = fbHeight;
-		*outWidth = widthFromHeight;
-	}
-}
-
-/*
-================
-UI_VR_UpdateScale
-
-Sets uis.xscale/yscale/bias/biasY each frame in VR, so the UI_AdjustFrom640
-draws and the text painters that apply those fields themselves share one
-transform: the centered 4:3 viewable box with the optical-center Y offset.
-A flatscreen engine keeps the host's values untouched.
-================
-*/
-void UI_VR_UpdateScale( void )
-{
-	float vw;
-	float vh;
-	float scale;
-	float safeHeight;
-
-	if ( !vrActive ) {
-		return;
-	}
-	if ( !hostScaleSaved ) {
-		hostXscale = uis.xscale;
-		hostYscale = uis.yscale;
-		hostBias = uis.bias;
-		hostBiasY = uis.biasY;
-		hostScaleSaved = qtrue;
-	}
-
-	if ( vr->sp_intermission_active ) {
-		// SP intermission draws to the 1280x960 HUD buffer, even while the console has the virtual screen
-		uis.xscale = 2.0f;
-		uis.yscale = 2.0f;
-		uis.bias = 0.0f;
-		uis.biasY = 0.0f;
-	} else if ( vr->virtual_screen ) {
-		// the 4:3 box scales uniformly (vw/640 == vh/480); bias and biasY center it
-		UI_GetViewable4x3Dimensions( &vw, &vh );
-		scale = vw / 640.0f;
-		uis.bias = ( uis.glconfig.vidWidth - vw ) / 2.0f;
-		uis.biasY = ( uis.glconfig.vidHeight - vh ) / 2.0f + UI_GetProjectionCenterYOffset() * scale;
-
-		// VRFM_FIRSTPERSON renders the full framebuffer but shows its centered 4:3 part
-		if ( vr->first_person_following ) {
-			safeHeight = ( uis.glconfig.vidWidth * 3.0f ) / 4.0f;
-			scale = safeHeight / 480.0f;
-			uis.biasY = ( uis.glconfig.vidHeight - safeHeight ) / 2.0f + UI_GetProjectionCenterYOffset() * scale;
-		}
-		uis.xscale = scale;
-		uis.yscale = scale;
-	} else {
-		uis.xscale = hostXscale;
-		uis.yscale = hostYscale;
-		uis.bias = hostBias;
-		uis.biasY = hostBiasY;
-	}
-}
-
-/*
-================
 UI_VR_FillScreen
 
 Whole-framebuffer fill for full-bleed screens (connect/loading).
@@ -410,6 +292,31 @@ pillarboxes wide windows; this fill would paint the bars).
 */
 void UI_VR_FillScreen( qhandle_t shader ) {
 	trap_R_DrawStretchPic( 0, 0, uis.glconfig.vidWidth, uis.glconfig.vidHeight, 0, 0, 1, 1, shader );
+}
+
+/*
+================
+UI_VR_HostScale
+
+VR 2D letterboxes 640x480 into the frame's centered 4:3 box with one scale
+for both axes: the box the engine places on the virtual screen and the HUD
+buffer.
+================
+*/
+qboolean UI_VR_HostScale( float *scale, float *xBias, float *yBias ) {
+	if ( !vrActive ) {
+		return qfalse;
+	}
+	if ( uis.glconfig.vidWidth * 480 > uis.glconfig.vidHeight * 640 ) {
+		*scale = uis.glconfig.vidHeight * ( 1.0f / 480.0f );
+		*xBias = 0.5f * ( uis.glconfig.vidWidth - uis.glconfig.vidHeight * ( 640.0f / 480.0f ) );
+		*yBias = 0.0f;
+	} else {
+		*scale = uis.glconfig.vidWidth * ( 1.0f / 640.0f );
+		*xBias = 0.0f;
+		*yBias = 0.5f * ( uis.glconfig.vidHeight - uis.glconfig.vidWidth * ( 480.0f / 640.0f ) );
+	}
+	return qtrue;
 }
 
 /*

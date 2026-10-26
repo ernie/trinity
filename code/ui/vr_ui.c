@@ -405,6 +405,50 @@ void UI_VR_FillScreen( qhandle_t shader ) {
 }
 
 /*
+================
+UI_VR_HostScale
+
+VR 2D letterboxes 640x480 into the frame's centered 4:3 box with one scale
+for both axes: the box the engine places on the virtual screen and the HUD
+buffer.
+================
+*/
+qboolean UI_VR_HostScale( float *scale, float *xBias, float *yBias ) {
+	const glconfig_t *gl = &uiInfo.uiDC.glconfig;
+
+	if ( !vrActive ) {
+		return qfalse;
+	}
+	if ( gl->vidWidth * 480 > gl->vidHeight * 640 ) {
+		*scale = gl->vidHeight * ( 1.0f / 480.0f );
+		*xBias = 0.5f * ( gl->vidWidth - gl->vidHeight * ( 640.0f / 480.0f ) );
+		*yBias = 0.0f;
+	} else {
+		*scale = gl->vidWidth * ( 1.0f / 640.0f );
+		*xBias = 0.0f;
+		*yBias = 0.5f * ( gl->vidHeight - gl->vidWidth * ( 480.0f / 640.0f ) );
+	}
+	return qtrue;
+}
+
+/*
+================
+UI_VR_DrawCinematic
+
+On the virtual screen the engine maps 640x480 into the same 4:3 box the UI
+letterboxes into, so the extents go to the engine in 640 units.
+================
+*/
+qboolean UI_VR_DrawCinematic( int handle, float x, float y, float w, float h ) {
+	if ( !vrActive || !vr->virtual_screen ) {
+		return qfalse;
+	}
+	trap_CIN_SetExtents( handle, x, y, w, h );
+	trap_CIN_DrawCinematic( handle );
+	return qtrue;
+}
+
+/*
 ===============
 UI_VR_LoadMenus
 

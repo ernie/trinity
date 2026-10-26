@@ -2103,6 +2103,8 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 		cgs.screenXScale = cgs.screenYScale = cgs.glconfig.vidWidth * (1.0/640.0);
 		cgs.screenYBias = 0.5 * ( cgs.glconfig.vidHeight - ( cgs.glconfig.vidWidth * (480.0/640.0) ) );
 	}
+	CG_VR_HostScale( &cgs.screenXScale, &cgs.screenXBias, &cgs.screenYBias );
+	cgs.screenYScale = cgs.screenXScale;
 
 	cgs.screenXmin = 0.0 - (cgs.screenXBias / cgs.screenXScale);
 	cgs.screenXmax = 640.0 + (cgs.screenXBias / cgs.screenXScale);

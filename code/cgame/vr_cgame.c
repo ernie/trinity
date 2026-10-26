@@ -45,8 +45,6 @@ static int      vrc_weaponSelectorTime;      // wheel open timestamp, 0 closed
 static vec3_t   vrc_weaponSelectorAngles;
 static vec3_t   vrc_weaponSelectorOrigin;
 static vec3_t   vrc_weaponSelectorOffset;
-static qboolean vrc_drawingHUD;              // inside the HUD-buffer 2D pass
-static qboolean vrc_drawingZoomedHUD;        // inside the zoom minimal-HUD pass
 static float    vrc_portraitPitch;
 static float    vrc_portraitYaw;
 static qboolean vrc_portraitInitialized;
@@ -329,7 +327,7 @@ void CG_VR_RegisterMedia( void ) {
 			CG_RegisterWeapon( i );
 		}
 
-		vrc_reticleShader = trap_R_RegisterShader( "gfx/weapon/scope" );
+		vrc_reticleShader = trap_R_RegisterShaderNoMip( "gfx/weapon/scope" );
 
 		//HUD
 		vrc_hudShader = trap_R_RegisterShader( "sprites/vr/hud" );
@@ -367,11 +365,6 @@ void CG_VR_DeathCamReset( void ) {
 // teleport (a demo seek); a follow switch re-seeds on its own.
 void CG_VR_PortraitReset( void ) {
 	vrc_portraitInitialized = qfalse;
-}
-
-// qtrue while the zoom minimal-HUD pass is drawing (host layout reads).
-qboolean CG_VR_DrawingZoomedHUD( void ) {
-	return vrc_drawingZoomedHUD;
 }
 
 // The zoom scope mask shader; 0 until media registration (host zoom draw).
@@ -1028,13 +1021,13 @@ void CG_VR_ComputeWeaponAngles( void ) {
 
 		if (cg_debugWeaponAiming.integer)
 		{
-			byte colour[4];
-			colour[0] = 0xff;
-			colour[1] = 0x00;
-			colour[2] = 0x00;
-			colour[3] = 0x40;
+			byte color[4];
+			color[0] = 0xff;
+			color[1] = 0x00;
+			color[2] = 0x00;
+			color[3] = 0x40;
 
-			CG_LaserSight(weaponorigin, trace.endpos, colour, 1.0f);
+			CG_LaserSight(weaponorigin, trace.endpos, color, 1.0f);
 		}
 
 		if (cg.predictedPlayerState.pm_type == PM_SPECTATOR && (cg.snap->ps.pm_flags & PMF_FOLLOW))
@@ -1067,13 +1060,13 @@ void CG_VR_ComputeWeaponAngles( void ) {
 
 			if (cg_debugWeaponAiming.integer)
 			{
-				byte colour[4];
-				colour[0] = 0x00;
-				colour[1] = 0xff;
-				colour[2] = 0x00;
-				colour[3] = 0x40;
+				byte color[4];
+				color[0] = 0x00;
+				color[1] = 0xff;
+				color[2] = 0x00;
+				color[3] = 0x40;
 
-				CG_LaserSight(cg.refdef.vieworg, trace2.endpos, colour, 1.0f);
+				CG_LaserSight(cg.refdef.vieworg, trace2.endpos, color, 1.0f);
 			}
 
 			//convert to real-world angles - should be very close to real weapon angles
@@ -1102,7 +1095,7 @@ qboolean CG_VR_ViewAxis( void ) {
 			//If we are zoomed, then we use the refdefViewANgles (which are the weapon angles)
 			vec3_t angles;
 			VectorCopy(cg.refdefViewAngles, angles);
-			angles[ROLL] = vr->hmdorientation[ROLL];
+			angles[ROLL] = vr->weaponangles[ROLL];
 			AnglesToAxis( angles, cg.refdef.viewaxis );
 		}
 		else if ( (cg.demoPlayback && !vr->first_person_following) || CG_VR_IsThirdPersonFollow(VRFM_QUERY))
@@ -1132,7 +1125,7 @@ qboolean CG_VR_ViewAxis( void ) {
 	} else {
 		if (vr->weapon_zoomed) {
 			vec3_t angles;
-			angles[ROLL] = vr->hmdorientation[ROLL];
+			angles[ROLL] = vr->weaponangles[ROLL];
 			angles[PITCH] = vr->weaponangles[PITCH];
 			angles[YAW] = (cg.refdefViewAngles[YAW] - vr->hmdorientation[YAW]) + vr->weaponangles[YAW];
 			AnglesToAxis(angles, cg.refdef.viewaxis);
@@ -2089,12 +2082,12 @@ void CG_DrawWeaponSelector( void )
 
 		if (selectorMode == WS_CONTROLLER)
 		{
-			byte colour[4];
-			colour[0] = 0x00;
-			colour[1] = 0x00;
-			colour[2] = 0xff;
-			colour[3] = 0x40;
-			CG_LaserSight(beamOrigin, selectorOrigin, colour, 0.1f);
+			byte color[4];
+			color[0] = 0x00;
+			color[1] = 0x00;
+			color[2] = 0xff;
+			color[3] = 0x40;
+			CG_LaserSight(beamOrigin, selectorOrigin, color, 0.1f);
 		}
 	}
 
@@ -2350,7 +2343,7 @@ qboolean CG_VR_HideViewWeapon( void ) {
 qboolean CG_VR_WeaponHandPose( vec3_t origin, vec3_t angles, float *scale ) {
 	vec3_t		forward, end;
 	trace_t		trace;
-	byte		colour[4];
+	byte		color[4];
 	char		lasersightBuf[16];
 
 	if ( !vrActive ) {
@@ -2372,12 +2365,12 @@ qboolean CG_VR_WeaponHandPose( vec3_t origin, vec3_t angles, float *scale ) {
 		VectorMA(origin, 4096, forward, end);
 		VR_HostTraceRender(&trace, origin, NULL, NULL, end, cg.predictedPlayerState.clientNum, MASK_SOLID);
 
-		colour[0] = 0xff;
-		colour[1] = 0x00;
-		colour[2] = 0x00;
-		colour[3] = 0x40;
+		color[0] = 0xff;
+		color[1] = 0x00;
+		color[2] = 0x00;
+		color[3] = 0x40;
 
-		CG_LaserSight(origin, trace.endpos, colour, 1.0f);
+		CG_LaserSight(origin, trace.endpos, color, 1.0f);
 	}
 
 		//Scale / Move gun etc
@@ -2721,32 +2714,31 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 
 		if (vr->weapon_zoomed)
 		{
-			// Weapon zoomed: render minimal HUD with scaled coordinates
-			vrc_drawingHUD = qtrue;
-			vrc_drawingZoomedHUD = qtrue;
+			// Weapon zoomed: render minimal HUD; the engine scopes only off the virtual screen
+			qboolean scoped = !vr->virtual_screen;
 			VR_HostWarmupEvents();
 			CG_PushHUDAnchors();
+			if ( scoped ) {
+				trap_R_HUDBufferStart( qfalse );
+			}
 			CG_Draw2DMinimal( STEREO_CENTER );
+			if ( scoped ) {
+				trap_R_HUDBufferEnd();
+			}
 			CG_PopHUDAnchors();
-			vrc_drawingZoomedHUD = qfalse;
-			vrc_drawingHUD = qfalse;
 		}
 		else if (hudStatus == 2 && !vr->virtual_screen)
 		{
 			// HUD mode 2: render directly to main swapchain with stereo parallax
-			vrc_drawingHUD = qtrue;
 			trap_R_HUDBufferStart( qfalse );
 			CG_VR_DrawHUDContent( selectorHidesHud );
 			trap_R_HUDBufferEnd();
-			vrc_drawingHUD = qfalse;
 		}
 
 		if (!vr->weapon_zoomed && (!vr->virtual_screen || vr->first_person_following))
 		{
 			if (hudStatus != 0)
 			{
-				vrc_drawingHUD = qtrue;
-
 				if (hudStatus == 2 && vr->first_person_following)
 				{
 					// HUD mode 2 in first person following: direct-to-screen with stereo offset
@@ -2763,8 +2755,6 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 					CG_VR_DrawHUDContent( selectorHidesHud );
 					trap_R_HUDBufferEnd();
 				}
-
-				vrc_drawingHUD = qfalse;
 			}
 			else
 			{
@@ -2773,11 +2763,9 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 				trap_R_HUDBufferEnd();
 				// with no floating HUD the renderer overlays the buffer as in mode 2, as it does the notify lines
 				if ( vr->weapon_adjust ) {
-					vrc_drawingHUD = qtrue;
 					trap_R_HUDBufferStart( qfalse );
 					CG_WeaponAdjustDraw();
 					trap_R_HUDBufferEnd();
-					vrc_drawingHUD = qfalse;
 				}
 			}
 		}
@@ -3195,171 +3183,36 @@ static void CG_WeaponAdjustDraw( void ) {
 
 TRANSFORMS / QUERIES
 
-cg_drawtools.c's CG_AdjustFrom640 keystone (2D screen-space scaling), plus
-the crosshair aim ray, rail muzzle origin, chat paint offsets, portrait head
-angles, and standardized cvar accessors.
+cg_main.c's 2D scaling helper, plus the crosshair aim ray, rail muzzle
+origin, chat paint offsets, portrait head angles, and standardized cvar
+accessors.
 
 ==============================================================================
 */
 
 /*
 =================
-CG_VR_AdjustFrom640
+CG_VR_HostScale
 
-The entire vrActive body of CG_AdjustFrom640, moved verbatim (internal bare
-returns become return qtrue). The one sanctioned edit: `vr && vr->virtual_screen`
-drops the vestigial `vr &&` (A4-retired idiom; vr is never NULL).
+VR 2D letterboxes 640x480 into the frame's centered 4:3 box with one scale
+for both axes: the box the engine places on the virtual screen and the HUD
+targets.
 =================
 */
-qboolean CG_VR_AdjustFrom640( float *x, float *y, float *w, float *h )
-{
+qboolean CG_VR_HostScale( float *scale, float *xBias, float *yBias ) {
 	if ( !vrActive ) {
 		return qfalse;
 	}
-	{
-		char hudBuf[16];
-		int  hudDrawStatus;
-		float vrXScale = cgs.glconfig.vidWidth * (1.0/640.0);
-		float vrYScale = cgs.glconfig.vidHeight * (1.0/480.0);
-
-		trap_Cvar_VariableStringBuffer( "vr_currentHudDrawStatus", hudBuf, sizeof( hudBuf ) );
-		hudDrawStatus = (int)atof( hudBuf );
-
-		//If using floating HUD and we are drawing it, double coordinates since the HUD
-		//buffer is now 1280x960 instead of 640x480
-		if ( hudDrawStatus == 1 && vrc_drawingHUD && !vrc_drawingZoomedHUD)
-		{
-			*x *= 2.0f;
-			*y *= 2.0f;
-			*w *= 2.0f;
-			*h *= 2.0f;
-			return qtrue;
-		}
-
-		if (vrc_drawingZoomedHUD)
-		{
-			// Weapon zoomed HUD: scaled down and centered, similar to HUD mode 2
-			// Use 1:1 square layout (640x640) to push top/bottom elements away from center
-			float screenXScale = vrXScale / 2.25f;
-			float screenYScale = vrXScale / 2.25f;
-			float effectiveWidth = cg.refdef.width;
-			float effectiveHeight = cg.refdef.height;
-
-			// Remap Y from 480 range to 640 range (stretch vertically to fill square)
-			// This maps input y=0 to output y=0, and input y=480 to output y=640
-			*y = (*y / 480.0f) * 640.0f;
-
-			// Cyclopean scope renders to the geometric framebuffer center; HUD too.
-
-			*x *= screenXScale;
-			*y *= screenYScale;
-			*w *= screenXScale;
-			*h *= screenYScale;
-
-			*x += (effectiveWidth - (640 * screenXScale)) / 2.0f;
-			*y += (effectiveHeight - (640 * screenYScale)) / 2.0f;
-		}
-		else if (!vrc_drawingHUD)
-		{
-			float screenXScale = vrXScale;
-			float screenYScale = vrYScale;
-			float xOffset = 0.0f;
-			float yOffset = 0.0f;
-
-			// In virtual screen mode, scale to fit 4:3 aspect within the framebuffer
-			// For ultra-wide headsets, we may be height-limited rather than width-limited
-			// This ensures 2D elements are positioned correctly for the 4:3 crop
-			if (vr->virtual_screen) {
-				float viewableWidth, viewableHeight;
-				float projCenterY;
-				float opticalOffsetVirtual;
-				CG_GetViewable4x3Dimensions(&viewableWidth, &viewableHeight);
-				screenXScale = viewableWidth / 640.0f;
-				screenYScale = viewableHeight / 480.0f;
-
-				// Use optical center offset instead of geometric center to account for
-				// asymmetric FOV (VR headsets have more down-look than up-look)
-				CG_GetProjectionCenter(NULL, &projCenterY);
-				opticalOffsetVirtual = projCenterY - 240.0f;
-				xOffset = (cgs.glconfig.vidWidth - viewableWidth) / 2.0f;
-				yOffset = (cgs.glconfig.vidHeight - viewableHeight) / 2.0f + opticalOffsetVirtual * screenYScale;
-			}
-
-			*x *= screenXScale;
-			*x += xOffset;
-			*y *= screenYScale;
-			*y += yOffset;
-			*w *= screenXScale;
-			*h *= screenYScale;
-		}
-		else  // scale to clearly visible portion of VR screen
-		{
-			char  yOffBuf[16];
-			float hudYOffset;
-			float screenXScale, screenYScale;
-			float xOffset = 0.0f;
-			float yOffset = 0.0f;
-			float effectiveWidth = cg.refdef.width;
-			float effectiveHeight = cg.refdef.height;
-
-			if (vr->virtual_screen) {
-				screenXScale = vrXScale;
-				screenYScale = vrYScale;
-
-				// For VRFM_FIRSTPERSON gameplay, we're rendering to full framebuffer
-				// but only displaying the centered 4:3 portion, so adjust scale and offset
-				if (vr->first_person_following) {
-					// Calculate the 4:3 safe area
-					float safeWidth, safeHeight;
-					float projCenterY;
-					float opticalOffsetVirtual;
-					CG_GetViewable4x3Dimensions(&safeWidth, &safeHeight);
-
-					// Recalculate scale based on the visible 4:3 area, not full dimensions
-					screenXScale = safeWidth / 640.0f;
-					screenYScale = safeHeight / 480.0f;
-
-					// Use safe dimensions for centering calculation
-					effectiveWidth = safeWidth;
-					effectiveHeight = safeHeight;
-
-					// Use optical center offset instead of geometric center to account for
-					// asymmetric FOV (VR headsets have more down-look than up-look)
-					CG_GetProjectionCenter(NULL, &projCenterY);
-					opticalOffsetVirtual = projCenterY - 240.0f;
-					xOffset = (cgs.glconfig.vidWidth - safeWidth) / 2.0f;
-					yOffset = (cgs.glconfig.vidHeight - safeHeight) / 2.0f + opticalOffsetVirtual * screenYScale;
-				}
-			} else {
-				// HUD mode 2: scaled down for in-world display
-				float projCenterY;
-				float opticalOffset;
-				screenXScale = vrXScale / 2.25f;
-				screenYScale = (vrXScale / 2.25f);
-
-				// Apply optical centering for HUD mode 2 (asymmetric FOV compensation)
-				CG_GetProjectionCenter(NULL, &projCenterY);
-				opticalOffset = projCenterY - 240.0f;
-				yOffset = opticalOffset * screenYScale;
-			}
-
-			// vr_hudYOffset moves the HUD in the 3D views only; on the virtual screen the HUD is part of the screen
-			hudYOffset = 0.0f;
-			if (!vr->virtual_screen) {
-				trap_Cvar_VariableStringBuffer( "vr_hudYOffset", yOffBuf, sizeof( yOffBuf ) );
-				hudYOffset = atof( yOffBuf );
-			}
-
-			*x *= screenXScale;
-			*y *= screenYScale;
-			*w *= screenXScale;
-			*h *= screenYScale;
-
-			*x += (effectiveWidth - (640 * screenXScale)) / 2.0f + xOffset;
-			*y += (effectiveHeight - (480 * screenYScale)) / 2.0f - hudYOffset + yOffset;
-		}
-		return qtrue;
+	if ( cgs.glconfig.vidWidth * 480 > cgs.glconfig.vidHeight * 640 ) {
+		*scale = cgs.glconfig.vidHeight * ( 1.0f / 480.0f );
+		*xBias = 0.5f * ( cgs.glconfig.vidWidth - cgs.glconfig.vidHeight * ( 640.0f / 480.0f ) );
+		*yBias = 0.0f;
+	} else {
+		*scale = cgs.glconfig.vidWidth * ( 1.0f / 640.0f );
+		*xBias = 0.0f;
+		*yBias = 0.5f * ( cgs.glconfig.vidHeight - cgs.glconfig.vidWidth * ( 480.0f / 640.0f ) );
 	}
+	return qtrue;
 }
 
 /*
@@ -3913,7 +3766,6 @@ static void CG_VR_ResetState( void ) {
 	vrc_portraitInitialized = qfalse;
 	vrc_weaponSelectorSelection = 0;
 	vrc_weaponSelectorTime = 0;
-	vrc_drawingHUD = vrc_drawingZoomedHUD = qfalse;
 	vr_hmdYaw = 0;
 	CG_VR_FollowHeadViewReset();
 	weaponAdjustParam = weaponAdjustWeaponId = 0;

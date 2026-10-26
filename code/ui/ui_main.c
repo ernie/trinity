@@ -199,7 +199,7 @@ void _UI_MouseEvent( int dx, int dy );
 void _UI_Refresh( int realtime );
 qboolean _UI_IsFullscreen( void );
 void UI_VideoCheck( int time );
-static void UI_CIN_SetExtents( int handle, int x, int y, int w, int h );
+static void UI_DrawCinematic( int handle, float x, float y, float w, float h );
 DLLEXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11  ) {
   switch ( command ) {
 	  case UI_GETAPIVERSION:
@@ -1554,8 +1554,7 @@ static void UI_DrawClanCinematic(rectDef_t *rect, float scale, vec4_t color) {
 			}
 			if (uiInfo.teamList[i].cinematic >= 0) {
 			  trap_CIN_RunCinematic(uiInfo.teamList[i].cinematic);
-				UI_CIN_SetExtents(uiInfo.teamList[i].cinematic, rect->x, rect->y, rect->w, rect->h);
-	 			trap_CIN_DrawCinematic(uiInfo.teamList[i].cinematic);
+				UI_DrawCinematic(uiInfo.teamList[i].cinematic, rect->x, rect->y, rect->w, rect->h);
 			} else {
 			  	trap_R_SetColor( color );
 				UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon_Metal);
@@ -1576,8 +1575,7 @@ static void UI_DrawPreviewCinematic(rectDef_t *rect, float scale, vec4_t color) 
 		uiInfo.previewMovie = trap_CIN_PlayCinematic(va("%s.roq", uiInfo.movieList[uiInfo.movieIndex]), 0, 0, 0, 0, (CIN_loop | CIN_silent) );
 		if (uiInfo.previewMovie >= 0) {
 		  trap_CIN_RunCinematic(uiInfo.previewMovie);
-			UI_CIN_SetExtents(uiInfo.previewMovie, rect->x, rect->y, rect->w, rect->h);
- 			trap_CIN_DrawCinematic(uiInfo.previewMovie);
+			UI_DrawCinematic(uiInfo.previewMovie, rect->x, rect->y, rect->w, rect->h);
 		} else {
 			uiInfo.previewMovie = -2;
 		}
@@ -1814,8 +1812,7 @@ static void UI_DrawMapCinematic(rectDef_t *rect, float scale, vec4_t color, qboo
 		}
 		if (uiInfo.mapList[map].cinematic >= 0) {
 		  trap_CIN_RunCinematic(uiInfo.mapList[map].cinematic);
-		  UI_CIN_SetExtents(uiInfo.mapList[map].cinematic, rect->x, rect->y, rect->w, rect->h);
- 			trap_CIN_DrawCinematic(uiInfo.mapList[map].cinematic);
+		  UI_DrawCinematic(uiInfo.mapList[map].cinematic, rect->x, rect->y, rect->w, rect->h);
 		} else {
 			uiInfo.mapList[map].cinematic = -2;
 		}
@@ -1914,8 +1911,7 @@ static void UI_DrawNetMapCinematic(rectDef_t *rect, float scale, vec4_t color) {
 
 	if (uiInfo.serverStatus.currentServerCinematic >= 0) {
 	  trap_CIN_RunCinematic(uiInfo.serverStatus.currentServerCinematic);
-	  UI_CIN_SetExtents(uiInfo.serverStatus.currentServerCinematic, rect->x, rect->y, rect->w, rect->h);
- 	  trap_CIN_DrawCinematic(uiInfo.serverStatus.currentServerCinematic);
+	  UI_DrawCinematic(uiInfo.serverStatus.currentServerCinematic, rect->x, rect->y, rect->w, rect->h);
 	} else {
 		UI_DrawNetMapPreview(rect, scale, color);
 	}
@@ -6167,38 +6163,10 @@ static void UI_CIN_SetExtents(int handle, int x, int y, int w, int h) {
 }
 
 static void UI_DrawCinematic(int handle, float x, float y, float w, float h) {
-	if ( vrActive ) {
-		// The engine re-virtualizes CIN extents through its own 640->framebuffer
-		// transform (virtual-screen 4:3 box + optical center), so it expects
-		// 640-virtual coords: apply the UI transform, then inverse-map back.
-		UI_AdjustFrom640( &x, &y, &w, &h );
-
-		x *= SCREEN_WIDTH / (float)uiInfo.uiDC.glconfig.vidWidth;
-		w *= SCREEN_WIDTH / (float)uiInfo.uiDC.glconfig.vidWidth;
-
-		if ( vr->virtual_screen ) {
-			float viewableHeight = uiInfo.uiDC.glconfig.vidWidth * 0.75f;
-			float yoffset = ( uiInfo.uiDC.glconfig.vidHeight - viewableHeight ) / 2.0f;
-			float tanUp = tan( vr->fov_angle_up );
-			float tanDown = tan( vr->fov_angle_down );
-			float tanHeight = tanUp - tanDown;
-			if ( fabs( tanHeight ) > 0.001f ) {
-				float m9 = ( tanUp + tanDown ) / tanHeight;
-				float opticalOffsetVirtual = 240.0f * m9;
-				float yscale = viewableHeight / 480.0f;
-				yoffset += opticalOffsetVirtual * yscale;
-			}
-			y = ( y - yoffset ) * ( SCREEN_HEIGHT / viewableHeight );
-			h *= SCREEN_HEIGHT / viewableHeight;
-		} else {
-			y *= SCREEN_HEIGHT / (float)uiInfo.uiDC.glconfig.vidHeight;
-			h *= SCREEN_HEIGHT / (float)uiInfo.uiDC.glconfig.vidHeight;
-		}
-
-		trap_CIN_SetExtents( handle, x, y, w, h );
-	} else {
-		UI_CIN_SetExtents( handle, x, y, w, h );
+	if ( UI_VR_DrawCinematic( handle, x, y, w, h ) ) {
+		return;
 	}
+	UI_CIN_SetExtents( handle, x, y, w, h );
 	trap_CIN_DrawCinematic( handle );
 }
 
@@ -6766,13 +6734,8 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 
 	if ( !overlay && menu ) {
 		// VR: cover the physical framebuffer edge-to-edge before the stock
-		// paint, so the letterbox bars outside the centered 4:3 box (see
-		// UI_VR_AdjustFrom640) don't show stale eye-buffer content. Gated
-		// to VR only: on flatscreen the stock Menu_Paint background draw
-		// is already letterboxed/pillarboxed to the 4:3 box via the normal
-		// scale/bias transform, so an ungated fill would visibly paint the
-		// window's black bars with the menu background, a flatscreen
-		// visual change, not just harmless overdraw.
+		// paint, so the letterbox bars outside the centered 4:3 box don't
+		// show stale eye-buffer content.
 		if ( vrActive && menu->window.background ) {
 			UI_VR_FillScreen( menu->window.background );
 		}
@@ -6954,6 +6917,7 @@ void UI_VideoCheck( int time )
 				uiInfo.uiDC.scale = uiInfo.uiDC.glconfig.vidWidth * (1.0/640.0);
 				uiInfo.uiDC.biasY = 0.5 * ( uiInfo.uiDC.glconfig.vidHeight - ( uiInfo.uiDC.glconfig.vidWidth * (480.0/640) ) );
 			}
+			UI_VR_HostScale( &uiInfo.uiDC.scale, &uiInfo.uiDC.biasX, &uiInfo.uiDC.biasY );
 
 			uiInfo.uiDC.screenXmin = 0.0 - (uiInfo.uiDC.biasX / uiInfo.uiDC.scale);
 			uiInfo.uiDC.screenXmax = 640.0 + (uiInfo.uiDC.biasX / uiInfo.uiDC.scale);

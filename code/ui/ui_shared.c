@@ -3854,10 +3854,6 @@ qboolean Item_Bind_HandleKey(itemDef_t *item, int key, qboolean down) {
 
 
 void AdjustFrom640(float *x, float *y, float *w, float *h) {
-	if ( UI_VR_AdjustFrom640( x, y, w, h ) ) {
-		return;
-	}
-
 	*x = *x * DC->scale + DC->biasX;
 	*y = *y * DC->scale + DC->biasY;
 	*w *= DC->scale;

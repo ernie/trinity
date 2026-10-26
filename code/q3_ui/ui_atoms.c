@@ -1097,8 +1097,7 @@ void UI_Init( void ) {
 ================
 UI_AdjustFrom640
 
-Adjusted for resolution and screen aspect ratio. In VR, UI_VR_UpdateScale
-sets these fields each frame.
+Adjusted for resolution and screen aspect ratio
 ================
 */
 void UI_AdjustFrom640( float *x, float *y, float *w, float *h ) {
@@ -1207,8 +1206,6 @@ UI_Refresh
 */
 void UI_Refresh( int realtime )
 {
-	UI_VR_UpdateScale();
-
 	UI_VR_CursorOverride( &uis.cursorx, &uis.cursory );
 
 	uis.frametime = realtime - uis.realtime;

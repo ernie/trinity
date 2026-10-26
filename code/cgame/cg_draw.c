@@ -1827,9 +1827,7 @@ CG_DrawLowerRight
 static void CG_DrawLowerRight( void ) {
 	float	y;
 
-	// Minimal (zoomed) HUD doesn't draw the status bar, so don't reserve
-	// space for it: anchor scores/powerups to the actual bottom edge.
-	y = CG_VR_DrawingZoomedHUD() ? cgs.screenYmax + 1 : cgs.screenYmax + 1 - STATUSBAR_HEIGHT;
+	y = cgs.screenYmax + 1 - STATUSBAR_HEIGHT;
 
 	if ( cgs.gametype >= GT_TEAM && cg_drawTeamOverlay.integer == 2 ) {
 		y = CG_DrawTeamOverlay( y, qtrue, qfalse );
@@ -4492,71 +4490,6 @@ void CG_TrackClientTeamChange( void )
 
 /*
 ==============
-CG_GetProjectionCenter
-
-Calculates the optical center of the VR projection in virtual 640x480 coordinates.
-
-VR headsets have asymmetric FOV (more down-look than up-look), which causes the
-OpenXR projection matrix to shift the optical center away from the geometric
-framebuffer center. This function computes that offset based on the current FOV
-angles and weapon zoom level.
-
-The OpenGL projection matrix elements m[8] and m[9] determine the horizontal and
-vertical offsets:
-  m[8] = (tanRight + tanLeft) / (tanRight - tanLeft)
-  m[9] = (tanUp + tanDown) / (tanUp - tanDown)
-
-A point along the view axis (straight ahead) projects to NDC position (-m[8], -m[9]).
-Converting to screen coordinates (with 0,0 at top-left):
-  screenX = 320 * (1 + m[8])
-  screenY = 240 * (1 + m[9])
-==============
-*/
-void CG_GetProjectionCenter( float *outX, float *outY )
-{
-	// Default to geometric center
-	float x = 320.0f;
-	float y = 240.0f;
-	float zoomLevel;
-	float angleUp, angleDown, angleLeft, angleRight;
-	float tanUp, tanDown, tanLeft, tanRight;
-	float tanHeightV, tanWidthH;
-
-	// Get the effective FOV angles, accounting for weapon zoom
-	// The projection matrix in vr_renderer.c divides angles by weapon_zoomLevel
-	zoomLevel = vr->weapon_zoomLevel;
-	if (zoomLevel < 1.0f) zoomLevel = 1.0f;
-
-	angleUp = vr->fov_angle_up / zoomLevel;
-	angleDown = vr->fov_angle_down / zoomLevel;
-	angleLeft = vr->fov_angle_left / zoomLevel;
-	angleRight = vr->fov_angle_right / zoomLevel;
-
-	tanUp = tan(angleUp);
-	tanDown = tan(angleDown);
-	tanLeft = tan(angleLeft);
-	tanRight = tan(angleRight);
-
-	// Vertical: m[9] = (tanUp + tanDown) / (tanUp - tanDown)
-	tanHeightV = tanUp - tanDown;
-	if (fabs(tanHeightV) > 0.001f) {
-		float m9 = (tanUp + tanDown) / tanHeightV;
-		y = 240.0f * (1.0f + m9);
-	}
-
-	// Horizontal: m[8] = (tanRight + tanLeft) / (tanRight - tanLeft)
-	tanWidthH = tanRight - tanLeft;
-	if (fabs(tanWidthH) > 0.001f) {
-		float m8 = (tanRight + tanLeft) / tanWidthH;
-		x = 320.0f * (1.0f + m8);
-	}
-
-	if (outX) *outX = x;
-	if (outY) *outY = y;
-}
-
-/*
-==============
 CG_DrawWeapReticle
 
 Draws the railgun scope reticle overlay.
@@ -4569,45 +4502,43 @@ static void CG_DrawWeapReticle( void )
 	vec4_t red = {0.8f, 0.0f, 0.0f, 0.5f};
 
 	float indentX = 0.16f;
-	float aspect = (float)cgs.glconfig.vidWidth / (float)cgs.glconfig.vidHeight;
-	float indentY = 0.5f - (0.5f - indentX) * aspect;
-	float X_WIDTH = 640;
-	float Y_HEIGHT = 480;
+	float width = cgs.glconfig.vidWidth;
+	float height = cgs.glconfig.vidHeight;
+	// hair sizes keep their 640x480 values over a square as wide as the frame
+	float unitX = width / 640.0f;
+	float unitY = width / 480.0f;
 
 	// Geometric center: cyclopean scope renders to the geometric framebuffer center.
-	float centerX = 320.0f;
-	float centerY = 240.0f;
+	float centerX = width * 0.5f;
+	float centerY = height * 0.5f;
 
-	float x, y, w, h;
+	float w = width * (0.5f - indentX);
+	float h = w;
+	float x, y;
 
-	if ( indentY < 0.0f ) {
-		indentY = 0.0f;  // very wide buffer: the circle overruns the top and bottom
+	if ( h > centerY ) {
+		h = centerY;  // very wide buffer: the circle overruns the top and bottom
 	}
+	x = centerX - w;
+	y = centerY - h;
 
-	x = (X_WIDTH * indentX);
-	y = (Y_HEIGHT * indentY);
-	w = (X_WIDTH * (1-(2*indentX))) / 2.0f;
-	h = (Y_HEIGHT * (1-(2*indentY))) / 2;
-
-	CG_AdjustFrom640( &x, &y, &w, &h );
-
-	// sides - black mask outside the scope circle
-	CG_FillRect( 0, 0, X_WIDTH * indentX, Y_HEIGHT, black );
-	CG_FillRect( X_WIDTH * (1 - indentX), 0, X_WIDTH * indentX, Y_HEIGHT, black );
-	// top/bottom
-	CG_FillRect( X_WIDTH * indentX, 0, X_WIDTH * (1-2*indentX), Y_HEIGHT * indentY, black );
-	CG_FillRect( X_WIDTH * indentX, Y_HEIGHT * (1-indentY), X_WIDTH * (1-2*indentX), Y_HEIGHT * indentY, black );
+	// black mask outside the scope circle
+	trap_R_SetColor( black );
+	trap_R_DrawStretchPic( 0, 0, x, height, 0, 0, 0, 0, cgs.media.whiteShader );
+	trap_R_DrawStretchPic( width - x, 0, x, height, 0, 0, 0, 0, cgs.media.whiteShader );
+	trap_R_DrawStretchPic( x, 0, 2 * w, y, 0, 0, 0, 0, cgs.media.whiteShader );
+	trap_R_DrawStretchPic( x, height - y, 2 * w, y, 0, 0, 0, 0, cgs.media.whiteShader );
+	trap_R_SetColor( NULL );
 
 	{
 		// crosshairs - coming from scope edges toward center
-		float hairThick = 1.0f;
 		float hairLength = 160.0f;
 
 		// Scope edges
-		float leftEdge = X_WIDTH * indentX;
-		float rightEdge = X_WIDTH * (1.0f - indentX);
-		float topEdge = Y_HEIGHT * indentY;
-		float bottomEdge = Y_HEIGHT * (1.0f - indentY);
+		float leftEdge = x;
+		float rightEdge = width - x;
+		float topEdge = y;
+		float bottomEdge = height - y;
 
 		// center
 		{
@@ -4620,37 +4551,16 @@ static void CG_DrawWeapReticle( void )
 			}
 		}
 
-		CG_FillRect( leftEdge, centerY - hairThick/2.66f, hairLength, hairThick * 0.75f, light_color );                 // left
-		CG_FillRect( rightEdge - hairLength, centerY - hairThick/2.66f, hairLength, hairThick * 0.75f, light_color );   // right
-		CG_FillRect( centerX - hairThick/2, topEdge, hairThick, hairLength * 0.65f, light_color );                  // top
-		CG_FillRect( centerX - hairThick/2, bottomEdge - (hairLength * 0.65f), hairThick, hairLength * 0.75f, light_color );  // bottom
-		CG_FillRect( centerX - hairThick/2, centerY - 6, hairThick, 12, red ); // Vertical center
-		CG_FillRect( centerX - 8, centerY - hairThick/2.66f, 16, hairThick * 0.75f, red ); // Horizontal center
+		trap_R_SetColor( light_color );
+		trap_R_DrawStretchPic( leftEdge, centerY - unitY / 2.66f, hairLength * unitX, 0.75f * unitY, 0, 0, 0, 0, cgs.media.whiteShader );                 // left
+		trap_R_DrawStretchPic( rightEdge - hairLength * unitX, centerY - unitY / 2.66f, hairLength * unitX, 0.75f * unitY, 0, 0, 0, 0, cgs.media.whiteShader );   // right
+		trap_R_DrawStretchPic( centerX - unitX / 2, topEdge, unitX, hairLength * 0.65f * unitY, 0, 0, 0, 0, cgs.media.whiteShader );                  // top
+		trap_R_DrawStretchPic( centerX - unitX / 2, bottomEdge - hairLength * 0.65f * unitY, unitX, hairLength * 0.75f * unitY, 0, 0, 0, 0, cgs.media.whiteShader );  // bottom
+		trap_R_SetColor( red );
+		trap_R_DrawStretchPic( centerX - unitX / 2, centerY - 6 * unitY, unitX, 12 * unitY, 0, 0, 0, 0, cgs.media.whiteShader ); // Vertical center
+		trap_R_DrawStretchPic( centerX - 8 * unitX, centerY - unitY / 2.66f, 16 * unitX, 0.75f * unitY, 0, 0, 0, 0, cgs.media.whiteShader ); // Horizontal center
+		trap_R_SetColor( NULL );
 	}
-}
-
-/*
-==============
-CG_GetCombinedFovScale
-
-Return ratio of combined binocular FOV to single eye FOV.
-Used to scale vignette width for full stereo coverage.
-==============
-*/
-float CG_GetCombinedFovScale( void )
-{
-	float leftEyeLeft = vr->eye_fov_angle_left[0];
-	float leftEyeRight = vr->eye_fov_angle_right[0];
-	float rightEyeRight = vr->eye_fov_angle_right[1];
-
-	float singleEyeTanWidth = tan(leftEyeRight) - tan(leftEyeLeft);
-	float combinedTanWidth = tan(rightEyeRight) - tan(leftEyeLeft);
-
-	if (fabs(singleEyeTanWidth) < 0.001f) {
-		return 1.0f;
-	}
-
-	return combinedTanWidth / singleEyeTanWidth;
 }
 
 /*
@@ -4696,76 +4606,23 @@ static void CG_DrawVignette( void )
 
 	if (currentComfortVignetteValue > 0.0f && currentComfortVignetteValue <= 1.0f && !(vr->weapon_zoomed))
 	{
-		// Calculate combined FOV scale - the ratio of binocular FOV to single eye FOV
-		// This tells us how much wider the total view is than a single eye's view
-		float combinedFovScale = CG_GetCombinedFovScale();
-
-		// How much extra width on each side to cover the combined FOV
-		float extraWidth = (cg.refdef.width * (combinedFovScale - 1.0f)) / 2.0f;
-
-		float projCenterX, projCenterY;
-		float verticalAsymmetryOffset;
-		float baseInsetX;
-		float baseInsetY;
-		int insetTop;
-		int insetBottom;
-		int insetX;
-		int vignetteX;
-		int vignetteW;
-		int vignetteH;
-		int yOffset;
-		int leftEdge;
-		int rightEdge;
-		vec4_t black = {0.0, 0.0, 0.0, 1};
-
-		// Calculate vertical FOV asymmetry offset
-		// OpenXR typically has more FOV below optical center than above
-		CG_GetProjectionCenter(&projCenterX, &projCenterY);
-		// projCenterY is in 640x480 coords where 240 is geometric center
-		// Convert to screen pixel offset: positive means optical center is below geometric center
-		verticalAsymmetryOffset = (projCenterY - 240.0f) / 480.0f * cg.refdef.height;
-
-		// Base inset from the edges based on comfort vignette value
-		baseInsetX = currentComfortVignetteValue * cg.refdef.width / 3.5f;
-		baseInsetY = currentComfortVignetteValue * cg.refdef.height / 3.5f;
-
-		// Adjust top/bottom insets for vertical asymmetry
-		// verticalAsymmetryOffset is positive when optical center is below geometric center
-		// Adding it to top inset and subtracting from bottom shifts the opening upward
-		insetTop = (int)(baseInsetY + verticalAsymmetryOffset);
-		insetBottom = (int)(baseInsetY - verticalAsymmetryOffset);
-		if (insetTop < 0) insetTop = 0;
-		if (insetBottom < 0) insetBottom = 0;
-
-		insetX = (int)baseInsetX;
-
-		// Vignette covers the normal viewport minus insets (not stretched into extended FOV)
-		vignetteX = insetX;
-		vignetteW = cg.refdef.width - 2 * insetX;
-		vignetteH = cg.refdef.height - insetTop - insetBottom;
-
+		int insetX = (int)(currentComfortVignetteValue * cg.refdef.width / 3.5f);
+		int insetY = (int)(currentComfortVignetteValue * cg.refdef.height / 3.5f);
+		int vignetteW = cg.refdef.width - 2 * insetX;
+		int vignetteH = cg.refdef.height - 2 * insetY;
 		// Account for vertical offset when viewport is centered (e.g., virtual screen mode)
-		yOffset = cg.refdef.y;
-
-		// Extended FOV edges
-		leftEdge = (int)(-extraWidth);
-		rightEdge = (int)(cg.refdef.width + extraWidth);
+		int yOffset = cg.refdef.y;
+		vec4_t black = {0.0, 0.0, 0.0, 1};
 
 		// Black borders to fill the solid black areas around the vignette
 		trap_R_SetColor( black );
 
-		// Left border: from extended left edge to vignette start
-		trap_R_DrawStretchPic( leftEdge, yOffset, vignetteX - leftEdge, cg.refdef.height, 0, 0, 1, 1, cgs.media.whiteShader );
-		// Right border: from vignette end to extended right edge
-		trap_R_DrawStretchPic( vignetteX + vignetteW, yOffset, rightEdge - (vignetteX + vignetteW), cg.refdef.height, 0, 0, 1, 1, cgs.media.whiteShader );
+		trap_R_DrawStretchPic( 0, yOffset, insetX, cg.refdef.height, 0, 0, 1, 1, cgs.media.whiteShader );
+		trap_R_DrawStretchPic( insetX + vignetteW, yOffset, insetX, cg.refdef.height, 0, 0, 1, 1, cgs.media.whiteShader );
+		trap_R_DrawStretchPic( insetX, yOffset, vignetteW, insetY, 0, 0, 1, 1, cgs.media.whiteShader );
+		trap_R_DrawStretchPic( insetX, yOffset + cg.refdef.height - insetY, vignetteW, insetY, 0, 0, 1, 1, cgs.media.whiteShader );
 
-		// Top border: between the side borders, above the vignette
-		trap_R_DrawStretchPic( vignetteX, yOffset, vignetteW, insetTop, 0, 0, 1, 1, cgs.media.whiteShader );
-		// Bottom border: between the side borders, below the vignette
-		trap_R_DrawStretchPic( vignetteX, yOffset + cg.refdef.height - insetBottom, vignetteW, insetBottom, 0, 0, 1, 1, cgs.media.whiteShader );
-
-		// Vignette shader - covers normal viewport minus insets
-		trap_R_DrawStretchPic( vignetteX, yOffset + insetTop, vignetteW, vignetteH, 0, 0, 1, 1, cgs.media.vignetteShader );
+		trap_R_DrawStretchPic( insetX, yOffset + insetY, vignetteW, vignetteH, 0, 0, 1, 1, cgs.media.vignetteShader );
 
 		trap_R_SetColor( NULL );
 	}

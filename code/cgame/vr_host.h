@@ -45,12 +45,15 @@
 
 // ---- Functions the host must provide (absent from stock 1.32) -------------
 
-// Draw one screen-space 2D overlay pass (damage border and friends) directly
-// to the active render target. Called by the VR frame fork for passes that
-// bypass the HUD buffer. A minimal host may draw nothing.
+// Draw the full-frame overlays (vignette, damage border, zoom reticle) in
+// frame pixels, 0 to vidWidth by 0 to vidHeight, with trap_R_DrawStretchPic.
+// Off the virtual screen the engine puts the frame's center on the line of
+// sight and its edges on each eye's edges; while zoomed it maps the frame one
+// to one onto each eye. A minimal host may draw nothing.
 void CG_DrawScreen2D( void );
 
-// Draw the reduced HUD used while the weapon zoom scope is up.
+// Draw the reduced HUD used while the weapon zoom scope is up, in 640x480
+// units; the engine places it inside the scope HUD.
 void CG_Draw2DMinimal( stereoFrame_t stereoFrame );
 
 // Save (Push) and restore (Pop) the 2D anchor/placement transform around the
@@ -59,17 +62,9 @@ void CG_Draw2DMinimal( stereoFrame_t stereoFrame );
 void CG_PushHUDAnchors( void );
 void CG_PopHUDAnchors( void );
 
-// The largest centered 4:3 box that fits the current framebuffer, in
-// framebuffer pixels. On a 4:3 framebuffer this is the framebuffer's size.
-void CG_GetViewable4x3Dimensions( float *outW, float *outH );
-
-// The projection's optical center in 640x480 virtual coordinates - (320,240)
-// unless the host renders asymmetric FOVs.
-void CG_GetProjectionCenter( float *outX, float *outY );
-
 // Add a laser/beam render entity from start to end (the drop's laser sight
 // and aim-debug rays draw through this).
-void CG_LaserSight( vec3_t start, vec3_t end, byte colour[4], float width );
+void CG_LaserSight( vec3_t start, vec3_t end, byte color[4], float width );
 
 #if VR_HOST_HAS_WARMUP_EVENTS
 // Fire warmup/countdown announcer events during the HUD pass.
@@ -108,22 +103,32 @@ void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale
 //   vr_host_config.h (#define Q_sscanf sscanf).
 // * tr_types.h: RF_OVERBRIGHT, RF_WORLD_ORIENTED, RF_VIEW_ORIENTED, RT_LASERSIGHT and the
 //   tail-appended refdef_t.isHUD, which must stay last (Appendix E).
-// * cg_t / cgs_t: no additions are required. All VR view/camera/HUD/selector
-//   state the drop uses lives as module state inside vr_cgame.c; the host
-//   reads what it needs through accessors (CG_VR_DrawingZoomedHUD,
-//   CG_VR_ReticleShader) and resets drop state through call-outs
-//   (CG_VR_DeathCamReset, CG_VR_PortraitReset). A host that wires the
-//   scoreboard-cursor pair makes cgs.cursorX/cursorY float (stock: int) -
-//   CG_VR_ScoreboardCursor writes the cursor through float *. One existing
-//   media entry changes scope: register cgs.media.friendShader
+// * cg_t / cgs_t: cgs gains float screenYBias beside stock screenXBias, both
+//   added in CG_AdjustFrom640 and the two proportional-text painters. CG_Init
+//   passes screenXScale and both biases to CG_VR_HostScale at the end of its
+//   2D scaling setup; when it returns qtrue, screenYScale takes screenXScale.
+//   No other additions are required. All VR view/camera/HUD/selector state
+//   the drop uses lives as module state inside vr_cgame.c; the host reads
+//   what it needs through accessors (CG_VR_ReticleShader) and resets drop
+//   state through call-outs (CG_VR_DeathCamReset, CG_VR_PortraitReset). A
+//   host that wires the scoreboard-cursor pair makes cgs.cursorX/cursorY
+//   float (stock: int) - CG_VR_ScoreboardCursor writes the cursor through
+//   float *. One existing media entry changes scope: register cgs.media.friendShader
 //   ("sprites/foe") in every gametype, not just GT_TEAM - the weapon
 //   wheel's selection marker draws through it.
 // * baseq3 UI (q3_ui): uiStatic_t gains float biasY beside stock
 //   xscale/yscale/bias, added to the vertical transform in UI_AdjustFrom640
-//   and the three text painters; UI_VR_UpdateScale writes all four in VR.
+//   and the three text painters. The end of the 2D scaling setup passes a
+//   scale, bias and biasY to UI_VR_HostScale; when it returns qtrue, xscale
+//   and yscale both take that scale.
 //   uis.cursorx/uis.cursory become float (stock: int) -
 //   UI_VR_CursorOverride writes the cursor through float * (see Appendix E).
-// * Team Arena UI: ui_shared.c gains Menu_EditingItem and
+// * Team Arena UI: displayContextDef_t gains float biasY beside stock bias,
+//   added to the vertical transform in UI_AdjustFrom640 and AdjustFrom640;
+//   AdjustFrom640 also adds the x bias.
+//   The end of the 2D scaling setup passes a scale, the x bias and biasY to
+//   UI_VR_HostScale; when it returns qtrue, every scale field the 2D
+//   transform reads takes that scale. ui_shared.c gains Menu_EditingItem and
 //   Menu_SetEditingItem, which UI_VR_KeyHandled uses after each key to open
 //   the keyboard clear of the field being edited. displayContextDef_t's cursorx/cursory become
 //   float (stock: int) - UI_VR_CursorOverride writes the cursor through

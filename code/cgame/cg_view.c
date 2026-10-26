@@ -1121,7 +1121,8 @@ Uses actual pixel coordinates for proper scaling on all aspect ratios.
 void CG_DamageBorderVignette( void ) {
 	int     t, maxTime;
 	float   alpha, damageIntensity, coverage;
-	int     borderBase;
+	int     borderBase, margin;
+	int     extLeft, extRight, extTop, extBottom;
 	int     leftBorder, rightBorder, topBorder, bottomBorder;
 	int     innerWidth, innerHeight;
 	float   leftWeight, rightWeight, topWeight, bottomWeight;
@@ -1148,15 +1149,12 @@ void CG_DamageBorderVignette( void ) {
 
 	// Scale border thickness based on damage value
 	// cg.damageValue is clamped between 5 and 10 in CG_DamageFeedback (cg_playerstate.c)
-	// Normalize to 0-1 range: (value - min) / (max - min), with a floor of 0.2
+	// Normalize to 0-1 range: (value - min) / (max - min)
 	damageIntensity = (cg.damageValue - 5.0f) / 5.0f;
-	if (damageIntensity < 0.2f) {
-		damageIntensity = 0.2f;
-	}
 
 	// Use height as reference for all borders to maintain consistent pixel thickness
 	// regardless of aspect ratio. This ensures left/right borders match top/bottom visually.
-	coverage = damageIntensity / 4.0f;
+	coverage = 0.20f + 0.05f * damageIntensity;
 	borderBase = (int)(coverage * cg.refdef.height);
 
 	// Apply directional weighting to borders based on damage direction
@@ -1168,137 +1166,11 @@ void CG_DamageBorderVignette( void ) {
 	topWeight = 1.0f + cg.damageY;
 	bottomWeight = 1.0f - cg.damageY;
 
-	// VR draws the vignette directly to the per-eye XR swapchain. The single-eye
-	// refdef only covers one eye's frustum, and OpenXR frustums are asymmetric
-	// (more down-look than up, offset horizontally per eye). Transplant native's
-	// FOV-asymmetry offsets + combined-FOV stereo extension so the border covers
-	// the full binocular field and stays optically centered. Flatscreen keeps the
-	// plain refdef-pixel path below unchanged.
-	if ( vrActive ) {
-		float projCenterX, projCenterY;
-		float verticalAsymmetryOffset, horizontalAsymmetryOffset;
-		float combinedFovScale, extraWidth;
-		int   leftEdge, rightEdge, leftExtension, rightExtension;
-
-		// Calculate FOV asymmetry offsets
-		// OpenXR typically has asymmetric FOV (more down than up, offset horizontal per eye)
-		CG_GetProjectionCenter(&projCenterX, &projCenterY);
-		// projCenterY is in 640x480 coords where 240 is geometric center
-		// Positive offset means optical center is below geometric center
-		verticalAsymmetryOffset = (projCenterY - 240.0f) / 480.0f * cg.refdef.height;
-		// projCenterX is in 640x480 coords where 320 is geometric center
-		// Positive offset means optical center is to the right of geometric center
-		horizontalAsymmetryOffset = (projCenterX - 320.0f) / 640.0f * cg.refdef.width;
-
-		// Calculate weighted border dimensions with asymmetry adjustments
-		topBorder = (int)(borderBase * topWeight + verticalAsymmetryOffset);
-		bottomBorder = (int)(borderBase * bottomWeight - verticalAsymmetryOffset);
-		leftBorder = (int)(borderBase * leftWeight + horizontalAsymmetryOffset);
-		rightBorder = (int)(borderBase * rightWeight - horizontalAsymmetryOffset);
-
-		// Clamp negative values
-		if (topBorder < 0) topBorder = 0;
-		if (bottomBorder < 0) bottomBorder = 0;
-		if (leftBorder < 0) leftBorder = 0;
-		if (rightBorder < 0) rightBorder = 0;
-
-		// Calculate combined FOV scale for stereo coverage
-		combinedFovScale = CG_GetCombinedFovScale();
-		extraWidth = (cg.refdef.width * (combinedFovScale - 1.0f)) / 2.0f;
-		leftEdge = (int)(-extraWidth);
-		rightEdge = (int)(cg.refdef.width + extraWidth);
-
-		// Dimensions for edge pieces (between corners)
-		innerWidth = cg.refdef.width - leftBorder - rightBorder;
-		innerHeight = cg.refdef.height - topBorder - bottomBorder;
-
-		// Red with fading alpha
-		red[0] = 1.0f;
-		red[1] = 0.0f;
-		red[2] = 0.0f;
-		red[3] = alpha * 0.8f;
-
-		trap_R_SetColor(red);
-
-		// Screen base coordinates
-		x = cg.refdef.x;
-		y = cg.refdef.y;
-		w = cg.refdef.width;
-		h = cg.refdef.height;
-
-		// Extended widths for stereo FOV coverage
-		leftExtension = x - leftEdge;
-		rightExtension = rightEdge - (x + w);
-
-		// Draw 4 corners (from texture corners, extended for stereo)
-		// Top-left corner
-		if ((leftBorder + leftExtension) > 0 && topBorder > 0) {
-			trap_R_DrawStretchPic(leftEdge, y, leftBorder + leftExtension, topBorder,
-				0.0f, 0.0f, UV_EDGE_H, UV_EDGE_V, cgs.media.vignetteShader);
-		}
-		// Top-right corner
-		if ((rightBorder + rightExtension) > 0 && topBorder > 0) {
-			trap_R_DrawStretchPic(x + w - rightBorder, y, rightBorder + rightExtension, topBorder,
-				1.0f - UV_EDGE_H, 0.0f, 1.0f, UV_EDGE_V, cgs.media.vignetteShader);
-		}
-		// Bottom-left corner
-		if ((leftBorder + leftExtension) > 0 && bottomBorder > 0) {
-			trap_R_DrawStretchPic(leftEdge, y + h - bottomBorder, leftBorder + leftExtension, bottomBorder,
-				0.0f, 1.0f - UV_EDGE_V, UV_EDGE_H, 1.0f, cgs.media.vignetteShader);
-		}
-		// Bottom-right corner
-		if ((rightBorder + rightExtension) > 0 && bottomBorder > 0) {
-			trap_R_DrawStretchPic(x + w - rightBorder, y + h - bottomBorder, rightBorder + rightExtension, bottomBorder,
-				1.0f - UV_EDGE_H, 1.0f - UV_EDGE_V, 1.0f, 1.0f, cgs.media.vignetteShader);
-		}
-
-		// Draw 4 edges (stretched pieces from texture edge middles)
-		// Left edge (extended for stereo, and into missing corner spaces)
-		if ((leftBorder + leftExtension) > 0) {
-			// Extend into top corner space if top corner wasn't drawn
-			int edgeTop = (topBorder > 0) ? topBorder : 0;
-			// Extend into bottom corner space if bottom corner wasn't drawn
-			int edgeBottom = (bottomBorder > 0) ? bottomBorder : 0;
-			int edgeHeight = h - edgeTop - edgeBottom;
-			if (edgeHeight > 0) {
-				trap_R_DrawStretchPic(leftEdge, y + edgeTop, leftBorder + leftExtension, edgeHeight,
-					0.0f, UV_EDGE_V, UV_EDGE_H, 1.0f - UV_EDGE_V, cgs.media.vignetteShader);
-			}
-		}
-		// Right edge (extended for stereo, and into missing corner spaces)
-		if ((rightBorder + rightExtension) > 0) {
-			int edgeTop = (topBorder > 0) ? topBorder : 0;
-			int edgeBottom = (bottomBorder > 0) ? bottomBorder : 0;
-			int edgeHeight = h - edgeTop - edgeBottom;
-			if (edgeHeight > 0) {
-				trap_R_DrawStretchPic(x + w - rightBorder, y + edgeTop, rightBorder + rightExtension, edgeHeight,
-					1.0f - UV_EDGE_H, UV_EDGE_V, 1.0f, 1.0f - UV_EDGE_V, cgs.media.vignetteShader);
-			}
-		}
-		// Top edge (between top-left and top-right corners)
-		if (topBorder > 0 && innerWidth > 0) {
-			trap_R_DrawStretchPic(x + leftBorder, y, innerWidth, topBorder,
-				UV_EDGE_H, 0.0f, 1.0f - UV_EDGE_H, UV_EDGE_V, cgs.media.vignetteShader);
-		}
-		// Bottom edge (between bottom-left and bottom-right corners)
-		if (bottomBorder > 0 && innerWidth > 0) {
-			trap_R_DrawStretchPic(x + leftBorder, y + h - bottomBorder, innerWidth, bottomBorder,
-				UV_EDGE_H, 1.0f - UV_EDGE_V, 1.0f - UV_EDGE_H, 1.0f, cgs.media.vignetteShader);
-		}
-
-		trap_R_SetColor(NULL);
-		return;
-	}
-
 	// Calculate weighted border dimensions (all based on height for aspect-ratio independence)
 	leftBorder = (int)(borderBase * leftWeight);
 	rightBorder = (int)(borderBase * rightWeight);
 	topBorder = (int)(borderBase * topWeight);
 	bottomBorder = (int)(borderBase * bottomWeight);
-
-	// Dimensions for edge pieces (between corners)
-	innerWidth = cg.refdef.width - leftBorder - rightBorder;
-	innerHeight = cg.refdef.height - topBorder - bottomBorder;
 
 	// Red with fading alpha
 	red[0] = 1.0f;
@@ -1308,11 +1180,35 @@ void CG_DamageBorderVignette( void ) {
 
 	trap_R_SetColor(red);
 
-	// Screen base coordinates
-	x = cg.refdef.x;
-	y = cg.refdef.y;
-	w = cg.refdef.width;
-	h = cg.refdef.height;
+	// Headset lenses hide the outer edge of each eye, so the band starts behind a solid margin
+	margin = (int)((0.015f + 0.045f * damageIntensity) * cg.refdef.height);
+	x = cg.refdef.x + margin;
+	y = cg.refdef.y + margin;
+	w = cg.refdef.width - 2 * margin;
+	h = cg.refdef.height - 2 * margin;
+
+	// A side with no band leaves its corners to the neighboring sides, which run on to the frame edge
+	extLeft = leftBorder > 0 ? 0 : margin;
+	extRight = rightBorder > 0 ? 0 : margin;
+	extTop = topBorder > 0 ? 0 : margin;
+	extBottom = bottomBorder > 0 ? 0 : margin;
+
+	// Dimensions for edge pieces (between corners)
+	innerWidth = w - leftBorder - rightBorder + extLeft + extRight;
+	innerHeight = h - topBorder - bottomBorder + extTop + extBottom;
+
+	if (leftBorder > 0) {
+		trap_R_DrawStretchPic(x - margin, y - margin, margin, h + 2 * margin, 0, 0, 1, 1, cgs.media.whiteShader);
+	}
+	if (rightBorder > 0) {
+		trap_R_DrawStretchPic(x + w, y - margin, margin, h + 2 * margin, 0, 0, 1, 1, cgs.media.whiteShader);
+	}
+	if (topBorder > 0) {
+		trap_R_DrawStretchPic(x - extLeft, y - margin, w + extLeft + extRight, margin, 0, 0, 1, 1, cgs.media.whiteShader);
+	}
+	if (bottomBorder > 0) {
+		trap_R_DrawStretchPic(x - extLeft, y + h, w + extLeft + extRight, margin, 0, 0, 1, 1, cgs.media.whiteShader);
+	}
 
 	// Draw 4 corners (square pieces from texture corners)
 	// Top-left corner
@@ -1339,22 +1235,22 @@ void CG_DamageBorderVignette( void ) {
 	// Draw 4 edges (stretched pieces from texture edge middles)
 	// Left edge (between top-left and bottom-left corners)
 	if (leftBorder > 0 && innerHeight > 0) {
-		trap_R_DrawStretchPic(x, y + topBorder, leftBorder, innerHeight,
+		trap_R_DrawStretchPic(x, y + topBorder - extTop, leftBorder, innerHeight,
 			0.0f, UV_EDGE_V, UV_EDGE_H, 1.0f - UV_EDGE_V, cgs.media.vignetteShader);
 	}
 	// Right edge (between top-right and bottom-right corners)
 	if (rightBorder > 0 && innerHeight > 0) {
-		trap_R_DrawStretchPic(x + w - rightBorder, y + topBorder, rightBorder, innerHeight,
+		trap_R_DrawStretchPic(x + w - rightBorder, y + topBorder - extTop, rightBorder, innerHeight,
 			1.0f - UV_EDGE_H, UV_EDGE_V, 1.0f, 1.0f - UV_EDGE_V, cgs.media.vignetteShader);
 	}
 	// Top edge (between top-left and top-right corners)
 	if (topBorder > 0 && innerWidth > 0) {
-		trap_R_DrawStretchPic(x + leftBorder, y, innerWidth, topBorder,
+		trap_R_DrawStretchPic(x + leftBorder - extLeft, y, innerWidth, topBorder,
 			UV_EDGE_H, 0.0f, 1.0f - UV_EDGE_H, UV_EDGE_V, cgs.media.vignetteShader);
 	}
 	// Bottom edge (between bottom-left and bottom-right corners)
 	if (bottomBorder > 0 && innerWidth > 0) {
-		trap_R_DrawStretchPic(x + leftBorder, y + h - bottomBorder, innerWidth, bottomBorder,
+		trap_R_DrawStretchPic(x + leftBorder - extLeft, y + h - bottomBorder, innerWidth, bottomBorder,
 			UV_EDGE_H, 1.0f - UV_EDGE_V, 1.0f - UV_EDGE_H, 1.0f, cgs.media.vignetteShader);
 	}
 
