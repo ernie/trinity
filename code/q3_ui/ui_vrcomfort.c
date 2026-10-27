@@ -46,6 +46,7 @@ VR COMFORT OPTIONS MENU
 #define ID_HEIGHTADJUST			128
 #define ID_SIXDOF				129
 #define ID_ROLLHIT				130
+#define ID_PHYSICALCROUCH		131
 #define ID_HAPTICINTENSITY		132
 #define ID_BHAPTICS				133
 
@@ -61,6 +62,7 @@ typedef struct {
 
 	menuslider_s		comfortvignette;
 	menuslider_s		heightadjust;
+	menuradiobutton_s	physicalcrouch;
 	menuradiobutton_s	sixdof;
 	menuradiobutton_s	rollhit;
 	menuslider_s		hapticintensity;
@@ -76,9 +78,14 @@ static void VRComfort_SixDofStatusBar( void *self ) {
 	UI_DrawString( SCREEN_WIDTH * 0.50, SCREEN_HEIGHT * 0.80, "Physical head movement controls in-game movement (SP only)", UI_SMALLFONT|UI_CENTER, colorWhite );
 }
 
+static void VRComfort_PhysicalCrouchStatusBar( void *self ) {
+	UI_DrawString( SCREEN_WIDTH * 0.50, SCREEN_HEIGHT * 0.80, "Crouching in real life crouches the player", UI_SMALLFONT|UI_CENTER, colorWhite );
+}
+
 static void VRComfort_SetMenuItems( void ) {
 	s_vrcomfort.comfortvignette.curvalue	= trap_Cvar_VariableValue( "vr_comfortVignette" );
 	s_vrcomfort.heightadjust.curvalue		= trap_Cvar_VariableValue( "vr_heightAdjust" );
+	s_vrcomfort.physicalcrouch.curvalue		= trap_Cvar_VariableValue( "vr_physicalCrouch" ) != 0;
 	s_vrcomfort.sixdof.curvalue				= trap_Cvar_VariableValue( "vr_6dof" ) != 0;
 	s_vrcomfort.rollhit.curvalue			= trap_Cvar_VariableValue( "vr_rollWhenHit" ) != 0;
 	s_vrcomfort.hapticintensity.curvalue	= trap_Cvar_VariableValue( "vr_hapticIntensity" );
@@ -98,6 +105,10 @@ static void VRComfort_MenuEvent( void* ptr, int notification ) {
 
 		case ID_HEIGHTADJUST:
 			trap_Cvar_SetValue( "vr_heightAdjust", s_vrcomfort.heightadjust.curvalue );
+			break;
+
+		case ID_PHYSICALCROUCH:
+			trap_Cvar_SetValue( "vr_physicalCrouch", s_vrcomfort.physicalcrouch.curvalue );
 			break;
 
 		case ID_SIXDOF:
@@ -155,8 +166,8 @@ static void VRComfort_MenuInit( void ) {
 	s_vrcomfort.framer.width			= 256;
 	s_vrcomfort.framer.height			= 334;
 
-	// Center the 6-row block (small-font rows) in the frame interior.
-	y = VR_FRAME_CENTER_Y - ( 5 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
+	// Center the 7-row block (small-font rows) in the frame interior.
+	y = VR_FRAME_CENTER_Y - ( 6 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
 	s_vrcomfort.comfortvignette.generic.type		= MTYPE_SLIDER;
 	s_vrcomfort.comfortvignette.generic.x			= VR_X_POS;
 	s_vrcomfort.comfortvignette.generic.y			= y;
@@ -183,6 +194,16 @@ static void VRComfort_MenuInit( void ) {
 #ifdef UI_SLIDER_VALUE
 	Slider_ShowValue( &s_vrcomfort.heightadjust, SLIDER_VALUE_PERCENT, 0.01f, 1, 0 );
 #endif
+
+	y += BIGCHAR_HEIGHT+2;
+	s_vrcomfort.physicalcrouch.generic.type			= MTYPE_RADIOBUTTON;
+	s_vrcomfort.physicalcrouch.generic.name			= "Physical Crouch:";
+	s_vrcomfort.physicalcrouch.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_vrcomfort.physicalcrouch.generic.callback		= VRComfort_MenuEvent;
+	s_vrcomfort.physicalcrouch.generic.id			= ID_PHYSICALCROUCH;
+	s_vrcomfort.physicalcrouch.generic.x			= VR_X_POS;
+	s_vrcomfort.physicalcrouch.generic.y			= y;
+	s_vrcomfort.physicalcrouch.generic.statusbar	= VRComfort_PhysicalCrouchStatusBar;
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrcomfort.sixdof.generic.type			= MTYPE_RADIOBUTTON;
@@ -243,6 +264,7 @@ static void VRComfort_MenuInit( void ) {
 
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.comfortvignette );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.heightadjust );
+	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.physicalcrouch );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.sixdof );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.rollhit );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.hapticintensity );

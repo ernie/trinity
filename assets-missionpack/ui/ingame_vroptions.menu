@@ -358,9 +358,25 @@ itemDef {
 	name comfort
 	group grpVR
 	type ITEM_TYPE_YESNO
+	text "Physical Crouch:"
+	cvar "vr_physicalCrouch"
+	rect 50 86 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	mouseEnter { show msg_physcrouch }
+	mouseExit { hide msg_physcrouch }
+	}
+itemDef {
+	name comfort
+	group grpVR
+	type ITEM_TYPE_YESNO
 	text "SP 6DoF Movement:"
 	cvar "vr_6dof"
-	rect 50 86 340 18
+	rect 50 104 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -376,7 +392,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Roll When Hit:"
 	cvar "vr_rollWhenHit"
-	rect 50 104 340 18
+	rect 50 122 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -393,7 +409,7 @@ itemDef {
 #ifdef TRINITY_SLIDER_VALUE
 	sliderValue SLIDER_VALUE_PERCENT 0.01
 #endif
-	rect 50 122 340 18
+	rect 50 140 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -407,7 +423,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "bHaptics Support:"
 	cvar "vr_bhaptics"
-	rect 50 140 340 18
+	rect 50 158 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -419,6 +435,19 @@ itemDef {
 	name msg_sixdof
 	group grpVR
 	text "Physical head movement controls in-game movement (SP only)"
+	rect 50 340 352 18
+	textalign ITEM_ALIGN_CENTER
+	textalignx 176
+	textaligny 14
+	textscale .2
+	forecolor 1 .75 0 1
+	visible 0
+	decoration
+	}
+itemDef {
+	name msg_physcrouch
+	group grpVR
+	text "Crouching in real life crouches the player"
 	rect 50 340 352 18
 	textalign ITEM_ALIGN_CENTER
 	textalignx 176

@@ -3,6 +3,10 @@
 #include "vr_bg.h"
 #include "vr_game.h"
 
+#ifndef PLAYER_HEIGHT
+#define PLAYER_HEIGHT 48
+#endif
+
 // VR shared-state mirror. The engine's VR-aware QVM ladder scans each
 // module's .qvm for this sentinel, so the game module carries its own copy.
 const char vr_api_sentinel[] = VR_API_SENTINEL;
@@ -218,7 +222,8 @@ qboolean G_VR_MuzzlePoint( struct gentity_s *ent, const vec3_t forward, const ve
 
 	worldscale = trap_Cvar_VariableValue("vr_worldscale");
 	convertFromVR(ent, vr->weaponoffset, ent->r.currentOrigin, muzzlePoint);
-	muzzlePoint[2] -= ent->client->ps.viewheight;
+	// cgame draws the gun from this floor frame
+	muzzlePoint[2] += ent->client->ps.viewheight - PLAYER_HEIGHT;
 	muzzlePoint[2] += vr->hmdposition[1] * worldscale;
 	VectorCopy( muzzlePoint, origin );
 	return qtrue;
