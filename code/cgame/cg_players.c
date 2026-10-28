@@ -1402,6 +1402,10 @@ void CG_NewClientInfo( int clientNum ) {
 	// replace whatever was there with the new one
 	newInfo.infoValid = qtrue;
 	*ci = newInfo;
+
+	if ( clientNum == cg.clientNum ) {
+		CG_VoipCheckTarget();
+	}
 }
 
 

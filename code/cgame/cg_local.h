@@ -1794,6 +1794,7 @@ void CG_ScoreboardClick( void );
 qboolean CG_ConsoleCommand( void );
 void CG_InitConsoleCommands( void );
 qboolean CG_BuildTeamVoipTarget( char *buf, int bufSize );
+void CG_VoipCheckTarget( void );
 qboolean CG_VoteActive( void );
 qboolean CG_TeamVoteActive( void );
 qboolean CG_TVDOfferActive( void );

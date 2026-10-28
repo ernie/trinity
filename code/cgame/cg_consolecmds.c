@@ -822,6 +822,26 @@ static qboolean CG_VoipSetTarget( const char *channel ) {
 
 /*
 =================
+CG_VoipCheckTarget
+
+A team target chosen in a team mode outlives a switch to a mode without teams
+=================
+*/
+void CG_VoipCheckTarget( void ) {
+	char target[16];
+
+	if ( cgs.clientinfo[cg.clientNum].team != TEAM_FREE ) {
+		return;
+	}
+	trap_Cvar_VariableStringBuffer( "cl_voipSendTarget", target, sizeof( target ) );
+	if ( !Q_stricmp( target, "team" ) ) {
+		CG_VoipSetTarget( "spatial" );
+	}
+}
+
+
+/*
+=================
 CG_VoipTarget_f
 
 Cycle VOIP target (no args) or set explicitly: voiptarget [spatial|team|all]
