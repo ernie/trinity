@@ -2470,6 +2470,7 @@ static qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
 	end[2] -= SHADOW_DISTANCE;
 
 	trap_CM_BoxTrace( &trace, cent->lerpOrigin, end, mins, maxs, 0, MASK_PLAYERSOLID );
+	CG_TraceMovers( &trace, cent->lerpOrigin, mins, maxs, end, MASK_PLAYERSOLID );
 
 	// no shadow if too high
 	if ( trace.fraction == 1.0 || trace.startsolid || trace.allsolid ) {
@@ -2484,6 +2485,13 @@ static qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
 
 	// fade the shadow out with height
 	alpha = 1.0 - trace.fraction;
+
+	// the game sinks a body along a linear trajectory starting at trTime
+	if ( ( cent->currentState.eFlags & EF_DEAD ) && cent->currentState.number >= MAX_CLIENTS
+			&& cent->currentState.pos.trType == TR_LINEAR ) {
+		alpha *= Com_Clamp( 0.0f, 1.0f,
+			1.0f - ( cg.time - cent->currentState.pos.trTime ) / (float)BODY_SINK_TIME );
+	}
 
 	// bk0101022 - hack / FPE - bogus planes?
 	//assert( DotProduct( trace.plane.normal, trace.plane.normal ) != 0.0f ) 

@@ -22,6 +22,7 @@ void CG_Shutdown( void );
 qboolean intShaderTime = qfalse;
 qboolean linearLight = qfalse;
 qboolean projectDecal = qfalse;
+qboolean markFragments2 = qfalse;
 qboolean animFrame = qfalse;
 
 qboolean spritePolyTrap = qfalse;
@@ -31,7 +32,8 @@ qboolean polyFxTrap = qfalse;
 qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 void (*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
-void (*trap_R_ProjectDecal)( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
+void (*trap_R_ProjectDecal)( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime, qhandle_t model, const vec3_t modelOrigin, const vec3_t modelAxis[3] );
+int (*trap_R_MarkFragments2)( int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer, qhandle_t model, const vec3_t modelOrigin, const vec3_t modelAxis[3] );
 void (*trap_R_AddSpritePolyToScene)( qhandle_t hShader, const vec3_t origin, float width, float height, float rotation, const byte *rgba );
 void (*trap_R_AddPolysToScene2)( qhandle_t hShader, int numVerts, const polyVert_t *verts, int numPolys, int renderfx );
 void (*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
@@ -40,6 +42,7 @@ int dll_com_trapGetValue;
 int dll_trap_R_AddRefEntityToScene2;
 int dll_trap_R_AddLinearLightToScene;
 int dll_trap_R_ProjectDecal;
+int dll_trap_R_MarkFragments2;
 int dll_trap_R_AddSpritePolyToScene;
 int dll_trap_R_AddPolysToScene2;
 int dll_trap_VR_RegisterState;
@@ -1133,6 +1136,8 @@ static void CG_RegisterGraphics( void ) {
 		for ( j = 0 ; j < 3 ; j++ ) {
 			cgs.inlineModelMidpoints[i][j] = mins[j] + 0.5 * ( maxs[j] - mins[j] );
 		}
+		VectorCopy( mins, cgs.inlineModelMins[i] );
+		VectorCopy( maxs, cgs.inlineModelMaxs[i] );
 	}
 
 	// register all the server specified models
@@ -2029,6 +2034,10 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 			trap_R_ProjectDecal = (void*)~atoi( value );
 			projectDecal = qtrue;
 		}
+		if ( trap_GetValue( value, sizeof( value ), "trap_R_MarkFragments2" ) ) {
+			trap_R_MarkFragments2 = (void*)~atoi( value );
+			markFragments2 = qtrue;
+		}
 		if ( trap_GetValue( value, sizeof( value ), "trap_R_AddSpritePolyToScene" ) ) {
 			trap_R_AddSpritePolyToScene = (void*)~atoi( value );
 			spritePolyTrap = qtrue;
@@ -2053,6 +2062,10 @@ void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 		if ( trap_GetValue( value, sizeof( value ), "trap_R_ProjectDecal" ) ) {
 			dll_trap_R_ProjectDecal = atoi( value );
 			projectDecal = qtrue;
+		}
+		if ( trap_GetValue( value, sizeof( value ), "trap_R_MarkFragments2" ) ) {
+			dll_trap_R_MarkFragments2 = atoi( value );
+			markFragments2 = qtrue;
 		}
 		if ( trap_GetValue( value, sizeof( value ), "trap_R_AddSpritePolyToScene" ) ) {
 			dll_trap_R_AddSpritePolyToScene = atoi( value );

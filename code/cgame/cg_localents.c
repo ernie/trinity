@@ -94,6 +94,12 @@ or generates more localentities along a trail.
 // min gib speed (u/s) to keep trailing, so settling gibs don't stack trails
 #define GIB_TRAIL_SPEED	200
 
+// a pad that drops fragments back on itself lets them settle after this many
+#define JUMP_PAD_LAUNCHES	3
+
+// horizontal speed (u/s) that parts gibs launched together from one point
+#define JUMP_PAD_SCATTER	40
+
 /*
 ================
 CG_BloodTrail
@@ -234,17 +240,153 @@ void CG_FragmentBounceSound( localEntity_t *le, trace_t *trace ) {
 
 /*
 ================
+CG_DebrisTrace
+
+Movers at the pose they are drawn at, which debris rides
+================
+*/
+static void CG_DebrisTrace( trace_t *trace, const vec3_t start, const vec3_t end ) {
+	trap_CM_BoxTrace( trace, start, end, NULL, NULL, 0, CONTENTS_SOLID );
+	trace->entityNum = trace->fraction < 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
+	CG_TraceMovers( trace, start, vec3_origin, vec3_origin, end, CONTENTS_SOLID );
+}
+
+/*
+================
+CG_MoverAtPoint
+================
+*/
+static int CG_MoverAtPoint( const vec3_t point ) {
+	int					i;
+	const centity_t		*cent;
+
+	for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {
+		cent = &cg_entities[ cg.snap->entities[ i ].number ];
+		if ( !CG_MoverInlineModel( &cent->currentState ) ) {
+			continue;
+		}
+		if ( trap_CM_TransformedPointContents( point, trap_CM_InlineModel( cent->currentState.modelindex ),
+				cent->lerpOrigin, cent->lerpAngles ) & CONTENTS_SOLID ) {
+			return cent->currentState.number;
+		}
+	}
+	return ENTITYNUM_NONE;
+}
+
+/*
+================
+CG_RestOn
+================
+*/
+static void CG_RestOn( localEntity_t *le, int entityNum ) {
+	const centity_t	*mover;
+
+	le->groundEntityNum = entityNum;
+	if ( entityNum < 0 || entityNum >= ENTITYNUM_MAX_NORMAL ) {
+		return;
+	}
+	mover = &cg_entities[ entityNum ];
+	if ( !mover->currentValid || !CG_MoverInlineModel( &mover->currentState ) ) {
+		le->groundEntityNum = ENTITYNUM_NONE;
+		return;
+	}
+	VectorCopy( mover->lerpOrigin, le->moverOrigin );
+	VectorCopy( mover->lerpAngles, le->moverAngles );
+}
+
+/*
+================
+CG_CarryVector
+================
+*/
+static void CG_CarryVector( const vec3_t in, vec3_t from[3], vec3_t to[3], vec3_t out ) {
+	vec3_t	local;
+
+	local[0] = DotProduct( in, from[0] );
+	local[1] = DotProduct( in, from[1] );
+	local[2] = DotProduct( in, from[2] );
+	VectorScale( to[0], local[0], out );
+	VectorMA( out, local[1], to[1], out );
+	VectorMA( out, local[2], to[2], out );
+}
+
+/*
+================
+CG_RideMover
+================
+*/
+static void CG_RideMover( localEntity_t *le, vec3_t origin, vec3_t axis[3] ) {
+	const centity_t	*mover;
+	vec3_t			oldAxis[3], newAxis[3], newOrigin, offset;
+	int				i;
+
+	if ( le->groundEntityNum < 0 || le->groundEntityNum >= ENTITYNUM_MAX_NORMAL ) {
+		return;
+	}
+	mover = &cg_entities[ le->groundEntityNum ];
+	if ( !mover->currentValid || !CG_MoverInlineModel( &mover->currentState ) ) {
+		return;
+	}
+	if ( VectorCompare( mover->lerpOrigin, le->moverOrigin )
+			&& VectorCompare( mover->lerpAngles, le->moverAngles ) ) {
+		return;
+	}
+
+	AnglesToAxis( le->moverAngles, oldAxis );
+	CG_MoverPose( mover, newOrigin, newAxis );
+	VectorSubtract( origin, le->moverOrigin, offset );
+	CG_CarryVector( offset, oldAxis, newAxis, offset );
+	VectorAdd( newOrigin, offset, origin );
+	for ( i = 0 ; i < 3 ; i++ ) {
+		CG_CarryVector( axis[i], oldAxis, newAxis, axis[i] );
+	}
+
+	VectorCopy( mover->lerpOrigin, le->moverOrigin );
+	VectorCopy( mover->lerpAngles, le->moverAngles );
+}
+
+/*
+================
+CG_FragmentStepBack
+
+A mover that moved into a flying fragment hits it from where the fragment was
+last frame, carried along by the mover since then
+================
+*/
+static qboolean CG_FragmentStepBack( localEntity_t *le, const vec3_t end, trace_t *trace ) {
+	int		mover;
+	vec3_t	angles;
+
+	mover = CG_MoverAtPoint( le->refEntity.origin );
+	if ( mover == ENTITYNUM_NONE ) {
+		return qtrue;
+	}
+	if ( le->startTime == cg.time ) {
+		return qfalse;
+	}
+
+	// cg.frametime still holds the previous frame's interval while local entities run
+	CG_AdjustPositionForMover( le->refEntity.origin, mover, cg.oldTime, cg.time,
+		le->refEntity.origin, vec3_origin, angles );
+	CG_DebrisTrace( trace, le->refEntity.origin, end );
+	return !trace->startsolid;
+}
+
+/*
+================
 CG_ReflectVelocity
 ================
 */
 void CG_ReflectVelocity( localEntity_t *le, trace_t *trace ) {
-	vec3_t	velocity;
+	vec3_t	velocity, surface;
 	float	dot;
 	int		hitTime;
 
-	// reflect the velocity on the trace plane
+	// reflect the velocity on the trace plane, in the frame of the surface it hit
 	hitTime = cg.time - cg.frametime + cg.frametime * trace->fraction;
 	BG_EvaluateTrajectoryDelta( &le->pos, hitTime, velocity );
+	CG_MoverPointVelocity( trace->entityNum, trace->endpos, surface );
+	VectorSubtract( velocity, surface, velocity );
 	dot = DotProduct( velocity, trace->plane.normal );
 	VectorMA( velocity, -2*dot, trace->plane.normal, le->pos.trDelta );
 
@@ -252,16 +394,63 @@ void CG_ReflectVelocity( localEntity_t *le, trace_t *trace ) {
 
 	VectorCopy( trace->endpos, le->pos.trBase );
 	le->pos.trTime = cg.time;
+	le->launchPad = NULL;
 
 
 	// check for stop, making sure that even on low FPS systems it doesn't bobble
-	if ( trace->allsolid || 
-		( trace->plane.normal[2] > 0 && 
+	if ( trace->allsolid ||
+		( trace->plane.normal[2] > 0 &&
 		( le->pos.trDelta[2] < 40 || le->pos.trDelta[2] < -cg.frametime * le->pos.trDelta[2] ) ) ) {
 		le->pos.trType = TR_STATIONARY;
+		CG_RestOn( le, trace->entityNum );
 	} else {
-
+		VectorAdd( le->pos.trDelta, surface, le->pos.trDelta );
 	}
+}
+
+/*
+================
+CG_FragmentJumpPad
+================
+*/
+static qboolean CG_FragmentJumpPad( localEntity_t *le, const trace_t *trace ) {
+	centity_t	*pad;
+	vec3_t		delta;
+	float		fraction;
+	int			startTime;
+
+	if ( le->padLaunches >= JUMP_PAD_LAUNCHES || trace->allsolid ) {
+		return qfalse;
+	}
+
+	// rising out of the pad that launched it, the fragment is still inside its trigger
+	pad = CG_JumpPadTouched( le->refEntity.origin, trace->endpos, le->launchPad, &fraction );
+	if ( !pad ) {
+		return qfalse;
+	}
+
+	VectorSubtract( trace->endpos, le->refEntity.origin, delta );
+	VectorMA( le->refEntity.origin, fraction, delta, le->refEntity.origin );
+
+	startTime = cg.time - cg.frametime;
+	if ( startTime < le->pos.trTime ) {
+		startTime = le->pos.trTime;
+	}
+
+	le->pos.trType = TR_GRAVITY;
+	le->pos.trTime = startTime + (int)( ( cg.time - startTime ) * trace->fraction * fraction );
+	VectorCopy( le->refEntity.origin, le->pos.trBase );
+	VectorCopy( pad->currentState.origin2, le->pos.trDelta );
+	le->pos.trDelta[0] += crandom() * JUMP_PAD_SCATTER;
+	le->pos.trDelta[1] += crandom() * JUMP_PAD_SCATTER;
+
+	le->launchPad = pad;
+	le->padLaunches++;
+	if ( le->pos.trDelta[2] > 0 ) {
+		le->endTime += (int)( 2000 * le->pos.trDelta[2] / DEFAULT_GRAVITY );
+	}
+
+	return qtrue;
 }
 
 /*
@@ -277,7 +466,8 @@ static void CG_AddFragment( localEntity_t *le ) {
 		// sink into the ground if near the removal time
 		int		t;
 		float	oldZ;
-		
+
+		CG_RideMover( le, le->refEntity.origin, le->refEntity.axis );
 		t = le->endTime - cg.time;
 		if ( t < SINK_TIME ) {
 			// we must use an explicit lighting origin, otherwise the
@@ -300,7 +490,15 @@ static void CG_AddFragment( localEntity_t *le ) {
 	BG_EvaluateTrajectory( &le->pos, cg.time, newOrigin );
 
 	// trace a line from previous position to new position
-	CG_Trace( &trace, le->refEntity.origin, NULL, NULL, newOrigin, -1, CONTENTS_SOLID );
+	CG_DebrisTrace( &trace, le->refEntity.origin, newOrigin );
+	if ( trace.startsolid && !CG_FragmentStepBack( le, newOrigin, &trace ) ) {
+		CG_FreeLocalEntity( le );
+		return;
+	}
+	if ( CG_FragmentJumpPad( le, &trace ) ) {
+		BG_EvaluateTrajectory( &le->pos, cg.time, newOrigin );
+		CG_DebrisTrace( &trace, le->refEntity.origin, newOrigin );
+	}
 	if ( trace.fraction == 1.0 ) {
 		// still in free fall
 		VectorCopy( newOrigin, le->refEntity.origin );
@@ -391,7 +589,7 @@ dart instead of turning past it.
 */
 static void CG_AddGrapplePad( localEntity_t *le ) {
 	refEntity_t	*re = &le->refEntity;
-	vec3_t		newOrigin, ang, cleanOrigin, cleanOldOrigin, vel;
+	vec3_t		newOrigin, ang, cleanOrigin, cleanOldOrigin, vel, surface;
 	trace_t		trace;
 	float		t, u, c, retract, embed;
 	float		fpos;
@@ -399,9 +597,16 @@ static void CG_AddGrapplePad( localEntity_t *le ) {
 
 	t = ( cg.time - le->startTime ) * 0.001f;
 
+	if ( le->pos.trType == TR_STATIONARY ) {
+		CG_RideMover( le, le->pos.trBase, re->axis );
+	}
 	BG_EvaluateTrajectory( &le->pos, cg.time, newOrigin );
 	if ( le->pos.trType != TR_STATIONARY ) {
-		CG_Trace( &trace, re->origin, NULL, NULL, newOrigin, -1, CONTENTS_SOLID );
+		CG_DebrisTrace( &trace, re->origin, newOrigin );
+		if ( trace.startsolid && !CG_FragmentStepBack( le, newOrigin, &trace ) ) {
+			CG_FreeLocalEntity( le );
+			return;
+		}
 		if ( trace.fraction < 1.0f ) {
 			// reflect the CURRENT velocity: the trajectory's initial
 			// delta is dwarfed by the gravity term and reads as no bounce.
@@ -409,6 +614,8 @@ static void CG_AddGrapplePad( localEntity_t *le ) {
 			// which ends the hop: heavy machinery does not litter
 			// read before the reflect scrubs it
 			BG_EvaluateTrajectoryDelta( &le->pos, cg.time, vel );
+			CG_MoverPointVelocity( trace.entityNum, trace.endpos, surface );
+			VectorSubtract( vel, surface, vel );
 			hard = VectorLength( vel ) >= PAD_FALL_CLANK_SPEED;
 			CG_ReflectVelocity( le, &trace );
 
@@ -427,6 +634,7 @@ static void CG_AddGrapplePad( localEntity_t *le ) {
 				// pitch all fall while raw tumble integrated underneath, so
 				// freezing the raw angles snaps the pad crooked
 				CG_GrapplePadSettle( t, ang );
+				AnglesToAxis( ang, re->axis );
 				le->angles.trType = TR_STATIONARY;
 				VectorClear( le->angles.trDelta );
 			} else {
@@ -444,13 +652,13 @@ static void CG_AddGrapplePad( localEntity_t *le ) {
 	}
 	VectorCopy( re->origin, re->oldorigin );
 
-	BG_EvaluateTrajectory( &le->angles, cg.time, ang );
-	// at rest trBase already holds the frozen, settle-corrected attitude;
-	// pulling further would move a pad that has stopped
+	// at rest the axis holds the frozen, settle-corrected attitude, turned
+	// only by a mover the pad rides
 	if ( le->angles.trType != TR_STATIONARY ) {
+		BG_EvaluateTrajectory( &le->angles, cg.time, ang );
 		CG_GrapplePadSettle( t, ang );
+		AnglesToAxis( ang, re->axis );
 	}
-	AnglesToAxis( ang, re->axis );
 
 	// claws let go before the pad does, so walk the swing ramp frame by frame
 	// so the rigid blade never lerps across more than one ~8 deg step.  The
@@ -506,7 +714,7 @@ static void CG_AddGrapplePad( localEntity_t *le ) {
 	// re->origin/oldorigin hold the clean, un-embedded physics position
 	// everywhere except across this draw call: the same save/offset/draw/restore
 	// idiom as CG_AddFragment's ground-sink offset earlier in this file.
-	// GRAPPLE_PAD_EMBED is draw-only: it must not be there when CG_Trace
+	// GRAPPLE_PAD_EMBED is draw-only: it must not be there when CG_DebrisTrace
 	// above reads re->origin next frame
 	VectorCopy( re->origin, cleanOrigin );
 	VectorCopy( re->oldorigin, cleanOldOrigin );
@@ -1053,7 +1261,7 @@ void CG_AddInvulnerabilityJuiced( localEntity_t *le ) {
 	}
 	if ( t > 5000 ) {
 		le->endTime = 0;
-		CG_GibPlayer( le->refEntity.origin, vec3_origin );
+		CG_GibPlayer( le->refEntity.origin, vec3_origin, vec3_origin );
 	}
 	else {
 		trap_R_AddRefEntityToScene( &le->refEntity );
@@ -1402,8 +1610,8 @@ while tumble and scatter need only a ceiling: zero tumble is correct on a floor,
 and the kick already carries the pad clear without any scatter at all.
 ====================
 */
-void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClientNum, int stamp, int num,
-	qboolean posed ) {
+void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, const vec3_t carry, int ownerClientNum,
+	int stamp, int num, qboolean posed ) {
 	localEntity_t	*le;
 	refEntity_t		*re;
 	vec3_t			normal, right, up;
@@ -1425,7 +1633,7 @@ void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClien
 	VectorNegate( normal, normal );
 
 	// physics starts at the true impact point, NOT embedded like the anchored
-	// draw: an embedded trBase starts every CG_Trace in CG_AddGrapplePad
+	// draw: an embedded trBase starts every CG_DebrisTrace in CG_AddGrapplePad
 	// solid, and the pad never leaves the wall. The embedded look on the
 	// handoff frame is drawn-only, applied in CG_AddGrapplePad
 	VectorCopy( origin, le->pos.trBase );
@@ -1461,6 +1669,9 @@ void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClien
 				le->pos.trDelta );
 		}
 	}
+
+	// let go off a mover, it leaves at the speed the grip carried it
+	VectorAdd( le->pos.trDelta, carry, le->pos.trDelta );
 
 	// tumble comes from gravity's lever arm on the offset mass, so it vanishes
 	// when the normal is vertical: face down on a floor or hung off a ceiling,

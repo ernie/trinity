@@ -1077,34 +1077,50 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		// only a witness draws the debris and the scar
 		if ( trap_R_inPVS( cg.refdef.vieworg, position ) ) {
 			if ( es->eventParm ) {
+				// a hook on a mover falls and scars from its drawn pose; the matching
+				// time confirms the slot still holds this hook
+				const centity_t	*hook = es->time2 >= 0 && es->time2 < MAX_GENTITIES
+					? &cg_entities[ es->time2 ] : NULL;
+				const qboolean	posed = hook && es->otherEntityNum2 >= MAX_CLIENTS
+					&& hook->currentState.eType == ET_GRAPPLE && hook->currentState.time == es->time;
+				vec3_t			origin, axis[3], angles, carry;
+				qboolean		onMover;
+
+				// the event's origin is the server's last frame; the mover is drawn further along
+				onMover = posed && CG_GrapplePadMoverPose( &hook->currentState, origin, axis );
+				if ( onMover ) {
+					CG_AxisToAngles( axis, angles );
+					CG_MoverPointVelocity( es->otherEntityNum2, origin, carry );
+				} else {
+					VectorCopy( position, origin );
+					if ( posed ) {
+						VectorCopy( hook->lerpAngles, angles );
+					} else {
+						VectorCopy( es->angles, angles );
+					}
+					VectorClear( carry );
+				}
+
 				// only an anchored release has a claw to draw out of anything
 				if ( cgs.media.sfx_grapplefree ) {
 					trap_S_StartSound( position, ENTITYNUM_WORLD, CHAN_AUTO,
 						cgs.media.sfx_grapplefree );
 				}
-				{
-					// a hook on a mover falls from its drawn angles; the matching time
-					// confirms the slot still holds this hook
-					const centity_t	*hook = es->time2 >= 0 && es->time2 < MAX_GENTITIES
-						? &cg_entities[ es->time2 ] : NULL;
-					const qboolean	posed = hook && es->otherEntityNum2 >= MAX_CLIENTS
-						&& hook->currentState.eType == ET_GRAPPLE && hook->currentState.time == es->time;
-
-					CG_GrapplePadFall( position, posed ? hook->lerpAngles : es->angles,
-						es->otherEntityNum, es->time, es->time2, posed );
-				}
+				CG_GrapplePadFall( origin, angles, carry, es->otherEntityNum, es->time, es->time2, posed );
 				// the anchored scar is temporary and dies with the entity;
 				// leave the persistent, fading copy. s.time/time2 carry
 				// the hook's spin stamp and number so a witness who never
 				// had the anchored pad in a snapshot still lands the gouges
-				// under the claws. No scar on a mover (marks are static)
-				if ( es->otherEntityNum2 < MAX_CLIENTS && !es->modelindex2 ) {
-					vec3_t	axis[3];
-
-					CG_GrapplePadAnchorAxis( es->angles, es->time,
-						es->time2, axis );
-					CG_GrapplePadMark( position, axis, es->time, es->time2,
-						qfalse );
+				// under the claws. A scar on a mover needs the engine's mover marks
+				if ( !es->modelindex2 && ( es->otherEntityNum2 < MAX_CLIENTS || markFragments2 ) ) {
+					if ( onMover ) {
+						CG_GrapplePadMark( origin, axis, es->time, es->time2, qfalse );
+					} else {
+						CG_GrapplePadAnchorAxis( es->angles, es->time,
+							es->time2, axis );
+						CG_GrapplePadMark( position, axis, es->time, es->time2,
+							qfalse );
+					}
 				}
 			}
 		}
@@ -1309,7 +1325,12 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 #else
 		trap_S_StartSound( NULL, es->number, CHAN_BODY, cgs.media.gibSound );
 #endif
-		CG_GibPlayer( cent->lerpOrigin, cent->currentState.pos.trDelta );
+		{
+			vec3_t	carry;
+
+			CG_MoverPointVelocity( cent->currentState.groundEntityNum, cent->lerpOrigin, carry );
+			CG_GibPlayer( cent->lerpOrigin, cent->currentState.pos.trDelta, carry );
+		}
 		break;
 
 	case EV_STOPLOOPINGSOUND:

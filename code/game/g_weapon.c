@@ -762,7 +762,7 @@ void Weapon_HookFree (gentity_t *ent)
 		tent->s.eventParm = ( ent->s.eType == ET_GRAPPLE ) ? 1 : 0;
 		// the release scar re-derives the pad's spin from these; a witness
 		// who never had the anchored pad in a snapshot has no other source.
-		// otherEntityNum2 flags a mover anchor (no scar)
+		// otherEntityNum2 flags a mover anchor
 		tent->s.time = ent->s.time;
 		// 32 bits; generic1 is 8 on the wire. This is the release tent, not the
 		// hook: the hook entity's own time2 packs the hooked mover's parts instead,

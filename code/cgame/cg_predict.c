@@ -68,6 +68,47 @@ void CG_BuildSolidList( void ) {
 	}
 }
 
+/*
+====================
+CG_JumpPadTouched
+
+The first jump pad other than skip that the segment touches, and the fraction
+of the segment where it does; a start inside the pad touches it at 0
+====================
+*/
+centity_t *CG_JumpPadTouched( const vec3_t start, const vec3_t end, const centity_t *skip, float *fraction ) {
+	int				i;
+	float			hit;
+	trace_t			trace;
+	centity_t		*cent, *pad;
+	entityState_t	*ent;
+	clipHandle_t	cmodel;
+
+	pad = NULL;
+	*fraction = 1.0f;
+	for ( i = 0 ; i < cg_numTriggerEntities ; i++ ) {
+		cent = cg_triggerEntities[ i ];
+		ent = &cent->currentState;
+		if ( cent == skip || ent->eType != ET_PUSH_TRIGGER || ent->solid != SOLID_BMODEL ) {
+			continue;
+		}
+
+		cmodel = trap_CM_InlineModel( ent->modelindex );
+		if ( !cmodel ) {
+			continue;
+		}
+
+		trap_CM_BoxTrace( &trace, start, end, NULL, NULL, cmodel, -1 );
+		hit = trace.startsolid ? 0.0f : trace.fraction;
+		if ( hit < *fraction ) {
+			*fraction = hit;
+			pad = cent;
+		}
+	}
+
+	return pad;
+}
+
 
 /*
 ====================
@@ -203,6 +244,53 @@ void	CG_TraceRender( trace_t *result, const vec3_t start, const vec3_t mins, con
 	CG_ClipMoveToEntities (start, mins, maxs, end, skipNumber, mask, cg.time, NULL, &t);
 
 	*result = t;
+}
+
+/*
+================
+CG_TraceMovers
+
+Clips a finished world trace against the movers at their drawn pose
+================
+*/
+void	CG_TraceMovers( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
+					 int mask ) {
+	int				i;
+	trace_t			trace;
+	const centity_t	*cent;
+	vec3_t			sweepMins, sweepMaxs, p;
+
+	ClearBounds( sweepMins, sweepMaxs );
+	VectorAdd( start, mins, p );
+	AddPointToBounds( p, sweepMins, sweepMaxs );
+	VectorAdd( start, maxs, p );
+	AddPointToBounds( p, sweepMins, sweepMaxs );
+	VectorAdd( end, mins, p );
+	AddPointToBounds( p, sweepMins, sweepMaxs );
+	VectorAdd( end, maxs, p );
+	AddPointToBounds( p, sweepMins, sweepMaxs );
+
+	// cg.snap's movers are the ones lerped to this frame's drawn pose
+	for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {
+		cent = &cg_entities[ cg.snap->entities[ i ].number ];
+		if ( !CG_MoverInlineModel( &cent->currentState )
+				|| !CG_MoverTouchesBounds( cent, sweepMins, sweepMaxs ) ) {
+			continue;
+		}
+
+		trap_CM_TransformedBoxTrace( &trace, start, end, mins, maxs,
+			trap_CM_InlineModel( cent->currentState.modelindex ), mask, cent->lerpOrigin, cent->lerpAngles );
+
+		if ( trace.allsolid || trace.fraction < result->fraction ) {
+			trace.entityNum = cent->currentState.number;
+			*result = trace;
+		} else if ( trace.startsolid ) {
+			result->startsolid = qtrue;
+		}
+		if ( result->allsolid ) {
+			return;
+		}
+	}
 }
 
 /*

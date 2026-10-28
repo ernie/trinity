@@ -482,6 +482,45 @@ static const centity_t *CG_GrapplePadMover( const entityState_t *s ) {
 	return mover->currentValid && mover->currentState.eType == ET_MOVER ? mover : NULL;
 }
 
+/*
+===============
+CG_GrapplePadMoverPose
+
+A hook on a mover, re-derived from the mover's rendered trajectory so the pad
+paths with it; false for any other hook
+===============
+*/
+qboolean CG_GrapplePadMoverPose( const entityState_t *s, vec3_t origin, vec3_t axis[3] ) {
+	const centity_t	*mover;
+	vec3_t			morg, mang, a0, f, loc;
+	vec3_t			m[3], m0[3], axis0[3];
+	int				i;
+
+	mover = CG_GrapplePadMover( s );
+	if ( !mover ) {
+		return qfalse;
+	}
+
+	BG_EvaluateTrajectory( &mover->currentState.pos, cg.time, morg );
+	BG_EvaluateTrajectory( &mover->currentState.apos, cg.time, mang );
+	BG_CreateRotationMatrix( mang, m );
+	BG_MoverLocalToWorld( m, s->origin2, origin );
+	VectorAdd( morg, origin, origin );
+
+	// apply the spin before the mover's rotation; the spin rebuilds the side axes
+	// from the forward vector and would undo it
+	BG_EvaluateTrajectory( &mover->currentState.apos, s->time, a0 );
+	BG_CreateRotationMatrix( a0, m0 );
+	BG_MoverLocalToWorld( m0, s->angles2, f );
+	vectoangles( f, a0 );
+	CG_GrapplePadAnchorAxis( a0, s->time, s->number, axis0 );
+	for ( i = 0 ; i < 3 ; i++ ) {
+		BG_MoverWorldToLocal( m0, axis0[i], loc );
+		BG_MoverLocalToWorld( m, loc, axis[i] );
+	}
+	return qtrue;
+}
+
 void CG_GrappleHookAxis( const centity_t *cent, vec3_t axis[3] ) {
 	vec3_t	dir, angles;
 
@@ -723,7 +762,7 @@ void CG_AxisToAngles( vec3_t axis[3], vec3_t angles ) {
 static void CG_Grapple( centity_t *cent ) {
 	refEntity_t			ent;
 	entityState_t		*s1;
-	const centity_t		*mover;
+	vec3_t				moverAxis[3];
 	const weaponInfo_t		*weapon;
 	const clientInfo_t	*ci;
 	vec3_t				lightOrigin;
@@ -740,31 +779,8 @@ static void CG_Grapple( centity_t *cent ) {
 	CG_RegisterWeapon( s1->weapon );
 	weapon = &cg_weapons[s1->weapon];
 
-	// re-derive from the mover's rendered trajectory so the pad paths with it
-	mover = CG_GrapplePadMover( s1 );
-	if ( mover ) {
-		vec3_t	morg, mang, a0, f, loc;
-		vec3_t	m[3], m0[3], axis0[3], axis[3];
-		int		i;
-
-		BG_EvaluateTrajectory( &mover->currentState.pos, cg.time, morg );
-		BG_EvaluateTrajectory( &mover->currentState.apos, cg.time, mang );
-		BG_CreateRotationMatrix( mang, m );
-		BG_MoverLocalToWorld( m, s1->origin2, cent->lerpOrigin );
-		VectorAdd( morg, cent->lerpOrigin, cent->lerpOrigin );
-
-		// apply the spin before the mover's rotation; the spin rebuilds the side axes
-		// from the forward vector and would undo it
-		BG_EvaluateTrajectory( &mover->currentState.apos, s1->time, a0 );
-		BG_CreateRotationMatrix( a0, m0 );
-		BG_MoverLocalToWorld( m0, s1->angles2, f );
-		vectoangles( f, a0 );
-		CG_GrapplePadAnchorAxis( a0, s1->time, s1->number, axis0 );
-		for ( i = 0 ; i < 3 ; i++ ) {
-			BG_MoverWorldToLocal( m0, axis0[i], loc );
-			BG_MoverLocalToWorld( m, loc, axis[i] );
-		}
-		CG_AxisToAngles( axis, cent->lerpAngles );
+	if ( CG_GrapplePadMoverPose( s1, cent->lerpOrigin, moverAxis ) ) {
+		CG_AxisToAngles( moverAxis, cent->lerpAngles );
 	}
 
 	// the far end of the launcher's cell breathes on its envelope, always the
@@ -833,9 +849,9 @@ static void CG_Grapple( centity_t *cent ) {
 	CG_GrappleHookAxis( cent, ent.axis );
 
 	// temporary scar, re-projected per frame so it never ages under a held
-	// pad; the release event stamps the fading copy. No scar on a mover:
-	// mark polys are static world geometry and would be left hanging
-	if ( s1->otherEntityNum2 < MAX_CLIENTS && !s1->modelindex2 ) {
+	// pad; the release event stamps the fading copy. A scar on a mover
+	// needs the engine's mover marks
+	if ( !s1->modelindex2 && ( s1->otherEntityNum2 < MAX_CLIENTS || markFragments2 ) ) {
 		CG_GrapplePadMark( cent->lerpOrigin, ent.axis, s1->time, s1->number,
 			qtrue );
 	}
@@ -876,6 +892,86 @@ static void CG_Grapple( centity_t *cent ) {
 
 /*
 ===============
+CG_MoverPose
+
+Snapshot events cast marks before this frame's entity lerp runs
+===============
+*/
+void CG_MoverPose( const centity_t *cent, vec3_t origin, vec3_t axis[3] ) {
+	vec3_t	angles;
+
+	BG_EvaluateTrajectory( &cent->currentState.pos, cg.time, origin );
+	BG_EvaluateTrajectory( &cent->currentState.apos, cg.time, angles );
+	AnglesToAxis( angles, axis );
+}
+
+/*
+===============
+CG_MoverPointVelocity
+
+Velocity a point riding moverNum has now, turning included; zero off a mover
+===============
+*/
+#define	MOVER_VELOCITY_MS	10
+
+void CG_MoverPointVelocity( int moverNum, const vec3_t point, vec3_t velocity ) {
+	vec3_t	moved, angles;
+
+	CG_AdjustPositionForMover( point, moverNum, cg.time, cg.time + MOVER_VELOCITY_MS,
+		moved, vec3_origin, angles );
+	VectorSubtract( moved, point, velocity );
+	VectorScale( velocity, 1000.0f / MOVER_VELOCITY_MS, velocity );
+}
+
+/*
+===============
+CG_MoverInlineModel
+===============
+*/
+qhandle_t CG_MoverInlineModel( const entityState_t *s ) {
+	if ( s->eType != ET_MOVER || s->solid != SOLID_BMODEL
+			|| s->modelindex <= 0 || s->modelindex >= cgs.numInlineModels ) {
+		return 0;
+	}
+	return cgs.inlineDrawModel[ s->modelindex ];
+}
+
+/*
+===============
+CG_MoverTouchesBounds
+
+cent must pass CG_MoverInlineModel
+===============
+*/
+qboolean CG_MoverTouchesBounds( const centity_t *cent, const vec3_t mins, const vec3_t maxs ) {
+	const float	*modelMins, *modelMaxs;
+	vec3_t		origin, axis[3], center, extent;
+	float		mid, half;
+	int			i, j;
+
+	modelMins = cgs.inlineModelMins[ cent->currentState.modelindex ];
+	modelMaxs = cgs.inlineModelMaxs[ cent->currentState.modelindex ];
+	CG_MoverPose( cent, origin, axis );
+	VectorCopy( origin, center );
+	VectorClear( extent );
+	for ( j = 0 ; j < 3 ; j++ ) {
+		mid = 0.5f * ( modelMins[j] + modelMaxs[j] );
+		half = 0.5f * ( modelMaxs[j] - modelMins[j] );
+		for ( i = 0 ; i < 3 ; i++ ) {
+			center[i] += mid * axis[j][i];
+			extent[i] += fabs( half * axis[j][i] );
+		}
+	}
+	for ( i = 0 ; i < 3 ; i++ ) {
+		if ( center[i] + extent[i] < mins[i] || center[i] - extent[i] > maxs[i] ) {
+			return qfalse;
+		}
+	}
+	return qtrue;
+}
+
+/*
+===============
 CG_Mover
 ===============
 */
@@ -887,9 +983,8 @@ static void CG_Mover( const centity_t *cent ) {
 
 	// create the render entity
 	memset (&ent, 0, sizeof(ent));
-	VectorCopy( cent->lerpOrigin, ent.origin);
-	VectorCopy( cent->lerpOrigin, ent.oldorigin);
-	AnglesToAxis( cent->lerpAngles, ent.axis );
+	CG_MoverPose( cent, ent.origin, ent.axis );
+	VectorCopy( ent.origin, ent.oldorigin );
 
 	ent.renderfx = RF_NOSHADOW;
 
@@ -1390,6 +1485,14 @@ void CG_AddPacketEntities( void ) {
 
 	AnglesToAxis( cg.autoAngles, cg.autoAxis );
 	AnglesToAxis( cg.autoAnglesFast, cg.autoAxisFast );
+
+	// traces made while adding entities hit movers at this frame's pose
+	for ( num = 0 ; num < cg.snap->numEntities ; num++ ) {
+		cent = &cg_entities[ cg.snap->entities[ num ].number ];
+		if ( cent->currentState.eType == ET_MOVER ) {
+			CG_CalcEntityLerpPositions( cent );
+		}
+	}
 
 	// generate and add the entity from the playerstate
 	ps = &cg.predictedPlayerState;

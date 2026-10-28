@@ -93,6 +93,94 @@ markPoly_t	*CG_AllocMark( void ) {
 
 
 
+#define	MAX_MARK_FRAGMENTS	128
+#define	MAX_MARK_POINTS		384
+
+/*
+=================
+CG_MoverPointToWorld
+=================
+*/
+static void CG_MoverPointToWorld( const vec3_t local, const vec3_t moverOrigin, vec3_t moverAxis[3], vec3_t out ) {
+	VectorMA( moverOrigin, local[0], moverAxis[0], out );
+	VectorMA( out, local[1], moverAxis[1], out );
+	VectorMA( out, local[2], moverAxis[2], out );
+}
+
+/*
+=================
+CG_AddMarkFragments
+=================
+*/
+static void CG_AddMarkFragments( qhandle_t markShader, const vec3_t origin, vec3_t axis[3], float radius,
+		const float color[4], qboolean alphaFade, qboolean temporary,
+		int numFragments, markFragment_t *markFragments, vec3_t *markPoints,
+		int entityNum, qhandle_t model, const vec3_t moverOrigin, vec3_t moverAxis[3] ) {
+	float			texCoordScale;
+	byte			colors[4];
+	int				i, j;
+	markFragment_t	*mf;
+
+	texCoordScale = 0.5 * 1.0 / radius;
+
+	colors[0] = color[0] * 255;
+	colors[1] = color[1] * 255;
+	colors[2] = color[2] * 255;
+	colors[3] = color[3] * 255;
+
+	for ( i = 0, mf = markFragments ; i < numFragments ; i++, mf++ ) {
+		polyVert_t	*v;
+		polyVert_t	verts[MAX_VERTS_ON_POLY];
+		markPoly_t	*mark;
+
+		// we have an upper limit on the complexity of polygons
+		// that we store persistantly
+		if ( mf->numPoints > MAX_VERTS_ON_POLY ) {
+			mf->numPoints = MAX_VERTS_ON_POLY;
+		}
+		for ( j = 0, v = verts ; j < mf->numPoints ; j++, v++ ) {
+			vec3_t		world, delta;
+
+			if ( entityNum == ENTITYNUM_WORLD ) {
+				VectorCopy( markPoints[mf->firstPoint + j], world );
+			} else {
+				CG_MoverPointToWorld( markPoints[mf->firstPoint + j], moverOrigin, moverAxis, world );
+			}
+			if ( temporary ) {
+				VectorCopy( world, v->xyz );
+			} else {
+				VectorCopy( markPoints[mf->firstPoint + j], v->xyz );
+			}
+
+			VectorSubtract( world, origin, delta );
+			v->st[0] = 0.5 + DotProduct( delta, axis[1] ) * texCoordScale;
+			v->st[1] = 0.5 + DotProduct( delta, axis[2] ) * texCoordScale;
+			*(int *)v->modulate = *(int *)colors;
+		}
+
+		// if it is a temporary (shadow) mark, add it immediately and forget about it
+		if ( temporary ) {
+			trap_R_AddPolyToScene( markShader, mf->numPoints, verts );
+			continue;
+		}
+
+		// otherwise save it persistantly
+		mark = CG_AllocMark();
+		mark->time = cg.time;
+		mark->alphaFade = alphaFade;
+		mark->markShader = markShader;
+		mark->entityNum = entityNum;
+		mark->model = model;
+		mark->poly.numVerts = mf->numPoints;
+		mark->color[0] = color[0];
+		mark->color[1] = color[1];
+		mark->color[2] = color[2];
+		mark->color[3] = color[3];
+		memcpy( mark->verts, verts, mf->numPoints * sizeof( verts[0] ) );
+		markTotal++;
+	}
+}
+
 /*
 =================
 CG_ImpactMark
@@ -104,21 +192,21 @@ temporary marks will not be stored or randomly oriented, but immediately
 passed to the renderer.
 =================
 */
-#define	MAX_MARK_FRAGMENTS	128
-#define	MAX_MARK_POINTS		384
-
-void CG_ImpactMark( qhandle_t markShader, const vec3_t origin, const vec3_t dir, 
+void CG_ImpactMark( qhandle_t markShader, const vec3_t origin, const vec3_t dir,
 				   float orientation, float red, float green, float blue, float alpha,
 				   qboolean alphaFade, float radius, qboolean temporary ) {
 	vec3_t			axis[3];
-	float			texCoordScale;
 	vec3_t			originalPoints[4];
-	byte			colors[4];
-	int				i, j;
+	float			color[4];
+	int				i;
 	int				numFragments;
-	markFragment_t	markFragments[MAX_MARK_FRAGMENTS], *mf;
+	markFragment_t	markFragments[MAX_MARK_FRAGMENTS];
 	vec3_t			markPoints[MAX_MARK_POINTS];
 	vec3_t			projection;
+	vec3_t			markMins, markMaxs, p;
+	const centity_t	*cent;
+	qhandle_t		model;
+	vec3_t			moverOrigin, moverAxis[3];
 
 	if ( !cg_addMarks.integer && !temporary ) {
 		return;
@@ -138,8 +226,6 @@ void CG_ImpactMark( qhandle_t markShader, const vec3_t origin, const vec3_t dir,
 	RotatePointAroundVector( axis[2], axis[0], axis[1], orientation );
 	CrossProduct( axis[0], axis[2], axis[1] );
 
-	texCoordScale = 0.5 * 1.0 / radius;
-
 	// create the full polygon
 	for ( i = 0 ; i < 3 ; i++ ) {
 		originalPoints[0][i] = origin[i] - radius * axis[1][i] - radius * axis[2][i];
@@ -148,56 +234,48 @@ void CG_ImpactMark( qhandle_t markShader, const vec3_t origin, const vec3_t dir,
 		originalPoints[3][i] = origin[i] - radius * axis[1][i] + radius * axis[2][i];
 	}
 
+	color[0] = red;
+	color[1] = green;
+	color[2] = blue;
+	color[3] = alpha;
+
 	// get the fragments
 	VectorScale( dir, -20, projection );
 	numFragments = trap_CM_MarkFragments( 4, (void *)originalPoints,
 					projection, MAX_MARK_POINTS, markPoints[0],
 					MAX_MARK_FRAGMENTS, markFragments );
+	CG_AddMarkFragments( markShader, origin, axis, radius, color, alphaFade, temporary,
+		numFragments, markFragments, markPoints, ENTITYNUM_WORLD, 0, NULL, NULL );
 
-	colors[0] = red * 255;
-	colors[1] = green * 255;
-	colors[2] = blue * 255;
-	colors[3] = alpha * 255;
+	if ( !markFragments2 || !cg.snap ) {
+		return;
+	}
 
-	for ( i = 0, mf = markFragments ; i < numFragments ; i++, mf++ ) {
-		polyVert_t	*v;
-		polyVert_t	verts[MAX_VERTS_ON_POLY];
-		markPoly_t	*mark;
+	// the renderer clips within the projection's reach on both sides of the points
+	ClearBounds( markMins, markMaxs );
+	for ( i = 0 ; i < 4 ; i++ ) {
+		VectorAdd( originalPoints[i], projection, p );
+		AddPointToBounds( p, markMins, markMaxs );
+		VectorSubtract( originalPoints[i], projection, p );
+		AddPointToBounds( p, markMins, markMaxs );
+	}
 
-		// we have an upper limit on the complexity of polygons
-		// that we store persistantly
-		if ( mf->numPoints > MAX_VERTS_ON_POLY ) {
-			mf->numPoints = MAX_VERTS_ON_POLY;
-		}
-		for ( j = 0, v = verts ; j < mf->numPoints ; j++, v++ ) {
-			vec3_t		delta;
-
-			VectorCopy( markPoints[mf->firstPoint + j], v->xyz );
-
-			VectorSubtract( v->xyz, origin, delta );
-			v->st[0] = 0.5 + DotProduct( delta, axis[1] ) * texCoordScale;
-			v->st[1] = 0.5 + DotProduct( delta, axis[2] ) * texCoordScale;
-			*(int *)v->modulate = *(int *)colors;
-		}
-
-		// if it is a temporary (shadow) mark, add it immediately and forget about it
-		if ( temporary ) {
-			trap_R_AddPolyToScene( markShader, mf->numPoints, verts );
+	for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {
+		cent = &cg_entities[ cg.snap->entities[ i ].number ];
+		model = CG_MoverInlineModel( &cent->currentState );
+		if ( !model ) {
 			continue;
 		}
-
-		// otherwise save it persistantly
-		mark = CG_AllocMark();
-		mark->time = cg.time;
-		mark->alphaFade = alphaFade;
-		mark->markShader = markShader;
-		mark->poly.numVerts = mf->numPoints;
-		mark->color[0] = red;
-		mark->color[1] = green;
-		mark->color[2] = blue;
-		mark->color[3] = alpha;
-		memcpy( mark->verts, verts, mf->numPoints * sizeof( verts[0] ) );
-		markTotal++;
+		if ( !CG_MoverTouchesBounds( cent, markMins, markMaxs ) ) {
+			continue;
+		}
+		CG_MoverPose( cent, moverOrigin, moverAxis );
+		numFragments = trap_R_MarkFragments2( 4, (void *)originalPoints,
+						projection, MAX_MARK_POINTS, markPoints[0],
+						MAX_MARK_FRAGMENTS, markFragments,
+						model, moverOrigin, (const vec3_t *)moverAxis );
+		CG_AddMarkFragments( markShader, origin, axis, radius, color, alphaFade, temporary,
+			numFragments, markFragments, markPoints, cent->currentState.number, model, moverOrigin, moverAxis );
 	}
 }
 
@@ -215,6 +293,9 @@ void CG_AddMarks( void ) {
 	markPoly_t	*mp, *next;
 	int			t;
 	int			fade;
+	const centity_t	*mover;
+	vec3_t		moverOrigin, moverAxis[3];
+	polyVert_t	verts[MAX_VERTS_ON_POLY];
 
 	if ( !cg_addMarks.integer ) {
 		return;
@@ -230,6 +311,19 @@ void CG_AddMarks( void ) {
 		if ( cg.time > mp->time + MARK_TOTAL_TIME ) {
 			CG_FreeMarkPoly( mp );
 			continue;
+		}
+
+		mover = NULL;
+		if ( mp->entityNum != ENTITYNUM_WORLD ) {
+			mover = &cg_entities[ mp->entityNum ];
+			// the number now belongs to another entity or model
+			if ( CG_MoverInlineModel( &mover->currentState ) != mp->model ) {
+				CG_FreeMarkPoly( mp );
+				continue;
+			}
+			if ( !mover->currentValid ) {
+				continue;
+			}
 		}
 
 		// fade out the energy bursts
@@ -267,6 +361,15 @@ void CG_AddMarks( void ) {
 			}
 		}
 
+		if ( mover ) {
+			CG_MoverPose( mover, moverOrigin, moverAxis );
+			for ( j = 0 ; j < mp->poly.numVerts ; j++ ) {
+				verts[j] = mp->verts[j];
+				CG_MoverPointToWorld( mp->verts[j].xyz, moverOrigin, moverAxis, verts[j].xyz );
+			}
+			trap_R_AddPolyToScene( mp->markShader, mp->poly.numVerts, verts );
+			continue;
+		}
 
 		trap_R_AddPolyToScene( mp->markShader, mp->poly.numVerts, mp->verts );
 	}

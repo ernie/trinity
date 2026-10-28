@@ -319,6 +319,8 @@ typedef struct markPoly_s {
 	qhandle_t	markShader;
 	qboolean	alphaFade;		// fade alpha instead of rgb
 	float		color[4];
+	int			entityNum;		// ENTITYNUM_WORLD, or a mover whose model space holds verts
+	qhandle_t	model;
 	poly_t		poly;
 	polyVert_t	verts[MAX_VERTS_ON_POLY];
 } markPoly_t;
@@ -392,6 +394,11 @@ typedef struct localEntity_s {
 
 	leMarkType_t		leMarkType;		// mark to leave on fragment impact
 	leBounceSoundType_t	leBounceSoundType;
+	int				padLaunches;
+	centity_t		*launchPad;			// the jump pad that launched the current flight
+	int				groundEntityNum;
+	vec3_t			moverOrigin;		// the ridden mover's pose when last carried
+	vec3_t			moverAngles;
 
 	refEntity_t		refEntity;		
 } localEntity_t;
@@ -1337,6 +1344,8 @@ typedef struct {
 	int				numInlineModels;
 	qhandle_t		inlineDrawModel[MAX_MODELS];
 	vec3_t			inlineModelMidpoints[MAX_MODELS];
+	vec3_t			inlineModelMins[MAX_MODELS];
+	vec3_t			inlineModelMaxs[MAX_MODELS];
 
 	clientInfo_t	clientinfo[MAX_CLIENTS];
 
@@ -1589,6 +1598,9 @@ void CG_Trace( trace_t *result, const vec3_t start, const vec3_t mins, const vec
 					 int skipNumber, int mask );
 void CG_TraceRender( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
 					 int skipNumber, int mask );
+void CG_TraceMovers( trace_t *result, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end,
+					 int mask );
+centity_t *CG_JumpPadTouched( const vec3_t start, const vec3_t end, const centity_t *skip, float *fraction );
 void CG_PredictPlayerState( void );
 int CG_GrappleLatchAnchor( void );
 void CG_LoadDeferredPlayers( void );
@@ -1612,9 +1624,14 @@ void CG_PainEvent( centity_t *cent, int health );
 void CG_SetEntitySoundPosition( const centity_t *cent );
 void CG_AddPacketEntities( void );
 void CG_Beam( const centity_t *cent );
+void CG_MoverPose( const centity_t *cent, vec3_t origin, vec3_t axis[3] );
+void CG_MoverPointVelocity( int moverNum, const vec3_t point, vec3_t velocity );
+qhandle_t CG_MoverInlineModel( const entityState_t *s );
+qboolean CG_MoverTouchesBounds( const centity_t *cent, const vec3_t mins, const vec3_t maxs );
 void CG_GrappleHookAxis( const centity_t *cent, vec3_t axis[3] );
 void CG_GrapplePadAnchorAxis( const vec3_t angles, int stamp, int num,
 		vec3_t axis[3] );
+qboolean CG_GrapplePadMoverPose( const entityState_t *s, vec3_t origin, vec3_t axis[3] );
 void CG_AxisToAngles( vec3_t axis[3], vec3_t angles );
 void CG_GrapplePadMark( const vec3_t origin, vec3_t axis[3], int stamp, int num,
 		qboolean temporary );
@@ -1696,8 +1713,8 @@ void	CG_InitLocalEntities( void );
 localEntity_t	*CG_AllocLocalEntity( void );
 void	CG_AddLocalEntities( void );
 // posed: angles already include the spin, as drawn
-void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, int ownerClientNum, int stamp, int num,
-	qboolean posed );
+void CG_GrapplePadFall( const vec3_t origin, const vec3_t angles, const vec3_t carry, int ownerClientNum,
+	int stamp, int num, qboolean posed );
 
 //
 // cg_effects.c
@@ -1741,7 +1758,7 @@ void CG_LightningBoltBeam( vec3_t start, vec3_t end );
 void CG_ScorePlum( int client, const vec3_t origin, int score );
 void CG_DamagePlum( vec3_t org, int damage );
 
-void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity );
+void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity, const vec3_t carry );
 void CG_BigExplode( vec3_t playerOrigin );
 
 void CG_BloodDecal( const vec3_t origin, float radius );
@@ -2038,6 +2055,7 @@ int CG_NewParticleArea ( int num );
 extern  qboolean intShaderTime;
 extern  qboolean linearLight;
 extern  qboolean projectDecal;
+extern  qboolean markFragments2;
 extern  qboolean animFrame;
 extern  qboolean spritePolyTrap;
 extern  qboolean polyFxTrap;
@@ -2046,7 +2064,8 @@ extern  qboolean polyFxTrap;
 extern qboolean (*trap_GetValue)( char *value, int valueSize, const char *key );
 extern void (*trap_R_AddRefEntityToScene2)( const refEntity_t *re );
 extern void	(*trap_R_AddLinearLightToScene)( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
-extern void	(*trap_R_ProjectDecal)( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
+extern void	(*trap_R_ProjectDecal)( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime, qhandle_t model, const vec3_t modelOrigin, const vec3_t modelAxis[3] );
+extern int	(*trap_R_MarkFragments2)( int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer, qhandle_t model, const vec3_t modelOrigin, const vec3_t modelAxis[3] );
 extern void	(*trap_R_AddSpritePolyToScene)( qhandle_t hShader, const vec3_t origin, float width, float height, float rotation, const byte *rgba );
 extern void	(*trap_R_AddPolysToScene2)( qhandle_t hShader, int numVerts, const polyVert_t *verts, int numPolys, int renderfx );
 extern void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, int apiMinor );
@@ -2054,7 +2073,8 @@ extern void	(*trap_VR_RegisterState)( void *state, int stateSize, int apiMajor, 
 qboolean trap_GetValue( char *value, int valueSize, const char *key );
 void trap_R_AddRefEntityToScene2( const refEntity_t *re );
 void trap_R_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
-void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime );
+void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime, qhandle_t model, const vec3_t modelOrigin, const vec3_t modelAxis[3] );
+int trap_R_MarkFragments2( int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer, qhandle_t model, const vec3_t modelOrigin, const vec3_t modelAxis[3] );
 void trap_R_AddSpritePolyToScene( qhandle_t hShader, const vec3_t origin, float width, float height, float rotation, const byte *rgba );
 void trap_R_AddPolysToScene2( qhandle_t hShader, int numVerts, const polyVert_t *verts, int numPolys, int renderfx );
 void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor );
@@ -2062,6 +2082,7 @@ extern int dll_com_trapGetValue;
 extern int dll_trap_R_AddRefEntityToScene2;
 extern int dll_trap_R_AddLinearLightToScene;
 extern int dll_trap_R_ProjectDecal;
+extern int dll_trap_R_MarkFragments2;
 extern int dll_trap_R_AddSpritePolyToScene;
 extern int dll_trap_R_AddPolysToScene2;
 extern int dll_trap_VR_RegisterState;

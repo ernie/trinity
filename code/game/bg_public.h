@@ -11,6 +11,7 @@
 
 #define	DEFAULT_GRAVITY		800
 #define	GIB_HEALTH			-40
+#define	BODY_SINK_TIME		1500
 
 #define	HEALTH_SOFT_LIMIT	100
 #define	AMMO_HARD_LIMIT		200

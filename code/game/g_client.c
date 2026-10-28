@@ -294,14 +294,25 @@ After sitting around for five seconds, fall into the ground and dissapear
 =============
 */
 void BodySink( gentity_t *ent ) {
-	if ( level.time - ent->timestamp > 6500 ) {
+	if ( ent->s.pos.trType == TR_STATIONARY ) {
+		// the sink passes through the floor, so it runs outside G_RunItem
+		ent->physicsObject = qfalse;
+		ent->s.pos.trType = TR_LINEAR;
+		ent->s.pos.trTime = level.time;
+		VectorSet( ent->s.pos.trDelta, 0, 0, -10 );
+	} else if ( ent->s.pos.trType != TR_LINEAR ) {
+		ent->nextthink = level.time + FRAMETIME;
+		return;
+	}
+
+	if ( level.time - ent->s.pos.trTime >= BODY_SINK_TIME ) {
 		// the body ques are never actually freed, they are just unlinked
 		trap_UnlinkEntity( ent );
-		ent->physicsObject = qfalse;
-		return;	
+		return;
 	}
-	ent->nextthink = level.time + FRAMETIME;
-	ent->s.pos.trBase[2] -= 1;
+	BG_EvaluateTrajectory( &ent->s.pos, level.time, ent->r.currentOrigin );
+	trap_LinkEntity( ent );
+	ent->nextthink = level.time + 1;
 }
 
 
@@ -358,7 +369,6 @@ void CopyToBodyQue( gentity_t *ent ) {
 	body->s.powerups = 0;	// clear powerups
 	body->s.loopSound = 0;	// clear lava burning
 	body->s.number = body - g_entities;
-	body->timestamp = level.time;
 	body->physicsObject = qtrue;
 	body->physicsBounce = 0;		// don't bounce
 	if ( body->s.groundEntityNum == ENTITYNUM_NONE ) {

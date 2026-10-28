@@ -445,8 +445,12 @@ void trap_R_AddPolysToScene2( qhandle_t hShader, int numVerts, const polyVert_t 
 	syscall( dll_trap_R_AddPolysToScene2, hShader, numVerts, verts, numPolys, renderfx );
 }
 
-void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime ) {
-	syscall( dll_trap_R_ProjectDecal, origin, PASSFLOAT(size), PASSFLOAT(reach), PASSFLOAT(orientation), hShader, rgba, lifeTime );
+void trap_R_ProjectDecal( const vec3_t origin, float size, float reach, float orientation, qhandle_t hShader, const float rgba[4], int lifeTime, qhandle_t model, const vec3_t modelOrigin, const vec3_t modelAxis[3] ) {
+	syscall( dll_trap_R_ProjectDecal, origin, PASSFLOAT(size), PASSFLOAT(reach), PASSFLOAT(orientation), hShader, rgba, lifeTime, model, modelOrigin, modelAxis );
+}
+
+int trap_R_MarkFragments2( int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer, qhandle_t model, const vec3_t modelOrigin, const vec3_t modelAxis[3] ) {
+	return syscall( dll_trap_R_MarkFragments2, numPoints, points, projection, maxPoints, pointBuffer, maxFragments, fragmentBuffer, model, modelOrigin, modelAxis );
 }
 
 void trap_VR_RegisterState( void *state, int stateSize, int apiMajor, int apiMinor ) {

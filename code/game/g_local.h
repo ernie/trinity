@@ -128,7 +128,7 @@ struct gentity_s {
 
 	char		*message;
 
-	int			timestamp;		// body queue sinking, etc
+	int			timestamp;
 
 	float		angle;			// set in editor, -1 = up, -2 = down
 	const char	*target;

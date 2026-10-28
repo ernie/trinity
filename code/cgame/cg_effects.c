@@ -563,14 +563,38 @@ void CG_BloodDecal( const vec3_t origin, float radius ) {
 	const bloodTuning_t *tuning = CG_BloodTuning();
 	float size  = radius * tuning->decalScale;	// painted footprint
 	float reach = radius * tuning->decalReach;	// surface-search distance
+	float orientation;
+	qhandle_t shader;
+	vec3_t mins, maxs, moverOrigin, moverAxis[3];
+	centity_t *cent;
+	qhandle_t model;
+	int i;
 
 	// projectDecal is the A1 capability flag: false on an engine without the
 	// extension, so Modern blood silently falls back to no engine decals.
 	if ( !tuning->decals || !projectDecal || size <= 0 ) {
 		return;
 	}
-	trap_R_ProjectDecal( origin, size, reach, random() * 360.0f,
-		cgs.media.bloodSplatShader[ rand() & 3 ], red, tuning->decalTime );
+	orientation = random() * 360.0f;
+	shader = cgs.media.bloodSplatShader[ rand() & 3 ];
+	trap_R_ProjectDecal( origin, size, reach, orientation, shader, red, tuning->decalTime,
+		0, NULL, NULL );
+
+	if ( !cg.snap ) {
+		return;
+	}
+	VectorSet( mins, origin[0] - reach, origin[1] - reach, origin[2] - reach );
+	VectorSet( maxs, origin[0] + reach, origin[1] + reach, origin[2] + reach );
+	for ( i = 0 ; i < cg.snap->numEntities ; i++ ) {
+		cent = &cg_entities[ cg.snap->entities[ i ].number ];
+		model = CG_MoverInlineModel( &cent->currentState );
+		if ( !model || !CG_MoverTouchesBounds( cent, mins, maxs ) ) {
+			continue;
+		}
+		CG_MoverPose( cent, moverOrigin, moverAxis );
+		trap_R_ProjectDecal( origin, size, reach, orientation, shader, red, tuning->decalTime,
+			model, moverOrigin, (const vec3_t *)moverAxis );
+	}
 }
 
 
@@ -905,14 +929,15 @@ Generated a bunch of gibs launching out from the bodies location
 #define	GIB_INHERIT_SCALE	1.0f	// how much of the hit's momentum gibs carry
 
 // Build one gib's launch velocity: inherited momentum (scaled by k) plus
-// random scatter, with an upward floor. base is the gibbing entity's trDelta.
-static void CG_GibVelocity( const vec3_t base, float k, float scatter, float jump, vec3_t out ) {
-	out[0] = base[0] * k + crandom() * scatter;
-	out[1] = base[1] * k + crandom() * scatter;
-	out[2] = base[2] * k + jump + crandom() * scatter;
+// random scatter, with an upward floor. base is the gibbing entity's trDelta;
+// carry is the velocity of the mover it stood on.
+static void CG_GibVelocity( const vec3_t base, const vec3_t carry, float k, float scatter, float jump, vec3_t out ) {
+	out[0] = base[0] * k + carry[0] + crandom() * scatter;
+	out[1] = base[1] * k + carry[1] + crandom() * scatter;
+	out[2] = base[2] * k + carry[2] + jump + crandom() * scatter;
 }
 
-void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity ) {
+void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity, const vec3_t carry ) {
 	vec3_t	origin, velocity;
 	float	scatter, jump, k;
 
@@ -938,7 +963,7 @@ void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity ) {
 	}
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	if ( rand() & 1 ) {
 		CG_LaunchGib( origin, velocity, cgs.media.gibSkull );
 	} else {
@@ -951,39 +976,39 @@ void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity ) {
 	}
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	CG_LaunchGib( origin, velocity, cgs.media.gibAbdomen );
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	CG_LaunchGib( origin, velocity, cgs.media.gibArm );
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	CG_LaunchGib( origin, velocity, cgs.media.gibChest );
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	CG_LaunchGib( origin, velocity, cgs.media.gibFist );
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	CG_LaunchGib( origin, velocity, cgs.media.gibFoot );
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	CG_LaunchGib( origin, velocity, cgs.media.gibForearm );
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	CG_LaunchGib( origin, velocity, cgs.media.gibIntestine );
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	CG_LaunchGib( origin, velocity, cgs.media.gibLeg );
 
 	VectorCopy( playerOrigin, origin );
-	CG_GibVelocity( baseVelocity, k, scatter, jump, velocity );
+	CG_GibVelocity( baseVelocity, carry, k, scatter, jump, velocity );
 	CG_LaunchGib( origin, velocity, cgs.media.gibLeg );
 }
 
