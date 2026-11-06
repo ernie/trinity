@@ -232,7 +232,7 @@ typedef enum {
 	STAT_CLIENTS_READY,				// bit mask of clients wishing to exit the intermission (FIXME: configstring?)
 	STAT_MAX_HEALTH,				// health / armor limit, changable by handicap
 	STAT_VR_HEAD_PITCH,				// VR head pitch angle (packed as short for demo playback)
-	STAT_VR_HEAD_YAW_OFFSET,		// VR head yaw offset from weapon direction (packed as short)
+	STAT_VR_HEAD_YAW_OFFSET,		// VR head yaw offset from the view yaw (packed as short)
 	STAT_JUMPTIME,					// CPM double-jump timer (counts down from 400ms)
 	STAT_ARMORTYPE					// CPM tiered armor: 0=none, 1=GA, 2=YA, 3=RA
 } statIndex_t;

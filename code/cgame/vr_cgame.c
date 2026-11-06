@@ -48,6 +48,8 @@ static vec3_t   vrc_weaponSelectorOffset;
 static float    vrc_portraitPitch;
 static float    vrc_portraitYaw;
 static qboolean vrc_portraitInitialized;
+static float    vrc_headYawOffset;
+static int      vrc_headYawOffsetTime;
 static qhandle_t vrc_reticleShader;
 static qhandle_t vrc_hudShader;
 static qhandle_t vrc_smallSphereModel;
@@ -3295,7 +3297,8 @@ qboolean CG_VR_PortraitHeadAngles( vec3_t angles ) {
 		return qfalse;
 	}
 
-	targetYaw   = 180.0f + (float)ps->stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f;
+	targetYaw   = 180.0f + ( vrc_headYawOffsetTime == cg.time ? vrc_headYawOffset
+		: (float)ps->stats[STAT_VR_HEAD_YAW_OFFSET] / 182.04f );
 	targetPitch = (float)ps->stats[STAT_VR_HEAD_PITCH] / 182.04f;
 
 	if ( !vrc_portraitInitialized || cg.nextFrameTeleport ) {
@@ -3575,6 +3578,54 @@ static vrHeadOrient_t *CG_VR_HeadOrientFor( const centity_t *cent ) {
 	return &vr_headOrient[cent->currentState.number];
 }
 
+static qboolean CG_VR_PlayerTorsoPose( const centity_t *cent, const vec3_t torsoAngles, refEntity_t *torso ) {
+	const clientInfo_t	*ci = &cgs.clientinfo[cent->currentState.clientNum];
+	refEntity_t			legs;
+	vec3_t				absoluteAngles, legsAngles, localAngles;
+
+	if ( !ci->legsModel || !ci->torsoModel ) {
+		return qfalse;
+	}
+	VectorCopy( torsoAngles, absoluteAngles );
+
+	memset( &legs, 0, sizeof( legs ) );
+	VectorCopy( cent->lerpOrigin, legs.origin );
+	VectorSet( legsAngles, 0, ci->fixedlegs ? absoluteAngles[YAW] : cent->pe.legs.yawAngle, 0 );
+	AnglesToAxis( legsAngles, legs.axis );
+	legs.oldframe = cent->pe.legs.oldFrame;
+	legs.frame = cent->pe.legs.frame;
+	legs.backlerp = cent->pe.legs.backlerp;
+
+	memset( torso, 0, sizeof( *torso ) );
+	AnglesSubtract( absoluteAngles, legsAngles, localAngles );
+	AnglesToAxis( localAngles, torso->axis );
+	CG_PositionRotatedEntityOnTag( torso, &legs, ci->legsModel, "tag_torso" );
+	torso->oldframe = cent->pe.torso.oldFrame;
+	torso->frame = cent->pe.torso.frame;
+	torso->backlerp = cent->pe.torso.backlerp;
+	return qtrue;
+}
+
+static float CG_VR_GunYawBias( const centity_t *cent ) {
+	const clientInfo_t	*ci = &cgs.clientinfo[cent->currentState.clientNum];
+	orientation_t		torsoTag, weaponTag;
+	vec3_t				axis[3];
+	int					anim, legsFrame, torsoFrame;
+
+	if ( ( cent->currentState.eFlags & EF_DEAD ) || cent->currentState.weapon == WP_GAUNTLET
+			|| !ci->legsModel || !ci->torsoModel ) {
+		return 0.0f;
+	}
+
+	anim = cent->currentState.legsAnim & ~ANIM_TOGGLEBIT;
+	legsFrame = ci->animations[( anim == LEGS_WALKCR || anim == LEGS_IDLECR ) ? LEGS_IDLECR : LEGS_IDLE].firstFrame;
+	torsoFrame = ci->animations[TORSO_STAND].firstFrame;
+	trap_R_LerpTag( &torsoTag, ci->legsModel, legsFrame, legsFrame, 0.0f, "tag_torso" );
+	trap_R_LerpTag( &weaponTag, ci->torsoModel, torsoFrame, torsoFrame, 0.0f, "tag_weapon" );
+	MatrixMultiply( weaponTag.axis, torsoTag.axis, axis );
+	return RAD2DEG( atan2( axis[0][1], axis[0][0] ) );
+}
+
 void CG_VR_PlayerHeadLerp( centity_t *cent ) {
 	if ((cent->currentState.eFlags & EF_VR_PLAYER) && !(cent->currentState.eFlags & EF_DEAD)) {
 		float headPitch, headYawOffset;
@@ -3599,7 +3650,8 @@ qboolean CG_VR_PlayerTorsoYaw( centity_t *cent, const vec3_t headAngles, vec3_t 
 		return qfalse;
 	}
 
-	torsoAngles[YAW] = headAngles[YAW];
+	// stand poses hold the gun off the torso's line
+	torsoAngles[YAW] = AngleMod( headAngles[YAW] - CG_VR_GunYawBias( cent ) );
 	cent->pe.torso.yawAngle = torsoAngles[YAW];
 	cent->pe.torso.yawing = qfalse;
 	return qtrue;
@@ -3623,7 +3675,9 @@ void CG_VR_PlayerSaveAbsoluteTorso( const centity_t *cent, const vec3_t torsoAng
 
 void CG_VR_PlayerHeadAngles( centity_t *cent, const vec3_t absoluteTorsoAngles, vec3_t headAngles ) {
 	vec3_t headWorldAngles, headLocalAngles;
-	vec3_t headWorldAxis[3], torsoWorldAxis[3], torsoInverseAxis[3], headLocalAxis[3];
+	vec3_t headWorldAxis[3], parentAxis[3], parentInverseAxis[3], headLocalAxis[3];
+	refEntity_t torso;
+	orientation_t headTag;
 
 	if (cent->currentState.eFlags & EF_VR_PLAYER) {
 		headWorldAngles[PITCH] = CG_VR_HeadOrientFor( cent )->pitch;
@@ -3631,10 +3685,21 @@ void CG_VR_PlayerHeadAngles( centity_t *cent, const vec3_t absoluteTorsoAngles, 
 		headWorldAngles[ROLL] = cent->lerpAngles[ROLL];
 
 		AnglesToAxis(headWorldAngles, headWorldAxis);
-		AnglesToAxis(absoluteTorsoAngles, torsoWorldAxis);
-		AxisTranspose(torsoWorldAxis, torsoInverseAxis);
+		if ( cent == &cg.predictedPlayerEntity ) {
+			vrc_headYawOffset = AngleSubtract( headWorldAngles[YAW], cent->lerpAngles[YAW] );
+			vrc_headYawOffsetTime = cg.time;
+		}
+		// solve against the torso and tag_head as drawn, so animation tag rotations cancel
+		if ( CG_VR_PlayerTorsoPose( cent, absoluteTorsoAngles, &torso ) ) {
+			trap_R_LerpTag( &headTag, cgs.clientinfo[cent->currentState.clientNum].torsoModel,
+				torso.oldframe, torso.frame, 1.0f - torso.backlerp, "tag_head" );
+			MatrixMultiply( headTag.axis, torso.axis, parentAxis );
+		} else {
+			AnglesToAxis( absoluteTorsoAngles, parentAxis );
+		}
+		AxisTranspose(parentAxis, parentInverseAxis);
 
-		MatrixMultiply(headWorldAxis, torsoInverseAxis, headLocalAxis);
+		MatrixMultiply(headWorldAxis, parentInverseAxis, headLocalAxis);
 
 		AxisToAngles(headLocalAxis, headLocalAngles);
 
@@ -3655,18 +3720,20 @@ CG_VR_PredictedPlayerHead
 
 Feeds the local VR player's HMD orientation into the predicted-player
 entity state so mirror/third-person-follow rendering shows the real head
-pose, skipping demo playback (would replace recorded angles) and the
-virtual screen (no head movement during menus). The read side is
+pose, skipping demo playback (would replace recorded angles), following
+another player (their head comes from the snapshot) and the virtual screen
+(no head movement during menus). The read side is
 CG_PlayerAngles' CG_VR_PlayerHeadLerp/CG_VR_PlayerHeadAngles hooks.
 =================
 */
 void CG_VR_PredictedPlayerHead( void ) {
-	if ( !( vrActive && !cg.demoPlayback && !vr->virtual_screen ) ) {
+	if ( !( vrActive && !cg.demoPlayback && !vr->virtual_screen ) || ( cg.snap->ps.pm_flags & PMF_FOLLOW ) ) {
 		return;
 	}
 
 	cg.predictedPlayerEntity.currentState.angles2[PITCH] = vr->hmdorientation[PITCH];
-	cg.predictedPlayerEntity.currentState.angles2[ROLL] = AngleSubtract(vr->hmdorientation[YAW], vr->weaponangles[YAW]);
+	cg.predictedPlayerEntity.currentState.angles2[ROLL] = AngleSubtract( vr->clientviewangles[YAW],
+		cg.predictedPlayerState.viewangles[YAW] - SHORT2ANGLE( cg.predictedPlayerState.delta_angles[YAW] ) );
 	cg.predictedPlayerEntity.currentState.eFlags |= EF_VR_PLAYER;
 }
 
