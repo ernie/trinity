@@ -2366,7 +2366,7 @@ so the endpoint will reflect the simulated strike (lagging the predicted
 angle)
 ===============
 */
-static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
+static void CG_LightningBolt( centity_t *cent, weapon_t weaponNum, vec3_t origin ) {
 	trace_t  trace;
 	refEntity_t  beam;
 	vec3_t   forward;
@@ -2375,7 +2375,7 @@ static void CG_LightningBolt( centity_t *cent, vec3_t origin ) {
 	qboolean directView;
 	vec3_t   vrAngle;
 
-	if (cent->currentState.weapon != WP_LIGHTNING) {
+	if ( weaponNum != WP_LIGHTNING ) {
 		return;
 	}
 
@@ -2958,7 +2958,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		int radius;
 
 		// add lightning bolt
-		CG_LightningBolt( nonPredictedCent, flash.origin );
+		CG_LightningBolt( nonPredictedCent, weaponNum, flash.origin );
 
 		// add rail trail
 		CG_SpawnRailTrail( cent, flash.origin );
@@ -3057,7 +3057,7 @@ void CG_AddViewWeapon( playerState_t *ps ) {
 				VectorCopy( origin, cg_entities[ps->clientNum].pe.muzzleOrigin );
 				cg_entities[ps->clientNum].pe.muzzleTime = cg.time;
 			}
-			CG_LightningBolt( &cg_entities[ps->clientNum], origin );
+			CG_LightningBolt( &cg_entities[ps->clientNum], ps->weapon, origin );
 		}
 		return;
 	}
