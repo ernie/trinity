@@ -2840,7 +2840,7 @@ static const char *weaponAdjustParamNames[WEAPADJUST_NUM_PARAMS] = {
 // Defaults matching vr_cvars.c registration
 static const char *weaponAdjustDefaultStrings[] = {
 	"",                                     // 0: WP_NONE
-	"0.8,-4.0,7.0,-10.0,8.0,-2.4,9.5",     // 1: Gauntlet
+	"0.8,-0.5,9.0,-12.0,0.0,0.0,70.0",     // 1: Gauntlet
 	"0.8,-3.0,5.5,0,0,0,0",               // 2: Machinegun
 	"0.8,-3.3,8,3.7,0,0,0",               // 3: Shotgun
 	"0.75,-5.4,6.5,-4,0,0,0",             // 4: Grenade Launcher
