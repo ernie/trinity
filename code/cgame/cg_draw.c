@@ -4499,7 +4499,7 @@ static void CG_DrawWeapReticle( void )
 {
 	vec4_t light_color = {0.7f, 0.7f, 0.7f, 0.5f};
 	vec4_t black = {0.0f, 0.0f, 0.0f, 1.0f};
-	vec4_t red = {0.8f, 0.0f, 0.0f, 0.5f};
+	vec4_t red = {0.8f, 0.0f, 0.0f, 0.85f};
 
 	float indentX = 0.16f;
 	float width = cgs.glconfig.vidWidth;
