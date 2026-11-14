@@ -1097,7 +1097,7 @@ qboolean CG_VR_ViewAxis( void ) {
 			//If we are zoomed, then we use the refdefViewANgles (which are the weapon angles)
 			vec3_t angles;
 			VectorCopy(cg.refdefViewAngles, angles);
-			angles[ROLL] = vr->weaponangles[ROLL];
+			angles[ROLL] = 0;
 			AnglesToAxis( angles, cg.refdef.viewaxis );
 		}
 		else if ( (cg.demoPlayback && !vr->first_person_following) || CG_VR_IsThirdPersonFollow(VRFM_QUERY))
@@ -1127,7 +1127,7 @@ qboolean CG_VR_ViewAxis( void ) {
 	} else {
 		if (vr->weapon_zoomed) {
 			vec3_t angles;
-			angles[ROLL] = vr->weaponangles[ROLL];
+			angles[ROLL] = 0;
 			angles[PITCH] = vr->weaponangles[PITCH];
 			angles[YAW] = (cg.refdefViewAngles[YAW] - vr->hmdorientation[YAW]) + vr->weaponangles[YAW];
 			AnglesToAxis(angles, cg.refdef.viewaxis);
