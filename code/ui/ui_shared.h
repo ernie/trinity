@@ -428,6 +428,8 @@ int Display_CursorType(int x, int y);
 qboolean Display_KeyBindPending();
 void Menus_OpenByName(const char *p);
 menuDef_t *Menus_FindByName(const char *p);
+itemDef_t *Menu_FindItemByName(menuDef_t *menu, const char *p);
+qboolean Item_EnableShowViaCvar(itemDef_t *item, int flag);
 void Menu_ShowItemByName(menuDef_t *menu, const char *p, qboolean bShow);
 void Menu_UpdatePosition(menuDef_t *menu);
 void Menus_ShowByName(const char *p);

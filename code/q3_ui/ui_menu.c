@@ -60,6 +60,27 @@ static qhandle_t trinityModel;
 #define SIGIL_Y		247
 #define SIGIL_SIZE	120
 
+#define BLOCK_CX			105
+#define WORDMARK_W			90
+#define VERSION_CHARW		4
+#define UPDATE_W			64
+#define UPDATE_H			13
+#define UPDATE_Y			389
+#define UPDATE_GAP			6
+#define UPDATE_CHARW		5
+#define UPDATE_CHARH		9
+#define ACCOUNT_Y			404
+#define ACCOUNT_MAXCHARS	16
+// the charset's glyphs sit high in their cells
+#define ACCOUNT_TEXT_DROP	2
+#define PORTRAIT_SIZE		16
+#define PORTRAIT_GAP		4
+
+static char      accountLabel[ACCOUNT_MAXCHARS + 1];
+static qhandle_t accountPortrait;
+static char      portraitModel[MAX_QPATH];
+static qhandle_t portraitIcon;
+
 /*
 ===============
 MainMenu_SigilFlare
@@ -92,56 +113,117 @@ static errorMessage_t s_errorMessage;
 
 /*
 =================
-Main_DrawLoginButton
+MainMenu_UpdateLabel
+=================
+*/
+static const char *MainMenu_UpdateLabel( float **color, qboolean *clickable ) {
+	*clickable = qfalse;
 
-Draws the Account button using the small bitmap font.
+	switch ( (int)trap_Cvar_VariableValue( "update_state" ) ) {
+	case 0:
+		if ( !trap_Cvar_VariableValue( "update_check" ) ) {
+			return NULL;
+		}
+		*color = colorGreen;
+		return "Latest";
+	case 1:
+		*color = colorMdGrey;
+		return "Checking...";
+	case 6:
+		*color = color_red;
+		*clickable = qtrue;
+		return "Error";
+	default:
+		*color = color_yellow;
+		*clickable = qtrue;
+		return "Update";
+	}
+}
+
+
+/*
+=================
+MainMenu_Portrait
+=================
+*/
+static qhandle_t MainMenu_Portrait( void ) {
+	char	model[MAX_QPATH];
+	char	*skin;
+
+	trap_Cvar_VariableStringBuffer( "model", model, sizeof( model ) );
+	if ( !Q_stricmp( model, portraitModel ) ) {
+		return portraitIcon;
+	}
+	Q_strncpyz( portraitModel, model, sizeof( portraitModel ) );
+
+	skin = strchr( model, '/' );
+	if ( skin ) {
+		*skin++ = '\0';
+	} else {
+		skin = "default";
+	}
+
+	portraitIcon = trap_R_RegisterShaderNoMip( va( "models/players/%s/icon_%s.tga", model, skin ) );
+	if ( !portraitIcon && Q_stricmp( skin, "default" ) ) {
+		portraitIcon = trap_R_RegisterShaderNoMip( va( "models/players/%s/icon_default.tga", model ) );
+	}
+	return portraitIcon;
+}
+
+
+/*
+=================
+Main_DrawLoginButton
 =================
 */
 static void Main_DrawLoginButton( void *self ) {
 	menutext_s	*t = (menutext_s *)self;
-	char		trinityUser[64];
-	const char	*label;
-	int			style;
-	int			w;
+	int			x = t->generic.x;
+	int			style = UI_LEFT | UI_SMALLFONT;
 
-	style = UI_RIGHT | UI_SMALLFONT;
-	if ( t->generic.flags & QMF_PULSEIFFOCUS && Menu_ItemAtCursor( t->generic.parent ) == t ) {
+	if ( Menu_ItemAtCursor( t->generic.parent ) == t ) {
 		style |= UI_PULSE;
 	}
 
-	trap_Cvar_VariableStringBuffer( "cl_trinityUser", trinityUser, sizeof( trinityUser ) );
-	label = trinityUser[0] ? trinityUser : t->string;
-
-	UI_DrawString( t->generic.x, t->generic.y, label, style,
-		( t->generic.flags & QMF_GRAYED ) ? text_color_disabled : t->color );
-
-	// Update hit rect to match current label width
-	w = strlen( label ) * SMALLCHAR_WIDTH;
-	t->generic.left = t->generic.x - w;
+	if ( accountPortrait ) {
+		UI_DrawHandlePic( x, t->generic.y, PORTRAIT_SIZE, PORTRAIT_SIZE, accountPortrait );
+		x += PORTRAIT_SIZE + PORTRAIT_GAP;
+	}
+	UI_DrawString( x, t->generic.y + ACCOUNT_TEXT_DROP, accountLabel, style, t->color );
 }
 
 
 /*
 =================
 Main_DrawUpdateButton
-
-Draws the Update Available button using the small bitmap font.
 =================
 */
 static void Main_DrawUpdateButton( void *self ) {
 	menutext_s	*t = (menutext_s *)self;
-	int			style;
-	int			w;
+	float		*color;
+	qboolean	clickable;
+	const char	*label;
+	int			x = t->generic.x;
+	int			y = t->generic.y;
 
-	style = UI_RIGHT | UI_SMALLFONT;
-	if ( t->generic.flags & QMF_PULSEIFFOCUS && Menu_ItemAtCursor( t->generic.parent ) == t ) {
-		style |= UI_PULSE;
+	label = MainMenu_UpdateLabel( &color, &clickable );
+	if ( !label ) {
+		return;
 	}
 
-	UI_DrawString( t->generic.x, t->generic.y, t->string, style, t->color );
+	if ( Menu_ItemAtCursor( t->generic.parent ) == t ) {
+		vec4_t fill;
 
-	w = strlen( t->string ) * SMALLCHAR_WIDTH;
-	t->generic.left = t->generic.x - w;
+		Vector4Copy( color, fill );
+		fill[3] = 0.25f;
+		UI_FillRect( x, y, UPDATE_W, UPDATE_H, fill );
+	}
+	UI_FillRect( x, y, UPDATE_W, 1, color );
+	UI_FillRect( x, y + UPDATE_H - 1, UPDATE_W, 1, color );
+	UI_FillRect( x, y + 1, 1, UPDATE_H - 2, color );
+	UI_FillRect( x + UPDATE_W - 1, y + 1, 1, UPDATE_H - 2, color );
+	UI_DrawString2( x + ( UPDATE_W - (int)strlen( label ) * UPDATE_CHARW ) / 2,
+		y + ( UPDATE_H - UPDATE_CHARH ) / 2, label, color, UPDATE_CHARW, UPDATE_CHARH );
 }
 
 
@@ -274,11 +356,75 @@ The menu's own strings start at 8x16, too big for a version line.
 ===============
 */
 static void MainMenu_DrawTinyString( int x, int y, const char *str, vec4_t color ) {
-	const int w = 4, h = 7;
+	const int w = VERSION_CHARW, h = 7;
 	vec4_t shadow = { 0, 0, 0, 0.8f };
 
 	UI_DrawString2( x + 1, y + 1, str, shadow, w, h );
 	UI_DrawString2( x, y, str, color, w, h );
+}
+
+static const char *MainMenu_VersionLine( void ) {
+	return trinityEngine[0] ? va( "%s / %s", trinityEngine, trinityVersion ) : trinityVersion;
+}
+
+/*
+===============
+MainMenu_LayoutTrinityBlock
+
+The button and the account line follow the widths of the version line and
+the name, so their positions and hit rects are set every frame.
+===============
+*/
+static void MainMenu_LayoutTrinityBlock( void ) {
+	char			user[64];
+	float			*color;
+	qboolean		clickable;
+	menucommon_s	*item;
+	int				x, w;
+
+	trap_Cvar_VariableStringBuffer( "cl_trinityUser", user, sizeof( user ) );
+	Q_strncpyz( accountLabel, user[0] ? user : s_main.login.string, sizeof( accountLabel ) );
+	accountPortrait = MainMenu_Portrait();
+
+	w = strlen( accountLabel ) * SMALLCHAR_WIDTH;
+	if ( accountPortrait ) {
+		w += PORTRAIT_SIZE + PORTRAIT_GAP;
+	}
+	x = BLOCK_CX - w / 2;
+	item = &s_main.login.generic;
+	item->x = x;
+	item->y = ACCOUNT_Y;
+	item->left = x;
+	item->right = x + w;
+	item->top = ACCOUNT_Y;
+	item->bottom = ACCOUNT_Y + SMALLCHAR_HEIGHT;
+
+	w = (int)strlen( MainMenu_VersionLine() ) * VERSION_CHARW;
+	if ( w < WORDMARK_W ) {
+		w = WORDMARK_W;
+	}
+	x = BLOCK_CX + w / 2 + UPDATE_GAP;
+	item = &s_main.update.generic;
+	item->x = x;
+	item->y = UPDATE_Y;
+	item->left = x;
+	item->right = x + UPDATE_W;
+	item->top = UPDATE_Y;
+	item->bottom = UPDATE_Y + UPDATE_H;
+
+	if ( !MainMenu_UpdateLabel( &color, &clickable ) ) {
+		item->flags |= QMF_HIDDEN | QMF_INACTIVE;
+	} else if ( !clickable ) {
+		item->flags = ( item->flags & ~QMF_HIDDEN ) | QMF_INACTIVE;
+	} else {
+		item->flags &= ~( QMF_HIDDEN | QMF_INACTIVE );
+	}
+	if ( item->flags & QMF_INACTIVE ) {
+		item->flags &= ~QMF_HASMOUSEFOCUS;
+		if ( Menu_ItemAtCursor( &s_main.menu ) == &s_main.update ) {
+			Menu_AdjustCursor( &s_main.menu, 1 );
+		}
+	}
 }
 
 /*
@@ -413,15 +559,20 @@ static void Main_MenuDraw( void ) {
 	trap_R_AddRefEntityToScene( &ent );
 
 	trap_R_RenderScene( &refdef );
-	
+
+	if ( !trinityVersionLoaded ) {
+		MainMenu_LoadTrinityVersion();
+	}
+
 	if (strlen(s_errorMessage.errorMessage))
 	{
 		UI_DrawProportionalString_AutoWrapped( 320, 192, 600, 20, s_errorMessage.errorMessage, UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, menu_text_color );
 	}
 	else
 	{
+		MainMenu_LayoutTrinityBlock();
 		// standard menu drawing
-		Menu_Draw( &s_main.menu );		
+		Menu_Draw( &s_main.menu );
 	}
 
 	if (uis.demoversion) {
@@ -431,25 +582,15 @@ static void Main_MenuDraw( void ) {
 		UI_DrawString( 320, 444, "Quake III Arena(c) 1999-2000, Id Software, Inc.  All Rights Reserved", UI_CENTER|UI_SMALLFONT, color );
 	}
 
-	// if update became available after menu was built, rebuild it
-	if ( !s_main.update.string && (int)trap_Cvar_VariableValue( "update_available" ) == 1 ) {
-		UI_MainMenu();
-		return;
-	}
-
-	if ( !trinityVersionLoaded ) {
-		MainMenu_LoadTrinityVersion();
-	}
 	if ( trinityVersion[0] ) {
 		vec4_t versionColor = { 1.0f, 1.0f, 1.0f, 0.8f };
-		const char *line = trinityEngine[0] ? va( "%s / %s", trinityEngine, trinityVersion ) : trinityVersion;
-		int cx = 105;
+		const char *line = MainMenu_VersionLine();
 
 		// the line's bottom is level with the Exit item's
 		if ( trinityWordmark ) {
-			UI_DrawHandlePic( cx - 45, 371, 90, 20, trinityWordmark );
+			UI_DrawHandlePic( BLOCK_CX - WORDMARK_W / 2, 371, WORDMARK_W, 20, trinityWordmark );
 		}
-		MainMenu_DrawTinyString( cx - (int)strlen( line ) * 4 / 2, 392, line, versionColor );
+		MainMenu_DrawTinyString( BLOCK_CX - (int)strlen( line ) * VERSION_CHARW / 2, 392, line, versionColor );
 	}
 }
 
@@ -615,30 +756,20 @@ void UI_MainMenu( void ) {
 	s_main.mods.color					= color_red;
 	s_main.mods.style					= style;
 
-	// Account button: right-aligned, small bitmap font
 	s_main.login.generic.type			= MTYPE_PTEXT;
-	s_main.login.generic.flags			= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_main.login.generic.x				= 610;
-	s_main.login.generic.y				= 134;
+	s_main.login.generic.flags			= QMF_LEFT_JUSTIFY;
 	s_main.login.generic.id				= ID_LOGIN;
 	s_main.login.generic.callback		= Main_MenuEvent;
 	s_main.login.generic.ownerdraw		= Main_DrawLoginButton;
-	s_main.login.string					= "Account";
+	s_main.login.string					= "Sign In";
 	s_main.login.color					= color_white;
-	s_main.login.style					= UI_RIGHT|UI_SMALLFONT;
 
-	if ( (int)trap_Cvar_VariableValue( "update_available" ) == 1 ) {
-		s_main.update.generic.type			= MTYPE_PTEXT;
-		s_main.update.generic.flags			= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
-		s_main.update.generic.x				= 610;
-		s_main.update.generic.y				= 134 + SMALLCHAR_HEIGHT + 2;
-		s_main.update.generic.id			= ID_UPDATE;
-		s_main.update.generic.callback		= Main_MenuEvent;
-		s_main.update.generic.ownerdraw		= Main_DrawUpdateButton;
-		s_main.update.string				= "Update Available";
-		s_main.update.color					= color_yellow;
-		s_main.update.style					= UI_RIGHT|UI_SMALLFONT;
-	}
+	s_main.update.generic.type			= MTYPE_PTEXT;
+	s_main.update.generic.flags			= QMF_LEFT_JUSTIFY|QMF_INACTIVE;
+	s_main.update.generic.id			= ID_UPDATE;
+	s_main.update.generic.callback		= Main_MenuEvent;
+	s_main.update.generic.ownerdraw		= Main_DrawUpdateButton;
+	s_main.update.string				= "Update";
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.exit.generic.type				= MTYPE_PTEXT;
@@ -660,9 +791,7 @@ void UI_MainMenu( void ) {
 		Menu_AddItem( &s_main.menu,	&s_main.teamArena );
 	}
 	Menu_AddItem( &s_main.menu,	&s_main.mods );
-	if ( s_main.update.string ) {
-		Menu_AddItem( &s_main.menu,	&s_main.update );
-	}
+	Menu_AddItem( &s_main.menu,	&s_main.update );
 	Menu_AddItem( &s_main.menu,	&s_main.exit );
 	Menu_AddItem( &s_main.menu,	&s_main.login );
 
@@ -675,21 +804,6 @@ void UI_MainMenu( void ) {
 	s_main.sigil.height				= SIGIL_SIZE;
 	s_main.sigil.generic.callback	= MainMenu_SigilEvent;
 	Menu_AddItem( &s_main.menu,	&s_main.sigil );
-	// Override hit rect to match bitmap font size (PText_Init sized it for proportional font)
-	{
-		int w = strlen( s_main.login.string ) * SMALLCHAR_WIDTH;
-		s_main.login.generic.left   = s_main.login.generic.x - w;
-		s_main.login.generic.right  = s_main.login.generic.x;
-		s_main.login.generic.top    = s_main.login.generic.y;
-		s_main.login.generic.bottom = s_main.login.generic.y + SMALLCHAR_HEIGHT;
-	}
-	if ( s_main.update.string ) {
-		int w = strlen( s_main.update.string ) * SMALLCHAR_WIDTH;
-		s_main.update.generic.left   = s_main.update.generic.x - w;
-		s_main.update.generic.right  = s_main.update.generic.x;
-		s_main.update.generic.top    = s_main.update.generic.y;
-		s_main.update.generic.bottom = s_main.update.generic.y + SMALLCHAR_HEIGHT;
-	}
 
 	trap_Key_SetCatcher( KEYCATCH_UI );
 	uis.menusp = 0;

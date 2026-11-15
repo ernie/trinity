@@ -1005,6 +1005,132 @@ static void UI_LoadTrinityVersion( void ) {
 	trinityModel = trap_R_RegisterModel( "models/trinity/trinity.md3" );
 }
 
+#define TRINITY_BLOCK_CX			593
+#define TRINITY_WORDMARK_W			90
+#define TRINITY_UPDATE_GAP			6
+#define TRINITY_ACCOUNT_RIGHT		636
+#define TRINITY_ACCOUNT_MAXCHARS	16
+#define TRINITY_PORTRAIT_GAP		4
+#define TRINITY_VERSION_SCALE		0.15f
+
+static const char *UI_TrinityVersionLine( void ) {
+	return trinityEngine[0] ? va( "%s / %s", trinityEngine, trinityVersion ) : trinityVersion;
+}
+
+/*
+===============
+UI_TrinityUpdateLabel
+===============
+*/
+static const char *UI_TrinityUpdateLabel( vec4_t color ) {
+	static vec4_t green = { 0.0f, 1.0f, 0.0f, 1.0f };
+	static vec4_t gray = { 0.5f, 0.5f, 0.5f, 1.0f };
+	static vec4_t yellow = { 1.0f, 0.75f, 0.0f, 1.0f };
+	static vec4_t red = { 1.0f, 0.0f, 0.0f, 1.0f };
+
+	switch ( (int)trap_Cvar_VariableValue( "update_state" ) ) {
+	case 0:
+		if ( !trap_Cvar_VariableValue( "update_check" ) ) {
+			return NULL;
+		}
+		Vector4Copy( green, color );
+		return "Latest";
+	case 1:
+		Vector4Copy( gray, color );
+		return "Checking...";
+	case 6:
+		Vector4Copy( red, color );
+		return "Error";
+	default:
+		Vector4Copy( yellow, color );
+		return "Update";
+	}
+}
+
+static const char *UI_TrinityAccountLabel( void ) {
+	static char label[TRINITY_ACCOUNT_MAXCHARS + 1];
+	char user[64];
+
+	trap_Cvar_VariableStringBuffer( "cl_trinityUser", user, sizeof( user ) );
+	Q_strncpyz( label, user[0] ? user : "Sign In", sizeof( label ) );
+	return label;
+}
+
+/*
+===============
+UI_TrinityPortrait
+===============
+*/
+static qhandle_t UI_TrinityPortrait( void ) {
+	static char cached[MAX_QPATH];
+	static qhandle_t icon;
+	char head[MAX_QPATH];
+	char *skin;
+
+	trap_Cvar_VariableStringBuffer( trap_Cvar_VariableValue( "ui_Q3Model" ) ? "headmodel" : "team_headmodel",
+		head, sizeof( head ) );
+	if ( !Q_stricmp( head, cached ) ) {
+		return icon;
+	}
+	Q_strncpyz( cached, head, sizeof( cached ) );
+
+	skin = strchr( head, '/' );
+	if ( skin ) {
+		*skin++ = '\0';
+	} else {
+		skin = "default";
+	}
+
+	if ( head[0] == '*' ) {
+		icon = trap_R_RegisterShaderNoMip( va( "models/players/heads/%s/icon_default.tga", head + 1 ) );
+		return icon;
+	}
+	icon = trap_R_RegisterShaderNoMip( va( "models/players/%s/icon_%s.tga", head, skin ) );
+	if ( !icon && Q_stricmp( skin, "default" ) ) {
+		icon = trap_R_RegisterShaderNoMip( va( "models/players/%s/icon_default.tga", head ) );
+	}
+	return icon;
+}
+
+/*
+===============
+UI_LayoutTrinityBlock
+
+The button and the account line follow the widths of the version line and
+the name, so their rects are set every frame.
+===============
+*/
+static void UI_LayoutTrinityBlock( menuDef_t *main ) {
+	itemDef_t *item;
+	float w;
+
+	item = Menu_FindItemByName( main, "updatebtn" );
+	if ( item ) {
+		w = Text_Width( UI_TrinityVersionLine(), TRINITY_VERSION_SCALE, 0 );
+		if ( w < TRINITY_WORDMARK_W ) {
+			w = TRINITY_WORDMARK_W;
+		}
+		item->window.rect.x = TRINITY_BLOCK_CX - w / 2 - TRINITY_UPDATE_GAP - item->window.rect.w;
+		// key handling acts on the focused item without testing enableCvar
+		if ( !Item_EnableShowViaCvar( item, CVAR_ENABLE ) ) {
+			item->window.flags &= ~WINDOW_HASFOCUS;
+		}
+	}
+
+	item = Menu_FindItemByName( main, "loginbtn" );
+	if ( item ) {
+		w = Text_Width( UI_TrinityAccountLabel(), item->textscale, 0 );
+		if ( UI_TrinityPortrait() ) {
+			w += item->window.rect.h + TRINITY_PORTRAIT_GAP;
+		}
+		item->window.rect.w = w;
+		item->window.rect.x = TRINITY_BLOCK_CX - w / 2;
+		if ( item->window.rect.x + w > TRINITY_ACCOUNT_RIGHT ) {
+			item->window.rect.x = TRINITY_ACCOUNT_RIGHT - w;
+		}
+	}
+}
+
 #define	UI_FPS_FRAMES	4
 void _UI_Refresh( int realtime )
 {
@@ -1056,6 +1182,16 @@ void _UI_Refresh( int realtime )
 		}
 	}
 
+	if ( !trinityVersionLoaded ) {
+		UI_LoadTrinityVersion();
+	}
+	{
+		menuDef_t *main = Menus_FindByName( "main" );
+		if ( main && ( main->window.flags & WINDOW_VISIBLE ) ) {
+			UI_LayoutTrinityBlock( main );
+		}
+	}
+
 	if (Menu_Count() > 0) {
 		// paint all the menus
 		Menu_PaintAll();
@@ -1067,21 +1203,17 @@ void _UI_Refresh( int realtime )
 		UI_BuildFindPlayerList(qfalse);
 	}
 
-	if ( !trinityVersionLoaded ) {
-		UI_LoadTrinityVersion();
-	}
 	if ( trinityVersion[0] ) {
 		menuDef_t *main = Menus_FindByName( "main" );
 		if ( main && ( main->window.flags & WINDOW_VISIBLE ) ) {
-			float scale = 0.15f;
-			float cx = 593;
+			float cx = TRINITY_BLOCK_CX;
 			vec4_t versionColor = { 1.0f, 1.0f, 1.0f, 0.8f };
-			const char *line = trinityEngine[0] ? va( "%s / %s", trinityEngine, trinityVersion ) : trinityVersion;
+			const char *line = UI_TrinityVersionLine();
 
 			if ( trinityWordmark ) {
-				UI_DrawHandlePic( cx - 45, 288, 90, 20, trinityWordmark );
+				UI_DrawHandlePic( cx - TRINITY_WORDMARK_W / 2, 288, TRINITY_WORDMARK_W, 20, trinityWordmark );
 			}
-			Text_Paint( cx - Text_Width( line, scale, 0 ) / 2, 316, scale, versionColor, line, 0, 0, ITEM_TEXTSTYLE_SHADOWED );
+			Text_Paint( cx - Text_Width( line, TRINITY_VERSION_SCALE, 0 ) / 2, 316, TRINITY_VERSION_SCALE, versionColor, line, 0, 0, ITEM_TEXTSTYLE_SHADOWED );
 		}
 	}
 
@@ -2344,17 +2476,6 @@ static int UI_OwnerDrawWidth(int ownerDraw, float scale) {
 		case UI_SERVERREFRESHDATE:
 			s = UI_Cvar_VariableString(va("ui_lastServerRefresh_%i", ui_netSource.integer));
 			break;
-		case UI_TRINITYLOGIN:
-			{
-				char trinityUser[64];
-				trap_Cvar_VariableStringBuffer( "cl_trinityUser", trinityUser, sizeof( trinityUser ) );
-				s = trinityUser[0] ? va( "%s", trinityUser ) : "Account";
-			}
-			break;
-		case UI_TRINITYUPDATE:
-			if ( (int)trap_Cvar_VariableValue( "update_available" ) == 1 )
-				s = "Update Available";
-			break;
 		case UI_UPDATEPROGRESS:
 		case UI_UPDATESTATUS:
 			return 0;
@@ -2862,20 +2983,34 @@ static void UI_OwnerDraw(float x, float y, float w, float h, float text_x, float
 			break;
 		case UI_TRINITYLOGIN:
 			{
-				char trinityUser[64];
-				const char *label;
-				float tw;
-				trap_Cvar_VariableStringBuffer( "cl_trinityUser", trinityUser, sizeof( trinityUser ) );
-				label = trinityUser[0] ? trinityUser : "Account";
-				tw = Text_Width( label, scale, 0 );
-				Text_Paint( rect.x - tw, rect.y, scale, color, label, 0, 0, textStyle );
+				qhandle_t portrait = UI_TrinityPortrait();
+				float tx = rect.x;
+
+				if ( portrait ) {
+					trap_R_SetColor( NULL );
+					UI_DrawHandlePic( rect.x, rect.y, rect.h, rect.h, portrait );
+					tx += rect.h + TRINITY_PORTRAIT_GAP;
+				}
+				Text_Paint( tx, rect.y + rect.h - 2, scale, color, UI_TrinityAccountLabel(), 0, 0, textStyle );
 			}
 			break;
 		case UI_TRINITYUPDATE:
-			if ( (int)trap_Cvar_VariableValue( "update_available" ) == 1 ) {
-				const char *label = "Update Available";
-				float tw = Text_Width( label, scale, 0 );
-				Text_Paint( rect.x - tw, rect.y, scale, color, label, 0, 0, textStyle );
+			{
+				vec4_t stateColor;
+				const char *label = UI_TrinityUpdateLabel( stateColor );
+
+				if ( label ) {
+					vec4_t fill = { 0.0f, 0.0f, 0.75f, 0.25f };
+					vec4_t focusFill = { 0.75f, 0.0f, 0.0f, 0.25f };
+					vec4_t border = { 0.5f, 0.5f, 0.5f, 1.0f };
+					itemDef_t *item = Menu_FindItemByName( Menus_FindByName( "main" ), "updatebtn" );
+					qboolean focused = item && ( item->window.flags & WINDOW_HASFOCUS );
+
+					DC->fillRect( rect.x, rect.y, rect.w, rect.h, focused ? focusFill : fill );
+					DC->drawRect( rect.x, rect.y, rect.w, rect.h, 1, border );
+					Text_Paint( rect.x + ( rect.w - Text_Width( label, scale, 0 ) ) / 2 + 1, rect.y + rect.h - 2,
+						scale, stateColor, label, 0, 0, textStyle );
+				}
 			}
 			break;
 		case UI_UPDATEPROGRESS:
