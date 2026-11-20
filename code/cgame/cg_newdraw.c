@@ -667,7 +667,7 @@ static void CG_DrawBlueFlagHead(rectDef_t *rect) {
       vec3_t angles;
       VectorClear( angles );
  		  angles[YAW] = 180 + 20 * sin( cg.time / 650.0 );;
-      CG_DrawHead( rect->x, rect->y, rect->w, rect->h, 0,angles );
+      CG_DrawHead( rect->x, rect->y, rect->w, rect->h, i,angles );
       return;
     }
   }
@@ -717,7 +717,7 @@ static void CG_DrawRedFlagHead(rectDef_t *rect) {
       vec3_t angles;
       VectorClear( angles );
  		  angles[YAW] = 180 + 20 * sin( cg.time / 650.0 );;
-      CG_DrawHead( rect->x, rect->y, rect->w, rect->h, 0,angles );
+      CG_DrawHead( rect->x, rect->y, rect->w, rect->h, i,angles );
       return;
     }
   }
