@@ -263,7 +263,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		text "Shadows:"
 		cvar "cg_shadows"
-		cvarFloatList { "None" 0 "Low" 1 "High" 2 }
+		cvarFloatList { "None" 0 "Low" 1 "High" 4 "None" 0 "Low" 1 "High" 2 "None" 0 "Low" 1 "High" 3 "None" 0 "High" 4 }
 		rect 24 103 256 17
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 133

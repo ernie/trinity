@@ -2493,7 +2493,8 @@ static qboolean CG_PlayerShadow( centity_t *cent, float *shadowPlane ) {
 
 	*shadowPlane = trace.endpos[2] + 1;
 
-	if ( cg_shadows.integer != 1 ) {	// no mark for stencil or projection shadows
+	// the blob mark serves cg_shadows 1, and 4 where the renderer can't draw soft shadows
+	if ( cg_shadows.integer != 1 && !( cg_shadows.integer == 4 && !cg_shadowTiles.integer ) ) {
 		return qtrue;
 	}
 

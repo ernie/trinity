@@ -59,6 +59,7 @@ static void CG_MachineGunEjectBrass( centity_t *cent ) {
 
 	AxisCopy( axisDefault, re->axis );
 	re->hModel = cgs.media.machinegunBrassModel;
+	re->renderfx = RF_NOSHADOW;
 
 	le->bounceFactor = 0.4 * waterScale;
 
@@ -136,6 +137,7 @@ static void CG_ShotgunEjectBrass( centity_t *cent ) {
 
 		AxisCopy( axisDefault, re->axis );
 		re->hModel = cgs.media.shotgunBrassModel;
+		re->renderfx = RF_NOSHADOW;
 		le->bounceFactor = 0.3f;
 
 		le->angles.trType = TR_LINEAR;

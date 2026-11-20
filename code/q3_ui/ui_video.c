@@ -768,7 +768,7 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 					shadows = 1;
 					break;
 				default:
-					shadows = 2;
+					shadows = 4;
 					break;
 			}
 			trap_Cvar_SetValue("cg_shadows", shadows);
