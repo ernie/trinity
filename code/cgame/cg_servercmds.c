@@ -588,7 +588,7 @@ static void CG_MapRestart( void ) {
 #ifdef MISSIONPACK
 
 #define MAX_VOICEFILESIZE	16384
-#define MAX_VOICEFILES		8
+#define MAX_VOICEFILES		10
 #define MAX_VOICECHATS		64
 #define MAX_VOICESOUNDS		64
 #define MAX_CHATSIZE		64
@@ -781,7 +781,15 @@ int CG_HeadModelVoiceChats( char *filename ) {
 		}
 	}
 
-	//FIXME: maybe try to load the .voice file which name is stored in token?
+	for ( i = 0; i < MAX_VOICEFILES; i++ ) {
+		if ( !voiceChatLists[i].name[0] ) {
+			if ( CG_ParseVoiceChats( token, &voiceChatLists[i], MAX_VOICECHATS ) ) {
+				return i;
+			}
+			voiceChatLists[i].name[0] = '\0';
+			return -1;
+		}
+	}
 
 	return -1;
 }
