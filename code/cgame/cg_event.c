@@ -748,7 +748,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		break;
 
 	case EV_TAUNT:
-		trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*taunt.wav" ) );
+		trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( clientNum, "*taunt.wav" ) );
 		break;
 
 #ifdef MISSIONPACK
