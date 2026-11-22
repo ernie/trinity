@@ -306,7 +306,7 @@ static void CG_DrawPlayerHead(rectDef_t *rect, qboolean draw2D) {
 		angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
 	}
 
-	CG_DrawHead( x, rect->y, rect->w, rect->h, cg.snap->ps.clientNum, angles );
+	CG_DrawHead( x, rect->y, rect->w, rect->h, cg.snap->ps.clientNum, angles, qtrue );
 }
 
 static void CG_DrawSelectedPlayerHealth( rectDef_t *rect, float scale, vec4_t color, qhandle_t shader, int textStyle ) {
@@ -667,7 +667,7 @@ static void CG_DrawBlueFlagHead(rectDef_t *rect) {
       vec3_t angles;
       VectorClear( angles );
  		  angles[YAW] = 180 + 20 * sin( cg.time / 650.0 );;
-      CG_DrawHead( rect->x, rect->y, rect->w, rect->h, i,angles );
+      CG_DrawHead( rect->x, rect->y, rect->w, rect->h, i,angles, qfalse );
       return;
     }
   }
@@ -717,7 +717,7 @@ static void CG_DrawRedFlagHead(rectDef_t *rect) {
       vec3_t angles;
       VectorClear( angles );
  		  angles[YAW] = 180 + 20 * sin( cg.time / 650.0 );;
-      CG_DrawHead( rect->x, rect->y, rect->w, rect->h, i,angles );
+      CG_DrawHead( rect->x, rect->y, rect->w, rect->h, i,angles, qfalse );
       return;
     }
   }

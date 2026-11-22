@@ -34,6 +34,7 @@ qboolean CG_VR_IntermissionView( void );
 qboolean CG_VR_OffsetView( void );
 void CG_VR_ComputeWeaponAngles( void );
 qboolean CG_VR_ViewAxis( void );
+void CG_VR_EyeOrigin( vec3_t org );
 
 // VR-protocol head rendering (cg_predict.c/cg_view.c/cg_draw.c call sites).
 // EF-gated or self-gating, NOT vrActive-gated: flatscreen engines render VR

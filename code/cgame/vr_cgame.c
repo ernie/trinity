@@ -2472,52 +2472,43 @@ static void CG_VR_DrawHUDContent( qboolean selectorHidesHud ) {
 
 /*
 =====================
-CG_VR_DrawFrame
+CG_VR_CameraScale
 
-VR draw tail: renders the 3D scene, then draws 2D overlays and the HUD
-inside the engine's post-bloom / HUD-buffer brackets. Only reachable when
-vrActive, and the v1 trap set is guaranteed by the RegisterState
-handshake, so the bracket traps are called unconditionally.
+Game units per meter for the camera mode; a spectator god-view also names
+its multiplier and lowers the camera.
 =====================
 */
-qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
-	vec3_t baseOrg;
-	float  heightOffset = 0.0f;
-	float  worldscale = vrc_worldscale;
-
-	if ( !vrActive ) {
-		return qfalse;
-	}
-
-	if ( !vr->weapon_zoomed && (!vr->virtual_screen || vr->first_person_following) ) {
-		CG_DrawCrosshair3D();
-	}
-
-	// Fold the camera anchor from Q3 viewheight down to the floor-relative HMD
-	// frame the weapon math assumes, then save the pre-fold origin so it can be
-	// restored after the scene is submitted.
-	VectorCopy( cg.refdef.vieworg, baseOrg );
-
+static float CG_VR_CameraScale( float *heightOffset, int *spectatorMultiplier ) {
 	if ( CG_VR_IsThirdPersonFollow(VRFM_THIRDPERSON_1) )
 	{
-		worldscale *= SPECTATOR_WORLDSCALE_MULTIPLIER;
-		trap_Cvar_Set( "vr_worldscaleScaler", va( "%i", SPECTATOR_WORLDSCALE_MULTIPLIER ) );
+		*spectatorMultiplier = SPECTATOR_WORLDSCALE_MULTIPLIER;
 		//Just move camera down about 20cm
-		heightOffset = -0.2f;
+		*heightOffset = -0.2f;
 	}
 	else if (CG_VR_IsDeathCam() || CG_VR_IsThirdPersonFollow(VRFM_THIRDPERSON_2))
 	{
-		worldscale *= SPECTATOR2_WORLDSCALE_MULTIPLIER;
-		trap_Cvar_Set( "vr_worldscaleScaler", va( "%i", SPECTATOR2_WORLDSCALE_MULTIPLIER ) );
+		*spectatorMultiplier = SPECTATOR2_WORLDSCALE_MULTIPLIER;
 		//Just move camera down about 50cm
-		heightOffset = -0.5f;
+		*heightOffset = -0.5f;
 	}
 	else
 	{
-		float zoomCoeff =  ((2.5f-vr->weapon_zoomLevel)/1.5f); // normally 1.0
-		trap_Cvar_Set( "vr_worldscaleScaler", va( "%f", zoomCoeff ) );
+		*spectatorMultiplier = 0;
+		*heightOffset = 0.0f;
+		return vrc_worldscale;
 	}
+	return vrc_worldscale * *spectatorMultiplier;
+}
 
+/*
+=====================
+CG_VR_FoldEye
+
+Moves a camera anchor at Q3 viewheight to the floor-relative HMD frame the
+weapon math assumes.
+=====================
+*/
+static void CG_VR_FoldEye( vec3_t org, float worldscale, float heightOffset ) {
 	if (vr->virtual_screen || CG_VR_IsDeathCam() || CG_VR_IsThirdPersonFollow(VRFM_QUERY))
 	{
 		// Do nothing to view height if we are viewing the virtual screen or in a camera mode
@@ -2525,8 +2516,8 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 	}
 	else
 	{
-		cg.refdef.vieworg[2] -= PLAYER_HEIGHT;
-		cg.refdef.vieworg[2] += (vr->hmdposition[1] + heightOffset) * worldscale;
+		org[2] -= PLAYER_HEIGHT;
+		org[2] += (vr->hmdposition[1] + heightOffset) * worldscale;
 	}
 
 	if ( !vr->use_6dof && !vr->virtual_screen )
@@ -2552,20 +2543,74 @@ qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
 			angleYaw = CG_VR_DeltaYaw() + ( vr->clientviewangles[YAW] - vr->hmdorientation[YAW] );
 			rotateAboutOrigin( hmdposition[2], hmdposition[0], angleYaw, pos );
 			VectorScale( pos, worldscale, pos );
-			VectorSubtract( cg.refdef.vieworg, pos, vieworg );
+			VectorSubtract( org, pos, vieworg );
 
 			// Prevent player clipping through solid objects
-			VR_HostTraceRender( &trace, cg.refdef.vieworg, mins, maxs, vieworg, cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
+			VR_HostTraceRender( &trace, org, mins, maxs, vieworg, cg.snap->ps.clientNum, CONTENTS_SOLID|CONTENTS_BODY );
 
 			// the carry's own trace ignores the carrying mover, and the camera clip
 			// ignores it too, since the player is carried right up against it
 			if ( trace.entityNum == VR_HostGrappleAnchor() ) {
-				VectorCopy( vieworg, cg.refdef.vieworg );
+				VectorCopy( vieworg, org );
 			} else {
-				VectorCopy( trace.endpos, cg.refdef.vieworg );
+				VectorCopy( trace.endpos, org );
 			}
 		}
 	}
+}
+
+/*
+=====================
+CG_VR_EyeOrigin
+
+Moves a view origin to the VR eye the scene draws from.
+=====================
+*/
+void CG_VR_EyeOrigin( vec3_t org ) {
+	float heightOffset;
+	int   spectatorMultiplier;
+
+	if ( !vrActive ) {
+		return;
+	}
+	CG_VR_FoldEye( org, CG_VR_CameraScale( &heightOffset, &spectatorMultiplier ), heightOffset );
+}
+
+/*
+=====================
+CG_VR_DrawFrame
+
+VR draw tail: renders the 3D scene, then draws 2D overlays and the HUD
+inside the engine's post-bloom / HUD-buffer brackets. Only reachable when
+vrActive, and the v1 trap set is guaranteed by the RegisterState
+handshake, so the bracket traps are called unconditionally.
+=====================
+*/
+qboolean CG_VR_DrawFrame( stereoFrame_t stereoView ) {
+	vec3_t baseOrg;
+	float  heightOffset;
+	float  worldscale;
+	int    spectatorMultiplier;
+
+	if ( !vrActive ) {
+		return qfalse;
+	}
+
+	if ( !vr->weapon_zoomed && (!vr->virtual_screen || vr->first_person_following) ) {
+		CG_DrawCrosshair3D();
+	}
+
+	// Save the pre-fold origin so it can be restored after the scene is submitted.
+	VectorCopy( cg.refdef.vieworg, baseOrg );
+
+	worldscale = CG_VR_CameraScale( &heightOffset, &spectatorMultiplier );
+	if ( spectatorMultiplier ) {
+		trap_Cvar_Set( "vr_worldscaleScaler", va( "%i", spectatorMultiplier ) );
+	} else {
+		float zoomCoeff =  ((2.5f-vr->weapon_zoomLevel)/1.5f); // normally 1.0
+		trap_Cvar_Set( "vr_worldscaleScaler", va( "%f", zoomCoeff ) );
+	}
+	CG_VR_FoldEye( cg.refdef.vieworg, worldscale, heightOffset );
 
 	// Draw the HUD sprite in the world (HUD mode 1)
 	// Also used for SP intermission UI (world-locked at podium position)

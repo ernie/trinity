@@ -7,6 +7,7 @@
 #include "cg_public.h"
 #include "../game/vr_shared.h"
 #include "../game/vr_platform.h"
+#include "cg_headanim.h"
 
 // VOIP channel flags (must match engine q_shared.h)
 #define VOIP_SPATIAL	0x01
@@ -499,6 +500,11 @@ typedef struct {
 
 	qhandle_t		headModel;
 	qhandle_t		headSkin;
+	qboolean		headAnimated;
+	headAnim_t		headAnims[HEAD_NUM_ANIMS];
+	headFx_t		headFx[HEAD_MAX_FX];
+	int				headNumFx;		// 0 unless the head also has a tag_beak
+	qhandle_t		headFxShaders[HEAD_MAX_FX][8];
 
 	qhandle_t		modelIcon;
 
@@ -877,6 +883,8 @@ typedef struct {
 	int				voipLevel[MAX_CLIENTS];			// 0 = idle/silent, 1-4 = audible level (selects speakerLevelShader[level-1])
 	int				voipTalkingTime[MAX_CLIENTS];	// cg.time when last seen talking (for HUD fade)
 	int				voipChannel[MAX_CLIENTS];		// per-client channel flags from engine
+
+	headState_t		head[MAX_CLIENTS];
 } cg_t;
 
 
@@ -1554,7 +1562,7 @@ void CG_AddLagometerSnapshotInfo( snapshot_t *snap );
 void CG_CenterPrint( const char *str, int y, int charWidth );
 qhandle_t CG_GetArmorIcon( void );
 qhandle_t CG_GetArmorModel( void );
-void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles );
+void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles, qboolean animated );
 void CG_DrawActive( stereoFrame_t stereoView );
 void CG_DrawFlagModel( float x, float y, float w, float h, int team, qboolean force2D );
 void CG_DrawTeamBackground( int x, int y, int w, int h, float alpha, int team );
@@ -1592,6 +1600,10 @@ void CG_Player( centity_t *cent );
 void CG_ResetPlayerEntity( centity_t *cent );
 void CG_AddRefEntityWithPowerups( refEntity_t *ent, entityState_t *state, int team );
 void CG_NewClientInfo( int clientNum );
+void CG_ResetHeadState( int clientNum );
+void CG_HeadSound( int entityNum, const char *soundName );
+void CG_AdvanceHeads( void );
+void CG_HeadPose( const centity_t *cent, const clientInfo_t *ci, headPose_t *pose );
 sfxHandle_t	CG_CustomSound( int clientNum, const char *soundName );
 void CG_TrailItem( centity_t *cent, qhandle_t hModel, vec3_t offset, float scale );
 

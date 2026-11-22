@@ -14,7 +14,7 @@ ifeq ($(CONFIG),missionpack)
 CG_SRC = \
  cg_main $(CGDIR)/cg_syscalls.asm \
  cg_consolecmds cg_draw cg_drawtools cg_effects cg_ents cg_event cg_info \
- cg_localents cg_marks cg_newdraw cg_players cg_playerstate \
+ cg_headanim cg_localents cg_marks cg_newdraw cg_players cg_playerstate \
  cg_predict cg_scoreboard cg_servercmds cg_snapshot cg_trinity_announce cg_view vr_cgame cg_weapons \
  ui_shared vr_uishared ui_slidervalue \
  bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc vr_bg vr_platform vr_glyph \
@@ -25,7 +25,7 @@ else
 CG_SRC = \
  cg_main $(CGDIR)/cg_syscalls.asm \
  cg_consolecmds cg_draw cg_drawtools cg_effects cg_ents cg_event cg_info \
- cg_localents cg_marks cg_players cg_playerstate cg_predict cg_scoreboard \
+ cg_headanim cg_localents cg_marks cg_players cg_playerstate cg_predict cg_scoreboard \
  cg_servercmds cg_snapshot cg_trinity_announce cg_view vr_cgame cg_weapons \
  bg_mode bg_hash bg_slidemove bg_pmove bg_lib bg_misc vr_bg vr_platform vr_glyph \
  q_math q_shared \

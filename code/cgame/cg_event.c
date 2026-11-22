@@ -519,13 +519,13 @@ void CG_PainEvent( centity_t *cent, int health ) {
 	// play a gurp sound instead of a normal pain sound
 	if (CG_WaterLevel(cent) == 3) {
 		if (rand()&1) {
-			trap_S_StartSound(NULL, cent->currentState.number, CHAN_VOICE, CG_CustomSound(cent->currentState.number, "sound/player/gurp1.wav"));
+			snd = "sound/player/gurp1.wav";
 		} else {
-			trap_S_StartSound(NULL, cent->currentState.number, CHAN_VOICE, CG_CustomSound(cent->currentState.number, "sound/player/gurp2.wav"));
+			snd = "sound/player/gurp2.wav";
 		}
-	} else {
-		trap_S_StartSound(NULL, cent->currentState.number, CHAN_VOICE, CG_CustomSound(cent->currentState.number, snd));
 	}
+	trap_S_StartSound(NULL, cent->currentState.number, CHAN_VOICE, CG_CustomSound(cent->currentState.number, snd));
+	CG_HeadSound( cent->currentState.number, snd );
 
 	// save pain time for programitic twitch animation
 	cent->pe.painTime = cg.time;
@@ -666,6 +666,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 	case EV_FALL_MEDIUM:
 		// use normal pain sound
 		trap_S_StartSound( NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*pain100_1.wav" ) );
+		CG_HeadSound( es->number, "*pain100_1.wav" );
 		cent->pe.painIgnore = qtrue;
 		cent->pe.painTime = cg.time;	// don't play a pain sound right after this
 		if ( clientNum == cg.predictedPlayerState.clientNum ) {
@@ -677,6 +678,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 
 	case EV_FALL_FAR:
 		trap_S_StartSound (NULL, es->number, CHAN_AUTO, CG_CustomSound( es->number, "*fall1.wav" ) );
+		CG_HeadSound( es->number, "*fall1.wav" );
 		cent->pe.painIgnore = qtrue;
 		cent->pe.painTime = cg.time;	// don't play a pain sound right after this
 		if ( clientNum == cg.predictedPlayerState.clientNum ) {
@@ -739,16 +741,20 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		// boing sound at origin, jump sound on player
 		trap_S_StartSound ( cent->lerpOrigin, -1, CHAN_VOICE, cgs.media.jumpPadSound );
 		trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*jump1.wav" ) );
+		CG_HeadSound( es->number, "*jump1.wav" );
 		break;
 
 	case EV_JUMP:
 		// pain event with fast sequential jump just creates sound distortion
-		if ( cg.time - cent->pe.painTime > 50 )
+		if ( cg.time - cent->pe.painTime > 50 ) {
 			trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, "*jump1.wav" ) );
+			CG_HeadSound( es->number, "*jump1.wav" );
+		}
 		break;
 
 	case EV_TAUNT:
 		trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( clientNum, "*taunt.wav" ) );
+		CG_HeadSound( es->number, "*taunt.wav" );
 		break;
 
 #ifdef MISSIONPACK
@@ -790,6 +796,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 
 	case EV_WATER_CLEAR:
 		trap_S_StartSound (NULL, es->number, CHAN_AUTO, CG_CustomSound( es->number, "*gasp.wav" ) );
+		CG_HeadSound( es->number, "*gasp.wav" );
 		break;
 
 	case EV_ITEM_PICKUP:
@@ -1137,6 +1144,7 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		} else {
 			s = CG_ConfigString( CS_SOUNDS + es->eventParm );
 			trap_S_StartSound (NULL, es->number, CHAN_VOICE, CG_CustomSound( es->number, s ) );
+			CG_HeadSound( es->number, s );
 		}
 		break;
 
@@ -1277,11 +1285,9 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 	case EV_DEATH1:
 	case EV_DEATH2:
 	case EV_DEATH3:
-		if ( CG_WaterLevel(cent) == 3 ) {
-			trap_S_StartSound( NULL, es->number, CHAN_VOICE, CG_CustomSound(es->number, "*drown.wav") );
-		} else {
-			trap_S_StartSound( NULL, es->number, CHAN_VOICE, CG_CustomSound(es->number, va("*death%i.wav", event - EV_DEATH1 + 1)) );
-		}
+		s = CG_WaterLevel(cent) == 3 ? "*drown.wav" : va("*death%i.wav", event - EV_DEATH1 + 1);
+		trap_S_StartSound( NULL, es->number, CHAN_VOICE, CG_CustomSound(es->number, s) );
+		CG_HeadSound( es->number, s );
 		break;
 
 	case EV_OBITUARY:

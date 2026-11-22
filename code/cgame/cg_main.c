@@ -2002,10 +2002,14 @@ Will perform callbacks to make the loading info screen update.
 void CG_Init( int serverMessageNum, int serverCommandSequence, int clientNum ) {
 	char  value[MAX_CVAR_VALUE_STRING];
 	const char	*s;
+	int		i;
 
 	// clear everything
 	memset( &cgs, 0, sizeof( cgs ) );
 	memset( &cg, 0, sizeof( cg ) );
+	for ( i = 0; i < MAX_CLIENTS; i++ ) {
+		CG_ResetHeadState( i );
+	}
 	memset( cg_entities, 0, sizeof(cg_entities) );
 	memset( cg_weapons, 0, sizeof(cg_weapons) );
 	memset( cg_items, 0, sizeof(cg_items) );

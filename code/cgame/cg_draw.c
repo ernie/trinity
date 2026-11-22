@@ -305,7 +305,7 @@ void CG_Draw3DModel( float x, float y, float w, float h, qhandle_t model, qhandl
 CG_Draw3DModel
 ================
 */
-void CG_Draw3DModelColor( float x, float y, float w, float h, qhandle_t model, qhandle_t skin, vec3_t origin, vec3_t angles, vec3_t color ) {
+void CG_Draw3DModelColor( float x, float y, float w, float h, qhandle_t model, qhandle_t skin, vec3_t origin, vec3_t angles, vec3_t color, const headPose_t *pose ) {
 	refdef_t		refdef;
 	refEntity_t		ent;
 
@@ -323,6 +323,11 @@ void CG_Draw3DModelColor( float x, float y, float w, float h, qhandle_t model, q
 	ent.hModel = model;
 	ent.customSkin = skin;
 	ent.renderfx = RF_NOSHADOW;		// no stencil shadows
+	if ( pose ) {
+		ent.oldframe = pose->oldFrame;
+		ent.frame = pose->frame;
+		ent.backlerp = pose->backlerp;
+	}
 
 	refdef.rdflags = RDF_NOWORLDMODEL;
 
@@ -358,12 +363,13 @@ CG_DrawHead
 Used for both the status bar and the scoreboard
 ================
 */
-void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles ) {
+void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t headAngles, qboolean animated ) {
 	clipHandle_t	cm;
 	clientInfo_t	*ci;
 	float			len;
 	vec3_t			origin;
 	vec3_t			mins, maxs;
+	headPose_t		pose;
 
 	ci = &cgs.clientinfo[ clientNum ];
 
@@ -387,7 +393,11 @@ void CG_DrawHead( float x, float y, float w, float h, int clientNum, vec3_t head
 		// allow per-model tweaking
 		VectorAdd( origin, ci->headOffset, origin );
 
-		CG_Draw3DModelColor( x, y, w, h, ci->headModel, ci->headSkin, origin, headAngles, ci->headColor );
+		animated = animated && ci->headAnimated && clientNum == cg.predictedPlayerState.clientNum;
+		if ( animated ) {
+			CG_HeadPose( &cg.predictedPlayerEntity, ci, &pose );
+		}
+		CG_Draw3DModelColor( x, y, w, h, ci->headModel, ci->headSkin, origin, headAngles, ci->headColor, animated ? &pose : NULL );
 	} else if ( cg_drawIcons.integer ) {
 		trap_R_SetColor ( NULL );
 		CG_DrawPic( x, y, w, h, ci->modelIcon );
@@ -528,7 +538,7 @@ static void CG_DrawStatusBarHead( float x ) {
 		angles[PITCH] = cg.headStartPitch + ( cg.headEndPitch - cg.headStartPitch ) * frac;
 	}
 
-	CG_DrawHead( x, cgs.screenYmax + 1 - size, size, size, cg.snap->ps.clientNum, angles );
+	CG_DrawHead( x, cgs.screenYmax + 1 - size, size, size, cg.snap->ps.clientNum, angles, qtrue );
 }
 #endif // MISSIONPACK
 
@@ -898,7 +908,7 @@ static float CG_DrawAttacker( float y ) {
 	angles[PITCH] = 0;
 	angles[YAW] = 180;
 	angles[ROLL] = 0;
-	CG_DrawHead( cgs.screenXmax + 1 - size, y, size, size, clientNum, angles );
+	CG_DrawHead( cgs.screenXmax + 1 - size, y, size, size, clientNum, angles, qfalse );
 
 	info = CG_ConfigString( CS_PLAYERS + clientNum );
 	name = Info_ValueForKey(  info, "n" );
@@ -4290,6 +4300,12 @@ See also: CG_WarmupEvent (similar subset for warmup/client changes)
 ===============
 */
 void CG_ResetSeekState( void ) {
+	int i;
+
+	// Head animations, CG_HeadPoseFor/CG_HeadFx: head timers run on cg.time
+	for ( i = 0; i < MAX_CLIENTS; i++ ) {
+		CG_ResetHeadState( i );
+	}
 
 	// -- HUD display timers --
 

@@ -537,6 +537,90 @@ static qboolean	CG_RegisterClientSkin( clientInfo_t *ci, const char *teamName, c
 }
 
 
+static int CG_Md3FileFrames( const char *path ) {
+	unsigned char	header[108];
+	fileHandle_t	f;
+	int				len;
+
+	len = trap_FS_FOpenFile( path, &f, FS_READ );
+	if ( f == FS_INVALID_HANDLE ) {
+		return -1;
+	}
+	if ( len > (int)sizeof( header ) ) {
+		len = sizeof( header );
+	}
+	trap_FS_Read( header, len, f );
+	trap_FS_FCloseFile( f );
+	return CG_HeadMd3FrameCount( header, len );
+}
+
+/*
+==========================
+CG_LoadHeadAnims
+==========================
+*/
+static void CG_LoadHeadAnims( clientInfo_t *ci, const char *headPath ) {
+	char			path[MAX_QPATH * 2], text[4096], warn[128];
+	fileHandle_t	f;
+	int				frames, len, lod, defined, fx;
+	char			*slash, *ext;
+	orientation_t	beak;
+
+	ci->headAnimated = qfalse;
+	memset( ci->headAnims, 0, sizeof( ci->headAnims ) );
+	ci->headNumFx = 0;
+
+	Q_strncpyz( path, headPath, sizeof( path ) );
+	slash = Q_strrchr( path, '/' );
+	if ( !slash ) {
+		return;
+	}
+	Q_strncpyz( slash + 1, "headanim.cfg", sizeof( path ) - ( slash + 1 - path ) );
+	len = trap_FS_FOpenFile( path, &f, FS_READ );
+	if ( f == FS_INVALID_HANDLE ) {
+		return;
+	}
+	if ( len <= 0 || len >= (int)sizeof( text ) ) {
+		CG_Printf( "%s: empty or too long\n", path );
+		trap_FS_FCloseFile( f );
+		return;
+	}
+	trap_FS_Read( text, len, f );
+	text[len] = '\0';
+	trap_FS_FCloseFile( f );
+
+	frames = CG_Md3FileFrames( headPath );
+	defined = CG_HeadParseAnims( text, frames, ci->headAnims, ci->headFx, &ci->headNumFx, warn, sizeof( warn ) );
+	if ( warn[0] ) {
+		CG_Printf( "%s: %s\n", path, warn );
+	}
+	if ( ci->headNumFx && !trap_R_LerpTag( &beak, ci->headModel, 0, 0, 1.0f, "tag_beak" ) ) {
+		CG_Printf( "%s has no tag_beak, so its head effects are off\n", headPath );
+		ci->headNumFx = 0;
+	}
+	for ( fx = 0; fx < ci->headNumFx; fx++ ) {
+		for ( lod = 0; lod < ci->headFx[fx].frames; lod++ ) {
+			ci->headFxShaders[fx][lod] = trap_R_RegisterShader( va( "%s_%i", ci->headFx[fx].prefix, lod ) );
+		}
+	}
+
+	// the renderer may draw any LOD, so each needs the head's frames
+	for ( lod = 1; lod <= 2; lod++ ) {
+		Q_strncpyz( path, headPath, sizeof( path ) );
+		ext = Q_strrchr( path, '.' );
+		if ( !ext ) {
+			return;
+		}
+		Com_sprintf( ext, sizeof( path ) - ( ext - path ), "_%i.md3", lod );
+		len = CG_Md3FileFrames( path );
+		if ( len >= 0 && len < frames ) {
+			CG_Printf( "%s has fewer frames than %s, so the head won't animate\n", path, headPath );
+			return;
+		}
+	}
+	ci->headAnimated = defined > 0;
+}
+
 /*
 ==========================
 CG_RegisterClientModelname
@@ -591,6 +675,7 @@ static qboolean CG_RegisterClientModelname( clientInfo_t *ci, const char *modelN
 		Com_Printf( "Failed to load model file %s\n", filename );
 		return qfalse;
 	}
+	CG_LoadHeadAnims( ci, filename );
 
 	// if any skins failed to load, return failure
 	if ( !CG_RegisterClientSkin( ci, teamName, modelName, skinName, headName, headSkinName ) ) {
@@ -897,6 +982,11 @@ static void CG_CopyClientInfoModel( const clientInfo_t *from, clientInfo_t *to )
 	to->torsoSkin = from->torsoSkin;
 	to->headModel = from->headModel;
 	to->headSkin = from->headSkin;
+	to->headAnimated = from->headAnimated;
+	memcpy( to->headAnims, from->headAnims, sizeof( to->headAnims ) );
+	memcpy( to->headFx, from->headFx, sizeof( to->headFx ) );
+	to->headNumFx = from->headNumFx;
+	memcpy( to->headFxShaders, from->headFxShaders, sizeof( to->headFxShaders ) );
 	to->modelIcon = from->modelIcon;
 
 	to->newAnims = from->newAnims;
@@ -1238,6 +1328,235 @@ static void CG_SetSkinAndModel( clientInfo_t *newInfo,
 
 /*
 ======================
+CG_ResetHeadState
+======================
+*/
+void CG_ResetHeadState( int clientNum ) {
+	memset( &cg.head[clientNum], 0, sizeof( cg.head[clientNum] ) );
+	cg.head[clientNum].anim = -1;
+}
+
+/*
+======================
+CG_HeadClient
+
+The client whose head state an entity's head plays from, or -1 for a corpse.
+A podium stand-in plays its winner's head.
+======================
+*/
+static int CG_HeadClient( const entityState_t *es ) {
+	if ( es->number < MAX_CLIENTS ) {
+		return es->number;
+	}
+	if ( es->eType == ET_PLAYER && !( es->eFlags & EF_DEAD ) && es->clientNum >= 0 && es->clientNum < MAX_CLIENTS ) {
+		return es->clientNum;
+	}
+	return -1;
+}
+
+/*
+======================
+CG_HeadDeathNum
+======================
+*/
+static int CG_HeadDeathNum( const entityState_t *es ) {
+	int torsoAnim = es->torsoAnim & ~ANIM_TOGGLEBIT;
+
+	// the dying and dead poses pair up in order: BOTH_DEATH1, BOTH_DEAD1, BOTH_DEATH2, ...
+	if ( torsoAnim >= BOTH_DEATH1 && torsoAnim <= BOTH_DEAD3 ) {
+		return ( torsoAnim - BOTH_DEATH1 ) / 2 + 1;
+	}
+	return 0;
+}
+
+/*
+======================
+CG_HeadSound
+======================
+*/
+void CG_HeadSound( int entityNum, const char *soundName ) {
+	clientInfo_t	*ci;
+	headState_t		*hs;
+	int				anim, i, clientNum;
+
+	if ( entityNum < 0 || entityNum >= MAX_GENTITIES ) {
+		return;
+	}
+	clientNum = CG_HeadClient( &cg_entities[entityNum].currentState );
+	if ( clientNum < 0 ) {
+		return;
+	}
+	ci = &cgs.clientinfo[clientNum];
+	if ( !ci->headAnimated ) {
+		return;
+	}
+	hs = &cg.head[clientNum];
+	anim = CG_HeadAnimForSound( soundName );
+	for ( i = 0; i < ci->headNumFx; i++ ) {
+		if ( ci->headFx[i].anim == anim ) {
+			hs->fxTime[i] = cg.time;
+			hs->fxPlaced[i] = qfalse;
+		}
+	}
+	anim = CG_HeadSoundStarts( ci->headAnims, hs->anim, CG_HeadDeathNum( &cg_entities[entityNum].currentState ), anim );
+	if ( anim < 0 ) {
+		return;
+	}
+	hs->anim = anim;
+	hs->startTime = cg.time;
+	hs->blendFrom = 0;
+}
+
+/*
+======================
+CG_AdvanceHeads
+======================
+*/
+void CG_AdvanceHeads( void ) {
+	int i;
+
+	for ( i = 0; i < MAX_CLIENTS; i++ ) {
+		if ( cgs.clientinfo[i].headAnimated ) {
+			cg.head[i].openness = CG_HeadOpenness( cg.head[i].openness, CG_HeadTalkTarget( cg.voipLevel[i] ), cg.time - cg.oldTime );
+		}
+	}
+}
+
+static const float headFxSt[4][2] = { { 0, 1 }, { 1, 1 }, { 1, 0 }, { 0, 0 } };
+static const float headFxCorner[4][2] = { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } };
+
+/*
+======================
+CG_HeadFxFirstPerson
+======================
+*/
+static void CG_HeadFxFirstPerson( const clientInfo_t *ci, const headState_t *hs, const refEntity_t *head ) {
+	const headFx_t		*fx;
+	refEntity_t			beak;
+	orientation_t		rest;
+	polyVert_t			verts[4];
+	vec3_t				screenRight, right, up, center, point, restDir, eye;
+	float				size, r[2], u[2], c[2], fan[2], yaw = 0.0f, pitch = 0.0f;
+	int					i, k, frame;
+	qboolean			eyed = qfalse, swung = qfalse;
+
+	// only the engine's main-view polygons keep this card out of mirrors
+	if ( !polyFxTrap ) {
+		return;
+	}
+	VectorNegate( cg.refdef.viewaxis[1], screenRight );
+	for ( i = 0; i < ci->headNumFx; i++ ) {
+		fx = &ci->headFx[i];
+		frame = hs->fxTime[i] && fx->viewed ? CG_HeadFxFrame( fx, cg.time - hs->fxTime[i] ) : -1;
+		if ( frame < 0 ) {
+			continue;
+		}
+		if ( !eyed ) {
+			VectorCopy( cg.refdef.vieworg, eye );
+			CG_VR_EyeOrigin( eye );
+			eyed = qtrue;
+		}
+		if ( !swung && fx->viewSwing > 0.0f ) {
+			memset( &beak, 0, sizeof( beak ) );
+			AxisClear( beak.axis );
+			CG_PositionRotatedEntityOnTag( &beak, head, ci->headModel, "tag_beak" );
+			trap_R_LerpTag( &rest, ci->headModel, 0, 0, 0.0f, "tag_beak" );
+			VectorScale( cg.refdef.viewaxis[0], rest.axis[0][0], restDir );
+			VectorMA( restDir, rest.axis[0][1], cg.refdef.viewaxis[1], restDir );
+			VectorMA( restDir, rest.axis[0][2], cg.refdef.viewaxis[2], restDir );
+			CG_HeadFxSwing( restDir, beak.axis[0], (const float (*)[3])cg.refdef.viewaxis, &yaw, &pitch );
+			swung = qtrue;
+		}
+		size = CG_HeadFxView( fx, eye, (const float (*)[3])cg.refdef.viewaxis, yaw, pitch, point, fan );
+		CG_HeadFxCard( fx, fan, 0.0f, r, u, c );
+		VectorScale( screenRight, r[0], right );
+		VectorMA( right, r[1], cg.refdef.viewaxis[2], right );
+		VectorScale( screenRight, u[0], up );
+		VectorMA( up, u[1], cg.refdef.viewaxis[2], up );
+		VectorMA( point, c[0] * size, screenRight, center );
+		VectorMA( center, c[1] * size, cg.refdef.viewaxis[2], center );
+		for ( k = 0; k < 4; k++ ) {
+			VectorMA( center, headFxCorner[k][0] * fx->width * size * 0.5f, right, verts[k].xyz );
+			VectorMA( verts[k].xyz, headFxCorner[k][1] * fx->height * size * 0.5f, up, verts[k].xyz );
+			verts[k].st[0] = headFxSt[k][0];
+			verts[k].st[1] = headFxSt[k][1];
+			verts[k].modulate[0] = verts[k].modulate[1] = verts[k].modulate[2] = verts[k].modulate[3] = 255;
+		}
+		trap_R_AddPolysToScene2( ci->headFxShaders[i][frame], 4, verts, 1, RF_FIRST_PERSON );
+	}
+}
+
+/*
+======================
+CG_HeadFx
+======================
+*/
+static void CG_HeadFx( const clientInfo_t *ci, headState_t *hs, const refEntity_t *head ) {
+	const headFx_t		*fx;
+	refEntity_t			beak;
+	polyVert_t			verts[4];
+	vec3_t				screenRight, right, up, center;
+	float				beakOnScreen[2], beakDepth = 0.0f, *card;
+	int					i, k, frame;
+	qboolean			posed = qfalse;
+
+	// a mirror-only head is the viewer's own
+	if ( head->renderfx & RF_THIRD_PERSON ) {
+		CG_HeadFxFirstPerson( ci, hs, head );
+		return;
+	}
+	VectorNegate( cg.refdef.viewaxis[1], screenRight );
+	for ( i = 0; i < ci->headNumFx; i++ ) {
+		fx = &ci->headFx[i];
+		frame = hs->fxTime[i] ? CG_HeadFxFrame( fx, cg.time - hs->fxTime[i] ) : -1;
+		if ( frame < 0 ) {
+			continue;
+		}
+		if ( !posed ) {
+			memset( &beak, 0, sizeof( beak ) );
+			AxisClear( beak.axis );
+			CG_PositionRotatedEntityOnTag( &beak, head, ci->headModel, "tag_beak" );
+			beakOnScreen[0] = DotProduct( beak.axis[0], screenRight );
+			beakOnScreen[1] = DotProduct( beak.axis[0], cg.refdef.viewaxis[2] );
+			beakDepth = DotProduct( beak.axis[0], cg.refdef.viewaxis[0] );
+			posed = qtrue;
+		}
+		card = hs->fxCard[i];
+		if ( !hs->fxPlaced[i] ) {
+			CG_HeadFxCard( fx, beakOnScreen, beakDepth, &card[0], &card[2], &card[4] );
+			hs->fxPlaced[i] = qtrue;
+		}
+		VectorScale( screenRight, card[0], right );
+		VectorMA( right, card[1], cg.refdef.viewaxis[2], right );
+		VectorScale( screenRight, card[2], up );
+		VectorMA( up, card[3], cg.refdef.viewaxis[2], up );
+		VectorMA( beak.origin, card[4], screenRight, center );
+		VectorMA( center, card[5], cg.refdef.viewaxis[2], center );
+		for ( k = 0; k < 4; k++ ) {
+			VectorMA( center, headFxCorner[k][0] * fx->width * 0.5f, right, verts[k].xyz );
+			VectorMA( verts[k].xyz, headFxCorner[k][1] * fx->height * 0.5f, up, verts[k].xyz );
+			verts[k].st[0] = headFxSt[k][0];
+			verts[k].st[1] = headFxSt[k][1];
+			verts[k].modulate[0] = verts[k].modulate[1] = verts[k].modulate[2] = verts[k].modulate[3] = 255;
+		}
+		trap_R_AddPolyToScene( ci->headFxShaders[i][frame], 4, verts );
+	}
+}
+
+/*
+======================
+CG_HeadPose
+======================
+*/
+void CG_HeadPose( const centity_t *cent, const clientInfo_t *ci, headPose_t *pose ) {
+	int clientNum = CG_HeadClient( &cent->currentState );
+
+	CG_HeadPoseFor( ci->headAnims, clientNum < 0 ? NULL : &cg.head[clientNum], clientNum < 0,
+		CG_HeadDeathNum( &cent->currentState ), cg.time, pose );
+}
+
+/*
+======================
 CG_NewClientInfo
 ======================
 */
@@ -1265,6 +1584,7 @@ void CG_NewClientInfo( int clientNum ) {
 			trap_SendConsoleCommand( va( "voip unignore %i\n", clientNum ) );
 		}
 		memset( ci, 0, sizeof( *ci ) );
+		CG_ResetHeadState( clientNum );
 		return;	// player just left
 	}
 
@@ -1411,6 +1731,9 @@ void CG_NewClientInfo( int clientNum ) {
 
 	// replace whatever was there with the new one
 	newInfo.infoValid = qtrue;
+	if ( !ci->infoValid || ci->headModel != newInfo.headModel ) {
+		CG_ResetHeadState( clientNum );
+	}
 	*ci = newInfo;
 
 	if ( clientNum == cg.clientNum ) {
@@ -1442,6 +1765,7 @@ void CG_LoadDeferredPlayers( void ) {
 				continue;
 			}
 			CG_LoadClientInfo( ci );
+			CG_ResetHeadState( i );
 //			break;
 		}
 	}
@@ -2715,6 +3039,7 @@ void CG_Player( centity_t *cent ) {
 	refEntity_t		torso;
 	refEntity_t		head;
 	int				clientNum;
+	int				headClient;
 	int				renderfx;
 	qboolean		shadow;
 	float			shadowPlane;
@@ -3081,6 +3406,15 @@ void CG_Player( centity_t *cent ) {
 
 	CG_PositionRotatedEntityOnTag( &head, &torso, ci->torsoModel, "tag_head");
 
+	if ( ci->headAnimated ) {
+		headPose_t	pose;
+
+		CG_HeadPose( cent, ci, &pose );
+		head.oldframe = pose.oldFrame;
+		head.frame = pose.frame;
+		head.backlerp = pose.backlerp;
+	}
+
 	head.shadowPlane = shadowPlane;
 	head.renderfx = renderfx;
 
@@ -3099,6 +3433,10 @@ void CG_Player( centity_t *cent ) {
 	if (!firstPersonBody)
 	{
 		CG_AddRefEntityWithPowerups( &head, &cent->currentState, ci->team );
+		headClient = CG_HeadClient( &cent->currentState );
+		if ( ci->headAnimated && headClient >= 0 ) {
+			CG_HeadFx( ci, &cg.head[headClient], &head );
+		}
 	}
 
 #ifdef MISSIONPACK

@@ -1501,6 +1501,7 @@ void CG_DrawActiveFrame( int serverTime, stereoFrame_t stereoView, qboolean demo
 	// update VOIP state
 	CG_UpdateVoipLevels();
 	CG_UpdateVoipChannelState();
+	CG_AdvanceHeads();
 
 	CG_VR_Frame();
 
