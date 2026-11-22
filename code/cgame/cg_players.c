@@ -109,6 +109,7 @@ static qboolean	CG_ParseAnimationFile( const char *filename, clientInfo_t *ci ) 
 	ci->gender = GENDER_MALE;
 	ci->fixedlegs = qfalse;
 	ci->fixedtorso = qfalse;
+	ci->feathers = qfalse;
 
 	// read optional parameters
 	while ( 1 ) {
@@ -163,6 +164,9 @@ static qboolean	CG_ParseAnimationFile( const char *filename, clientInfo_t *ci ) 
 			continue;
 		} else if ( !Q_stricmp( token, "fixedtorso" ) ) {
 			ci->fixedtorso = qtrue;
+			continue;
+		} else if ( !Q_stricmp( token, "feathers" ) ) {
+			ci->feathers = qtrue;
 			continue;
 		}
 
@@ -852,6 +856,10 @@ static void CG_LoadClientInfo( clientInfo_t *ci ) {
 			ci->sounds[i] = trap_S_RegisterSound( va("sound/player/%s/%s", DEFAULT_MODEL, s + 1), qfalse );
 		}
 	}
+	ci->gibSound = 0;
+	if ( modelloaded && ci->feathers ) {
+		ci->gibSound = trap_S_RegisterSound( va( "sound/player/%s/gib.wav", dir ), qfalse );
+	}
 
 	ci->deferred = qfalse;
 
@@ -881,6 +889,7 @@ static void CG_CopyClientInfoModel( const clientInfo_t *from, clientInfo_t *to )
 	VectorCopy( from->headOffset, to->headOffset );
 	to->footsteps = from->footsteps;
 	to->gender = from->gender;
+	to->feathers = from->feathers;
 
 	to->legsModel = from->legsModel;
 	to->legsSkin = from->legsSkin;
@@ -895,6 +904,7 @@ static void CG_CopyClientInfoModel( const clientInfo_t *from, clientInfo_t *to )
 
 	memcpy( to->animations, from->animations, sizeof( to->animations ) );
 	memcpy( to->sounds, from->sounds, sizeof( to->sounds ) );
+	to->gibSound = from->gibSound;
 }
 
 

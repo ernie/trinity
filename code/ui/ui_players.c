@@ -1111,6 +1111,8 @@ static qboolean UI_ParseAnimationFile( const char *filename, playerInfo_t *pi ) 
 		} else if ( !Q_stricmp( token, "fixedtorso" ) ) {
 			pi->fixedtorso = qtrue;
 			continue;
+		} else if ( !Q_stricmp( token, "feathers" ) ) {
+			continue;
 		}
 
 		// if it is a number, start parsing animations

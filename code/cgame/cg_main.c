@@ -915,6 +915,8 @@ static void CG_RegisterGraphics( void ) {
 	cgs.media.bloodSplatShader[1] = trap_R_RegisterShader( "bloodSplat1" );
 	cgs.media.bloodSplatShader[2] = trap_R_RegisterShader( "bloodSplat2" );
 	cgs.media.bloodSplatShader[3] = trap_R_RegisterShader( "bloodSplat3" );
+	cgs.media.featherPuffShader = trap_R_RegisterShader( "featherPuff" );
+	cgs.media.featherFallShader = trap_R_RegisterShader( "featherFall" );
 	cgs.media.lagometerShader = trap_R_RegisterShader("lagometer" );
 	cgs.media.connectionShader = trap_R_RegisterShader( "disconnected" );
 

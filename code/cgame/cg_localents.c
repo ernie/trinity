@@ -1261,7 +1261,7 @@ void CG_AddInvulnerabilityJuiced( localEntity_t *le ) {
 	}
 	if ( t > 5000 ) {
 		le->endTime = 0;
-		CG_GibPlayer( le->refEntity.origin, vec3_origin, vec3_origin );
+		CG_GibPlayer( le->refEntity.origin, vec3_origin, vec3_origin, ( le->leFlags & LEF_FEATHERS ) != 0 );
 	}
 	else {
 		trap_R_AddRefEntityToScene( &le->refEntity );
@@ -1595,6 +1595,84 @@ static void CG_AddBloodParticle( localEntity_t *le ) {
 }
 
 
+/*
+===================
+CG_AddFeather
+
+A feather sprite: light enough that drag wins over gravity, so it slows to a
+drift, settles where it lands and fades over the end of its life.
+===================
+*/
+#define	FEATHER_FRAMES	10		// frame count of both feather animMaps
+#define	FEATHER_GRAVITY	0.12f	// share of world gravity a feather feels
+#define	FEATHER_DRAG	3.0f	// air resistance (1/s)
+#define	FEATHER_FADE	0.4f	// share of its life a feather spends fading out
+#define	FEATHER_REST_NORMAL	0.7f	// flattest surface normal a feather comes to rest on
+
+static void CG_AddFeather( localEntity_t *le ) {
+	refEntity_t	*re;
+	vec3_t		newOrigin;
+	trace_t		trace;
+	float		c, dt, damp, age, frames, dot;
+
+	re = &le->refEntity;
+
+	c = ( le->endTime - cg.time ) * le->lifeRate / FEATHER_FADE;
+	if ( c > 1.0f ) {
+		c = 1.0f;
+	}
+	re->shaderRGBA.rgba[3] = 0xff * c;
+
+	age = ( cg.time - le->angles.trTime ) * 0.001f;
+	re->rotation = le->angles.trBase[0] + le->angles.trDelta[0] * age;
+	frames = le->angles.trBase[1] + le->angles.trDelta[1] * age;
+	if ( re->renderfx & RF_ANIMFRAME ) {
+		if ( re->customShader == cgs.media.featherPuffShader ) {
+			re->frame = (int)( ( 1.0f - ( le->endTime - cg.time ) * le->lifeRate ) * FEATHER_FRAMES );
+			if ( re->frame > FEATHER_FRAMES - 1 ) {
+				re->frame = FEATHER_FRAMES - 1;
+			}
+		} else {
+			re->frame = (int)frames % FEATHER_FRAMES;
+		}
+	}
+
+	if ( le->pos.trType == TR_GRAVITY ) {
+		dt = ( cg.time - le->pos.trTime ) * 0.001f;
+		if ( dt > 0.0f ) {
+			damp = 1.0f - FEATHER_DRAG * dt;
+			if ( damp < 0.0f ) {
+				damp = 0.0f;
+			}
+			le->pos.trDelta[2] -= DEFAULT_GRAVITY * FEATHER_GRAVITY * dt;
+			VectorScale( le->pos.trDelta, damp, le->pos.trDelta );
+			VectorMA( le->pos.trBase, dt, le->pos.trDelta, newOrigin );
+			le->pos.trTime = cg.time;
+
+			CG_Trace( &trace, le->pos.trBase, NULL, NULL, newOrigin, -1, CONTENTS_SOLID );
+			if ( trace.fraction < 1.0f && trace.plane.normal[2] >= FEATHER_REST_NORMAL ) {
+				VectorMA( trace.endpos, re->radius * 0.3f, trace.plane.normal, newOrigin );
+				le->pos.trType = TR_STATIONARY;
+				le->angles.trBase[0] = re->rotation;
+				le->angles.trBase[1] = frames;
+				le->angles.trDelta[0] = 0;
+				le->angles.trDelta[1] = 0;
+				le->angles.trTime = cg.time;
+			} else if ( trace.fraction < 1.0f ) {
+				// a wall or ceiling only takes the motion into it
+				dot = DotProduct( le->pos.trDelta, trace.plane.normal );
+				VectorMA( le->pos.trDelta, -dot, trace.plane.normal, le->pos.trDelta );
+				VectorMA( trace.endpos, 0.5f, trace.plane.normal, newOrigin );
+			}
+			VectorCopy( newOrigin, le->pos.trBase );
+			VectorCopy( newOrigin, re->origin );
+		}
+	}
+
+	trap_R_AddRefEntityToScene( re );
+}
+
+
 //==============================================================================
 
 /*
@@ -1794,6 +1872,10 @@ void CG_AddLocalEntities( void ) {
 
 		case LE_BLOOD_PARTICLE:
 			CG_AddBloodParticle( le );
+			break;
+
+		case LE_FEATHER:
+			CG_AddFeather( le );
 			break;
 
 #ifdef MISSIONPACK

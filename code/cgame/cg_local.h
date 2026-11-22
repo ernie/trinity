@@ -339,6 +339,7 @@ typedef enum {
 	LE_SCOREPLUM,
 	LE_DAMAGEPLUM,
 	LE_BLOOD_PARTICLE,
+	LE_FEATHER,
 #ifdef MISSIONPACK
 	LE_KAMIKAZE,
 	LE_INVULIMPACT,
@@ -353,7 +354,8 @@ typedef enum {
 	LEF_SOUND1			 = 0x0004,			// a once-only sound has played (kamikaze, the fallen pad)
 	LEF_SOUND2			 = 0x0008,			// sound 2 for kamikaze
 	LEF_NO_MARK			 = 0x0010,			// blood particle: do not leave a mark on impact
-	LEF_BLOOD_TRAIL		 = 0x0020			// gib trails blood across bounces (modern)
+	LEF_BLOOD_TRAIL		 = 0x0020,			// gib trails blood across bounces (modern)
+	LEF_FEATHERS		 = 0x0040			// juiced player bursts into feathers
 } leFlag_t;
 
 typedef enum {
@@ -483,6 +485,7 @@ typedef struct {
 	qboolean		newAnims;		// true if using the new mission pack animations
 	qboolean		fixedlegs;		// true if legs yaw is always the same as torso yaw
 	qboolean		fixedtorso;		// true if torso never changes yaw
+	qboolean		feathers;		// true if hits and gibbing throw feathers
 
 	vec3_t			headOffset;		// move head in icon views
 	footstep_t		footsteps;
@@ -502,6 +505,7 @@ typedef struct {
 	animation_t		animations[MAX_TOTALANIMATIONS];
 
 	sfxHandle_t		sounds[MAX_CUSTOM_SOUNDS];
+	sfxHandle_t		gibSound;		// a feathered model's own gib.wav
 
 	qboolean		coloredSkin;
 	vec3_t			headColor;
@@ -993,6 +997,8 @@ typedef struct {
 	qhandle_t	bloodTrailShader;
 	qhandle_t	bloodGoutShader;
 	qhandle_t	bloodSplatShader[4];
+	qhandle_t	featherPuffShader;
+	qhandle_t	featherFallShader;
 #ifdef MISSIONPACK
 	qhandle_t	nailPuffShader;
 	qhandle_t	blueProxMine;
@@ -1752,13 +1758,13 @@ void CG_KamikazeEffect( vec3_t org );
 void CG_ObeliskExplode( vec3_t org, int entityNum );
 void CG_ObeliskPain( vec3_t org );
 void CG_InvulnerabilityImpact( vec3_t org, vec3_t angles );
-void CG_InvulnerabilityJuiced( vec3_t org );
+void CG_InvulnerabilityJuiced( vec3_t org, qboolean feathers );
 void CG_LightningBoltBeam( vec3_t start, vec3_t end );
 #endif
 void CG_ScorePlum( int client, const vec3_t origin, int score );
 void CG_DamagePlum( vec3_t org, int damage );
 
-void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity, const vec3_t carry );
+void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity, const vec3_t carry, qboolean feathers );
 void CG_BigExplode( vec3_t playerOrigin );
 
 void CG_BloodDecal( const vec3_t origin, float radius );

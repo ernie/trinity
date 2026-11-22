@@ -186,7 +186,7 @@ ProximityMine_ExplodeOnPlayer
 ================
 */
 static void ProximityMine_ExplodeOnPlayer( gentity_t *mine ) {
-	gentity_t	*player;
+	gentity_t	*player, *te;
 
 	player = mine->enemy;
 	player->client->ps.eFlags &= ~EF_TICKING;
@@ -194,7 +194,9 @@ static void ProximityMine_ExplodeOnPlayer( gentity_t *mine ) {
 	if ( player->client->invulnerabilityTime > level.time ) {
 		G_Damage( player, mine->parent, mine->parent, vec3_origin, mine->s.origin, 1000, DAMAGE_NO_KNOCKBACK, MOD_JUICED );
 		player->client->invulnerabilityTime = 0;
-		G_TempEntity( player->client->ps.origin, EV_JUICED );
+		te = G_TempEntity( player->client->ps.origin, EV_JUICED );
+		// the dying client plus one, so a stock server's 0 names nobody
+		te->s.eventParm = player->s.clientNum + 1;
 	}
 	else {
 		G_SetOrigin( mine, player->s.pos.trBase );

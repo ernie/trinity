@@ -350,13 +350,13 @@ void CG_InvulnerabilityImpact( vec3_t org, vec3_t angles ) {
 CG_InvulnerabilityJuiced
 ==================
 */
-void CG_InvulnerabilityJuiced( vec3_t org ) {
+void CG_InvulnerabilityJuiced( vec3_t org, qboolean feathers ) {
 	localEntity_t	*le;
 	refEntity_t		*re;
 	vec3_t			angles;
 
 	le = CG_AllocLocalEntity();
-	le->leFlags = 0;
+	le->leFlags = feathers ? LEF_FEATHERS : 0;
 	le->leType = LE_INVULJUICED;
 	le->startTime = cg.time;
 	le->endTime = cg.time + 10000;
@@ -600,6 +600,164 @@ void CG_BloodDecal( const vec3_t origin, float radius ) {
 
 /*
 =================
+CG_LaunchFeather
+
+A sprite from one of the feather shaders. flutter is the fall shader's frame
+rate; the puff shader plays once across the sprite's life.
+=================
+*/
+static localEntity_t *CG_LaunchFeather( const vec3_t origin, const vec3_t velocity, qhandle_t shader,
+		float radius, int life, float flutter ) {
+	localEntity_t	*le;
+	refEntity_t		*re;
+
+	le = CG_AllocLocalEntity();
+	re = &le->refEntity;
+
+	le->leType = LE_FEATHER;
+	le->startTime = cg.time;
+	le->endTime = cg.time + life;
+	le->lifeRate = 1.0f / life;
+
+	le->pos.trType = TR_GRAVITY;
+	le->pos.trTime = cg.time;
+	VectorCopy( origin, le->pos.trBase );
+	VectorCopy( velocity, le->pos.trDelta );
+
+	// angles[0] spins the billboard, angles[1] counts flutter frames
+	le->angles.trType = TR_LINEAR;
+	le->angles.trTime = cg.time;
+	le->angles.trBase[0] = rand() % 360;
+	le->angles.trDelta[0] = crandom() * 120;
+	le->angles.trBase[1] = ( shader == cgs.media.featherFallShader ) ? rand() % 10 : 0;
+	le->angles.trDelta[1] = flutter;
+
+	VectorCopy( origin, re->origin );
+	re->reType = RT_SPRITE;
+	re->rotation = le->angles.trBase[0];
+	re->radius = radius;
+	re->customShader = shader;
+	if ( animFrame ) {
+		re->renderfx |= RF_ANIMFRAME;
+	}
+	re->u.shaderTime = cg.time / 1000.0f - le->angles.trBase[1] / flutter;
+	re->shaderRGBA.rgba[0] = 0xff;
+	re->shaderRGBA.rgba[1] = 0xff;
+	re->shaderRGBA.rgba[2] = 0xff;
+	re->shaderRGBA.rgba[3] = 0xff;
+
+	le->radius = radius;
+	return le;
+}
+
+static qboolean CG_EntityFeathered( int entityNum ) {
+	const entityState_t	*es;
+
+	if ( entityNum < 0 || entityNum >= MAX_GENTITIES ) {
+		return qfalse;
+	}
+	if ( entityNum < MAX_CLIENTS ) {
+		return cgs.clientinfo[ entityNum ].feathers;
+	}
+	// a corpse keeps its owner's client number
+	es = &cg_entities[ entityNum ].currentState;
+	if ( es->eType != ET_PLAYER || es->clientNum < 0 || es->clientNum >= MAX_CLIENTS ) {
+		return qfalse;
+	}
+	return cgs.clientinfo[ es->clientNum ].feathers;
+}
+
+/*
+=================
+CG_ShedFeathers
+
+The hit effect of a feathered model: a puff at the wound and a few loose
+feathers knocked along the damage direction.
+=================
+*/
+#define	FEATHER_HIT_CAP			3
+#define	FEATHER_DMG_PER_LOOSE	15
+
+static void CG_ShedFeathers( const vec3_t origin, const vec3_t dir, int damage, qboolean isPlayer ) {
+	localEntity_t	*le;
+	vec3_t			velocity;
+	int				i, count;
+
+	count = damage / FEATHER_DMG_PER_LOOSE;
+	if ( count > FEATHER_HIT_CAP ) {
+		count = FEATHER_HIT_CAP;
+	}
+
+	VectorScale( dir, 20 + random() * 40, velocity );
+	velocity[0] += crandom() * 15;
+	velocity[1] += crandom() * 15;
+	velocity[2] += 20 + random() * 20;
+	le = CG_LaunchFeather( origin, velocity, cgs.media.featherPuffShader,
+		9 + count * 2 + random() * 3, 450 + random() * 150, 30 );
+	if ( isPlayer ) {
+		le->refEntity.renderfx |= RF_THIRD_PERSON;
+	}
+
+	for ( i = 0; i < count; i++ ) {
+		VectorScale( dir, 60 + random() * 80, velocity );
+		velocity[0] += crandom() * 50;
+		velocity[1] += crandom() * 50;
+		velocity[2] += 40 + random() * 60;
+		le = CG_LaunchFeather( origin, velocity, cgs.media.featherFallShader,
+			4 + random() * 3, 1200 + random() * 800, 6 + random() * 8 );
+		if ( isPlayer ) {
+			le->refEntity.renderfx |= RF_THIRD_PERSON;
+		}
+	}
+}
+
+/*
+=================
+CG_FeatherBurst
+
+What gibbing a feathered model leaves: a cloud of puffs and a burst of loose
+feathers that drift down and fade.
+=================
+*/
+#define	FEATHER_BURST_PUFFS		4
+#define	FEATHER_BURST_COUNT		40
+#define	FEATHER_BURST_INHERIT	0.35f	// how much of the hit's momentum the feathers carry
+
+static void CG_FeatherBurst( const vec3_t playerOrigin, const vec3_t baseVelocity, const vec3_t carry ) {
+	vec3_t	origin, velocity;
+	int		i, count;
+	float	speed;
+
+	for ( i = 0; i < FEATHER_BURST_PUFFS; i++ ) {
+		origin[0] = playerOrigin[0] + crandom() * 10;
+		origin[1] = playerOrigin[1] + crandom() * 10;
+		origin[2] = playerOrigin[2] + crandom() * 14;
+		velocity[0] = carry[0] + crandom() * 30;
+		velocity[1] = carry[1] + crandom() * 30;
+		velocity[2] = carry[2] + 30 + random() * 40;
+		CG_LaunchFeather( origin, velocity, cgs.media.featherPuffShader,
+			28 + random() * 16, 600 + random() * 300, 30 );
+	}
+
+	count = (int)( FEATHER_BURST_COUNT * CG_BloodTuning()->gibSpray + 0.5f );
+	if ( count < 8 ) {
+		count = 8;
+	}
+	for ( i = 0; i < count; i++ ) {
+		origin[0] = playerOrigin[0] + crandom() * 10;
+		origin[1] = playerOrigin[1] + crandom() * 10;
+		origin[2] = playerOrigin[2] + crandom() * 16;
+		speed = 80 + random() * 180;
+		velocity[0] = baseVelocity[0] * FEATHER_BURST_INHERIT + carry[0] + crandom() * speed;
+		velocity[1] = baseVelocity[1] * FEATHER_BURST_INHERIT + carry[1] + crandom() * speed;
+		velocity[2] = baseVelocity[2] * FEATHER_BURST_INHERIT + carry[2] + 60 + random() * speed;
+		CG_LaunchFeather( origin, velocity, cgs.media.featherFallShader,
+			4 + random() * 4, 2500 + random() * 2000, 5 + random() * 8 );
+	}
+}
+
+/*
+=================
 CG_Bleed
 
 This is the spurt of blood when a character gets hit.
@@ -628,7 +786,18 @@ void CG_Bleed( vec3_t origin, vec3_t dir, int entityNum, int damage, qboolean di
 		return;
 	}
 
-	isPlayer = ( entityNum == cg.snap->ps.clientNum );
+	// in third person the viewer sees their own body and what it sheds
+	isPlayer = ( entityNum == cg.snap->ps.clientNum && !cg.renderingThirdPerson );
+
+	if ( CG_EntityFeathered( entityNum ) ) {
+		if ( dir && ( dir[0] != 0 || dir[1] != 0 || dir[2] != 0 ) ) {
+			VectorNormalize2( dir, baseDir );
+		} else {
+			VectorSet( baseDir, 0, 0, 1 );
+		}
+		CG_ShedFeathers( origin, baseDir, damage, isPlayer );
+		return;
+	}
 
 	// com_blood 1 = classic (legacy sprite); 2+ = enhanced (gouts + decals below)
 	if ( cg_blood.integer < 2 ) {
@@ -937,11 +1106,16 @@ static void CG_GibVelocity( const vec3_t base, const vec3_t carry, float k, floa
 	out[2] = base[2] * k + carry[2] + jump + crandom() * scatter;
 }
 
-void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity, const vec3_t carry ) {
+void CG_GibPlayer( const vec3_t playerOrigin, const vec3_t baseVelocity, const vec3_t carry, qboolean feathers ) {
 	vec3_t	origin, velocity;
 	float	scatter, jump, k;
 
 	if ( !cg_blood.integer ) {
+		return;
+	}
+
+	if ( feathers ) {
+		CG_FeatherBurst( playerOrigin, baseVelocity, carry );
 		return;
 	}
 

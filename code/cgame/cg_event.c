@@ -975,7 +975,8 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		break;
 
 	case EV_JUICED:
-		CG_InvulnerabilityJuiced( cent->lerpOrigin );
+		CG_InvulnerabilityJuiced( cent->lerpOrigin,
+			es->eventParm > 0 && es->eventParm <= MAX_CLIENTS && cgs.clientinfo[es->eventParm - 1].feathers );
 		break;
 
 	case EV_LIGHTNINGBOLT:
@@ -1319,17 +1320,16 @@ void CG_EntityEvent( centity_t *cent, vec3_t position, int entityNum ) {
 		// with the kamikaze sound, downside is that the gib sound will also
 		// not be played when someone is gibbed while just carrying the kamikaze
 #ifdef MISSIONPACK
-		if ( !(es->eFlags & EF_KAMIKAZE) ) {
-			trap_S_StartSound( NULL, es->number, CHAN_BODY, cgs.media.gibSound );
-		}
-#else
-		trap_S_StartSound( NULL, es->number, CHAN_BODY, cgs.media.gibSound );
+		if ( !(es->eFlags & EF_KAMIKAZE) )
 #endif
+		{
+			trap_S_StartSound( NULL, es->number, CHAN_BODY, ci->gibSound ? ci->gibSound : cgs.media.gibSound );
+		}
 		{
 			vec3_t	carry;
 
 			CG_MoverPointVelocity( cent->currentState.groundEntityNum, cent->lerpOrigin, carry );
-			CG_GibPlayer( cent->lerpOrigin, cent->currentState.pos.trDelta, carry );
+			CG_GibPlayer( cent->lerpOrigin, cent->currentState.pos.trDelta, carry, ci->feathers );
 		}
 		break;
 

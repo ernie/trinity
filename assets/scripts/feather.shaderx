@@ -1,0 +1,22 @@
+featherPuff
+{
+	cull none
+	{
+		animMap 30 gfx/feather/puff01.tga gfx/feather/puff02.tga gfx/feather/puff03.tga gfx/feather/puff04.tga gfx/feather/puff05.tga gfx/feather/puff06.tga gfx/feather/puff07.tga gfx/feather/puff08.tga gfx/feather/puff09.tga gfx/feather/puff10.tga
+		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbGen vertex
+		alphaGen vertex
+	}
+	clampTime 0.333
+}
+
+featherFall
+{
+	cull none
+	{
+		animMap 10 gfx/feather/fall01.tga gfx/feather/fall02.tga gfx/feather/fall03.tga gfx/feather/fall04.tga gfx/feather/fall05.tga gfx/feather/fall06.tga gfx/feather/fall07.tga gfx/feather/fall08.tga gfx/feather/fall09.tga gfx/feather/fall10.tga
+		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+		rgbGen vertex
+		alphaGen vertex
+	}
+}
