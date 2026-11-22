@@ -4778,12 +4778,12 @@ qboolean UI_hasSkinForBase(const char *base, const char *team) {
 	
 	Com_sprintf( test, sizeof( test ), "models/players/%s/%s/lower_default.skin", base, team );
 
-	if (trap_FS_FOpenFile(test, 0, FS_READ)) {
+	if (trap_FS_FOpenFile(test, 0, FS_READ) > 0) {
 		return qtrue;
 	}
 	Com_sprintf( test, sizeof( test ), "models/players/characters/%s/%s/lower_default.skin", base, team );
 
-	if (trap_FS_FOpenFile(test, 0, FS_READ)) {
+	if (trap_FS_FOpenFile(test, 0, FS_READ) > 0) {
 		return qtrue;
 	}
 	return qfalse;
@@ -5756,6 +5756,11 @@ static qhandle_t UI_FeederItemImage(float feederID, int index) {
   return 0;
 }
 
+// a character on a whole player model of its own wears that model's head
+static qboolean UI_CharacterIsModel( const char *base ) {
+	return Q_stricmp( base, "James" ) && Q_stricmp( base, "Janet" );
+}
+
 static void UI_FeederSelection(float feederID, int index) {
   if (feederID == FEEDER_HEADS) {
 	int actual;
@@ -5763,7 +5768,11 @@ static void UI_FeederSelection(float feederID, int index) {
 	index = actual;
     if (index >= 0 && index < uiInfo.characterCount) {
 		trap_Cvar_Set( "team_model", va("%s", uiInfo.characterList[index].base));
-		trap_Cvar_Set( "team_headmodel", va("*%s", uiInfo.characterList[index].name));
+		if ( UI_CharacterIsModel( uiInfo.characterList[index].base ) ) {
+			trap_Cvar_Set( "team_headmodel", uiInfo.characterList[index].base );
+		} else {
+			trap_Cvar_Set( "team_headmodel", va("*%s", uiInfo.characterList[index].name));
+		}
 		updateModel = qtrue;
     }
   } else if (feederID == FEEDER_Q3HEADS) {
@@ -5922,13 +5931,12 @@ static qboolean Character_Parse(char **p) {
     }
 
     if (token[0] == '{') {
-      // two tokens per line, character name and sex
+      // two tokens per line: character name, then sex or the character's own player model
       if (!String_Parse(p, &uiInfo.characterList[uiInfo.characterCount].name) || !String_Parse(p, &tempStr)) {
         return qfalse;
       }
-    
+
       uiInfo.characterList[uiInfo.characterCount].headImage = -1;
-			uiInfo.characterList[uiInfo.characterCount].imageName = String_Alloc(va("models/players/heads/%s/icon_default.tga", uiInfo.characterList[uiInfo.characterCount].name));
 
 	  if (tempStr && (!Q_stricmp(tempStr, "female"))) {
         uiInfo.characterList[uiInfo.characterCount].base = String_Alloc(va("Janet"));
@@ -5936,6 +5944,12 @@ static qboolean Character_Parse(char **p) {
         uiInfo.characterList[uiInfo.characterCount].base = String_Alloc(va("James"));
 	  } else {
         uiInfo.characterList[uiInfo.characterCount].base = String_Alloc(va("%s",tempStr));
+	  }
+
+	  if ( UI_CharacterIsModel( uiInfo.characterList[uiInfo.characterCount].base ) ) {
+		uiInfo.characterList[uiInfo.characterCount].imageName = String_Alloc( va( "models/players/%s/icon_default.tga", uiInfo.characterList[uiInfo.characterCount].base ) );
+	  } else {
+		uiInfo.characterList[uiInfo.characterCount].imageName = String_Alloc( va( "models/players/heads/%s/icon_default.tga", uiInfo.characterList[uiInfo.characterCount].name ) );
 	  }
 
       Com_Printf("Loaded %s character %s.\n", uiInfo.characterList[uiInfo.characterCount].base, uiInfo.characterList[uiInfo.characterCount].name);
