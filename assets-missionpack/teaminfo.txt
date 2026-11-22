@@ -21,10 +21,11 @@ teams {
   { "Stroggs" "ui/assets/stroggs" "Enforcer" "Icarus" "Gammy" "Gladiator" "Paracyte" }
   { "The Fallen" "ui/assets/thefallen" "Neptune" "Stalker" "Ursula" "Abominator" "Sinister" }
   { "Team Beef" "ui/assets/teambeef" "DrBeef" "Baggy" "Bummser" "Lubos" "Wellington" }
+  { "The Flock" "ui/assets/theflock" "Goose" "Honker" "Gander" "Gawker" "Felldrake" }
 }
 
 
-// character name ( used for display and head derivation ), sex
+// character name ( used for display and head derivation ), sex or its own player model
 characters {
   { "James"  "male" }
   { "Janet"  "female" }
@@ -37,6 +38,10 @@ characters {
   { "Neptune"  "male" }
   { "Ursula"  "female" }
   { "Flayer"  "male" }
+  { "Goose"  "goose" }
+  { "Honker"  "honker" }
+  { "Gander"  "gander" }
+  { "Gawker"  "gawker" }
 }
 
 aliases {
@@ -70,6 +75,11 @@ aliases {
 	{ "Bummser"			"Neptune"	"a"				}
 	{ "Lubos"			"Gaunt"		"d"				}
 	{ "Wellington"			"James"		"o"				}
+	{ "Goose"			"Goose"		"o"				}
+	{ "Honker"			"Honker"	"o"				}
+	{ "Gander"			"Gander"	"d"				}
+	{ "Gawker"			"Gawker"	"d"				}
+	{ "Felldrake"			"Goose"		"a"				}
 }
 
 

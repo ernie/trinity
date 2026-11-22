@@ -1,0 +1,23 @@
+{
+name		Goose
+model		goose
+aifile	bots/goose_c.c
+}
+
+{
+name		Honker
+model		honker
+aifile	bots/honker_c.c
+}
+
+{
+name		Gander
+model		gander
+aifile	bots/gander_c.c
+}
+
+{
+name		Gawker
+model		gawker
+aifile	bots/gawker_c.c
+}

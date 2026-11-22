@@ -1,0 +1,238 @@
+male
+
+getflag
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! Get the flag!"
+	sound/voices/goose_b/firm_2.wav	"HONK! Secure the flag!"
+}
+
+offense
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! You're on offense"
+}
+
+defend
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! Stay Home"
+	sound/voices/goose_b/firm_2.wav	"HONK! Guard the base"
+	sound/voices/goose_b/firm_1.wav	"HONK! You're on defense"
+}
+
+defendflag
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! Guard our flag"
+}
+
+patrol
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! Patrol"
+	sound/voices/goose_b/firm_2.wav	"HONK! Take point"
+	sound/voices/goose_b/firm_1.wav	"HONK! Go on patrol"
+}
+
+followme
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! Follow me"
+	sound/voices/goose_b/firm_2.wav	"HONK! Cover me"
+	sound/voices/goose_b/firm_1.wav	"HONK! Watch my back"
+}
+
+yes
+{
+	sound/voices/goose_b/short_1.wav	"HONK! Yessir"
+	sound/voices/goose_b/short_2.wav	"HONK! Yes ma'am"
+	sound/voices/goose_b/short_1.wav	"HONK! Aye, aye, sir"
+	sound/voices/goose_b/short_2.wav	"HONK! Aye, aye, ma'am"
+	sound/voices/goose_b/short_1.wav	"HONK! Affirmative"
+	sound/voices/goose_b/short_2.wav	"HONK! Copy"
+	sound/voices/goose_b/short_1.wav	"HONK! Roger"
+}
+
+no
+{
+	sound/voices/goose_b/double_1.wav	"HONK! No sir"
+	sound/voices/goose_b/double_2.wav	"HONK! No ma'am"
+	sound/voices/goose_b/double_1.wav	"HONK! Negative"
+	sound/voices/goose_b/double_2.wav	"HONK! I'm busy"
+}
+
+ihaveflag
+{
+	sound/voices/goose_b/burst_1.wav	"HONK! I'm coming in hot!"
+	sound/voices/goose_b/burst_2.wav	"HONK! I've secured the flag!"
+	sound/voices/goose_b/burst_1.wav	"HONK! I've got the flag!"
+	sound/voices/goose_b/burst_2.wav	"HONK! Bringing home the bacon!"
+}
+
+baseattack
+{
+	sound/voices/goose_b/burst_1.wav	"HONK! We're taking enemy fire!"
+	sound/voices/goose_b/burst_2.wav	"HONK! Security breach!"
+	sound/voices/goose_b/burst_1.wav	"HONK! Our base is under attack."
+}
+
+enemyhasflag
+{
+	sound/voices/goose_b/burst_1.wav	"HONK! Our flag is gone!"
+	sound/voices/goose_b/burst_2.wav	"HONK! They've got our flag!"
+	sound/voices/goose_b/burst_1.wav	"HONK! Enemy has taken our flag!"
+}
+
+ongetflag
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! Getting the flag..."
+}
+
+onoffense
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! I'm taking offense"
+	sound/voices/goose_b/soft_2.wav	"HONK! I'm going in..."
+}
+
+ondefense
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! I'll stay home"
+	sound/voices/goose_b/soft_2.wav	"HONK! Securing base."
+	sound/voices/goose_b/soft_1.wav	"HONK! Guarding the base now."
+}
+
+onpatrol
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! On patrol..."
+	sound/voices/goose_b/soft_2.wav	"HONK! Patroling..."
+	sound/voices/goose_b/soft_1.wav	"HONK! I'll take point."
+}
+
+startleader
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! I'm the leader."
+	sound/voices/goose_b/soft_2.wav	"HONK! I'm in charge."
+}
+
+stopleader
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! I don't want to lead"
+	sound/voices/goose_b/soft_2.wav	"HONK! Someone else lead."
+	sound/voices/goose_b/soft_1.wav	"HONK! I resign."
+}
+
+kill_insult
+{
+	sound/voices/goose_b/hiss_1.wav	"HONK! Next time don't get up"
+	sound/voices/goose_b/firm_1.wav	"HONK! You're just a waste of space"
+	sound/voices/goose_b/hiss_2.wav	"HONK! Are you blind?"
+	sound/voices/goose_b/burst_1.wav	"HONK! Duck next time"
+	sound/voices/goose_b/hiss_1.wav	"HONK! Suh-weeet!"
+	sound/voices/goose_b/firm_2.wav	"HONK! YEA!"
+	sound/voices/goose_b/hiss_2.wav	"HONK! You just got schooled!"
+}
+
+taunt
+{
+	sound/voices/goose_b/hiss_1.wav	"HONK! How about some competition here?"
+	sound/voices/goose_b/firm_1.wav	"HONK! FRAGbait!"
+	sound/voices/goose_b/hiss_2.wav	"HONK! My momma shoots better!"
+	sound/voices/goose_b/burst_1.wav	"HONK! Wanna BUY a shot?"
+}
+
+death_insult
+{
+	sound/voices/goose_b/hiss_1.wav	"HONK! Thank you sir.. may I have another!"
+	sound/voices/goose_b/firm_1.wav	"HONK! Bite me!"
+	sound/voices/goose_b/hiss_2.wav	"HONK! Cheap shot!"
+	sound/voices/goose_b/burst_1.wav	"HONK! Nobody does that!"
+	sound/voices/goose_b/hiss_1.wav	"HONK! What the?"
+	sound/voices/goose_b/firm_2.wav	"HONK! DOH"
+}
+
+kill_gauntlet
+{
+	sound/voices/goose_b/hiss_1.wav	"HONK! Eat gauntlet baby!"
+	sound/voices/goose_b/firm_1.wav	"HONK! Chew on This!"
+}
+
+praise
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! What was that?"
+	sound/voices/goose_b/firm_2.wav	"HONK! Where did you learn that?"
+}
+
+camp
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! Camp this position."
+	sound/voices/goose_b/firm_2.wav	"HONK! Camp here."
+}
+
+returnflag
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! Get our flag!"
+	sound/voices/goose_b/firm_2.wav	"HONK! Return our flag!"
+	sound/voices/goose_b/firm_1.wav	"HONK! Recover our flag!"
+}
+
+whoisleader
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! Who's our leader?"
+	sound/voices/goose_b/soft_2.wav	"HONK! Who's in charge?"
+	sound/voices/goose_b/soft_1.wav	"HONK! Who leads this team?"
+}
+
+followflagcarrier
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! Follow our carrier."
+	sound/voices/goose_b/firm_2.wav	"HONK! Stay with the carrier."
+	sound/voices/goose_b/firm_1.wav	"HONK! Protect the carrier."
+	sound/voices/goose_b/firm_2.wav	"HONK! Cover the carrier."
+}
+
+inposition
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! I'm in place."
+	sound/voices/goose_b/soft_2.wav	"HONK! I'm at my post."
+	sound/voices/goose_b/soft_1.wav	"HONK! I am in position."
+}
+
+wantondefense
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! Let me defend."
+	sound/voices/goose_b/soft_2.wav	"HONK! I'd rather defend."
+}
+
+wantonoffense
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! Let me go on offense."
+	sound/voices/goose_b/soft_2.wav	"HONK! I'd rather go on offense."
+}
+
+wantonpatrol
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! Let me patrol."
+	sound/voices/goose_b/soft_2.wav	"HONK! I'd rather patrol."
+}
+
+oncamp
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! I'm camping here."
+}
+
+onfollow
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! I'm following."
+	sound/voices/goose_b/soft_2.wav	"HONK! Following!"
+}
+
+onfollowcarrier
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! Guarding the carrier."
+}
+
+onreturnflag
+{
+	sound/voices/goose_b/soft_1.wav	"HONK! Getting our flag."
+}
+
+harvest
+{
+	sound/voices/goose_b/firm_1.wav	"HONK! Go collect skulls."
+	sound/voices/goose_b/firm_2.wav	"HONK! Harvest some skulls."
+}
