@@ -1677,9 +1677,12 @@ static void UI_DrawClanLogo(rectDef_t *rect, float scale, vec4_t color) {
 
 static void UI_DrawClanCinematic(rectDef_t *rect, float scale, vec4_t color) {
   int i;
+  float side = rect->w < rect->h ? rect->w : rect->h;
+  float x = rect->x + ( rect->w - side ) * 0.5f, y = rect->y + ( rect->h - side ) * 0.5f;
   i = UI_TeamIndexFromName(UI_Cvar_VariableString("ui_teamName"));
   if (i >= 0 && i < uiInfo.teamCount) {
 
+		// the clan videos fill the frame; the clan logos are square
 		if (uiInfo.teamList[i].cinematic >= -2) {
 			if (uiInfo.teamList[i].cinematic == -1) {
 				uiInfo.teamList[i].cinematic = trap_CIN_PlayCinematic(va("%s.roq", uiInfo.teamList[i].imageName), 0, 0, 0, 0, (CIN_loop | CIN_silent) );
@@ -1689,13 +1692,13 @@ static void UI_DrawClanCinematic(rectDef_t *rect, float scale, vec4_t color) {
 				UI_DrawCinematic(uiInfo.teamList[i].cinematic, rect->x, rect->y, rect->w, rect->h);
 			} else {
 			  	trap_R_SetColor( color );
-				UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon_Metal);
+				UI_DrawHandlePic( x, y, side, side, uiInfo.teamList[i].teamIcon_Metal);
 				trap_R_SetColor(NULL);
 				uiInfo.teamList[i].cinematic = -2;
 			}
 		} else {
 	  	trap_R_SetColor( color );
-			UI_DrawHandlePic( rect->x, rect->y, rect->w, rect->h, uiInfo.teamList[i].teamIcon);
+			UI_DrawHandlePic( x, y, side, side, uiInfo.teamList[i].teamIcon);
 			trap_R_SetColor(NULL);
 		}
 	}
