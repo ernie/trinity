@@ -52,6 +52,8 @@ VR DESKTOP MIRROR OPTIONS MENU (PC-only)
 #define ID_DESKTOPMENUSTYLE      154
 #define ID_APPLY                 155
 #define ID_BACK                  156
+#define ID_MIRRORFOV             157
+#define ID_MIRRORSTABILIZE       158
 
 
 typedef struct {
@@ -64,6 +66,8 @@ typedef struct {
 	menulist_s mode;
 	menulist_s resolution;
 	menulist_s contenttype;
+	menulist_s fov;
+	menulist_s stabilize;
 	menulist_s contentfit;
 	menulist_s menustyle;
 
@@ -75,6 +79,19 @@ static vrmirror_t s_vrmirror;
 
 static int s_ivo_desktopmode;
 static int s_ivo_desktopresolution;
+
+static const float s_mirrorFovs[] = { 0, 90, 80, 70, 60, 50 };
+static const float s_mirrorStabilizes[] = { 0, 0.05f, 0.1f, 0.2f };
+
+static int VRMirror_Row( const float *values, int count, float value ) {
+	int i, best = 0;
+
+	for ( i = 1; i < count; i++ ) {
+		if ( fabs( values[i] - value ) < fabs( values[best] - value ) )
+			best = i;
+	}
+	return best;
+}
 
 // Window Resolution rows: the mirror list, then Custom when the saved size is in none of it
 static dmList_t		s_mirrorList;
@@ -126,6 +143,10 @@ static void VRMirror_SetMenuItems( void ) {
 	}
 	s_ivo_desktopmode = s_vrmirror.mode.curvalue;
 	s_vrmirror.contenttype.curvalue = trap_Cvar_VariableValue( "vr_desktopContentType" );
+	s_vrmirror.fov.curvalue = VRMirror_Row( s_mirrorFovs, ARRAY_LEN( s_mirrorFovs ),
+		trap_Cvar_VariableValue( "vr_mirrorFov" ) );
+	s_vrmirror.stabilize.curvalue = VRMirror_Row( s_mirrorStabilizes, ARRAY_LEN( s_mirrorStabilizes ),
+		trap_Cvar_VariableValue( "vr_mirrorStabilize" ) );
 	s_vrmirror.contentfit.curvalue = trap_Cvar_VariableValue( "vr_desktopContentFit" );
 	s_vrmirror.menustyle.curvalue = trap_Cvar_VariableValue( "vr_desktopMenuStyle" );
 }
@@ -137,6 +158,21 @@ static void VRMirror_UpdateMenuItems( void )
 		s_vrmirror.resolution.generic.flags &= ~QMF_GRAYED;
 	else
 		s_vrmirror.resolution.generic.flags |= QMF_GRAYED;
+
+	// both eyes side by side show each whole eye
+	if ( s_vrmirror.contenttype.curvalue == 2 ) {
+		s_vrmirror.fov.generic.flags |= QMF_GRAYED;
+		s_vrmirror.stabilize.generic.flags |= QMF_GRAYED;
+	} else {
+		s_vrmirror.fov.generic.flags &= ~QMF_GRAYED;
+		s_vrmirror.stabilize.generic.flags &= ~QMF_GRAYED;
+	}
+
+	// the fit shapes only a mirror of whole eyes
+	if ( s_vrmirror.contenttype.curvalue == 2 || ( s_vrmirror.fov.curvalue == 0 && s_vrmirror.stabilize.curvalue == 0 ) )
+		s_vrmirror.contentfit.generic.flags &= ~QMF_GRAYED;
+	else
+		s_vrmirror.contentfit.generic.flags |= QMF_GRAYED;
 
 	s_vrmirror.apply.generic.flags |= QMF_HIDDEN|QMF_INACTIVE;
 
@@ -204,6 +240,14 @@ static void VRMirror_MenuEvent( void* ptr, int notification ) {
 			trap_Cvar_SetValue( "vr_desktopContentType", s_vrmirror.contenttype.curvalue );
 			break;
 
+		case ID_MIRRORFOV:
+			trap_Cvar_SetValue( "vr_mirrorFov", s_mirrorFovs[s_vrmirror.fov.curvalue] );
+			break;
+
+		case ID_MIRRORSTABILIZE:
+			trap_Cvar_SetValue( "vr_mirrorStabilize", s_mirrorStabilizes[s_vrmirror.stabilize.curvalue] );
+			break;
+
 		case ID_DESKTOPCONTENTFIT:
 			trap_Cvar_SetValue( "vr_desktopContentFit", s_vrmirror.contentfit.curvalue );
 			break;
@@ -224,6 +268,18 @@ static void VRMirror_MenuEvent( void* ptr, int notification ) {
 	VRMirror_UpdateMenuItems();
 }
 
+static void VRMirror_MenuDraw( void ) {
+	float fov = trap_Cvar_VariableValue( "vr_mirrorFov" );
+	float active = trap_Cvar_VariableValue( "vr_mirrorFovActive" );
+
+	// stabilizing can draw a narrower field of view than the one set, and the row shows what is drawn
+	if ( active > 0 && ( fov <= 0 || active < fov ) )
+		fov = active;
+	s_vrmirror.fov.curvalue = VRMirror_Row( s_mirrorFovs, ARRAY_LEN( s_mirrorFovs ), fov );
+	VRMirror_UpdateMenuItems();
+	Menu_Draw( &s_vrmirror.menu );
+}
+
 static void VRMirror_MenuInit( void ) {
 	int y;
 
@@ -240,6 +296,26 @@ static void VRMirror_MenuInit( void ) {
 		"Left eye",
 		"Right eye",
 		"Both eyes",
+		NULL,
+	};
+
+	static const char *s_mirrorFovNames[] =
+	{
+		"Whole eye",
+		"90 Degrees",
+		"80 Degrees",
+		"70 Degrees",
+		"60 Degrees",
+		"50 Degrees",
+		NULL,
+	};
+
+	static const char *s_mirrorStabilizeNames[] =
+	{
+		"Off",
+		"Light",
+		"Medium",
+		"Strong",
 		NULL,
 	};
 
@@ -264,6 +340,7 @@ static void VRMirror_MenuInit( void ) {
 
 	s_vrmirror.menu.wrapAround = qtrue;
 	s_vrmirror.menu.fullscreen = qtrue;
+	s_vrmirror.menu.draw = VRMirror_MenuDraw;
 
 	s_vrmirror.banner.generic.type  = MTYPE_BTEXT;
 	s_vrmirror.banner.generic.x     = 320;
@@ -288,8 +365,8 @@ static void VRMirror_MenuInit( void ) {
 	s_vrmirror.framer.width         = 256;
 	s_vrmirror.framer.height        = 334;
 
-	// Center the 5-row block (small-font rows) in the frame interior.
-	y = VR_FRAME_CENTER_Y - ( 4 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
+	// Center the 7-row block (small-font rows) in the frame interior.
+	y = VR_FRAME_CENTER_Y - ( 6 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
 	s_vrmirror.mode.generic.type     = MTYPE_SPINCONTROL;
 	s_vrmirror.mode.generic.x        = VR_X_POS;
 	s_vrmirror.mode.generic.y        = y;
@@ -323,6 +400,28 @@ static void VRMirror_MenuInit( void ) {
 	s_vrmirror.contenttype.generic.callback = VRMirror_MenuEvent;
 	s_vrmirror.contenttype.itemnames        = s_desktopContentTypes;
 	s_vrmirror.contenttype.numitems         = 3;
+
+	y += BIGCHAR_HEIGHT+2;
+	s_vrmirror.fov.generic.type             = MTYPE_SPINCONTROL;
+	s_vrmirror.fov.generic.x                = VR_X_POS;
+	s_vrmirror.fov.generic.y                = y;
+	s_vrmirror.fov.generic.flags            = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_vrmirror.fov.generic.name             = "Field of view:";
+	s_vrmirror.fov.generic.id               = ID_MIRRORFOV;
+	s_vrmirror.fov.generic.callback         = VRMirror_MenuEvent;
+	s_vrmirror.fov.itemnames                = s_mirrorFovNames;
+	s_vrmirror.fov.numitems                 = ARRAY_LEN( s_mirrorFovs );
+
+	y += BIGCHAR_HEIGHT+2;
+	s_vrmirror.stabilize.generic.type       = MTYPE_SPINCONTROL;
+	s_vrmirror.stabilize.generic.x          = VR_X_POS;
+	s_vrmirror.stabilize.generic.y          = y;
+	s_vrmirror.stabilize.generic.flags      = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_vrmirror.stabilize.generic.name       = "Stabilization:";
+	s_vrmirror.stabilize.generic.id         = ID_MIRRORSTABILIZE;
+	s_vrmirror.stabilize.generic.callback   = VRMirror_MenuEvent;
+	s_vrmirror.stabilize.itemnames          = s_mirrorStabilizeNames;
+	s_vrmirror.stabilize.numitems           = ARRAY_LEN( s_mirrorStabilizes );
 
 	y += BIGCHAR_HEIGHT+2;
 	s_vrmirror.contentfit.generic.type      = MTYPE_SPINCONTROL;
@@ -375,6 +474,8 @@ static void VRMirror_MenuInit( void ) {
 	Menu_AddItem( &s_vrmirror.menu, &s_vrmirror.mode  );
 	Menu_AddItem( &s_vrmirror.menu, &s_vrmirror.resolution );
 	Menu_AddItem( &s_vrmirror.menu, &s_vrmirror.contenttype );
+	Menu_AddItem( &s_vrmirror.menu, &s_vrmirror.fov );
+	Menu_AddItem( &s_vrmirror.menu, &s_vrmirror.stabilize );
 	Menu_AddItem( &s_vrmirror.menu, &s_vrmirror.contentfit );
 	Menu_AddItem( &s_vrmirror.menu, &s_vrmirror.menustyle );
 

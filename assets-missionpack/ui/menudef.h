@@ -290,6 +290,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define UI_DISPLAYREFRESH 273
 #define UI_CUSTOMSIZE 274
 #define UI_COLORDEPTH 275
+#define UI_VRMIRRORFIT 276
+#define UI_VRMIRRORFOV 277
 
 // Menus shared with hosts lacking sliderValue test this first.
 #define TRINITY_SLIDER_VALUE

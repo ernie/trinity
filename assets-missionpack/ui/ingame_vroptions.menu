@@ -10,6 +10,7 @@ menuDef {
 	outOfBoundsClick			// this closes the window if it gets a click out of the rectangle
 	rect 104 30 430 375
 	focusColor 1 .75 0 1
+	disableColor .5 .5 .5 1
 	style 1
 	border 1
 	onOpen { hide grpVR ; show comfort ; uiScript vrMirrorSetup }
@@ -1108,11 +1109,42 @@ itemDef {
 itemDef {
 	name mirror
 	group grpVR
-	type ITEM_TYPE_MULTI
-	text "Content fit:"
-	cvar "vr_desktopContentFit"
-	cvarFloatList { "Fit / Contain" 0 "Fill / Crop" 1 }
+	type ITEM_TYPE_OWNERDRAW
+	text "Field of view:"
+	ownerdraw UI_VRMIRRORFOV
 	rect 50 104 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	cvarTest "vr_desktopContentType"
+	disableCvar { "2" }
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Stabilization:"
+	cvar "vr_mirrorStabilize"
+	cvarFloatList { "Off" 0 "Light" 0.05 "Medium" 0.1 "Strong" 0.2 }
+	rect 50 122 340 18
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 180
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 0
+	cvarTest "vr_desktopContentType"
+	disableCvar { "2" }
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	ownerdraw UI_VRMIRRORFIT
+	rect 50 140 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -1127,7 +1159,7 @@ itemDef {
 	text "Menu style:"
 	cvar "vr_desktopMenuStyle"
 	cvarFloatList { "Desktop view" 0 "VR view" 1 }
-	rect 50 122 340 18
+	rect 50 158 340 18
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 180
 	textaligny 14
@@ -1143,7 +1175,7 @@ itemDef {
 	textscale .25
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 181 155 100 20
+	rect 181 191 100 20
 	textalign 1
 	textalignx 50
 	textaligny 15

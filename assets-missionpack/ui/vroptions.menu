@@ -10,6 +10,7 @@ menuDef {
 	rect 0 0 640 480
 	background "menuback_a"
 	focusColor 1 .75 0 1
+	disableColor .5 .5 .5 1
 	style 1
 	border 1
 	onOpen { setitemcolor fadebox backcolor 0 0 0 1 ;
@@ -1006,11 +1007,42 @@ itemDef {
 itemDef {
 	name mirror
 	group grpVR
-	type ITEM_TYPE_MULTI
-	text "Content fit:"
-	cvar "vr_desktopContentFit"
-	cvarFloatList { "Fit / Contain" 0 "Fill / Crop" 1 }
+	type ITEM_TYPE_OWNERDRAW
+	text "Field of view:"
+	ownerdraw UI_VRMIRRORFOV
 	rect 301 212 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	cvarTest "vr_desktopContentType"
+	disableCvar { "2" }
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_MULTI
+	text "Stabilization:"
+	cvar "vr_mirrorStabilize"
+	cvarFloatList { "Off" 0 "Light" 0.05 "Medium" 0.1 "Strong" 0.2 }
+	rect 301 234 256 20
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 128
+	textaligny 20
+	textscale .333
+	forecolor 1 1 1 1
+	visible 0
+	cvarTest "vr_desktopContentType"
+	disableCvar { "2" }
+	}
+itemDef {
+	name mirror
+	group grpVR
+	type ITEM_TYPE_OWNERDRAW
+	ownerdraw UI_VRMIRRORFIT
+	rect 301 256 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
 	textaligny 20
@@ -1025,7 +1057,7 @@ itemDef {
 	text "Menu style:"
 	cvar "vr_desktopMenuStyle"
 	cvarFloatList { "Desktop view" 0 "VR view" 1 }
-	rect 301 234 256 20
+	rect 301 278 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
 	textaligny 20
@@ -1041,7 +1073,7 @@ itemDef {
 	textscale .333
 	style WINDOW_STYLE_FILLED
 	background "ui/assets/button_back.tga"
-	rect 377 264 100 24
+	rect 377 308 100 24
 	textalign ITEM_ALIGN_CENTER
 	textalignx 50
 	textaligny 18

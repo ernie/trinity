@@ -802,6 +802,72 @@ static qboolean UI_FoveationStrength_HandleKey(int flags, float *special, int ke
 	return qfalse;
 }
 
+static const char *uiMirrorFovNames[] = { "Whole eye", "90 Degrees", "80 Degrees", "70 Degrees", "60 Degrees", "50 Degrees" };
+static const float uiMirrorFovs[] = { 0, 90, 80, 70, 60, 50 };
+
+#define UI_MIRROR_FOV_ROWS ( (int)ARRAY_LEN( uiMirrorFovs ) )
+
+static int UI_VRMirrorFovShown( void ) {
+	float fov = trap_Cvar_VariableValue( "vr_mirrorFov" );
+	float active = trap_Cvar_VariableValue( "vr_mirrorFovActive" );
+	int i, best = 0;
+
+	if ( active > 0 && ( fov <= 0 || active < fov ) ) {
+		fov = active;
+	}
+	for ( i = 1; i < UI_MIRROR_FOV_ROWS; i++ ) {
+		if ( fabs( uiMirrorFovs[i] - fov ) < fabs( uiMirrorFovs[best] - fov ) ) {
+			best = i;
+		}
+	}
+	return best;
+}
+
+static void UI_DrawVRMirrorFov( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
+	uiInfo.uiDC.drawText( rect->x, rect->y, scale, color, uiMirrorFovNames[UI_VRMirrorFovShown()], 0, 0, textStyle );
+}
+
+static qboolean UI_VRMirrorFov_HandleKey( int key ) {
+	int select = UI_SelectForKey( key );
+	int i;
+
+	if ( select == 0 ) {
+		return qfalse;
+	}
+	i = ( UI_VRMirrorFovShown() + select + UI_MIRROR_FOV_ROWS ) % UI_MIRROR_FOV_ROWS;
+	trap_Cvar_SetValue( "vr_mirrorFov", uiMirrorFovs[i] );
+	return qtrue;
+}
+
+// The fit row paints its own label so it can gray where the fit has no effect.
+static const char *uiMirrorFitNames[] = { "Fit / Contain", "Fill / Crop" };
+static const vec4_t uiMirrorFitGray = { .5f, .5f, .5f, 1 };
+
+static qboolean UI_VRMirrorFitApplies( void ) {
+	return trap_Cvar_VariableValue( "vr_desktopContentType" ) == 2
+		|| ( trap_Cvar_VariableValue( "vr_mirrorFov" ) <= 0 && trap_Cvar_VariableValue( "vr_mirrorStabilize" ) <= 0 );
+}
+
+static void UI_DrawVRMirrorFit( rectDef_t *rect, float scale, vec4_t color, int textStyle ) {
+	const char *label = "Content fit:";
+	float *paint = UI_VRMirrorFitApplies() ? color : (float *)uiMirrorFitGray;
+	int fit = trap_Cvar_VariableValue( "vr_desktopContentFit" ) != 0;
+
+	uiInfo.uiDC.drawText( rect->x - uiInfo.uiDC.textWidth( label, scale, 0 ), rect->y, scale, paint, label, 0, 0,
+		textStyle );
+	uiInfo.uiDC.drawText( rect->x + 8, rect->y, scale, paint, uiMirrorFitNames[fit], 0, 0, textStyle );
+}
+
+static qboolean UI_VRMirrorFit_HandleKey( int key ) {
+	if ( UI_SelectForKey( key ) == 0 ) {
+		return qfalse;
+	}
+	if ( UI_VRMirrorFitApplies() ) {
+		trap_Cvar_SetValue( "vr_desktopContentFit", trap_Cvar_VariableValue( "vr_desktopContentFit" ) == 0 );
+	}
+	return qtrue;
+}
+
 // vr_superSampling as a 1.0..2.0 slider in tenths, with the eye size each step renders at beside it.
 static rectDef_t uiSuperSamplingBar;   // the bar's window from its last paint, so a click can land on it
 static int uiEyeSize[4];               // recommended w h, maximum w h; zeros outside VR
@@ -1064,6 +1130,12 @@ void UI_VR_OwnerDraw( float x, float y, float w, float h, float text_x, float te
 	case UI_VRBIND_STATUS:
 		UI_DrawVRBindStatus( &rect, scale, color, textStyle );
 		break;
+	case UI_VRMIRRORFIT:
+		UI_DrawVRMirrorFit( &rect, scale, color, textStyle );
+		break;
+	case UI_VRMIRRORFOV:
+		UI_DrawVRMirrorFov( &rect, scale, color, textStyle );
+		break;
 	default:
 		break;
 	}
@@ -1081,6 +1153,10 @@ qboolean UI_VR_OwnerDrawHandleKey( int ownerDraw, int flags, float *special, int
 		return UI_SuperSampling_HandleKey( flags, special, key );
 	case UI_VRBIND:
 		return UI_VRBind_HandleKey( special, key );
+	case UI_VRMIRRORFIT:
+		return UI_VRMirrorFit_HandleKey( key );
+	case UI_VRMIRRORFOV:
+		return UI_VRMirrorFov_HandleKey( key );
 	default:
 		break;
 	}
