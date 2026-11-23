@@ -61,6 +61,24 @@ color2		6
 }
 
 {
+name		Gander
+color1		4
+color2		6
+}
+
+{
+name		Gawker
+color1		4
+color2		5
+}
+
+{
+name		Goose
+color1		6
+color2		7
+}
+
+{
 name		Gorre
 color1		4
 color2		6
@@ -70,6 +88,12 @@ color2		6
 name		Grunt
 color1		2
 color2		4
+}
+
+{
+name		Honker
+color1		5
+color2		7
 }
 
 {
