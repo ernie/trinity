@@ -226,6 +226,22 @@ itemDef {
 		visible 1
 	}
 
+	itemDef {
+		name options
+		group grpOptions
+		text "Follow Turn:"
+		type ITEM_TYPE_MULTI
+		cvar "cg_followTurn"
+		cvarFloatList { "Look" 0 "Orbit" 1 }
+		rect 30 325 270 20
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .3
+		forecolor 1 1 1 1
+		visible 1
+	}
+
 // RIGHT COLUMN
 
 	itemDef {
@@ -408,7 +424,7 @@ itemDef {
 		text "Damage Numbers:"
 		type ITEM_TYPE_YESNO
 		cvar "cg_damagePlums"
-		rect 30 325 210 20
+		rect 30 345 210 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -424,7 +440,7 @@ itemDef {
 		type ITEM_TYPE_MULTI
 		cvar "cg_hitSounds"
 		cvarFloatList { "Classic" 0 "Big Hits Low" 1 "Big Hits High" 2 }
-		rect 30 345 270 20
+		rect 30 365 270 20
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -436,7 +452,7 @@ itemDef {
 itemDef {
 		name msg_blooddensity
 		text "Blood density is performance-heavy on standalone headsets"
-		rect 0 375 443 20
+		rect 0 390 443 20
 		textalign ITEM_ALIGN_CENTER
 		textalignx 221
 		textaligny 14

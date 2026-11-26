@@ -8,7 +8,7 @@ menuDef {
 	visible 0
 	fullscreen 0
 	outOfBoundsClick			// this closes the window if it gets a click out of the rectangle
-	rect 232 30 290 397
+	rect 232 30 290 414
 	focusColor 1 .75 0 1
 	style 1
 	border 1
@@ -16,7 +16,7 @@ menuDef {
 
 itemDef {
 	name window
-	rect 10 15 280 382
+	rect 10 15 280 399
 	style 1
 	backcolor 0 .1 0 1
 	visible 1
@@ -84,7 +84,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 0 336 64 64
+	rect 0 353 64 64
 	style 3
 	background "ui/assets/ingameleftcornerb.tga"
 	visible 1
@@ -92,7 +92,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 237 336 64 64
+	rect 237 353 64 64
 	style 3
 	background "ui/assets/ingamerightcornerb.tga"
 	visible 1
@@ -119,7 +119,7 @@ itemDef {
 
 itemDef {
 	name window
-	rect 0 232 16 104
+	rect 0 232 16 121
 	style 3
 	background "ui/assets/ingameleft.tga"
 	visible 1
@@ -145,7 +145,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 285 232 16 104
+	rect 285 232 16 121
 	style 3
 	background "ui/assets/ingameright.tga"
 	visible 1
@@ -154,7 +154,7 @@ itemDef {
 
 itemDef {
 	name window
-	rect 64 392 64 8
+	rect 64 409 64 8
 	style 3
 	background "ui/assets/ingamebottom.tga"
 	visible 1
@@ -162,7 +162,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 128 392 64 8
+	rect 128 409 64 8
 	style 3
 	background "ui/assets/ingamebottom.tga"
 	visible 1
@@ -170,7 +170,7 @@ itemDef {
 	}
 itemDef {
 	name window
-	rect 192 392 64 8
+	rect 192 409 64 8
 	style 3
 	background "ui/assets/ingamebottom.tga"
 	visible 1
@@ -487,11 +487,27 @@ itemDef {
 itemDef {
 	name options
 	group grpOptions
+	text "Follow Turn:"
+	type ITEM_TYPE_MULTI
+	cvar "cg_followTurn"
+	cvarFloatList { "Look" 0 "Orbit" 1 }
+	rect 3 366 275 17
+	textalign ITEM_ALIGN_RIGHT
+	textalignx 146
+	textaligny 14
+	textscale .25
+	forecolor 1 1 1 1
+	visible 1
+	}
+
+itemDef {
+	name options
+	group grpOptions
 	text "TVD Download:"
 	type ITEM_TYPE_MULTI
 	cvar "cl_tvDownload"
 	cvarFloatList { "Off" 0 "Decline" 1 "Accept" 2 }
-	rect 3 366 275 17
+	rect 3 383 275 17
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 14

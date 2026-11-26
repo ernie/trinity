@@ -35,9 +35,9 @@ static vec3_t   vrc_headAnchor;              // head position the camera's horiz
 static int      vrc_deathCamTime = -1;       // cg.time death cam began, -1 inactive
 static int      vrc_followLastClientNum = -1;
 static float    vrc_smoothFollow_distance;
-static float    vrc_smoothFollow_distanceTarget;
+static float    vrc_smoothFollow_reach;
 static float    vrc_smoothFollow_yaw;
-static float    vrc_smoothFollow_pitch;
+static float    vrc_smoothFollow_rise;
 static float    vrc_smoothFollow_hmdYawOffset;
 static qboolean vrc_smoothFollow_initialized;
 static int      vrc_weaponSelectorSelection;
@@ -63,6 +63,7 @@ static vmCvar_t cg_weaponSelectorWeapons;
 static vmCvar_t cg_weaponSelectorGauntlet;
 static vmCvar_t cg_firstPersonBodyScale;
 static vmCvar_t vr_snapturn;
+static vmCvar_t vrc_followTurn;
 
 // Optional host features, routed through one gate each (vr_host_config.h).
 static void VR_HostWarmupEvents( void ) {
@@ -213,6 +214,7 @@ void CG_VR_Init( void ) {
 	trap_Cvar_Register( &cg_weaponSelectorGauntlet, "cg_weaponSelectorGauntlet", "0", CVAR_ARCHIVE );
 	trap_Cvar_Register( &cg_firstPersonBodyScale, "cg_firstPersonBodyScale", "0", CVAR_ARCHIVE );
 	trap_Cvar_Register( &vr_snapturn, "vr_snapturn", "0", 0 );
+	trap_Cvar_Register( &vrc_followTurn, "cg_followTurn", "0", CVAR_ARCHIVE );
 
 	// keep the sentinel referenced so the toolchain retains it in the data segment
 	if ( vr_api_sentinel[0] != 'T' )
@@ -259,6 +261,7 @@ void CG_VR_Frame( void ) {
 	trap_Cvar_Update( &cg_weaponSelectorSimple2DIcons );
 	trap_Cvar_Update( &cg_firstPersonBodyScale );
 	trap_Cvar_Update( &vr_snapturn );
+	trap_Cvar_Update( &vrc_followTurn );
 
 	if ( vrActive && vr->scoreboardCursorActive ) {
 		cgs.cursorX = vr->scoreboardCursorX;
@@ -560,9 +563,9 @@ Initialize or recenter smooth follow camera behind the player
 */
 static void CG_InitSmoothFollow( void ) {
 	vrc_smoothFollow_distance = 200.0f;
-	vrc_smoothFollow_distanceTarget = 200.0f;
+	vrc_smoothFollow_reach = 1.0f;
 	vrc_smoothFollow_yaw = cg.snap->ps.viewangles[YAW] + 180.0f;
-	vrc_smoothFollow_pitch = 0.0f;
+	vrc_smoothFollow_rise = 0.0f;
 	vrc_smoothFollow_hmdYawOffset = vr->hmdorientation[YAW];
 	vrc_smoothFollow_initialized = qtrue;
 	vrc_followLastClientNum = cg.snap->ps.clientNum;
@@ -599,14 +602,13 @@ static void CG_OffsetVRThirdPersonView( void ) {
 		// smooth turning gets the orbit camera; snap turning keeps the teleporting one
 		if ( vr_snapturn.value <= 0.0f )
 		{
-			float yawInput, pitchInput;
+			float yawInput, riseInput;
 			float distanceInput;
+			float turn;
 			int ft;
 			float dt;
-			vec3_t orbitAngles, forward, right, up;
+			vec3_t orbitAngles, forward;
 			vec3_t playerEye;
-			vec3_t camPos;
-			vec3_t lookDir;
 
 			// Handle camera recentering when B button is pressed or followed player changes
 			if (vr->recenter_follow_camera)
@@ -622,7 +624,7 @@ static void CG_OffsetVRThirdPersonView( void ) {
 
 			// Turn stick: camera rotation and height
 			yawInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[VR_STICK_TURN][0];
-			pitchInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[VR_STICK_TURN][1];
+			riseInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[VR_STICK_TURN][1];
 
 			// Move stick: camera distance
 			distanceInput = vr->virtual_screen ? 0.0f : vr->thumbstick_location[VR_STICK_MOVE][1];
@@ -643,68 +645,62 @@ static void CG_OffsetVRThirdPersonView( void ) {
 			}
 			dt = ft / 1000.0f;
 
-			// Yaw: rotate around player (left/right on primary stick)
-			vrc_smoothFollow_yaw += yawInput * 180.0f * dt;
+			// Yaw: rotate around player (left/right on primary stick); Orbit moves the camera the stick's way
+			turn = vrc_followTurn.integer == 1 ? 1.0f : -1.0f;
+			vrc_smoothFollow_yaw += turn * yawInput * 180.0f * dt;
 
-			// Pitch: move up/down on sphere surface (up/down on primary stick)
-			vrc_smoothFollow_pitch += pitchInput * 120.0f * dt;
-			// FIXME: It would be great to allow near-vertical rotation, but
-			// doing so makes it obvious that moving forward/backward with the
-			// HMD isn't getting closer to the player, but moving along the game's
-			// Y axis. Which is kinda nauseating, no matter how good your VR legs are.
-			if (vrc_smoothFollow_pitch > 45.0f) vrc_smoothFollow_pitch = 45.0f;
-			if (vrc_smoothFollow_pitch < 0.0f) vrc_smoothFollow_pitch = 0.0f;
+			// Distance across the floor (up = closer, down = farther)
+			vrc_smoothFollow_distance -= distanceInput * 120.0f * dt;
+			if (vrc_smoothFollow_distance < 40.0f) vrc_smoothFollow_distance = 40.0f;
+			if (vrc_smoothFollow_distance > 512.0f) vrc_smoothFollow_distance = 512.0f;
 
-			// Distance: adjust target (up = closer, down = farther)
-			vrc_smoothFollow_distanceTarget -= distanceInput * 120.0f * dt;
-			if (vrc_smoothFollow_distanceTarget < 40.0f) vrc_smoothFollow_distanceTarget = 40.0f;
-			if (vrc_smoothFollow_distanceTarget > 512.0f) vrc_smoothFollow_distanceTarget = 512.0f;
-
-			// Compute camera direction
-			// Negate pitch because AngleVectors uses forward[2] = -sin(pitch),
-			// but our pitch convention is positive = camera above player
-			VectorSet(orbitAngles, -vrc_smoothFollow_pitch, vrc_smoothFollow_yaw, 0.0f);
-			AngleVectors(orbitAngles, forward, right, up);
+			VectorSet(orbitAngles, 0.0f, vrc_smoothFollow_yaw, 0.0f);
+			AngleVectors(orbitAngles, forward, NULL, NULL);
 
 			VectorCopy(cg.refdef.vieworg, playerEye);
 
-			// Trace at the target distance to find max safe distance
+			// Across the floor from the player's eye, then straight up from there, so the camera
+			// rises in place and the view stays level while the head alone tilts it
 			{
-				vec3_t testPos;
+				vec3_t base, top;
 				trace_t trace;
 				static vec3_t mins = { -4, -4, -4 };
 				static vec3_t maxs = { 4, 4, 4 };
-				float safeDistance;
-				float effectiveTarget;
-				float factor;
+				float factor, rise, highest;
 
-				VectorMA(playerEye, vrc_smoothFollow_distanceTarget, forward, testPos);
-				CG_Trace(&trace, playerEye, mins, maxs, testPos,
+				VectorMA(playerEye, vrc_smoothFollow_distance, forward, base);
+				CG_Trace(&trace, playerEye, mins, maxs, base,
 					cg.predictedPlayerState.clientNum, MASK_SOLID);
 
-				safeDistance = trace.fraction * vrc_smoothFollow_distanceTarget;
-				effectiveTarget = (safeDistance < vrc_smoothFollow_distanceTarget)
-					? safeDistance : vrc_smoothFollow_distanceTarget;
-
-				// Lerp distance - faster when pulling in for walls
-				if (vrc_smoothFollow_distance > effectiveTarget) {
+				if (vrc_smoothFollow_reach > trace.fraction) {
 					factor = 16.0f * dt;  // pull in quickly to avoid clipping
 				} else {
 					factor = 8.0f * dt;   // push out gently
 				}
 				if (factor > 1.0f) factor = 1.0f;
-				vrc_smoothFollow_distance += (effectiveTarget - vrc_smoothFollow_distance) * factor;
+				vrc_smoothFollow_reach += (trace.fraction - vrc_smoothFollow_reach) * factor;
+				VectorMA(playerEye, vrc_smoothFollow_distance * vrc_smoothFollow_reach, forward, base);
+
+				highest = vrc_smoothFollow_distance * tan(DEG2RAD(70.0f));
+				rise = vrc_smoothFollow_rise + riseInput * 240.0f * dt;
+				if (rise > highest) rise = highest;
+				if (rise < 0.0f) rise = 0.0f;
+
+				VectorCopy(base, top);
+				top[2] += rise;
+				CG_Trace(&trace, base, mins, maxs, top,
+					cg.predictedPlayerState.clientNum, MASK_SOLID);
+
+				// raising stops at what's overhead, so lowering answers at once
+				if (rise > vrc_smoothFollow_rise && trace.fraction < 1.0f) {
+					rise = trace.fraction * rise;
+					if (rise < vrc_smoothFollow_rise) rise = vrc_smoothFollow_rise;
+				}
+				vrc_smoothFollow_rise = rise;
+				VectorCopy(trace.endpos, vrc_vieworigin);
 			}
 
-			// Final camera position at the lerped distance
-			VectorMA(playerEye, vrc_smoothFollow_distance, forward, camPos);
-
-			VectorCopy(camPos, vrc_vieworigin);
-
-			// Point camera at player
-			VectorSubtract(playerEye, vrc_vieworigin, lookDir);
-			vectoangles(lookDir, vr->clientviewangles);
-			vr->clientviewangles[YAW] -= vrc_smoothFollow_hmdYawOffset;
+			VectorSet(vr->clientviewangles, 0.0f, vrc_smoothFollow_yaw + 180.0f - vrc_smoothFollow_hmdYawOffset, 0.0f);
 		}
 		else
 		{

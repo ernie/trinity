@@ -44,6 +44,7 @@ All of these settings are available in the options menu.
 - `cg_damageEffect`: Modern red-border damage indication, directionally-weighted (default on; `0` for the classic blood blob)
 - `com_blood`: `0` off, `1` classic blood, `2` modern (default) — animated blood gouts, gib blood spray, dense trails, and richer surface splats color-matched to Q3's dark blood. On Trinity servers, modern blood is aggregated per victim and scaled by damage; on vanilla servers it falls back to per-hit. Set in the Game Options menu.
 - `cg_followMode`: Third-person camera for spectating and demo playback. Mouse orbits around the followed player, forward/back keys zoom in and out. When following, weapon next/prev and zoom keys adjust distance and toggle follow mode, respectively, toggling between first and third-person.
+- `cg_followTurn`: How the third-person camera turns. `0` Look (default): the mouse or turn stick turns your view, as in first person. `1` Orbit: it moves the camera around the player instead. In VR it reverses only left and right; stick up always raises the camera.
 - Playback of TV demos (TrinityVision, of course :wink:). These `.tvd` files are server-side recorded, and work like other MVD systems. Requires the client engine support. Currently, [specific to trinity-engine](https://github.com/ernie/trinity-engine)
 
 You can also set your own bindings. The default ones behave like this, but only in follow mode, so they don't override normal gameplay:

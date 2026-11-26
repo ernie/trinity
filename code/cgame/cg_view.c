@@ -352,6 +352,7 @@ static void CG_UpdateOrbitInput( void ) {
 	int			cmdNum;
 	short		delta;
 	float		zoomSpeed;
+	float		turn;
 
 	cmdNum = trap_GetCurrentCmdNumber();
 	if ( !trap_GetUserCmd( cmdNum, &cmd ) ) {
@@ -369,13 +370,16 @@ static void CG_UpdateOrbitInput( void ) {
 		return;
 	}
 
+	// Look turns the view with the mouse; Orbit moves the camera with it
+	turn = cg_followTurn.integer == 1 ? -1.0f : 1.0f;
+
 	// compute yaw delta
 	delta = (short)( cmd.angles[YAW] - cg.orbitLastCmdAngles[YAW] );
-	cg.orbitAngles[YAW] += SHORT2ANGLE( delta );
+	cg.orbitAngles[YAW] += turn * SHORT2ANGLE( delta );
 
 	// compute pitch delta
 	delta = (short)( cmd.angles[PITCH] - cg.orbitLastCmdAngles[PITCH] );
-	cg.orbitAngles[PITCH] += SHORT2ANGLE( delta );
+	cg.orbitAngles[PITCH] += turn * SHORT2ANGLE( delta );
 
 	// clamp pitch
 	if ( cg.orbitAngles[PITCH] < -60 ) {

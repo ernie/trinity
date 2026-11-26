@@ -49,6 +49,7 @@ GAME OPTIONS MENU
 #define ID_BLOODDENSITY			148
 #define ID_DRAWTIMER			149
 #define ID_HITSOUNDS			150
+#define ID_FOLLOWTURN			151
 
 #define	NUM_CROSSHAIRS			10
 
@@ -78,6 +79,7 @@ typedef struct {
 	menuradiobutton_s	damageplums;
 	menulist_s			hitsounds;
 	menulist_s			followmode;
+	menulist_s			followturn;
 	menuradiobutton_s	allowdownload;
 	menulist_s			tvdownload;
 	menubitmap_s		back;
@@ -135,6 +137,13 @@ static const char *followmode_names[] =
 {
 	"First-person",
 	"Third-person",
+	NULL
+};
+
+static const char *followturn_names[] =
+{
+	"Look",
+	"Orbit",
 	NULL
 };
 
@@ -209,6 +218,7 @@ static void Preferences_SetMenuItems( void ) {
 	s_preferences.damageplums.curvalue		= trap_Cvar_VariableValue( "cg_damagePlums" ) != 0;
 	s_preferences.hitsounds.curvalue		= Com_Clamp( 0, 2, trap_Cvar_VariableValue( "cg_hitSounds" ) );
 	s_preferences.followmode.curvalue		= Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_followMode" ) );
+	s_preferences.followturn.curvalue		= Com_Clamp( 0, 1, trap_Cvar_VariableValue( "cg_followTurn" ) );
 	s_preferences.allowdownload.curvalue	= trap_Cvar_VariableValue( "cl_allowDownload" ) != 0;
 }
 
@@ -311,6 +321,10 @@ static void Preferences_Event( void* ptr, int notification ) {
 
 	case ID_FOLLOWMODE:
 		trap_Cvar_SetValue( "cg_followMode", s_preferences.followmode.curvalue );
+		break;
+
+	case ID_FOLLOWTURN:
+		trap_Cvar_SetValue( "cg_followTurn", s_preferences.followturn.curvalue );
 		break;
 
 	case ID_BACK:
@@ -489,7 +503,7 @@ static void Preferences_MenuInit( void ) {
 	// center the option column on the frame center (y=242): the count runs from
 	// Crosshair through Automatic Downloading, plus the TVD Download row when
 	// cl_tvDownload is set
-	rows = 19;
+	rows = 20;
 	if ( s_preferences.hasTvDownload ) {
 		rows++;
 	}
@@ -678,6 +692,16 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.followmode.itemnames           = followmode_names;
 
 	y += BIGCHAR_HEIGHT;
+	s_preferences.followturn.generic.type        = MTYPE_SPINCONTROL;
+	s_preferences.followturn.generic.name        = "Follow Turn:";
+	s_preferences.followturn.generic.flags       = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_preferences.followturn.generic.callback    = Preferences_Event;
+	s_preferences.followturn.generic.id          = ID_FOLLOWTURN;
+	s_preferences.followturn.generic.x           = PREFERENCES_X_POS;
+	s_preferences.followturn.generic.y           = y;
+	s_preferences.followturn.itemnames           = followturn_names;
+
+	y += BIGCHAR_HEIGHT;
 	s_preferences.allowdownload.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.allowdownload.generic.name	   = "Automatic Downloading:";
 	s_preferences.allowdownload.generic.flags	   = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -730,6 +754,7 @@ static void Preferences_MenuInit( void ) {
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageplums );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.hitsounds );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.followmode );
+	Menu_AddItem( &s_preferences.menu, &s_preferences.followturn );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.allowdownload );
 
 	Preferences_SetMenuItems();
