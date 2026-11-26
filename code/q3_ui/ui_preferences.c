@@ -30,10 +30,8 @@ GAME OPTIONS MENU
 
 #define ID_CROSSHAIR			127
 #define ID_SIMPLEITEMS			128
-#define ID_HIGHQUALITYSKY		129
 #define ID_EJECTINGBRASS		130
 #define ID_WALLMARKS			131
-#define ID_DYNAMICLIGHTS		132
 #define ID_IDENTIFYTARGET		133
 #define ID_DRAWTEAMOVERLAY		136
 #define ID_ALLOWDOWNLOAD		137
@@ -68,9 +66,7 @@ typedef struct {
 	menuradiobutton_s	simpleitems;
 	menuradiobutton_s	brass;
 	menuradiobutton_s	wallmarks;
-	menulist_s			dynamiclights;
 	menuradiobutton_s	identifytarget;
-	menuradiobutton_s	highqualitysky;
 	menulist_s			drawteamoverlay;
 	menuradiobutton_s	drawtimer;
 	menulist_s			damageeffect;
@@ -147,15 +143,6 @@ static const char *followturn_names[] =
 	NULL
 };
 
-static const char *dynamiclights_names[] =
-{
-	"Off",
-	"Low",
-	"Medium",
-	"High",
-	NULL
-};
-
 static const char *tvdownload_names[] =
 {
 	"Off",
@@ -201,14 +188,6 @@ static void Preferences_SetMenuItems( void ) {
 	s_preferences.brass.curvalue			= trap_Cvar_VariableValue( "cg_brassTime" ) != 0;
 	s_preferences.wallmarks.curvalue		= trap_Cvar_VariableValue( "cg_marks" ) != 0;
 	s_preferences.identifytarget.curvalue	= trap_Cvar_VariableValue( "cg_drawCrosshairNames" ) != 0;
-	// r_dynamiclight is the master switch and r_dlightMode picks the quality
-	// behind it, so one row folds both into a single off/low/medium/high step
-	if ( trap_Cvar_VariableValue( "r_dynamiclight" ) == 0 ) {
-		s_preferences.dynamiclights.curvalue	= 0;
-	} else {
-		s_preferences.dynamiclights.curvalue	= Com_Clamp( 1, 3, trap_Cvar_VariableValue( "r_dlightMode" ) + 1 );
-	}
-	s_preferences.highqualitysky.curvalue	= trap_Cvar_VariableValue ( "r_fastsky" ) == 0;
 	s_preferences.drawteamoverlay.curvalue	= Com_Clamp( 0, 3, trap_Cvar_VariableValue( "cg_drawTeamOverlay" ) );
 	s_preferences.drawtimer.curvalue		= trap_Cvar_VariableValue( "cg_drawTimer" ) != 0;
 	s_preferences.damageeffect.curvalue		= trap_Cvar_VariableValue( "cg_damageEffect" ) != 0;
@@ -249,10 +228,6 @@ static void Preferences_Event( void* ptr, int notification ) {
 		trap_Cvar_SetValue( "cg_simpleItems", s_preferences.simpleitems.curvalue );
 		break;
 
-	case ID_HIGHQUALITYSKY:
-		trap_Cvar_SetValue( "r_fastsky", !s_preferences.highqualitysky.curvalue );
-		break;
-
 	case ID_EJECTINGBRASS:
 		if ( s_preferences.brass.curvalue )
 			trap_Cvar_Reset( "cg_brassTime" );
@@ -262,15 +237,6 @@ static void Preferences_Event( void* ptr, int notification ) {
 
 	case ID_WALLMARKS:
 		trap_Cvar_SetValue( "cg_marks", s_preferences.wallmarks.curvalue );
-		break;
-
-	case ID_DYNAMICLIGHTS:
-		trap_Cvar_SetValue( "r_dynamiclight", s_preferences.dynamiclights.curvalue != 0 );
-		// leave the mode alone when switching off so the chosen quality
-		// survives a trip through Off and back
-		if ( s_preferences.dynamiclights.curvalue != 0 ) {
-			trap_Cvar_SetValue( "r_dlightMode", s_preferences.dynamiclights.curvalue - 1 );
-		}
 		break;
 
 	case ID_IDENTIFYTARGET:
@@ -503,7 +469,7 @@ static void Preferences_MenuInit( void ) {
 	// center the option column on the frame center (y=242): the count runs from
 	// Crosshair through Automatic Downloading, plus the TVD Download row when
 	// cl_tvDownload is set
-	rows = 20;
+	rows = 18;
 	if ( s_preferences.hasTvDownload ) {
 		rows++;
 	}
@@ -585,16 +551,6 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.brass.generic.y	              = y;
 
 	y += BIGCHAR_HEIGHT;
-	s_preferences.dynamiclights.generic.type      = MTYPE_SPINCONTROL;
-	s_preferences.dynamiclights.generic.name	  = "Dynamic Lights:";
-	s_preferences.dynamiclights.generic.flags     = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_preferences.dynamiclights.generic.callback  = Preferences_Event;
-	s_preferences.dynamiclights.generic.id        = ID_DYNAMICLIGHTS;
-	s_preferences.dynamiclights.generic.x	      = PREFERENCES_X_POS;
-	s_preferences.dynamiclights.generic.y	      = y;
-	s_preferences.dynamiclights.itemnames         = dynamiclights_names;
-
-	y += BIGCHAR_HEIGHT;
 	s_preferences.identifytarget.generic.type     = MTYPE_RADIOBUTTON;
 	s_preferences.identifytarget.generic.name	  = "Identify Target:";
 	s_preferences.identifytarget.generic.flags    = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
@@ -602,15 +558,6 @@ static void Preferences_MenuInit( void ) {
 	s_preferences.identifytarget.generic.id       = ID_IDENTIFYTARGET;
 	s_preferences.identifytarget.generic.x	      = PREFERENCES_X_POS;
 	s_preferences.identifytarget.generic.y	      = y;
-
-	y += BIGCHAR_HEIGHT;
-	s_preferences.highqualitysky.generic.type     = MTYPE_RADIOBUTTON;
-	s_preferences.highqualitysky.generic.name	  = "High Quality Sky:";
-	s_preferences.highqualitysky.generic.flags	  = QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_preferences.highqualitysky.generic.callback = Preferences_Event;
-	s_preferences.highqualitysky.generic.id       = ID_HIGHQUALITYSKY;
-	s_preferences.highqualitysky.generic.x	      = PREFERENCES_X_POS;
-	s_preferences.highqualitysky.generic.y	      = y;
 
 	y += BIGCHAR_HEIGHT;
 	s_preferences.drawteamoverlay.generic.type     = MTYPE_SPINCONTROL;
@@ -743,9 +690,7 @@ static void Preferences_MenuInit( void ) {
 	Menu_AddItem( &s_preferences.menu, &s_preferences.simpleitems );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.wallmarks );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.brass );
-	Menu_AddItem( &s_preferences.menu, &s_preferences.dynamiclights );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.identifytarget );
-	Menu_AddItem( &s_preferences.menu, &s_preferences.highqualitysky );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.drawteamoverlay );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.drawtimer );
 	Menu_AddItem( &s_preferences.menu, &s_preferences.damageeffect );

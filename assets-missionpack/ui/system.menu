@@ -83,14 +83,42 @@ itemDef {
     	}
 
 
+itemDef {
+	name graphics
+	group grpSystem
+	rect 2 4 439 341
+	style WINDOW_STYLE_FILLED
+	border 1
+	bordercolor .5 .5 .5 .5
+	forecolor 1 1 1 1
+	backcolor 0 0 0 .25
+	visible 0
+	decoration
+}
+
+itemDef {
+	name graphics
+	group grpSystem
+	style 1
+	text "Graphics"
+	rect 163 8 128 20
+	textalign ITEM_ALIGN_CENTER
+	textalignx 64
+	textaligny 20
+	textscale .333
+	forecolor .4 .4 .65 1
+	visible 0
+	decoration
+}
+
 	itemDef {
-    	name graphics				
+    	name graphics
 		group grpSystem
 		text "Quality:"
    		type ITEM_TYPE_MULTI	
 		cvar "ui_glCustom"
 		cvarFloatList { "High Quality" 0 "Normal" 1 "Fast" 2 "Fastest" 3 "Custom" 4 }
-		rect 99 43 256 20
+		rect 99 33 256 18
    		textalign ITEM_ALIGN_RIGHT
    		textalignx 128 
    		textaligny 20
@@ -107,7 +135,7 @@ itemDef {
 		text "MSAA:"
 		cvar "r_ext_multisample"
 		cvarFloatList { "Off" 0 "2x" 2 "4x" 4 "8x" 8 }
-		rect 99 63 256 20
+		rect 99 51 256 18
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -125,7 +153,7 @@ itemDef {
 		text "Lighting:"
 		cvar "r_vertexlight"
 		cvarFloatList { "Light Map (high)" 0 "Vertex (low)" 1  }
-		rect 99 83 256 20
+		rect 99 69 256 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -142,7 +170,7 @@ itemDef {
 		text "Shadows:"
 		cvar "cg_shadows"
 		cvarFloatList { "None" 0 "Low" 1 "High" 4 "None" 0 "Low" 1 "High" 2 "None" 0 "Low" 1 "High" 3 "None" 0 "High" 4 }
-		rect 99 103 256 20
+		rect 99 87 256 18
 		textalign ITEM_ALIGN_RIGHT
 		textalignx 128
 		textaligny 20
@@ -158,7 +186,7 @@ itemDef {
 		text "Model Detail:"
 		cvar "r_lodbias"
 		cvarFloatList { "Very Low" 2 "Low" 1 "Medium" 0 "High" -1 "Very High" -2 }
-		rect 99 123 256 20
+		rect 99 105 256 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -175,7 +203,7 @@ itemDef {
 		text "Curve Detail:"
 		cvar "r_subdivisions"
 		cvarFloatList { "Very Low" 20 "Low" 12 "Medium" 4 "High" 2 "Very High" 1 }
-		rect 99 143 256 20
+		rect 99 123 256 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -192,7 +220,7 @@ itemDef {
 		text "Texture Detail:"
 		cvar "r_picmip"
 		cvarFloatList { "Low" 2 "Normal" 1 "High" 0 }
-		rect 99 163 256 20
+		rect 99 141 256 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -209,7 +237,7 @@ itemDef {
 		text "Texture Quality:"
 		cvar "r_texturebits"
 		cvarFloatList { "Default" 0 "16 bit" 16 "32 bit" 32 }
-		rect 99 183 256 20
+		rect 99 159 256 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -225,7 +253,7 @@ itemDef {
 		text "Texture Filter:"
 		cvar "r_texturemode"
 		cvarStrList { "Bilinear", "GL_LINEAR_MIPMAP_NEAREST", "Trilinear", "GL_LINEAR_MIPMAP_LINEAR"  }
-		rect 99 203 353 20
+		rect 99 177 353 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -241,7 +269,7 @@ itemDef {
       		type ITEM_TYPE_YESNO
 		text "Compress Textures:"
 		cvar "r_ext_compressed_textures"
-		rect 76 223 279 20
+		rect 76 195 279 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 151
       		textaligny 20
@@ -252,11 +280,41 @@ itemDef {
 		}
 
 	itemDef {
+		name graphics
+		group grpSystem
+		text "Dynamic Lights:"
+		ownerdraw UI_DYNAMICLIGHTS
+		rect 99 213 256 18
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .333
+		forecolor 1 1 1 1
+		visible 0
+	}
+
+	itemDef {
+		name graphics
+		group grpSystem
+		type ITEM_TYPE_MULTI
+		text "High Quality Sky:"
+		cvar "r_fastsky"
+		cvarFloatList { "Yes" 0 "No" 1 }
+		rect 99 231 256 18
+		textalign ITEM_ALIGN_RIGHT
+		textalignx 128
+		textaligny 20
+		textscale .333
+		forecolor 1 1 1 1
+		visible 0
+	}
+
+	itemDef {
    		name graphics
 		group grpSystem
 		text "Resolution:"
 		ownerdraw UI_RESOLUTION
-		rect 99 243 302 20
+		rect 99 249 302 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -273,7 +331,7 @@ itemDef {
 		group grpSystem
 		text "Custom Size:"
 		ownerdraw UI_CUSTOMSIZE
-		rect 99 263 256 20
+		rect 99 267 256 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -290,7 +348,7 @@ itemDef {
 		group grpSystem
 		text "Color Depth:"
 		ownerdraw UI_COLORDEPTH
-		rect 99 283 256 20
+		rect 99 285 256 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -309,7 +367,7 @@ itemDef {
 		text "Window Mode:"
 		cvar "r_fullscreen"
 		cvarFloatList { "Windowed" 0 "Borderless" 2 "Fullscreen" 1 }
-		rect 99 303 256 20
+		rect 99 303 256 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20
@@ -326,7 +384,7 @@ itemDef {
 		group grpSystem
 		text "Refresh Rate:"
 		ownerdraw UI_DISPLAYREFRESH
-		rect 99 323 256 20
+		rect 99 321 256 18
       		textalign ITEM_ALIGN_RIGHT
       		textalignx 128
       		textaligny 20

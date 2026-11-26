@@ -232,6 +232,8 @@ GRAPHICS OPTIONS MENU
 #define ID_MSAA			115
 #define ID_REFRESH		116
 #define ID_CUSTOMSIZE	117
+#define ID_DYNAMICLIGHTS	118
+#define ID_HIGHQUALITYSKY	119
 
 #define NUM_SHADOWS 3
 #define NUM_MSAA		4
@@ -262,6 +264,8 @@ typedef struct {
 	menutext_s		driverinfo;
 
 	menulist_s		shadows;
+	menulist_s		dynamiclights;
+	menuradiobutton_s highqualitysky;
 	menulist_s		msaa;
 	menulist_s		refresh;
 	menuaction_s	customsize;
@@ -548,8 +552,8 @@ static void GraphicsOptions_UpdateMenuItems( void )
 	}
 
 	// Apply lights on any pending change to a row that needs the restart;
-	// the instant row (shadows) writes its live cvar
-	// and never lights it, while MSAA writes its latched cvar immediately
+	// the instant rows (shadows, dynamic lights, sky) write their live cvars
+	// and never light it, while MSAA writes its latched cvar immediately
 	// and still lights it for the restart
 	s_graphicsoptions.apply.generic.flags |= QMF_HIDDEN|QMF_INACTIVE;
 
@@ -775,6 +779,19 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 		}
 		break;
 
+	case ID_DYNAMICLIGHTS:
+		trap_Cvar_SetValue( "r_dynamiclight", s_graphicsoptions.dynamiclights.curvalue != 0 );
+		// leave the mode alone when switching off so the chosen quality
+		// survives a trip through Off and back
+		if ( s_graphicsoptions.dynamiclights.curvalue != 0 ) {
+			trap_Cvar_SetValue( "r_dlightMode", s_graphicsoptions.dynamiclights.curvalue - 1 );
+		}
+		break;
+
+	case ID_HIGHQUALITYSKY:
+		trap_Cvar_SetValue( "r_fastsky", !s_graphicsoptions.highqualitysky.curvalue );
+		break;
+
 	case ID_MSAA: {
 			int msaa;
 			switch (s_graphicsoptions.msaa.curvalue) {
@@ -964,6 +981,15 @@ static void GraphicsOptions_SetMenuItems( void )
 			break;
 	}
 
+	// r_dynamiclight is the master switch and r_dlightMode picks the quality
+	// behind it, so one row folds both into a single off/low/medium/high step
+	if ( trap_Cvar_VariableValue( "r_dynamiclight" ) == 0 ) {
+		s_graphicsoptions.dynamiclights.curvalue = 0;
+	} else {
+		s_graphicsoptions.dynamiclights.curvalue = Com_Clamp( 1, 3, trap_Cvar_VariableValue( "r_dlightMode" ) + 1 );
+	}
+	s_graphicsoptions.highqualitysky.curvalue = trap_Cvar_VariableValue( "r_fastsky" ) == 0;
+
 	// the r_mode-class rows are hidden under VR
 	if ( graphicsOptions_vr ) {
 		return;
@@ -1077,6 +1103,15 @@ void GraphicsOptions_MenuInit( void )
 		NULL
 	};
 
+	static const char *dynamiclights_names[] =
+	{
+		"Off",
+		"Low",
+		"Medium",
+		"High",
+		NULL
+	};
+
 	static const char *s_msaa[] =
 	{
 		"Off",
@@ -1168,12 +1203,12 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.network.color				= color_red;
 
 	if( graphicsOptions_vr ) {
-		// 10 settings rows + Driver Info link = 11 slots centered on the frame
-		y = 242 - ( 11 * (BIGCHAR_HEIGHT + 2) ) / 2;
+		// 12 settings rows + Driver Info link = 13 slots centered on the frame
+		y = 242 - ( 13 * (BIGCHAR_HEIGHT + 2) ) / 2;
 	}
 	else {
-		// 15 settings rows + Driver Info link = 16 slots centered on the frame
-		y = 242 - ( 16 * (BIGCHAR_HEIGHT + 2) ) / 2;
+		// 17 settings rows + Driver Info link = 18 slots centered on the frame
+		y = 242 - ( 18 * (BIGCHAR_HEIGHT + 2) ) / 2;
 	}
 
 	s_graphicsoptions.list.generic.type     = MTYPE_SPINCONTROL;
@@ -1337,6 +1372,27 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.compressed.generic.y		= y;
 	y += BIGCHAR_HEIGHT+2;
 
+	// references/modifies "r_dynamiclight" and "r_dlightMode"
+	s_graphicsoptions.dynamiclights.generic.type		= MTYPE_SPINCONTROL;
+	s_graphicsoptions.dynamiclights.generic.name		= "Dynamic Lights:";
+	s_graphicsoptions.dynamiclights.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_graphicsoptions.dynamiclights.generic.x			= 400;
+	s_graphicsoptions.dynamiclights.generic.y			= y;
+	s_graphicsoptions.dynamiclights.itemnames			= dynamiclights_names;
+	s_graphicsoptions.dynamiclights.generic.callback	= GraphicsOptions_Event;
+	s_graphicsoptions.dynamiclights.generic.id			= ID_DYNAMICLIGHTS;
+	y += BIGCHAR_HEIGHT+2;
+
+	// references/modifies "r_fastsky"
+	s_graphicsoptions.highqualitysky.generic.type		= MTYPE_RADIOBUTTON;
+	s_graphicsoptions.highqualitysky.generic.name		= "High Quality Sky:";
+	s_graphicsoptions.highqualitysky.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
+	s_graphicsoptions.highqualitysky.generic.x			= 400;
+	s_graphicsoptions.highqualitysky.generic.y			= y;
+	s_graphicsoptions.highqualitysky.generic.callback	= GraphicsOptions_Event;
+	s_graphicsoptions.highqualitysky.generic.id			= ID_HIGHQUALITYSKY;
+	y += BIGCHAR_HEIGHT+2;
+
 	s_graphicsoptions.driverinfo.generic.type     = MTYPE_PTEXT;
 	s_graphicsoptions.driverinfo.generic.flags    = QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_graphicsoptions.driverinfo.generic.callback = GraphicsOptions_Event;
@@ -1395,6 +1451,8 @@ void GraphicsOptions_MenuInit( void )
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.texturebits );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.filter );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.compressed );
+	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.dynamiclights );
+	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.highqualitysky );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.driverinfo );
 
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.back );
