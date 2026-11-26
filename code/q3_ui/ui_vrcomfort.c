@@ -43,7 +43,6 @@ VR COMFORT OPTIONS MENU
 #define VR_FRAME_CENTER_Y	242
 
 #define ID_COMFORTVIGNETTE		127
-#define ID_HEIGHTADJUST			128
 #define ID_SIXDOF				129
 #define ID_ROLLHIT				130
 #define ID_PHYSICALCROUCH		131
@@ -61,7 +60,6 @@ typedef struct {
 	menubitmap_s		framer;
 
 	menuslider_s		comfortvignette;
-	menuslider_s		heightadjust;
 	menuradiobutton_s	physicalcrouch;
 	menuradiobutton_s	sixdof;
 	menuradiobutton_s	rollhit;
@@ -84,7 +82,6 @@ static void VRComfort_PhysicalCrouchStatusBar( void *self ) {
 
 static void VRComfort_SetMenuItems( void ) {
 	s_vrcomfort.comfortvignette.curvalue	= trap_Cvar_VariableValue( "vr_comfortVignette" );
-	s_vrcomfort.heightadjust.curvalue		= trap_Cvar_VariableValue( "vr_heightAdjust" );
 	s_vrcomfort.physicalcrouch.curvalue		= trap_Cvar_VariableValue( "vr_physicalCrouch" ) != 0;
 	s_vrcomfort.sixdof.curvalue				= trap_Cvar_VariableValue( "vr_6dof" ) != 0;
 	s_vrcomfort.rollhit.curvalue			= trap_Cvar_VariableValue( "vr_rollWhenHit" ) != 0;
@@ -101,10 +98,6 @@ static void VRComfort_MenuEvent( void* ptr, int notification ) {
 	switch( ((menucommon_s*)ptr)->id ) {
 		case ID_COMFORTVIGNETTE:
 			trap_Cvar_SetValue( "vr_comfortVignette", s_vrcomfort.comfortvignette.curvalue );
-			break;
-
-		case ID_HEIGHTADJUST:
-			trap_Cvar_SetValue( "vr_heightAdjust", s_vrcomfort.heightadjust.curvalue );
 			break;
 
 		case ID_PHYSICALCROUCH:
@@ -166,8 +159,8 @@ static void VRComfort_MenuInit( void ) {
 	s_vrcomfort.framer.width			= 256;
 	s_vrcomfort.framer.height			= 334;
 
-	// Center the 7-row block (small-font rows) in the frame interior.
-	y = VR_FRAME_CENTER_Y - ( 6 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
+	// Center the 6-row block (small-font rows) in the frame interior.
+	y = VR_FRAME_CENTER_Y - ( 5 * (BIGCHAR_HEIGHT+2) + SMALLCHAR_HEIGHT ) / 2;
 	s_vrcomfort.comfortvignette.generic.type		= MTYPE_SLIDER;
 	s_vrcomfort.comfortvignette.generic.x			= VR_X_POS;
 	s_vrcomfort.comfortvignette.generic.y			= y;
@@ -179,20 +172,6 @@ static void VRComfort_MenuInit( void ) {
 	s_vrcomfort.comfortvignette.maxvalue			= 1.0f;
 #ifdef UI_SLIDER_VALUE
 	Slider_ShowValue( &s_vrcomfort.comfortvignette, SLIDER_VALUE_PERCENT, 0.01f, 1, 0 );
-#endif
-
-	y += BIGCHAR_HEIGHT+2;
-	s_vrcomfort.heightadjust.generic.type		= MTYPE_SLIDER;
-	s_vrcomfort.heightadjust.generic.x			= VR_X_POS;
-	s_vrcomfort.heightadjust.generic.y			= y;
-	s_vrcomfort.heightadjust.generic.flags		= QMF_PULSEIFFOCUS|QMF_SMALLFONT;
-	s_vrcomfort.heightadjust.generic.name		= "Height Adjust:";
-	s_vrcomfort.heightadjust.generic.id			= ID_HEIGHTADJUST;
-	s_vrcomfort.heightadjust.generic.callback	= VRComfort_MenuEvent;
-	s_vrcomfort.heightadjust.minvalue			= 0.0f;
-	s_vrcomfort.heightadjust.maxvalue			= 1.0f;
-#ifdef UI_SLIDER_VALUE
-	Slider_ShowValue( &s_vrcomfort.heightadjust, SLIDER_VALUE_PERCENT, 0.01f, 1, 0 );
 #endif
 
 	y += BIGCHAR_HEIGHT+2;
@@ -263,7 +242,6 @@ static void VRComfort_MenuInit( void ) {
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.framer );
 
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.comfortvignette );
-	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.heightadjust );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.physicalcrouch );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.sixdof );
 	Menu_AddItem( &s_vrcomfort.menu, &s_vrcomfort.rollhit );

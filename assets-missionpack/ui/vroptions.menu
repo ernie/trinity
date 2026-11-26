@@ -201,24 +201,7 @@ itemDef {
 #ifdef TRINITY_SLIDER_VALUE
 	sliderValue SLIDER_VALUE_PERCENT 0.01
 #endif
-	rect 301 139 256 20
-	textalign ITEM_ALIGN_RIGHT
-	textalignx 128
-	textaligny 20
-	textscale .333
-	forecolor 1 1 1 1
-	visible 0
-	}
-itemDef {
-	name comfort
-	group grpVR
-	type ITEM_TYPE_SLIDER
-	text "Height Adjust:"
-	cvarfloat "vr_heightAdjust" 0.2 0 1
-#ifdef TRINITY_SLIDER_VALUE
-	sliderValue SLIDER_VALUE_PERCENT 0.01
-#endif
-	rect 301 161 256 20
+	rect 301 150 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
 	textaligny 20
@@ -232,7 +215,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Physical Crouch:"
 	cvar "vr_physicalCrouch"
-	rect 293 183 264 20
+	rect 293 172 264 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 136
 	textaligny 20
@@ -248,7 +231,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "SP 6DoF Movement:"
 	cvar "vr_6dof"
-	rect 283 205 274 20
+	rect 283 194 274 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 146
 	textaligny 20
@@ -264,7 +247,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "Roll When Hit:"
 	cvar "vr_rollWhenHit"
-	rect 301 227 256 20
+	rect 301 216 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
 	textaligny 20
@@ -281,7 +264,7 @@ itemDef {
 #ifdef TRINITY_SLIDER_VALUE
 	sliderValue SLIDER_VALUE_PERCENT 0.01
 #endif
-	rect 301 249 256 20
+	rect 301 238 256 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 128
 	textaligny 20
@@ -295,7 +278,7 @@ itemDef {
 	type ITEM_TYPE_YESNO
 	text "bHaptics Support:"
 	cvar "vr_bhaptics"
-	rect 293 271 264 20
+	rect 293 260 264 20
 	textalign ITEM_ALIGN_RIGHT
 	textalignx 136
 	textaligny 20
