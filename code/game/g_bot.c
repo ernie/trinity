@@ -731,10 +731,10 @@ static int G_ClanMemberIndex( int clanIdx, const char *name ) {
 ===============
 G_RotateClanBots
 
-Same-map cycles go through map_restart, which keeps bots: swap the
-outgoing clan's bots for the incoming roster so rotation turns the
-roster over, not just the team name. Queued ahead of ExitLevel's map
-command, so the kicks and adds land before the restart.
+Bots survive the map change: swap the team's bots for the incoming
+roster so rotation turns the roster over, not just the team name.
+Queued ahead of ExitLevel's map command, so the kicks and adds land
+before the new level.
 ===============
 */
 static void G_RotateClanBots( team_t team, int oldIdx, int newIdx ) {
@@ -765,10 +765,6 @@ static void G_RotateClanBots( team_t team, int oldIdx, int newIdx ) {
 		if ( G_ClanMemberIndex( newIdx, clean ) >= 0 ) {
 			continue;
 		}
-		// wildcards stay; only the old roster and stray base characters go
-		if ( G_ClanMemberIndex( oldIdx, clean ) < 0 && !G_IsClanBaseCharacter( clean ) ) {
-			continue;
-		}
 
 		replacement = NULL;
 		for ( m = 0; m < MAX_CLAN_MEMBERS; m++ ) {
@@ -777,6 +773,10 @@ static void G_RotateClanBots( team_t team, int oldIdx, int newIdx ) {
 				replacement = alias;
 				break;
 			}
+		}
+		// roster exhausted: only the old roster and stray base characters go
+		if ( !replacement && G_ClanMemberIndex( oldIdx, clean ) < 0 && !G_IsClanBaseCharacter( clean ) ) {
+			continue;
 		}
 
 		trap_GetUserinfo( i, userinfo, sizeof( userinfo ) );
@@ -1665,6 +1665,7 @@ static void G_LoadBots( void ) {
 	} else {
 		G_LoadBotsFromFile( "scripts/bots.txt" );
 	}
+	G_LoadBotsFromFile( "scripts/bots_trinity.txt" );
 
 	// get all bots from .bot files (unless g_skipBotFiles is set)
 	if ( !skipBotFiles.integer ) {

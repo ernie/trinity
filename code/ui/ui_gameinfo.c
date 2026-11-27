@@ -243,6 +243,7 @@ void UI_LoadBots( void ) {
 	else {
 		UI_LoadBotsFromFile("scripts/bots.txt");
 	}
+	UI_LoadBotsFromFile("scripts/bots_trinity.txt");
 
 	// get all bots from .bot files
 	numdirs = trap_FS_GetFileList("scripts", ".bot", dirlist, 1024 );
